@@ -1,0 +1,14 @@
+Description=Logkeys based keylogger service to provide wavelet with input sense
+After=network.target syslog.target
+StartLimitIntervalSec=5
+
+[Service]
+Type=simple
+Restart=Always
+RestartSec=1
+WorkingDirectory=/usr/local/bin
+ExecStart=logkeys -u -s -o /var/tmp/keylogger.log 
+TimeoutStopSec=3
+
+[Install]
+WantedBy=multi-user.target

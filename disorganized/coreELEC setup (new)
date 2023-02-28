@@ -1,0 +1,25 @@
+coreELEC setup
+
+needs right DTB.img for the board in question, booting is as simple as preconfiguring SD card, wriing the correct DTB and then booting with a blunt cocktail stick on the button.
+
+Create a mountpoint and RAMdrive;
+sudo mkdir -p /media/ramdisk
+sudo mount -t tmpfs -o size=256M tmpfs /media/ramdisk
+
+If we need more than 256m for the ramdisk we're in trouble as this board only has 1gb.  Oops.
+
+ffmpeg command to output video stream to RAMdrive;
+ffmpeg -i srt://192.168.1.32:6001 latency-5 -use_timeline 1 -use_template 1 -remove_at_exit 1 -window_size 5 -extra_window_size 5 -f dash -streaming 1 /media/ramdisk/output.mpd
+24
+
+
+COREELEC installed
+ssh into machine
+copy repository .zip files for slideshow and autoplay
+install and enable in Kodi
+create .strm files for the slideshow applet to run
+reboot and test
+
+done.
+
+1234123412341234

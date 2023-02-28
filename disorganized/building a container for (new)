@@ -1,0 +1,24 @@
+building a container for idiots
+
+podman search (target Osname for image)
+
+
+so what feels right;
+
+
+podman pull registry.fedoraproject.org/fedora-minimal
+
+podman run registry.fedoraproject.org/fedora-minimal
+
+
+podman images displays installed images
+
+create instruction script
+
+cd working dir
+
+podman build . 
+
+to invoke buildah
+
+sudo dnf install pipewire-jack-audio-connection-kit-devel.x86_64

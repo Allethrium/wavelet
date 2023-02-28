@@ -1,0 +1,50 @@
+#May need some udev rule to make sure it always maps to the right input device
+#!/bin/bash
+
+# Define event paramaters
+event="1:2:3:4:5:6:7:8:9:"
+
+# this reads in the log from the keylogger service, and tails only the last input byte
+# it parses this event into a menu system and autolaunches scripts to perform tasks on the server and encoder/decoders
+# properly configured user + ssh keypair sign in is required, SSH is communications channel
+# polkit and systemd units must be preconfigured on encoders/decoders
+# dependency software must be installed properly and on the correct versions on all application targets
+
+
+main() {
+tailfrominput &
+read -n 1 -p "Waiting for Event:"
+while getopts ${event} arg; do
+        case ${arg} in
+        1) ./wavelet_kill_all.sh && ./wavelet_blankscreen.sh && echo "Option One, Blank activated" ;;
+        # display black screen
+        2) ./wavelet_kill_all.sh && ./wavelet_seal.sh && echo "Option Two, Seal activated" ;;
+        # TBD - just display a static image (dickbutt.jpg)
+        3) ./wavelet_kill_all.sh && ./wavelet_witness.sh && echo "Option Three, Witness activated";;
+        # feed from Webcam
+        4) ./wavelet_kill_all.sh && ./wavelet_evidence.sh && echo "Option Four, Document Camera activated";;
+        # document camera basically
+        5) ./wavelet_kill_all.sh && ./wavelet_evidence_pip.sh && echo "Option Five, Doc with Witness PIP activated";;
+        # display picture-in picture combo of Evidence, Witness in smaller frame
+        6) ./wavelet_kill_all.sh && ./wavelet_hybrid.sh && echo "Option Six, Hybrid Mode activated";;
+        # Switch to a screen capture pulling a Teams meeting window
+        7) ./wavelet_record.sh ;;
+        # does not kill any streams, instead copies stream and appends to a labeled MKV file
+        esac
+        done
+}
+
+
+tailfrominput() {
+	file=/home/labuser/Downloads/logkeys/test.log
+	#tail -F -c 1 $file | while read LINE ;do
+	#watch -n 1 -t -e tail -c1 /home/labuser/Downloads/logkeys/test.log & while read LINE; do
+	inotifywait -mq -e modify $file |
+	while read events; do
+	echo "Event discovered.."
+	LINE=$(tail -c 1 $file )
+	echo ${LINE}
+done
+}
+
+main 

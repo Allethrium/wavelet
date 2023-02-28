@@ -1,0 +1,1000 @@
+  103  sudo vim /etc/nginx/nginx.conf
+  104  sudo vim /etc/nginx/conf.d/default.conf 
+  105  cd /etc/nginx/
+  106  ls -l
+  107  cd conf.d/
+  108  ld
+  109  ls -l
+  110  cd ..
+  111  vim nginx.conf
+  112  sudo vim nginx.conf
+  113  nginx -t
+  114  sudo nginx -t
+  115  nginx -t
+  116  sudo vim nginx.conf
+  117  sudo nginx -t
+  118  sudo vim nginx.conf
+  119  sudo nginx -t
+  120  sudo vim nginx.conf
+  121  sudo nginx -t
+  122  sudo vim nginx.conf
+  123  sudo vim /etc/systemd/system/nginx.service
+  124  sudo systemctl daemon-reload
+  125  sudo systemctl start nginx
+  126  cat /var/log/nginx/
+  127  cat /var/log/nginx/error.log
+  128  sudo cat /var/log/nginx/error.log
+  129  cd /tmp
+  130  ls -l
+  131  cd /var/tmp/
+  132  ls -l
+  133  sudo vim /etc/systemd/system/nginx.service
+  134  sudo vim /etc/nginx/nginx.conf
+  135  sudo nginx -t
+  136  sudo mkdir /run/nginx
+  137  cd /run
+  138  sudo chown -R nginx:root nginx
+  139  sudo nginx -t
+  140  sudo vim /etc/systemd/system/nginx.service
+  141  sudo systemctl daemon-reload
+  142  sudo systemctl restart nginx
+  143  sudo journalctl -xe
+  144  sudo ausearch -c '(nginx)' --raw | audit2allow -M my-nginx
+  145  ausearch -c '(nginx)' --raw | audit2allow -M my-nginx
+  146  sudo ausearch -c '(nginx)' --raw | audit2allow -M my-nginx
+  147  cd /home
+  148  (nginx)' --raw | audit2allow -M my-nginx
+  149  sudo ausearch -c '(nginx)' --raw | audit2allow -M my-nginx
+  150  sudo su
+  151  sudo vim /etc/nginx/nginx.conf
+  152  cd /var/tmp/
+  153  ls -l
+  154  cd /usr/share/nginx/html/
+  155  ls -l
+  156  cd ..
+  157  ls
+  158  cd ..
+  159  ls
+  160  cd /tmp
+  161  ls -l
+  162  cd /var/tmp
+  163  ls -l
+  164  cd /run
+  165  ls -l
+  166  cd nginx/
+  167  ls -l
+  168  cd /
+  169  cd /var/tmp/
+  170  ls -l
+  171  sudo vim /etc/nginx/nginx.conf
+  172  sudo systemctl restart nginx
+  173  sudo ausearch -c 'systemd' --raw | audit2allow -M my-systemd
+  174  sudo semodule -i my-systemd.pp
+  175  ls -l
+  176  sudo systemctl restart nginx
+  177  ls -l
+  178  sudo vim /etc/nginx/nginx.conf
+  179  sudo systemctl restart nginx
+  180  sudo vim /etc/nginx/nginx.conf
+  181  ffplay 224.0.0.20
+  182  ffplay udp://224.0.0.20
+  183  clear
+  184  uv -t 224.0.020 --rtsp-server
+  185  uv -t 224.0.0.20 --rtsp-server
+  186  uv -t help 224.0.0.20 --rtsp-server
+  187  uv -t ug_input 224.0.0.20 --rtsp-server
+  188  uv -t ug_input 224.0.0.20 --video-protocol
+  189  uv -t ug_input 224.0.0.20 -protocol help
+  190  uv -t help
+  191  uv -t aggregate
+  192  uv -t aggregate:help
+  193  uv -t rtsp:help
+  194  uv -t rtsp:224.0.0.20
+  195  uv -t 192.168.1.32 -d gl
+  196  uv -d gl
+  197  ffplay 192.168.1.32
+  198  ffplay 192.168.1.32:5004
+  199  ffplay udp://192.168.1.32:5004
+  200  ffplay rtp://192.168.1.32:5004
+  201  ffplay rtsp://192.168.1.32:5004
+  202  ffplay rtmp://192.168.1.32:5004
+  203  ffplay udp://192.168.1.32:5004
+  204  ffplay rtsp://192.168.1.17
+  205  ffplay rtsp://192.168.1.17:8554/ultragrid
+  206  vlc
+  207  cat /etc/nginx/nginx.conf
+  208  ffmpeg -protocol_whitelist tcp,udp,http,rtp,file -probesize 60 -i rtsp://192.168.1.17:8554/ultragrid 
+  209  uv -t rtsp://192.168.1.17
+  210  uv rtsp://192.168.1.17
+  211  uv rtsp://192.168.1.17:8554:/ultragrid
+  212  vlc rtsp://192.168.1.17:8554:/ultragrid
+  213  sudo dnf install live555
+  214  vlc rtsp://192.168.1.17:8554:/ultragrid
+  215  cd /home/labuser/
+  216  ls -l
+  217  cd Downloads/
+  218  ls -l
+  219  cd srt-1.5.1/
+  220  ls -l
+  221  cat README.md 
+  222  cd ..
+  223  ls -l
+  224  ls /etc/systemd/system/
+  225  cat /etc/systemd/system/srt-server
+  226  cat /etc/systemd/system/srt-server1.service 
+  227  cd /usr/local/bin/
+  228  ./srt-server --help
+  229  sudo dnf update
+  230  sudo dnf update --exclude=firefox
+  231  cd /home/labuser
+  232  ls -l
+  233  cd Downloads/
+  234  ls -l
+  235  ./UltraGrid-1.7.7 -d gl
+  236  ./UltraGrid-1.7.7-x86_64.AppImage -d gl
+  237  sudo systemctl enable tuned --now
+  238  ls -l
+  239  ssh rppt@192.168.1.10
+  240  ssh roott@192.168.1.10
+  241  ssh root@192.168.1.10
+  242  ssh labuser@192.168.1.10
+  243  sudo dnf update
+  244  ls -l
+  245  cd ..
+  246  ls -l
+  247  cd Downloads/
+  248  ls -l
+  249  cat run_ffmpeg.sh 
+  250  ls -l
+  251  cd ..
+  252  ls -l
+  253  cd Desktop/
+  254  ls
+  255  cd ..
+  256  cd Documents/
+  257  ls
+  258  cd ..
+  259  cd ow
+  260  cd Downloads/
+  261  ls -l
+  262  uv -d gl
+  263  uv --record help
+  264  uv --record:help
+  265  hd-rum-transcode help
+  266  hd-rum-transcode --control-port 8888 ---verbose 
+  267  hd-rum-transcode --control-port 8888 --verbose 
+  268  hd-rum-transcode 8M 5004 192.168.1.10 --control-port 8888 --verbose 
+  269  hd-rum-transcode 8M 5004 192.168.1.10 --verbose 
+  270  hd-rum-transcode 8M 5004 192.168.1.10
+  271  hd-rum-transcode 8M 5004 192.168.1.10 192.168.1.25
+  272  hd-rum-transcode 16M 5004 -P 5005 192.168.1.10 -P 5006 192.168.1.25
+  273  hd-rum-transcode 16M 5004 -P 5006 192.168.1.10 -P 5008 192.168.1.25
+  274  hd-rum-transcode 16M 5004 -P 6004 192.168.1.10 -P 6004 192.168.1.25
+  275  hd-rum-transcode 8M 5004 -P 5006 192.168.1.10 -P 5006 192.168.1.25
+  276  hd-rum-transcode 8M -P 5006 192.168.1.10 -P 5006 192.168.1.25
+  277  hd-rum-transcode 8M 5004 192.168.1.10 192.168.1.25
+  278  hd-rum-transcode 8M 5004 -P 6004 192.168.1.10 -P 6004 192.168.1.25
+  279  hd-rum-transcode --help
+  280  hd-rum-transcode --verbose 8M 5004 -P 6004 192.168.1.10 -P 6004 192.168.1.25
+  281  sudo sysctl -w net.core.rmem_max=9123840
+  282  hd-rum-transcode --verbose 8M 5004 -P 6004 192.168.1.10 -P 6004 192.168.1.25
+  283  hd-rum-transcode --verbose 8M 6004 -P 5004 192.168.1.10 -P 5004 192.168.1.25
+  284  hd-rum-transcode --verbose 8M 5004 -P 6004 192.168.1.10 -P 6004 192.168.1.25
+  285  hd-rum-transcode --verbose 8M 6004 -P 5004 192.168.1.10 -P 5004 192.168.1.25
+  286  hd-rum-transcode --verbose 16M 6004 -P 5004 192.168.1.10 -P 5004 192.168.1.25
+  287  hd-rum-transcode --verbose 16M 6004 -P 5004 192.168.1.10 -P 5006 192.168.1.25
+  288  hd-rum-transcode --verbose 16M 6004 -P 5004 192.168.1.10
+  289  hd-rum-transcode --verbose 8M 6004 -P 5004 192.168.1.10
+  290  ls -l
+  291  cd UltraGrid-1.7.7/
+  292  ls-l
+  293  ls -l
+  294  cd bin
+  295  ls
+  296  cd ..
+  297  cd hd-rum-multi/
+  298  ls -l
+  299  make
+  300  ls -l
+  301  ./hd-rum 8M 6004 192.168.1.10
+  302  ./hd-rum 8M 6004 192.168.1.10 192.168.1.25
+  303  ./hd-rum help
+  304  ./hd-rum 8M 6004 -P 5004 192.168.1.10 -P 5004 192.168.1.25
+  305  ./hd-rum 8M 6004 -P 5004 192.168.1.10
+  306  ./hd-rum 8M 6004 192.168.1.10
+  307  ./hd-rum 8M 5004 192.168.1.10
+  308  ./hd-rum 8M 192.168.1.10
+  309  ./hd-rum 8M 5004 192.168.1.10
+  310  sudo nice -n 25 ./hd-rum 8M 5004 192.168.1.10
+  311  cat /etc/nginx/nginx.conf
+  312  sudo systemctl disable nginx --now
+  313  sudo systemctl enable srt-server.service --now
+  314  uv -d gl:spout=fromUV=hide:window
+  315  cd ..
+  316  ls -l
+  317  cd ..
+  318  ls -l
+  319  ./UltraGrid-1.7.7 -d gl:spout=fromUV=hide:window
+  320  ./UltraGrid-1.7.7-x86_64.AppImage -d gl:spout=fromUV=hide:window
+  321  ls -l
+  322  cd UltraGrid-1.7.7/
+  323  ls -l
+  324  ./autogen.sh 
+  325  ./hd-rum 8M 5004 192.168.1.10 192.168.1.25
+  326  ls -l
+  327  cd hd-rum-multi/
+  328  ls -l
+  329  ./hd-rum 8M 5004 192.168.1.10 192.168.1.25
+  330  ./hd-rum 32M 5004 192.168.1.10 192.168.1.25
+  331  ./hd-rum 32M 5004 192.168.1.10 192.168.1.25 192.168.1.7
+  332  sudo nice -n 99 ./hd-rum 32M 5004 192.168.1.10 192.168.1.25 192.168.1.7
+  333  sudo nice -n -99 ./hd-rum 32M 5004 192.168.1.10 192.168.1.25 192.168.1.7
+  334  sudo nice -n -99 ./hd-rum 32M 5004 192.168.1.10 192.168.1.25 192.168.1.7 192.168.1.21
+  335  sudo nmcli con modify LabWiFi mtu 9000
+  336  sudo nmcli con modify Wired\ connection\ 1 mtu 9000
+  337  sudo nice -n -99 ./hd-rum 32M 5004 192.168.1.10 192.168.1.25 192.168.1.7 192.168.1.21
+  338  history
+  339  ssh labuser@192.168.1.21
+  340  ls -l
+  341  cd ..
+  342  ls -l
+  343  ssh labuser@192.168.1.21
+  344  ssh labuser@192.168.1.10
+  345  ssh khadas@192.168.1.25
+  346  ssh labuser@192.168.1.7
+  347  ping odroidm1-1
+  348  vim /etc/dhcp/
+  349  cd /etc/sysconfig/
+  350  ls -l
+  351  cd network-scripts/
+  352  ls
+  353  cat readme-ifcfg-rh.txt 
+  354  cd /etc/NetworkManager/
+  355  ls -l
+  356  cd ..
+  357  cd systemd/network/
+  358  ls -l
+  359  cd ..
+  360  cd system
+  361  ls -
+  362  ls -l
+  363  cd /etc
+  364  sudo vim /etc/dhcp/dhcpd.conf
+  365  sudo systemctl restart dhcpd
+  366  ping vim3
+  367  ssh labuser@192.168.1.7
+  368  ssh khadas@192.168.1.25
+  369  ping vim3.wavelet.local.rm357m.
+  370  ssh khadas@192.168.1.25
+  371  ping vim3
+  372  cd /home/labuser/
+  373  ls -l
+  374  cd DOw
+  375  cd Downloads/
+  376  ls -l
+  377  fr ..
+  378  le -l
+  379  cd /run/media/labuser/
+  380  ls-l
+  381  ls -l
+  382  ssh labuser@laptop
+  383  ssh labuser@192.168.1.7
+  384  history
+  385  exit
+  386  ssh labuser@192.168.1.17
+  387  ping encoder
+  388  ping encoder.wavelet.rm357m.local.ucs.courtnet.org
+  389  sudo dnf update
+  390  ls -l
+  391  scp teams-1.5.00.23861-1.x86_64.rpm labuser@encoder
+  392  scp teams-1.5.00.23861-1.x86_64.rpm labuser@encoder:/home/labuser/Downloads
+  393  ping encoder
+  394  scp teams-1.5.00.23861-1.x86_64.rpm labuser@192.168.1.17:/home/labuser/Downloads
+  395  gwet https://github.com/CESNET/UltraGrid/releases/download/v1.8/UltraGrid-1.8-x86_64.AppImage
+  396  wget https://github.com/CESNET/UltraGrid/releases/download/v1.8/UltraGrid-1.8-x86_64.AppImage
+  397  scp UltraGrid-1.8-x86_64.AppImage labuser@192.168.1.17:/home/labuser/Downloads
+  398  scp UltraGrid-1.8-x86_64.AppImage labuser@192.168.1.10:/home/labuser/Downloads
+  399  scp UltraGrid-1.8-x86_64.AppImage khadas@192.168.1.25:/home/labuser/Downloads
+  400  scp UltraGrid-1.8-x86_64.AppImage khadas@192.168.1.25:/home/khadas/Downloads
+  401  sudo shutdown -r now
+  402  scp UltraGrid-1.8-x86_64.AppImage khadas@192.168.1.7:/home/labuser/Downloads
+  403  scp UltraGrid-1.8-x86_64.AppImage labuser@192.168.1.7:/home/labuser/Downloads
+  404  history
+  405  exit
+  406  history
+  407  ffmpeg -threads 1 -init_hw_device vaapi=igpu:/dev/dri/renderD128 -f v4l2 -input_format mjpeg -video_size 1280x720 -i /dev/video0 -fflags nobuffer -vf 'format=nv12,hwupload' -c:v hevc_vaapi -b:v 15M -profile 2 -f mpegts srt://192.168.1.32:6000
+  408  v4l2-ctl 
+  409  v4l2-ctl  --all
+  410  sudo v4l2-ctl  --all
+  411  dmesg
+  412  journalctl -f
+  413  sudo shutdown -r now
+  414  xprop _NET_WM_PID
+  415  cd ..
+  416  exit
+  417  cd /run/media/labuser/60A7-7954/
+  418  ls -l
+  419  vim wavelet_seal.img 
+  420  mv wavelet_seal.img wavelet_seal.sh
+  421  vim wavelet_seal.sh 
+  422  chmod +x *.sh
+  423  ls -l
+  424  ./wavelet_seal.sh
+  425  sudo ./wavelet_seal.sh
+  426  ls -l
+  427  cp *.sh /home/labuser/Downloads/
+  428  cd /home/labuser/Downloads/
+  429  ls -l
+  430  chmod +X wavelet_seal.sh 
+  431  ls -l
+  432  ./wavelet_seal.sh
+  433  ./wavelet_seal.sh
+  434  cd /etc/polkit-1/
+  435  ls -l
+  436  cd rules.d/
+  437  ls -l
+  438  cd rules.d/
+  439  sudo cd rules.d/
+  440  sudo su
+  441  showkey
+  442  aaaaaaa
+  443  ls -l
+  444  exit
+  445  exit
+  446  test
+  447  testtest
+  448  test
+  449  cd ..
+  450  ls -l
+  451  ls-l
+  452  ls -l
+  453  adadad
+  454  ls -l
+  455  exit
+  456  testing this keylogger
+  457  ls -l
+  458  cd ..
+  459  ls -l
+  460  cd debug/
+  461  ls -l
+  462  sudo dnf install chkrootkit
+  463  sudo dnf install rkhunter
+  464  ls -l
+  465  cd examples/
+  466  ls -l
+  467  d ..
+  468  cd ..
+  469  cd build/
+  470  ls -l
+  471  cd ..
+  472  ls -l
+  473  cd ..
+  474  ls -l
+  475  cd ..
+  476  ls -l
+  477  cd ..
+  478  ls -l
+  479  cd ..
+  480  ls -l
+  481  cd /
+  482  ls -l
+  483  cd /home/labuser/
+  484  ls -l
+  485  cd /home
+  486  ls -l
+  487  cd labuser/
+  488  ls -l
+  489  cd Downloads/
+  490  ls -l
+  491  ls *.log
+  492  ls -l
+  493  ls-l
+  494  ls -l
+  495  cd /var/tmp
+  496  ls -l
+  497  cd /home/labuser/Downloads/rs-keylog/
+  498  ls -l
+  499  cd target/
+  500  ls -l
+  501  cd debug/
+  502  ls -l
+  503  tail -f log.txt 
+  504  ls -l
+  505  cd ..
+  506  ls -l
+  507  cd Keylogger/
+  508  ls -l
+  509  cd ..
+  510  rm -rf Keylogger/
+  511  rm -rf rs-keylog/
+  512  git clone https://github.com/NovusEdge/keylogger
+  513  cd keylogger/
+  514  ls -l
+  515  cargo build
+  516  ls -l
+  517  cd target/
+  518  ls -l
+  519  cd debug/
+  520  ls -l
+  521  ./keylogger -h
+  522  ./keylogger -p /home/labuser/Downloads/keylog.log
+  523  sudo ./keylogger -p /home/labuser/Downloads/keylog.log
+  524  cargo run -- --path /home/labuser/Downloads/log.log
+  525  cargo run
+  526  sudo cargo run
+  527  cargo run
+  528  ls -l
+  529  cd ..
+  530  ls -l
+  531  rm -rf keylogger/
+  532  rm -rf rusty-keys-main
+  533  ls -l
+  534  git clone [200~https://github.com/kernc/logkeys~
+  535  git clone [200~https://github.com/kernc/l
+  536  git clone https://github.com/kernc/logkeys
+  537  ls -l
+  538  cd logkeys/
+  539  ls -l
+  540  sudo dnf install automake make gcc-c++ kbd
+  541  ./autogen.sh 
+  542  cd build/
+  543  ../configure 
+  544  make
+  545  ls -l
+  546  make install
+  547  sudo make install
+  548  locale
+  549  cd /home/labuser/Downloads/
+  550  ls -l
+  551  ./wavelet_seal.sh 
+  552  vim wavelet_seal.sh 
+  553  ./wavelet_seal.sh 
+  554  cat wavelet_seal.sh 
+  555  /home/labuser/Downloads/UltraGrid-1.8-x86_64.AppImage -t file:help
+  556  vim wavelet_seal.sh 
+  557  ./wavelet_seal.sh 
+  558  ls -l
+  559  vim wavelet_controller.sh 
+  560  cat wavelet_kill_all.sh 
+  561  cat wavelet_controller.sh 
+  562  vim wavelet_evidence.sh
+  563  ls -l
+  564  sudo cp UltraGrid-1.8-x86_64.AppImage /usr/bin/
+  565  ./wavelet_controller.sh 
+  566  vim wavelet_controller.sh 
+  567  sudo dnf install evtest
+  568  ./wavelet_controller.sh 
+  569  sudo ./wavelet_controller.sh 
+  570  clear
+  571  ls -
+  572  ls -l
+  573  cat wavelet_controller.sh 
+  574  dmesg
+  575  wvim wavelet_controller.sh 
+  576  vim wavelet_controller.sh 
+  577  wavelet_controller.sh 
+  578  sudo ./wavelet_controller.sh 
+  579  ls -l
+  580  sudo ./wavelet_controller.sh 
+  581  evtest
+  582  sudo evtest
+  583  sudo ./wavelet_controller.sh 
+  584  sudo vim wavelet_controller.sh 
+  585  ./wavelet_
+  586  ./wavelet_controller.sh 
+  587  sudo vim wavelet_controller.sh 
+  588  ./wavelet_controller.sh 
+  589  ls -l
+  590  vim wavelet_controller.sh 
+  591  wavelet_controller.sh 
+  592  ./wavelet_controller.sh 
+  593  vim wavelet_hosts
+  594  ./wavelet_controller.sh 
+  595  cat wavelet_controller.sh 
+  596  ./wavelet_controller.sh 
+  597  vim ./wavelet_controller.sh 
+  598  ./wavelet_controller.sh 
+  599  vim wavelet_seal.sh 
+  600  ./wavelet_controller.sh 
+  601  sudo systemctl daemon-reload
+  602  vim wavelet_kill_all.sh 
+  603  ssh-copy-id labuser@192.168.1.10
+  604  ssh-copy-id labuser@192.168.1.25
+  605  ssh labuser@192.168.1.25
+  606  ls -l
+  607  cat wavelet_controller.sh 
+  608  vim wavelet_evidence.sh 
+  609  vim wavelet_evidence
+  610  ./wavelet_controller.sh 
+  611  chmod +x wavelet_evidence
+  612  chmod +x wavelet_evidence.sh 
+  613  chmod -x wavelet_evidence
+  614  ls -l
+  615  ./wavelet_controller.sh 
+  616  cat wavelet_evidence
+  617  cat wavelet_evidence.sh 
+  618  ./wavelet_controller.sh 
+  619  history | grep pol
+  620  ./wavelet_controller.sh 
+  621  ls -l
+  622  cat wavelet_evidence.sh 
+  623  vim wavelet_evidence.sh 
+  624  ./wavelet_controller.sh 
+  625  ls -l
+  626  ./wavelet_controller.sh
+  627  ls -l
+  628  vim wavelet_kill_all.sh 
+  629  cp wavelet_evidence wavelet_encoders
+  630  ./wavelet_controller.sh 
+  631  ./wavelet_kill_all.sh 
+  632  cat wavelet_evidence
+  633  cat wavelet_e.s
+  634  cat wavelet_evidence.sh 
+  635  vim wavelet_kill_all.sh
+  636  ./wavelet_kill_all.sh
+  637  cat wavelet_seal.sh 
+  638  systemctl start ultragrid-seal.service
+  639  top
+  640  /home/labuser/Downloads/UltraGrid-1.8-x86_64.AppImage -t file:/home/labuser/Downloads/dickbutt.jpg:loop -c libavcodec:encoder=hevc_vaapi:gop=2:bitrate=7M -P 5004 192.168.1.32
+  641  sudo vim /etc/systemd/system/ultragrid-seal.service
+  642  /usr/bin/UltraGrid-1.8-x86_64.AppImage -t file:/home/labuser/Downloads/dickbutt.jpg:loop -c libavcodec:encoder=hevc_vaapi:gop=2:bitrate=7M -P 5004 192.168.1.32
+  643  sudo vim /etc/systemd/system/ultragrid-seal.service
+  644  sudo systemctl daemon-reload
+  645  systemctl start ultragrid-seal.service
+  646  systemctl status ultragrid-seal.service
+  647  systemctl stop ultragrid-seal.service 
+  648  ls -l
+  649  ./wavelet_controller.sh 
+  650  vim wavelet_controller.sh 
+  651  sudo dnf install inotifywait
+  652  sudo dnf install inotifywait*
+  653  sudo dnf install inotify
+  654  sudo dnf install inotify*
+  655  man inotify
+  656  vim wavelet_controller.sh 
+  657  ./wave
+  658  ./wavelet_controller.sh 
+  659  ls -l
+  660  vim wavelet_kill_all.sh 
+  661  im wavelet_encoders 
+  662  ./wavelet_kill_all.sh 
+  663  vim wavelet_kill_all.sh 
+  664  systemctl stop ultragrid-*.service
+  665  ./wavelet_controller.sh
+  666  sudo systemctl start sshd
+  667  ./wavelet_controller.sh
+  668  history | grep copy
+  669  ssh-copy-id -i ~/.ssh/id_ed25519.pub labuser@192.168.1.32
+  670  ./wavelet_controller.sh 
+  671  zenity -h
+  672  man zenity
+  673  ./wavelet_controller.sh 
+  674   ps ax | grep teams
+  675  sudo kill -9 9375
+  676  sudo kill -9 9279
+  677  sudo kill -9 9011
+  678   ps ax | grep teams
+  679  showkey 
+  680  showkey --scancodes
+  681  evtest
+  682  sudo evtest
+  683  dmesg
+  684  xev | awk -F'[ )]+' '/^KeyPress/ { a[NR+2] } NR in a { printf "%-3s %s\n", $5, $8 }'
+  685  sudo dnf install xev
+  686  xev | awk -F'[ )]+' '/^KeyPress/ { a[NR+2] } NR in a { printf "%-3s %s\n", $5, $8 }'
+  687  ./wavelet_controller.sh 
+  688  ls -l
+  689  vim wavelet_hybrid.sh 
+  690  cat wavelet_encoders 
+  691  vim wavelet_hybrid
+  692  vim wavelet_hybrid.sh 
+  693  cat wavelet_controller.sh 
+  694  ./wavelet_controller.sh 
+  695  ls -l
+  696  vim wavelet_hybrid.sh 
+  697  ./wavelet_controller.sh 
+  698  vim wavelet_controller.sh 
+  699  ./wavelet_controller.sh 
+  700  cat wavelet_controller.sh 
+  701  vim wavelet_controller.sh 
+  702  cat wavelet_kill_all.sh 
+  703  cat wavelet_encoders 
+  704  ssh labuser@192.168.1.17
+  705  ./wavelet_controller.sh 
+  706  ls -l
+  707  vim wavelet_controller.sh 
+  708  ./wavelet_controller.sh 
+  709  vim wavelet_controller.sh 
+  710  ./wavelet_controller.sh 
+  711  vim wavelet_controller.sh 
+  712  ./wavelet_
+  713  ./wavelet_controller.sh 
+  714  vim wavelet_controller.sh 
+  715  ./wavelet_controller.sh 
+  716  vim wavelet_controller.sh 
+  717  ./wavelet_controller.sh 
+  718  vim wavelet_controller.sh 
+  719  ps ax | grep tail
+  720  sudo kill -9 642889
+  721  ps ax | grep tail
+  722  ls -l
+  723  vim wavelet_controller.sh 
+  724  ./wavelet_
+  725  ./wavelet_controller.sh 
+  726  cd ..
+  727  ls -l
+  728  git clone https://github.com/GiacomoLaw/Keylogger
+  729  cd ke
+  730  ls -l
+  731  cd Keylogger/
+  732  ls -l
+  733  cd linux/
+  734  cd ..
+  735  rm -rf mac
+  736  rm -rf windows/
+  737  ls -l
+  738  cd li
+  739  cd linux/
+  740  ls -l
+  741  vi keylogger.py 
+  742  pip3 install -r requirements.txt 
+  743  ls -l
+  744  sudo cp keylogger.py /usr/bin/
+  745  cd /etc/systemd/system
+  746  ls -l
+  747  cp ultragrid-screencapture.service wavelet-keylogger.service
+  748  sudo cp ultragrid-screencapture.service wavelet-keylogger.service
+  749  sudo vim wavelet-keylogger.service 
+  750  sudo systemctl daemon-reload
+  751  sudo systemctl start wavelet-keylogger.service 
+  752  systemctl status wavelet-keylogger.service 
+  753  sudo vim wavelet-keylogger.service 
+  754  systemctl status wavelet-keylogger.service 
+  755  sudo systemctl daemon-reload
+  756  sudo systemctl start wavelet-keylogger.service 
+  757  systemctl status wavelet-keylogger.service 
+  758  sudo vim wavelet-keylogger.service 
+  759  sudo systemctl daemon-reload
+  760  sudo systemctl start wavelet-keylogger.service 
+  761  systemctl status wavelet-keylogger.service 
+  762  sudo vim wavelet-keylogger.service 
+  763  sudo mv /usr/bin/keylogger.py /usr/local/bin/
+  764  sudo systemctl daemon-reload
+  765  sudo systemctl start wavelet-keylogger.service 
+  766  systemctl status wavelet-keylogger.service 
+  767  cd /home/labuser/Downloads/
+  768  ls -l
+  769  git clone https://github.com/gsingh93/keylogger
+  770  cd keylogger/
+  771  ls -l
+  772  cd src/
+  773  ls -l
+  774  vim input.rs 
+  775  ls -l
+  776  vim main.rs 
+  777  sudo dnf install rustup
+  778  sudo dnf install rust
+  779  ls -l
+  780  cd ...
+  781  ls -l
+  782   cd ..
+  783  ls -l
+  784  cargo bild --release
+  785  sudo dnf install cargo
+  786  cargo build --release
+  787  cd ..
+  788  rm -rf keylogger/
+  789  git clone https://github.com/hulto/rusty-keys/tree/main/keylogger
+  790  git clone https://github.com/hulto/rusty-keys
+  791  ls -l
+  792  cd rusty-keys/
+  793  l -l
+  794  ls -l
+  795  rm rusty-keys-demo.mov 
+  796  cd keylogger/
+  797  ls -l
+  798  cargo build 
+  799  ls -l
+  800  cd target/
+  801  ls -l
+  802  cd ..
+  803  ls -l
+  804  cd keylogger/
+  805  ls -l
+  806  cd target/
+  807  ls -l
+  808  cd de
+  809  cd debug/
+  810  ls -l
+  811  ./keylogger 
+  812  ./keylogger --logfile ./test_keylogger
+  813  ./keylogger --logfile ./test_keylogger --timeout 5
+  814  sudo ./keylogger --logfile ./test_keylogger --timeout 5
+  815  ls -l
+  816  sudo ./keylogger --logfile ./test_keylogger --timeout 5
+  817  sudo ./keylogger --logfile /home/labuser/Downloads/test_keylogger.log --timeout 2
+  818  sudo ./keylogger --logfile /home/labuser/Downloads/test_keylogger.log --timeout 1
+  819  ls -l
+  820  cd ..
+  821  ls -l
+  822  cd ..
+  823  ls -l
+  824  cd src
+  825  ls -l
+  826  cat main.rs 
+  827  cd ..
+  828  ls -l
+  829  cargo build -e "\n\n\n"
+  830  cargo build && echo -e "\n\n\n"
+  831  cd target/
+  832  cd debug/
+  833  ls -l
+  834  ./keylogger 
+  835  ./keylogger  --logfile /var/tmp/keylog.txt
+  836  ./keylogger  --logfile /var/tmp/keylog.txt --timeout 1
+  837  sudo ./keylogger  --logfile /var/tmp/keylog.txt --timeout 1
+  838  sudo RUST_BACKTACE=1 ./keylogger  --logfile /var/tmp/keylog.txt --timeout 1
+  839  cd ..
+  840  ls -l
+  841  cd ..
+  842  ls -l
+  843  cd ..
+  844  ls -l
+  845  rm -rf rusty-keys
+  846  git clone https://github.com/Tandolf/rs-keylog
+  847  cd rs-keylog/
+  848  ls -l
+  849  cargo build
+  850  ls -l
+  851  cd target/
+  852  ls -l
+  853  cd debug/
+  854  ls -l
+  855  ./rs-keylog 
+  856  sudo ./rs-keylog 
+  857  ls -l
+  858  cd ..
+  859  ls -l
+  860  cd /tmp
+  861  ls -l
+  862  tail -f keylog.log
+  863  ls -l
+  864  cd /home/labuser/Downloads/
+  865  ls -l
+  866  cd logkeys/
+  867  ls -l
+  868  touch test.log
+  869  ls -l
+  870  logkeys --start --output test.log
+  871  sudo logkeys --start --output test.log
+  872  tail --f test.log 
+  873  tail --f test.log --help
+  874  sudo logkeys --start --output test.log -u
+  875  logkeys --kill
+  876  sudo logkeys --kill
+  877  sudo logkeys --start --output test.log -u
+  878  tail -f test.log 
+  879  sudo logkeys --start --output test.log -u
+  880  ls -l
+  881  tail -f test.log 
+  882  ls -l
+  883  vi wavelet.controller.new.sh 
+  884  ./wavelet.controller.new.sh 
+  885  vi wavelet.controller.new.sh 
+  886  ./wavelet.controller.new.sh 
+  887  ls -l
+  888  vim wavelet.controller.new.sh 
+  889  ./wavelet.controller.new.sh 
+  890  vim wavelet.controller.new.sh 
+  891  ./wavelet.controller.new.sh 
+  892  vim wavelet.controller.new.sh 
+  893  ./wavelet.controller.new.sh 
+  894  sudo ./wavelet.controller.new.sh 
+  895  cd /log
+  896  cd /logk
+  897  ls -l
+  898  cd logkeys/
+  899  ls -l
+  900  cat test.log 
+  901  clear
+  902  cat test.log 
+  903  clear
+  904  ls -l
+  905  cd ..
+  906  ls -l
+  907  watch
+  908  watch -n 1 -t ./Dowloads/logkeys/test.log
+  909  watch -n 1 -t ./Downloads/logkeys/test.log
+  910  watch -n 1 -t /home/labuser/Downloads/logkeys/test.log
+  911  watch -n 1 -t -g tail -c1 /home/labuser/Downloads/logkeys/test.log
+  912  watch -n 1 -t -e tail -c1 /home/labuser/Downloads/logkeys/test.log
+  913  vim wavelet.controller.new.sh 
+  914  ./wavelet
+  915  ./wavelet.controller.new.sh 
+  916  vim wavelet.controller.new.sh 
+  917  ./wavelet.controller.new.sh 
+  918  ./wavelet.controller.new.sh clear
+  919  clear
+  920  ls -l
+  921  vim wavelet.controller.new.sh 
+  922  ./wavelet.controller.new.sh 
+  923  vim wavelet.controller.new.sh 
+  924  ./wavelet.controller.new.sh 
+  925  vim wavelet.controller.new.sh 
+  926  ./wavelet.controller.new.sh 
+  927  clear
+  928  ./wavelet.controller.new.sh 
+  929  clear
+  930  ./wavelet.controller.new.sh 
+  931  clear
+  932  ./wavelet.controller.new.sh 
+  933  clear
+  934  ./wavelet.controller.new.sh 
+  935  clear
+  936  ./wavelet.controller.new.sh 
+  937  cd /home/labuser/Downloads/logkeys/
+  938  ls -l
+  939  tail -f test.log 
+  940  1234
+  941  4
+  942  12341234123454123512353
+  943  4
+  944  2
+  945  cd ..
+  946  ls -l
+  947  vim wavelet_controller.sh 
+  948  2
+  949  cd logkeys/
+  950  ls -l
+  951  tail -f test.log 
+  952  ls -l
+  953  cd src
+  954  ls -l
+  955  vim logkeys.cc 
+  956  cd ..
+  957  mkdir kbhit
+  958  cd khbit
+  959  cd kbhit/
+  960  vim kbhit.c
+  961  cp kbhit.c kbhit.c.bak
+  962  vim kbhit.c
+  963  ls -l
+  964  cd ..
+  965  ls -l
+  966  vim wavelet_controller.sh 
+  967  vp wavelet_controller.sh wavelet_controller.old
+  968  cp wavelet_controller.sh wavelet_controller.old
+  969  vp wavelet_controller.sh wavelet_controller.old
+  970  vim wavelet_controller.sh 
+  971  ./wavelet_controller.
+  972  ./wavelet_controller.sh
+  973  vim wavelet_controller.sh 
+  974  ./wavelet_controller.sh
+  975  vim wavelet_controller.sh 
+  976  ./wavelet_controller.sh
+  977  vim wavelet_controller.sh 
+  978  ./wavelet_controller.sh
+  979  cp wavelet_controller.sh wavelet_controller.sh.version1-tested.old
+  980  ls -l
+  981  vim wavelet_controller.old
+  982  cp wavelet_controller.old wavelet.controller.new.sh
+  983  vim wavelet.controller.new.sh 
+  984  cat wavelet_consoller.sh
+  985  cat wavelet_controller.sh.version1-tested.old 
+  986  vim wavelet.controller.new.sh 
+  987  cat wavelet_controller.sh.version1-tested.old 
+  988  vim wavelet.controller.new.sh 
+  989  ./wavelet.controller.new.sh 
+  990  vim wavelet.controller.new.sh 
+  991  ./wavelet.controller.new.sh 
+  992  vim wavelet.controller.new.sh 
+  993  ./wavelet.controller.new.sh 
+  994  vim wavelet.controller.new.sh 
+  995  ./wavelet.controller.new.sh 
+  996  clear
+  997  ./wavelet.controller.new.sh 
+  998  ls -l
+  999  cat wavelet.controller.new.sh 
+ 1000  vim ./wavelet.controller.new.sh 
+ 1001  ./wavelet.controller.new.sh 
+ 1002  vim ./wavelet.controller.new.sh 
+ 1003  ./wavelet.controller.new.sh 
+ 1004  cd /var/tmp/
+ 1005  ls -l
+ 1006  chmod +666 keylogger.log 
+ 1007  sudo chmod +666 keylogger.log 
+ 1008  ls -l
+ 1009  sudo chmod +760 keylogger.log 
+ 1010  ls -l
+ 1011  sudo chmod +660 keylogger.log 
+ 1012  sudo chmod +600 keylogger.log 
+ 1013  ls -l
+ 1014  sudo chmod 600 keylogger.log 
+ 1015  ls -l
+ 1016  sudo chmod 644keylogger.log 
+ 1017  sudo chmod 644 keylogger.log 
+ 1018  ls -l
+ 1019  cd /home/labuser/Downloads/
+ 1020  vim wavelet.controller.new.sh
+ 1021  ./wavelet.controller.new.sh
+ 1022  vim wavelet.controller.new.sh
+ 1023  ./wavelet.controller.new.sh
+ 1024  vim wavelet.controller.new.sh
+ 1025  ./wavelet.controller.new.sh
+ 1026  ls -l
+ 1027  cat /wavelet.controller.new.sh
+ 1028  cat wavelet.controller.new.sh
+ 1029  vim wavelet.controller.new.sh
+ 1030  ls -l
+ 1031  cp wavelet_evidence.sh wavelet_evidence-hdmi.sh
+ 1032  vim wavelet_evidence-hdmi.sh 
+ 1033  vim wavelet.controller.new.sh
+ 1034  ./wavelet.controller.new.sh
+ 1035  vim wavelet.controller.new.sh
+ 1036  ./wavelet.controller.new.sh
+ 1037  vim wavelet.controller.new.sh
+ 1038  vim wavelet_evidence-hdmi
+ 1039  cat wavelet_evidence
+ 1040  cat wavelet_evidence.sh
+ 1041  cat wavelet_evidence-hdmi.sh
+ 1042  cat wavelet_evidence
+ 1043  cat wavelet_evidence.sh 
+ 1044  cat wavelet_hybrid.sh 
+ 1045* vim wavelet_controller.sh
+ 1046  ./wavelet.controller.new.sh
+ 1047  vim wavelet.controller.new.sh
+ 1048  vim wavelet_evidence-hdmi.sh 
+ 1049  vim wavelet_kill_all.sh 
+ 1050  ./wavelet_kill_all.sh 
+ 1051  ls -l
+ 1052  ./wavelet_evidence-hdmi.sh 
+ 1053* 
+ 1054  ./wavelet.controller.new.sh
+ 1055  vim wavelet.controller.new.sh
+ 1056  ./wavelet.controller.new.sh
+ 1057  vim wavelet.controller.new.sh
+ 1058  ./wavelet.controller.new.sh
+ 1059  ls -l
+ 1060  cat wavelet_hybrid.sh 
+ 1061  ./wavelet.controller.new.sh
+ 1062  ls -l
+ 1063  vim wavelet.controller.new.sh
+ 1064  cat wavelet_hosts
+ 1065  cp wavelet_hybrid.sh wavelet_livestream.sh
+ 1066  vim wavelet_livestream.sh 
+ 1067  cat wavelet_hosts 
+ 1068  vim wavelet_hosts 
+ 1069  vim wavelet_livestream.sh
+ 1070  ./wavelet.controller.new.sh
+ 1071  vim wavelet_livestream.sh
+ 1072  ./wavelet.controller.new.sh
+ 1073  vim wavelet_livestream.sh
+ 1074  ./wavelet.controller.new.sh
+ 1075  vim wavelet_livestream.sh
+ 1076  ffmpeg -i http://192.168.1.32:8554/ug.sdp/dev/video0 -c:v libx264 -preset veryfast -maxrate 3000k -bufsize 6000k -pix_fmt yuv420p -g 50 -an -f flv $OUTPUT
+ 1077  ffmpeg  -i http://192.168.1.32:8554/ug.sdp/dev/video0 -c:v libx264 -preset veryfast -maxrate 3000k -bufsize 6000k -pix_fmt yuv420p -g 50 -an -f flv $OUTPUT
+ 1078  vim wavelet_livestream.sh
+ 1079  ./wavelet.controller.new.sh
+ 1080  vim wavelet.controller.new.sh
+ 1081  ls l-
+ 1082  ls -l
+ 1083  cat wavelet_evidence.sh 
+ 1084  cat wavelet_evidence
+ 1085  cat wavelet_encoders 
+ 1086  mv wavelet_hosts wavelet_decoders
+ 1087  vim wavelet.controller.new.sh
+ 1088  ./wavelet.controller.new.sh
+ 1089  vim wavelet.controller.new.sh
+ 1090  ./wavelet.controller.new.sh
+ 1091  vim wavelet.controller.new.sh
+ 1092  ./wavelet.controller.new.sh
+ 1093  vim wavelet.controller.new.sh
+ 1094  ./wavelet.controller.new.sh
+ 1095  hd-rum-m
+ 1096  ld -l
+ 1097  ls -l
+ 1098  rm UltraGrid-1.7.7.tar.gz 
+ 1099  ls -l
+ 1100  git clone https://github.com/CESNET/UltraGrid
+ 1101  history
+ 1102  history > history.txt
