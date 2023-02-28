@@ -23,13 +23,11 @@ sudo apt autoremove
 # this should be done as part of the basic board bringup and is probably out of scope for the setup script
 #
 # add Wavelet UID/user with password
-useradd wavelet -s /bin/bash -m 
+useradd -u 1337 wavelet -s /bin/bash -m 
 chpasswd << 'END'
 wavelet:WvltU$R60C
 END
-
 mkdir -p /home/wavelet
-chown -R wavelet:wavelet /home/wavelet
 
 #
 # generate password
@@ -84,30 +82,11 @@ loginctl enable-linger wavelet
 
 mkdir -p /home/wavelet/.config/systemd/user
 
-# start decoder service
-
-echo "[Unit]
-Description=Wavelet decoder viewer service
-
-[Service]
-ExecStart=/home/wavelet/start_decoder.sh
-WorkingDirectory=/home/wavelet/" > ~/.config/systemd/user/wavelet_start_decoder.service
-
 # Ensure Sway starts on autologin
 
 echo "if [ -z "${DISPLAY}" ] && [ "${XDG_VTNR}" -eq 1 ]; then
   exec sway
 fi" >> /etc/profile
-
-# start decoder-livestream service
-
-echo "[Unit]
-Description=Wavelet decoder viewer service
-
-[Service]
-ExecStart=/home/wavelet/start_decoder_libvestream.sh
-WorkingDirectory=/home/wavelet/" > ~/.config/systemd/user/wavelet_start_decoder_livestream.service
-
 
 # add powerline to system bashrc
 
@@ -134,31 +113,6 @@ WorkingDirectory=/home/wavelet/
 [Install]
 WantedBy=multi-user.target" > /home/wavelet/.config/systemd/user/wavelet_start_decoder.service
 
-
-# Generate bash script for decoder + prompt for livestream
-# capture filter is encoder-only, so we basically can only add a red border to show it's recording.
-# to do differently would require the capability of switching the capture filter on the encoder without disrupting its output.
-mkdir -p /home/wavelet/.config/systemd/user
-echo "[Unit]
-Description=Wavelet decoder viewer service
-After=network.target
-
-[Service]
-Type=simplei
-Environment=SDL_VIDEODRIVER=wayland
-#Environment=DISPLAY=:0
-Environment=WAYLAND_DISPLAY=wayland-1
-ExecStop=/usr/bin/pkill -u %i -x uv
-#Capture filter works only on ENCODER
-#ExecStart=uv --capture-filter logo:/home/wavelet/livestream_watermark.pam:1850:1000 -d sdl:fs
-ExecStart=uv -p border:color=#ff0000:width=20==8 -d sdl:fs 
-
-[Install]
-WantedBy=multi-user.target
-WorkingDirectory=/home/wavelet/" > /home/wavelet/.config/systemd/user/wavelet_start_decoder_livestream.service
-
-
-# Build Ultragrid.  
 # Why am I doing this instead of using the appimage?
 # Basically, the AppImage doesn't appear to work properly.  Eventually I will be working out how to cross-compile for appropriate targets and export as a container
 # For now, initial setup has to involve a local build of the application.
@@ -180,17 +134,20 @@ make install
 # apt install packages and QoL improvements
 # tweak system performance tuning
 #
-#systemctl enable tuned --now
+systemctl enable tuned --now
 
 
 # reload all systemd units, su to wavelet and reload user systemd units
 systemctl daemon-reload
-
+chown -R wavelet:wavelet /home/wavelet
+systemctl --user daemon-reload
 sudo -i -u wavelet bash << EOF
 echo "In"
 systemctl --user daemon-reload
 EOF
 echo "Out"
+
+
 
 # integration test with wavelet server
 # integration test with wavelet encoder
