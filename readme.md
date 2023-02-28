@@ -5,27 +5,20 @@ Wavelet is a courtroom video appliance designed to avoid shortcomings and pitfal
 
 It does so by:
 
-    *   Avoiding unnecessary cabling by utilizing modern Wireless technologies
-
-    *   Leveraging the power of open source software, as free as humanly possible from proprietary vendor lock-ins.
-
-    *   Being platform agnostic and portable between different systems and architectures
-
-    *   Targeting low-cost hardware platforms
+*   Avoiding unnecessary cabling by utilizing modern Wireless technologies
+*   Leveraging the power of open source software, as free as humanly possible from proprietary vendor lock-ins.
+*   Being platform agnostic and portable between different systems and architectures
+*   Targeting low-cost hardware platforms
 
 
 
 Wavelet at its most basic setup is composed of five components:
 
-    *   Linux-based server
-    
-    *   Linux-based primary encoder
-
-    *   Standalone Wireless Access Point
-
-    *   Small Network Switch
-
-    *   SBC-based primary decoder
+*   Linux-based server
+*   Linux-based primary encoder
+*   Standalone Wireless Access Point
+*   Small Network Switch
+*   SBC-based primary decoder
     
 More advanced setups may add additional encoders and decoders, however the core components of a switch, wireless AP and server are REQUIRED.
 
