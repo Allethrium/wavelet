@@ -42,6 +42,7 @@ useradd -u 1337 wavelet -s /bin/bash -m
 chpasswd << 'END'
 wavelet:WvltU$R60C
 END
+
 mkdir -p /home/wavelet
 cd /home/wavelet/
 git clone https://github.com/CESNET/UltraGrid
@@ -49,6 +50,7 @@ cd UltraGrid
 ./autogen.sh
 make -j$(nproc)
 make install
+
 echo "[Service]
 ExecStart=-/sbin/agetty --noclear %I $TERM
 Type=idle
@@ -62,6 +64,7 @@ TTYVTDisallocate=yes
 KillMode=process
 IgnoreSIGPIPE=no
 SendSIGHUP=yes" > /lib/systemd/system/getty@.service
+
 echo "[Service]
 ExecStart=-/sbin/agetty -a wavelet --noclear %I $TERM
 Type=idle
@@ -75,13 +78,20 @@ TTYVTDisallocate=yes
 KillMode=process
 IgnoreSIGPIPE=no
 SendSIGHUP=yes" > /lib/systemd/system/getty@tty1.service
+
 loginctl enable-linger wavelet
+
 sed -i -e 's/dynamic_tuning = 0/dynamic_tuning = 1/g' /etc/tuned/tuned-main.conf
+
 systemctl enable tuned --now
 systemctl disable NetworkManager-wait-online.service --now
+
 sed -i -e 's/GRUB_TIMEOUT=/GRUB_TIMEOUT=0/g' /etc/default/grub
+
 dracut --regenerate-all --force
+
 mkdir -p /home/wavelet/.config/systemd/user
+
 echo "[Unit]
 Description=Wavelet decoder viewer service
 After=network.target
@@ -100,10 +110,14 @@ WorkingDirectory=/home/wavelet/
 
 [Install]
 WantedBy=multi-user.target" > /home/wavelet/.config/systemd/user/wavelet_start_decoder.service
+
 chown -R 1337:root /home/wavelet
+
 systemctl --user daemon-reload
 fwupdmgr update
+
 echo "waiting ten seconds before system restart..." && wait 10
+
 shutdown -r now
 
 # stuff that should be done after this is completed:
