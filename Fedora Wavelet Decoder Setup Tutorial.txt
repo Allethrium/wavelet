@@ -1,7 +1,7 @@
 ### Wavelet Decoder Setup for Fedora/RPM-based distributions ###
 #
 #
-# < If it has a hash in front of it, it's a description and not a command, so don't type it in.
+# <<< If it has a hash in front of it, it's a description and not a command, so don't type it in.
 #
 #
 # Start with a Fedora Server or Fedora Minimal installer.   This boots only to a command prompt with a minimal number of installed packages.

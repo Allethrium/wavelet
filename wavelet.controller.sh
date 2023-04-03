@@ -13,7 +13,8 @@
 #
 # recorder-
 # livestream-
-#
+# hybrid (ug to dual-home windows PC running teams)
+# 
 #
 #pinghost() {
 # if ping -c 1 -W 1 "$hostname_or_ip_address"; then
@@ -45,7 +46,7 @@ event_livestream="0"
 # main thread, sits and waits for input, launches notification script from keylogger
 
 main() {
-wavelet_reflector && read -n 1 -p "Waiting for Event;" input & tailfrominput 
+read -n 1 -p "Waiting for Event;" input & tailfrominput 
 }
 
 #executes scripts based off of input
@@ -105,9 +106,7 @@ esac
 # inotify monitors logging file and executes tail -last byte on any changes, stores this in a variable, then calls waveletcontroller to do something with it
 
 tailfrominput() {
-	file=/var/tmp/keylogger.log
-	#tail -F -c 1 $file | while read LINE ;do
-	#watch -n 1 -t -e tail -c1 /home/labuser/Downloads/logkeys/test.log & while read LINE; do
+	file=/var/log/logkeys.log
 	inotifywait -mq -e modify $file |
 	while read events; do
 		echo "Event discovered.."
@@ -118,9 +117,19 @@ tailfrominput() {
 
 
 # runs hd-rum-multi against the declared list of decoders
+# adding a nonexistant decoder might break this, so we had to add logic to check against a valid list of predefined hostnames
+# .. or i could have just explicitly set IP addresses... sigh.
 wavelet_reflector() {
-     hd-rum 64M 5004 $(cat wavelet_decoders)
- }
+	rm -rf wavelet_clients
+	touch wavelet_clients
+	sense_hostnames=(dec0 dec1 dec2 dec3 dec4 dec5 dec6 dec7 livestream teamshybrid badhostname audiodec0 audiocodec1 audiocodec2 audiocodec3)
+	for i in "${sense_hostnames[@]}";
+	do
+		host -W 0 $i | awk '/has address/ { print $4 }'
+	done > wavelet_clients
+hd-rum 8M 5004 `cat wavelet_clients` & hd-rum 1M 5006 `cat wavelet_clients`
+}
+
 
 
 # wavelet scripted functions
@@ -133,24 +142,24 @@ event_livestream() {
         if [ $livestreaming = "0" ]; then 
                 echo "Option Zero, Livestream currently inactive, Livestream activating"
 		SERVERLIST=wavelet_livestream
-		ICMD1='systemctl --user start wavelet-livestream-decoder.service'
-		ICMD2='systemctl --user start wavelet-livestream.service'
+		ICMD1='systemctl --user start wavelet_start_decoder.service'
+		ICMD2='systemctl --user start wavelet_livestream.service'
 		while read SERVERNAME
 			do
-				ssh -n wavelet@$SERVERNAME $ICMD1 > $SERVERNAME_report.txt
+				ssh -n $SERVERNAME $ICMD1 > $SERVERNAME_report.txt
 			done < "$SERVERLIST"
 		#Runs on the encoder, kills current streaming, replaces image file with Livestream prompt and then restarts the service.
 		SERVERLIST=wavelet_encoders
 		ICMD0="systemctl stop ultragrid-*.service"
-		ICMD1="rm -f /home/labuser/encoder_active_watermark.pam"
-		ICMD2="cp /home/labuser/livestream_watermark.pam /home/labuser/encoder_active_watermark.pam"
+		ICMD1="rm -f /home/wavelet/encoder_active_watermark.pam"
+		ICMD2="cp /home/wavelet/livestream_watermark.pam /home/wavelet/encoder_active_watermark.pam"
 #		ICMD3="systemctl start ultragrid-usbcam.service"
 		while read SERVERNAME
 			do
-				ssh -n labuser@$SERVERNAME $ICMD0 > $SERVERNAME_report.txt
-				ssh -n labuser@$SERVERNAME $ICMD1 > $SERVERNAME_report.txt
-				ssh -n labuser@$SERVERNAME $ICMD2 > $SERVERNAME_report.txt
-#				ssh -n labuser@$SERVERNAME $ICMD3 > $SERVERNAME_report.txt
+				ssh -n $SERVERNAME $ICMD0 > $SERVERNAME_report.txt
+				ssh -n $SERVERNAME $ICMD1 > $SERVERNAME_report.txt
+				ssh -n $SERVERNAME $ICMD2 > $SERVERNAME_report.txt
+#				ssh -n SERVERNAME $ICMD3 > $SERVERNAME_report.txt
 			done < "$SERVERLIST"
 		livestreaming="1"
 		echo "Livestreaming Activated" 
@@ -159,27 +168,6 @@ event_livestream() {
                 echo "Option Zero, Livestream currently active, Livestream deactivating"
 		# Runs on dedicated livestream box and on encoder
 		wavelet_kill_livestream
-#                SERVERLIST=wavelet_livestream
-#                ICMD1='systemctl --user stop wavelet_start_decoder.service'
-#		ICMD2='kill ffmpeg blablabla"
-#                while read SERVERNAME
-#                        do
-#                                ssh -n wavelet@$SERVERNAME $ICMD1 > $SERVERNAME_report.txt
-#			#	ssh -n wavelet@$SERVERNAME $ICMD2 > $SERVERNAME_report.txt
-#                        done < "$SERVERLIST"
-# 		SERVERLIST=wavelet_encoders
-#		ICMD0="systemctl stop ultragrid-*.service" 
-#		ICMD1="rm -f /home/labuser/encoder_active_watermark.pam"
-#		ICMD2="cp /home/labuser/documentcam.pam /home/labuser/encoder_active_watermark.pam"
-#		while read SERVERNAME
-#                        do
-#				ssh -n labuser@$SERVERNAME $ICMD0 > $SERVERNAME_report.txt
-#				ssh -n labuser@$SERVERNAME $ICMD1 > $SERVERNAME_report.txt
-#				ssh -n labuser@$SERVERNAME $ICMD2 > $SERVERNAME_report.txt
-#                        done < "$SERVERLIST"
-#		livestreaming="0"
-#		echo "Livestreaming Disabled" 
-#		$current_event
 fi
 echo $livestreaming
 }
@@ -247,37 +235,37 @@ wavelet_kill_livestream() {
                 # Runs on dedicated livestream box, attempts to kill livestream on system restart.
                 # This is a security feature
                 SERVERLIST=wavelet_livestream
-                ICMD1='systemctl --user stop wavelet-livestream-decoder.service'
-                ICMD2='systemctl --user stop wavelet-livestream.service'
+                ICMD1='systemctl --user stop wavelet_start_decoder.service'
+                ICMD2='systemctl --user stop wavelet_livestream.service'
                 while read SERVERNAME
                         do
-                               ssh -n wavelet@$SERVERNAME $ICMD1 > $SERVERNAME_report.txt
-                               ssh -n wavelet@$SERVERNAME $ICMD2 > $SERVERNAME_report.txt
+                               ssh -n $SERVERNAME $ICMD1 > $SERVERNAME_report.txt
+                               ssh -n $SERVERNAME $ICMD2 > $SERVERNAME_report.txt
                         done < "$SERVERLIST"
 		# Runs on encoder box, stops service, swaps watermark.
                 SERVERLIST=wavelet_encoders
                 ICMD0="systemctl stop ultragrid-*.service" 
-                ICMD1="rm -f /home/labuser/encoder_active_watermark.pam"
-                ICMD2="cp /home/labuser/documentcam.pam /home/labuser/encoder_active_watermark.pam"
+                ICMD1="rm -f /home/wavelet/encoder_active_watermark.pam"
+                ICMD2="cp /home/wavelet/documentcam.pam /home/wavelet/encoder_active_watermark.pam"
                 while read SERVERNAME
                         do
-                                ssh -n labuser@$SERVERNAME $ICMD0 > $SERVERNAME_report.txt
-                                ssh -n labuser@$SERVERNAME $ICMD1 > $SERVERNAME_report.txt
-                                ssh -n labuser@$SERVERNAME $ICMD2 > $SERVERNAME_report.txt
-                        done < "$SERVERLIST"
+                                ssh -n $SERVERNAME $ICMD0 > $SERVERNAME_report.txt
+                                ssh -n $SERVERNAME $ICMD1 > $SERVERNAME_report.txt
+                                ssh -n $SERVERNAME $ICMD2 > $SERVERNAME_report.txt
+        		done < "$SERVERLIST"
+		echo "Livestreaming deactivated.."
+		$current_event
                 livestreaming="0"
 }
 
+
 # Brings up necessary services and executes main thread
-# keylogger necessary to get keystroke input from device
-# I still need to write this part...
-# systemctl start wavelet-keylogger.service
 
 
 # execute main function
-# always set livestreaming and recording to offi, kill encoder  as initial values when starting the application!
+# always set livestreaming and recording to off, kill encoder  as initial values when starting the application!
 # This ensures a system reset.
 wavelet_kill_all
 wavelet_kill_livestream
 recording=0
-main 
+wavelet_reflector & main 

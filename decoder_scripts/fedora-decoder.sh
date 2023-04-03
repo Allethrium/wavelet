@@ -50,6 +50,8 @@ cd UltraGrid
 ./autogen.sh
 make -j$(nproc)
 make install
+usermod -aG video wavelet
+usermod -aG render wavelet
 
 echo "[Service]
 ExecStart=-/sbin/agetty --noclear %I $TERM
@@ -127,3 +129,13 @@ shutdown -r now
 # integration test with wavelet decoder
 #
 # done.
+
+
+# ALT METHODS
+# Podman container is now functional
+install podman during setup
+pull podman image
+ensure wavelet user has group memberships for render and video groups
+run podman container w/ entrypoint args and appropriate security settings
+ensure selinux context set
+

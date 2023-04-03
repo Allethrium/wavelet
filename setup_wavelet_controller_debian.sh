@@ -1,15 +1,14 @@
 #!/bin/bash
 # Version 0.1 - functional test unit
 #
-# This script sets up a system to be a Wavelet Decoder appliance.   The machine will need to have realtime 1080p/H.264 transcoding capability.  
-#  I'd suggest a fast CPU or something # supporting VA-API
+# This script sets up a system to be a Wavelet Controller appliance.   The machine will need to have fast network capability and relatively powerful CPU.  
 #
 # It assumes the following;
 #
 #	Machine is already imaged with an Ubuntu or Debian os
 #	Machine is connected to a wavelet network (via ethernet) and to an internet network (via wifi)
 #	Machine hostname is properly set for the target room.
-#	Naming convention is:  dec(number).type (vim1s, vim3, edge2, opt7090) .dept (part3, mis). room (357m). loc (60C) . wavelet.local
+#	Naming convention is:  livestream.type (vim1s, vim3, edge2, opt7090) .dept (part3, mis). room (357m). loc (60C) . wavelet.local
 #	The Wavelet server depends on an accurate hostname in order to enumerate the new decoder... or it will eventually when I've written that part.
 #
 # Very simple here - just needs a lightweight gui like sway, Ultragrid 1.7+ appimage and nothing else.
@@ -21,14 +20,18 @@ if [ "$EUID" -ne 0 ]
   exit
 fi
 
+# Add self to hosts
+echo "192.168.1.32	svr" > /etc/hosts
+
+apt update && apt upgrade -y
 # this apt command installs EVERYTHING.  Probably not needed and can be pared down. 
 # Eventually when things are more settled maybe work out a way to deploy the binaries without building them
 # on every single decoder and encoder like an idiot?
-sudo apt install ffmpeg* sway sway-backgrounds swaybg waybar libasound2-dev uuid-dev libopencv-dev libglew-dev freeglut3-dev libgl1-mesa-dev libglfw3-dev libjack-jackd2-dev libavcodec-dev libavutil-dev libssl-dev portaudio19-dev libopencv-dev libcurl4-nss-dev libsdl2-dev libx11-dev libsdl1.2-dev libsoxr-dev libspeexdsp-dev libvulkan-dev libv4l-dev foot mplayer libsrt-openssl-dev libsrtp2-dev vim powerline tuned build-essential python3-zfec wget git build-essential autoconf automake libtool pkgconf libmagickcore-6.q16-dev libmagickwand-6.q16-dev libmagickwand-dev python3-powerline-gitstatus sphinx-rtd-theme-common fonts-font-awesome fonts-lato libjs-sphinxdoc libjs-underscore powerline-doc powerline-gitstatus libsdl2-image-2* libsdl2-gfx-dev 
+sudo apt install ffmpeg* sway sway-backgrounds swaybg waybar libasound2-dev uuid-dev libopencv-dev libglew-dev freeglut3-dev libgl1-mesa-dev libglfw3-dev libjack-jackd2-dev libavcodec-dev libavutil-dev libssl-dev portaudio19-dev libopencv-dev libcurl4-nss-dev libsdl2-dev libx11-dev libsdl1.2-dev libsoxr-dev libspeexdsp-dev libvulkan-dev libv4l-dev foot mplayer libsrt-openssl-dev libsrtp2-dev vim powerline tuned build-essential python3-zfec wget git build-essential autoconf automake libtool pkgconf libmagickcore-6.q16-dev libmagickwand-6.q16-dev libmagickwand-dev python3-powerline-gitstatus sphinx-rtd-theme-common fonts-font-awesome fonts-lato libjs-sphinxdoc libjs-underscore powerline-doc powerline-gitstatus libsdl2-image-2* libsdl2-gfx-dev build-essential autoconf automake libtool pkgconf -y
 
 # remove this in deployment, right now its only to automate 
 # decoder#,hwdescriptor,dept,room,location.wavelet.local
-sudo hostname dec.box.mis.357m.60C.wavelet.local
+# sudo hostname dec.box.mis.357m.60C.wavelet.local
 
 echo 'if [ -f `which powerline-daemon` ]; then
   powerline-daemon -q
@@ -47,8 +50,12 @@ chpasswd << 'END'
 wavelet:WvltU$R60C
 END
 
+# we're operating in a specific directory structure under the wavelet user
+# so we want all this stuff in specific places
 mkdir -p /home/wavelet/.config/systemd/user
+mkdir -p /home/wavelet/Downloads
 chown -R wavelet:wavelet /home/wavelet
+cd /home/wavelet/Downloads
 
 # create autologin service for wavelet user
 #
@@ -80,26 +87,19 @@ KillMode=process
 IgnoreSIGPIPE=no
 SendSIGHUP=yes" > /lib/systemd/system/getty@.service/lib/systemd/system/getty@tty1.service
 
-# Generate USER Systemd units for decoders
-# Ultragrid decoder to display
+
+# Generate USER Systemd units for server
+# Logkeys for input sense
 echo "[Service]
 Type=simple
-# These environment variables commonly need to be set to tell the service which display to use for output.  On a PC its not all that finnicky..usually
-# They are dependent on numerous considerations like the available GPU acceleration.  Since I lean towards Sway for the display, we will always be using Wayland as a Display Manager.
-# Display=:0 is a command that defines a display for an older DM called Xorg.  
-#Environment=SDL_VIDEODRIVER=wayland
-#Environment=DISPLAY=:0
-#Environment=WAYLAND_DISPLAY=wayland-1
-ExecStop=/usr/bin/pkill -u %i -x uv
-# This will pull a stream out of UltraGrid and render it to screen.  Depending on your target platform, this can be
-# a little sensitive.  gl is the most common working one.  sdl and vulkan_sdl2 can also work at a pinch.  use the cmd uv -d help to see what
-# is available on the system once UltraGrid has been built.
-# Future plans include template files so this won't be necessary once we work out what hardware we are using.
-ExecStart=uv -d gl
-WorkingDirectory=/home/wavelet/
+Description=Logkeys based keylogger service to provide wavelet with input sense
+After=network.target syslog.target
+ExecStop=/usr/bin/pkill -u %i -x logkeys
+ExecStart=logkeys -u -s -o /home/wavelet/Downloads/logkeys.log
+WorkingDirectory=/home/wavelet/Downloads
 
 [Install]
-WantedBy=multi-user.target" > /home/wavelet/.config/systemd/user/wavelet-decoder.service
+WantedBy=multi-user.target" > /home/wavelet/.config/systemd/user/wavelet-keylogger.service
 
 # poke a hole in the firewall
 firewall-cmd --permanent --add-port=5004/tcp
@@ -116,7 +116,6 @@ cp EmbeddableWebServer/EmbeddableWebServer.h ./UltraGrid/
 cd Ultragrid
 
 #build on debian
-
 ./autogen.sh
 # for faster build use
 # make -j$(nproc) 
@@ -125,13 +124,40 @@ make
 # install the binaries to /usr/bin and set aliases so they can be invoked without a path
 make install
 
+# build LogKeys
+git clone https://github.com/kernc/logkeys
+cd logkeys
+./autogen.sh
+cd build
+../configure
+make
+make install
+cd /home/wavelet/Downloads
 
-# tweak system performance tuning
+# tweak system performance tuning.
 # reload systemd units
 systemctl daemon-reload
 systemctl enable tuned --now
 su wavelet
-sytemctl --user daemon-reload
 
-# wavelet livestream from this box can now be controlled by systemctl --user start wavelet-livestream-decoder.service && systemctl --user start wavelet-livestream.service, substitute with stop to stop them.  The controller should have this built in already.
-# ssh keypairs need to be copied to this box from the server in order for a control channel to be established.
+# Wait so that devices can be plugged in
+echo "Please plug in any Wavelet sense peripherals (keyboard, remote) NOW." && wait 60
+
+sytemctl --user daemon-reload
+touch /home/wavelet/Downloads/logkeys.log
+systemctl --user start wavelet-keylogger.service
+./wavelet.controller.sh
+
+# wavelet controller should be always aware of devices on the network, livestreamers, encoders, decoders, recorders.
+# This means being aware of DNS cache and DNS cache changes
+# Since its already an authoritative DHCP server, it should ALSO be the DNS server
+# can we use dhcpd and dnsmasq?  or just dnsmasq?
+
+# The alternative is use some kind of list/inventory file which must be manually updated.  I'd rather this was automatic, doesn't seem like something people should have to do.
+
+# DNSMASQ
+# cat /var/lib/dnsmasq/dnsmasq.leases
+# sort this somehow and generate lists of decoder, encoder and other boxes, refresh upon new DHCP lease being assigned?
+# maybe this makes more sense to run in the wavelet_controller.sh file given it's a "live" functionality?
+
+
