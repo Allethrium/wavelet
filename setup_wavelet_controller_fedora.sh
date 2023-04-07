@@ -168,7 +168,7 @@ echo "input sense installed.."
 # as long as their hostname is properly set.  We can dispense with a file of statically set IP addresses.
 # Poke holes for DNS and DHCP in firewall
 # directories are a problem here.. ugh just echo it overwriting the existing file.  Less muss, less fuss.
-#
+# Do I want to containerize DHCP and DNS together at some point?   Probably.. running a mini-domain might make more sense.
 echo "# Wavelet svr config file for DNSmasq
 # provides DHCP and DNS functionality for the extremely simple network
 # # make sure DHCPD and systemd-resolved are both OFF
@@ -192,7 +192,7 @@ echo "# Wavelet svr config file for DNSmasq
 # log-queries
 # log-dhcp
 #
-# # ideally i'd like to use this to interrogate DNS records dynamically, but it might make more sense to simply label the devices intelligently and make assumptions on this end" >> /etc/dnsmasq.conf
+# Ideally i'd like to use this to interrogate DNS records dynamically, but it might make more sense to simply label the devices intelligently and make assumptions on this end" >> /etc/dnsmasq.conf
 systemctl disable systemd-resolved.service --now
 firewall-cmd --permanent --add-service=dns
 firewall-cmd --permanent --add-service=dhcp
@@ -253,10 +253,11 @@ systemctl enable wavelet-controller.service
 
 # We may, or may not use this but we're going to setup a local container registry on the server so that containers can be composed and then pushed out to sources appropriately.
 # This stuff isn't necessary unless we want to secure the registry... which might be a good idea for a production build, who knew?  Yes, that is a 10 year certificate.
-sudo dnf install httpd-tools
-mkdir -p /var/lib/registry/{auth,certs,data}
-htpasswd -bBc /var/lib/registry/auth/htpasswd wavelet wavelet
-openssl req -newkey rsa:4096 -nodes -sha256 -keyout /var/lib/registry/certs/domain.key -x509 -days 3650 -out /var/lib/registry/certs/domain.crt
+# Don't need this if insecure registry
+#sudo dnf install httpd-tools
+#mkdir -p /var/lib/registry/{auth,certs,data}
+#htpasswd -bBc /var/lib/registry/auth/htpasswd wavelet wavelet
+#openssl req -newkey rsa:4096 -nodes -sha256 -keyout /var/lib/registry/certs/domain.key -x509 -days 3650 -out /var/lib/registry/certs/domain.crt
 
 
 echo "[[registry]]
