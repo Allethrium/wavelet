@@ -54,6 +54,10 @@ END
 # Makehomedirs.  This should be done automatically by useradd but i'm not leaving it to chance.
 mkdir -p /home/wavelet
 cd /home/wavelet/
+
+# Replace with containerized workflow as soon as you get this up and running
+# should look something like;
+# 
 git clone https://github.com/CESNET/UltraGrid
 cd UltraGrid
 ./autogen.sh
@@ -119,39 +123,21 @@ ExecStart=uv -d vulkan_sdl2:fs
 WorkingDirectory=/home/wavelet/
 
 [Install]
-WantedBy=multi-user.target" > /home/wavelet/.config/systemd/user/wavelet_start_encoder_viewer.service
+WantedBy=multi-user.target" > /home/wavelet/.config/systemd/user/wavelet-encoder-viewer.service
 
 # This implements a user systemd service for the primary document camera
-# We choose H.265 as its the 'best' codec widely supported in hardware encoders/decoders.
-# Ultragrid is massively customizable, the options chosen here represent sane values for encoding and decoding tested on available hardware.
-# Depending on the document camera and our future needs, this command line will need to be modified.
-# I'm going to break down the command line here as a quick tutorial
-#
-#	--capture-filter logo:/home/wavelet/encoder_active_watermark.pam:1850:100	This tells UG to put a watermark at certain coordinates on the screen.  Since we use this for the livestream notification, it's always
-#											there.  I am considering adding color or text prompting for other modes.
-#
-#	--t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:convert=RGB:device=/dev/video1	Input capture device (dependent on v4l2 assigning USB device, may need tweaking to get all devices working depending on specificities)
-#											sets "caps" or settings for this device, we selected 1080 @ 30FPS.  The camera supports 4k @ 15fps but that's a little ropey.  
-#											It's important to convert the format to something VA-API can use, its very picky about
-#	that.
-#	-c libavcodec:encoder=h265_vaapi:gop=5:bitrate=7M				Output video codec settings.
-#
-# Note that sound may not be necessary and it might be desirable to implement it as a separate service going to only livestream and teams boxes.
-#
-#	-s alsa:front:CARD=USB,DEV=0 --audio-codec FLAC					Capture sound from available devices (alsa seems to work best, do uv -s alsa:help to display available devices!  atm set to Jabra)
-#	-P 5004 192.168.1.32								Port to use and destination IP of the reflector server.  It might be advantageous to hardwire both server and encoder to switch, but not 
-#											necessary
-#
-#	The document camera has no HDMI audio, 
-#
+# Configuration options are set via environment file from the controller, all other methods depreciated
+
 echo "[Unit]
-Description=Wavelet Encoder - Document camera x265 service
+Description=Wavelet (UltraGrid) Encoder Service
 After=network.target
 
 [Service]
 Type=simple
-ExecStop=/usr/bin/pkill -u %i -x uv
-ExecStart=uv --capture-filter logo:/home/wavelet/encoder_active_watermark.pam:1850:100 -t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:convert=RGB:device=/dev/video1 -c libavcodec:encoder=h265_vaapi:gop=5:bitrate=7M -P 5004 192.168.1.32
+Restart=always
+EnvironmentFile=/home/wavelet/uv_service.env
+ExecStop=/usr/bin/pkill uv
+ExecStart=uv $args (TO BE WRITTEN, UPDATE THIS BEFORE END OF WEEK)
 WorkingDirectory=/home/wavelet/
 
 [Install]
@@ -159,15 +145,15 @@ WantedBy=multi-user.target" > /home/wavelet/.config/systemd/user/wavelet_encoder
 
 
 # This is the always-on service to capture audio.  Right now it is set to use a USB Jabra device but it will be configured to ingest Bluetooth from the Biamp devices already installed.
-# After tests, audio latency with Ultragrid is too high.  We need to explore using JACK or some other low-latency option, and we need some useful echo cancellation.  
+# After tests, audio latency with Ultragrid is too high.  We need to explore using JACK, PipeWire or some other low-latency option, and we need some useful echo cancellation (speex?)  
 echo "[Unit]
-Description=Wavelet Encoder - Document camera x265 service
+Description=Wavelet Encoder - Audio Service
 After=network.target
 
 [Service]
 Type=simple
 ExecStop=/usr/bin/pkill -u %i -x uv
-ExecStart=uv -s alsa:--audio-codec FLAC -P 7058 192.168.1.32
+ExecStart=uv -s alsa:--audio-codec pcm -P 5006 192.168.1.32
 WorkingDirectory=/home/wavelet/
 
 [Install]
