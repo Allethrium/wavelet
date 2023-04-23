@@ -105,13 +105,14 @@ dracut --regenerate-all --force
 
 mkdir -p /home/wavelet/.config/systemd/user
 
-# This is where I should be more clever.
-# I'd like to call a script to enumerate attached capture devices via v4l2
-# and automatically generate a systemd unit for each one
-# even better, do something with udev rules!
-# PULL THESE OFF THE MODEL ENCODER TOMORROW!!!
+
+## TODO HERE ##
+
+# Make sure you're sending the systemd units to the correct user subdir.  It's been finnicky before.
+
 
 # This runs a viewer direct from the encoder.  It may run 4-5 frames ahead of the other devices, so it might not be a great idea.  we'll see.
+## TODO make this work in a container. can we even use VAAPI decode when we're using VAAPI *ENCODE* ? ##
 echo "[Unit]
 Description=Wavelet encoder viewer service
 After=network.target
@@ -127,6 +128,7 @@ WantedBy=multi-user.target" > /home/wavelet/.config/systemd/user/wavelet-encoder
 
 # This implements a user systemd service for the primary document camera
 # Configuration options are set via environment file from the controller, all other methods depreciated
+## TODO This needs to be rewritten to accommodate running UltraGrid in a containerized setting. ##
 
 echo "[Unit]
 Description=Wavelet (UltraGrid) Encoder Service
@@ -137,28 +139,46 @@ Type=simple
 Restart=always
 EnvironmentFile=/home/wavelet/uv_service.env
 ExecStop=/usr/bin/pkill uv
-ExecStart=uv $args (TO BE WRITTEN, UPDATE THIS BEFORE END OF WEEK)
+ExecStart=podman run ultragrid-container --uv $args (TO BE WRITTEN, UPDATE THIS BEFORE END OF WEEK)
 WorkingDirectory=/home/wavelet/
 
 [Install]
 WantedBy=multi-user.target" > /home/wavelet/.config/systemd/user/wavelet_encoder_documentcamera.service
 
 
+## DEPRECIATED, We're going to use PipeWire RTP for this. ##
 # This is the always-on service to capture audio.  Right now it is set to use a USB Jabra device but it will be configured to ingest Bluetooth from the Biamp devices already installed.
 # After tests, audio latency with Ultragrid is too high.  We need to explore using JACK, PipeWire or some other low-latency option, and we need some useful echo cancellation (speex?)  
-echo "[Unit]
-Description=Wavelet Encoder - Audio Service
-After=network.target
+#echo "[Unit]
+#Description=Wavelet Encoder - Audio Service
+#After=network.target
+#
+#[Service]
+#Type=simple
+#ExecStop=/usr/bin/pkill -u %i -x uv
+#ExecStart=uv -s alsa:--audio-codec pcm -P 5006 192.168.1.32
+#WorkingDirectory=/home/wavelet/
+#
+#[Install]
+#WantedBy=multi-user.target" > /home/wavelet/.config/systemd/user/wavelet_encoder_audio.service
 
-[Service]
-Type=simple
-ExecStop=/usr/bin/pkill -u %i -x uv
-ExecStart=uv -s alsa:--audio-codec pcm -P 5006 192.168.1.32
-WorkingDirectory=/home/wavelet/
+### TODO - Enable this ###
+# Configure Systemd Service run on boot/restart on failure to create PipeWire sinks
+# Remember to blacklist any weird additional mic devices (The IPEVO comes with one for some bizarre reason, for instance)
+# PipeWire's documentation is atrocious, but after some digging it seems quite straightforward to use.  3Msec is lowest latency i can squeeze w/o issues.
+# Could investigate vomiting up a UDP stream.  It technically supports AES67 too... so if we have network access to a Tesira box we would just tie it in with
+# that clock source?  Right?
 
-[Install]
-WantedBy=multi-user.target" > /home/wavelet/.config/systemd/user/wavelet_encoder_audio.service
+#	pactl load-module module-null-sink sink_name=rtp sink_properties="device.description'RTP'"
+#	pactl load-module module-rtp-send source=rtp.monitor destination_ip=xxx.xxx.xxx.xxx latency_msec=3
+# "Load module-combine-source and use that as the source for module-rtp-send"
+# 
 
+# Create Udev rule
+echo 'ACTION=="add", ENV{ID_BUS}=="usb", SUBSYSTEM=="usb", RUN+="/home/wavelet/udev_call.sh"' > /etc/udev/rules.d/80-wavelet-encoder.rules
+# run udevadm to reload rules and trigger 
+
+# ensure udev-call.sh and detectv4l.sh are all set here
 
 
 chown -R 1337:root /home/wavelet
