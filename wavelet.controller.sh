@@ -262,7 +262,7 @@ wavelet-evidence() {
 	envfile=/home/wavelet/uv_service.env
 	# Note the device and settings ("caps") for the document camera are device and setup dependent.
 	# Still want to circle back and get some kind of useful autosensing working for this
-	input="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:convert=RGB:device=/dev/video4"
+	input="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:convert=RGB:device=/dev/v4l_document_camera_0"
 	if [ $livestreaming = "0" ]; then
 		echo "Livestreaming is off, starting systemd unit on Encoder."
 		filter="--capture-filter text:color=FF0000:x=15:y=30:t='Ev1'"
@@ -295,7 +295,7 @@ wavelet-evidence-hdmi() {
 	current_event="wavelet-evidence-hdmi"
         SERVERLIST=wavelet_encoders
 	envfile=/home/wavelet/uv_service.env
-	input="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:convert=RGB:device=/dev/video0"
+	input="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:convert=RGB:device=/dev/v4l_lghdmi_0"
 	if [ $livestreaming = "0" ]; then
 		echo "Livestreaming is off, starting systemd unit on Encoder."
 		filter="--capture-filter text:color=FF0000:x=15:y=30:t='Cnsl'"
@@ -327,7 +327,7 @@ wavelet-hybrid() {
 	current_event="wavelet-hybrid"
 	SERVERLIST=wavelet_encoders
 	envfile=/home/wavelet/uv_service.env
-	input='-t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:convert=RGB:device=/dev/video2'
+	input='-t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:convert=RGB:device=/dev/v4l_lghdmi_1'
 	if [ $livestreaming = "0" ]; then
 		echo "Livestreaming is off, starting systemd unit on Encoder."
 		filter="--capture-filter text:color=FF0000:x=15:y=30:t='Gallery'"
