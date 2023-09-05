@@ -1,0 +1,39 @@
+<!doctype html>
+<link rel="stylesheet" href="styles.css">
+<html>
+<head>
+</head>
+<body>
+<form action="interface.php" method="post">
+<div>
+<div id="inputs_section">
+        Select Input:
+        <li class="class.inputs">
+        <ul class="">
+        <li><button class="inputs" name="inVar" type="submit" value="1" onclick=\"myForm.action='./page.php';return true;\">Blank Screen</li>
+        <li><button class="inputs" name="inVar" type="submit" value="2" onclick=\"myForm.action='./page.php';return true;\">NY State Seal</li>
+        <li><button class="inputs" name="inVar" type="submit" value="3" onclick=\"myForm.action='./page.php';return true;\">Evidence Camera</li>
+        <li><button class="inputs" name="inVar" type="submit" value="4" onclick=\"myForm.action='./page.php';return true;\">Counsel, HDMI 1</li>
+        <li><button class="inputs" name="inVar" type="submit" value="5" onclick=\"myForm.action='./page.php';return true;\">Input, HDMI 2</li>
+        <li><button class="inputs" name="inVar" type="submit" value="0" onclick=\"myForm.action='./page.php';return true;\">Toggle Livestreaming</li>
+        </ul>
+</div>
+<br>
+<br>
+<div id="codecs_section">
+         Select Codec:
+        <li class="class.codecs">
+        <ul class="">
+        <li><button class="codecs" name="inVar" type="submit" value="A" onclick=\"myForm.action='./page.php';return true;\">H.264 SW</li>
+        <li><button class="codecs" name="inVar" type="submit" value="B" onclick=\"myForm.action='./page.php';return true;\">H.264 QSV</li>
+        <li><button class="codecs" name="inVar" type="submit" value="C" onclick=\"myForm.action='./page.php';return true;\">HEVC SW</li>
+        <li><button class="codecs" name="inVar" type="submit" value="D" onclick=\"myForm.action='./page.php';return true;\">HEVC QSV</li>
+        <li><button class="codecs" name="inVar" type="submit" value="E" onclick=\"myForm.action='./page.php';return true;\">VP9 SW</li>
+        <li><button class="codecs" name="inVar" type="submit" value="F" onclick=\"myForm.action='./page.php';return true;\">VP9 HW</li>
+        </ul>
+        Note some codec options may not combine well with some video input sources.
+        x264 or HEVC Software (SW) modes are the most widely compatible.
+</div>
+</form>
+</body>
+</html>

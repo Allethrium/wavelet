@@ -1,0 +1,2 @@
+ACTION=="add", ENV{ID_BUS}=="usb", SUBSYSTEM=="usb", RUN+="/usr/local/bin/udev_call.sh"
+ACTION=="remove", ENV{ID_BUS}=="usb", SUBSYSTEM=="usb", RUN+="/usr/local/bin/udev_call.sh removed"

@@ -1,0 +1,91 @@
+#!/bin/bash
+# This file concatenates appropriate command line values and passes them to a systemd environment file
+# Directly launches and terminates the reflector as a service.
+# User permissions for this service are handled via Polkit, as the service is installed via Inition.
+
+#Etcd Interaction
+ETCDURI=http://192.168.1.32:2379/v2/keys
+ETCDENDPOINT=192.168.1.32:2379
+read_etcd(){
+        printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME})
+        echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
+}
+
+read_etcd_global(){
+        printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get "${KEYNAME}")
+        echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for Global value"
+}
+
+write_etcd(){
+        etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
+        echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
+}
+
+write_etcd_global(){
+        etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
+        echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
+}
+
+write_etcd_clientip(){
+        etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${KEYVALUE}"
+        echo -e "$(hostname) set to ${KEYVALUE} for Global value"
+}
+read_etcd_clients_ip() {
+        return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
+}
+read_etcd_clients_ip_sed() {
+        # We need this to manage the \n that etcd returns, 
+        # the above is useful for generating the reference text file but this is better for immediate processing.
+        processed_clients_ip=$(ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip --print-value-only | sed ':a;N;$!ba;s/\n/ /g')
+}
+
+wavelet_reflector() {
+# queries etcd for list of registered decoders
+# cleans data, runs hd-rum-transcode with appropriate settings for audio and video streams
+# reset sets reload_reflector flag to 0
+# HD-RUM-TRANSCODE supports capture filters directly, so we'd like to use that instead of bothering the encoder..
+# systemd is a user service that is configured in the build_ug.sh script
+        read_etcd_clients_ip
+        read_etcd_clients_ip_sed
+        echo ${return_etcd_clients_ip} > /home/wavelet/reflector_clients_ip.txt
+        if [[ ! -z "${return_etcd_clients_ip}" ]]; then
+                reflectorclients_file=/home/wavelet/reflector_clients_ip.txt
+        #       KEYNAME=uv_filter_cmd
+        #       read_etcd
+        #       uv_filterString=return_etcd
+                echo -e "Systemd will execute hd-rum-transcode with commandline: \n\n hd-rum-transcode 8M 5004 ${return_etcd_clients_ip} \n after a one-second delay"
+                KEYNAME=REFLECTOR_ARGS
+                ugargs="--tool hd-rum-transcode 8M 5004 ${processed_clients_ip}"
+                KEYVALUE="${ugargs}"
+                echo -e "Generating initial reflector clients list.."
+                echo "${return_etcd_clients_ip}" > /home/wavelet/reflector_clients_ip.txt
+                write_etcd_global
+                sleep 1
+                echo "
+                [Unit]
+                Description=UltraGrid AppImage Reflector
+                After=network-online.target
+                Wants=network-online.target
+                [Service]
+                ExecStart=/usr/local/bin/UltraGrid.AppImage ${ugargs}
+                [Install]
+                WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.Reflector.service
+                systemctl --user daemon-reload
+                systemctl --user restart UltraGrid.Reflector.service
+                echo -e "Reload_reflector flag is being set to 0.."
+                KEYNAME=reload_reflector
+                KEYVALUE=0
+                write_etcd_global
+        else
+                echo -e "It appears there are no populated client IP's for the reflector, sleeping for two minutes and exiting.  The reflector reload watcher will re-launch this script at that time."
+                sleep 120
+                KEYNAME=reload_reflector
+                KEYVALUE="1"
+                write_etcd_global
+                exit 0
+        fi
+}
+
+set -x
+exec >/home/wavelet/wavelet_reflector.log 2>&1
+wavelet_reflector

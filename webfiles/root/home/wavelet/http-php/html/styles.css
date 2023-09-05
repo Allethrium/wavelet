@@ -1,0 +1,90 @@
+<style>
+.button {
+    background:#03a9f4;
+    transition:0.6s;
+    border:4px solid white;
+    border-radius:2em;
+    color:white;
+    font-style:italic;
+    padding:0.5em;
+    transition:0.6s;
+}   
+.ocean {
+    background:#03a9f4;
+    transition:0.6s;
+    border:4px solid white;
+    border-radius:2em;
+    color:white;
+    font-style:italic;
+    padding:0.5em;
+    transition:0.6s;
+}
+
+#inputs_section
+{
+    background:#4681f4;
+    transition:0.6s;
+    border:4px solid white;
+    border-radius:2em;
+    color:white;
+    font-style:italic;
+    padding:0.5em;
+    transition:0.6s;
+}
+.inputs
+{
+    background:#999999;
+    transition:0.6s;
+    border:2px solid white;
+    border-radius:1em;
+    color:white;
+    font-style:italic;
+    padding:.5em;
+    transition:0.6s;
+    margin-top:5px;
+}   
+.inputs:hover {
+    border:2px solid #3f51b5;
+    background:#5c6bc0;
+    transition:0.6s;
+}
+.inputs:focus {
+    border:2px solid #000000;
+    background:#5c6bc0;
+    transition:0.6s;
+}
+
+#codecs_section
+{
+    background:#4681f4;
+    transition:0.6s;
+    border:4px solid white;
+    border-radius:1em;
+    color:white;
+    font-style:italic;
+    padding:0.5em;
+    transition:0.6s;
+}
+.codecs
+{
+    background:#404040;
+    transition:0.6s;
+    border:2px solid white;
+    border-radius:1em;
+    color:white;
+    font-style:italic;
+    padding:.5em;
+    transition:0.6s;
+    margin-top:5px;
+}   
+.codecs:hover {
+    border:2px solid #3f51b5;
+    background:#5c6bc0;
+    transition:0.6s;
+}
+.codecs:focus {
+    border:2px solid #000000;
+    background:#5c6bc0;
+    transition:0.6s;
+}
+</style>
