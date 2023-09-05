@@ -1,0 +1,69 @@
+Tested Hardware:
+
+PC's:
+
+	12th Gen Intel Core-I5 or better CPU
+	Required for VA-API / QuickSync video core
+
+	WiFi 6 networking via PCIe is highly recommended, 5ghz wifi capability is effectively a requirement. USB works, however does introduce some overhead.
+	B/G Band WiFi works, but very poorly.
+
+	Older CPU's will work, but may struggle particularly with more advanced HEVC/VP9/AV1 codecs
+
+	Not tested-
+		NVIDIA HW Acceleration (no available hw platform)
+		AMD HW Acceleration (no available hw platform)
+
+	No issues with AMD CPU's for software-based decoding, but has only been briefly tested in home lab.
+
+tested SBC's: 
++	manufacturer images
++	armbian
++	fedora ARM
+
+	Khadas:
+		VIM1			-	Too Slow, HDMI output issues.
+		VIM3S			-	Functional, but blacks are crushed on video output.  HW Video acceleration and therefore custom kernel is a requirement.
+		Edge2			-	WiFi 5ghz is broken, requires proprietary kernel for proper video acceleration, non-starter until these issues are fixed.
+	
+	Orange Pi:
+		OrangePi 4LTS	-	Software acceleration only, struggles on nearly every codec
+
+	Odroid:
+		Odroid M1		-	Manufacturer is missing wifi kernel modules, struggles on most codecs due to older design
+
+	Raspberry Pi:
+		?
+
+	Here, I think we are waiting for that one SBC unicorn with proper mainline kernel support.  Suggestions are more than welcome.
+
+
+
+Networking Equipment:
+
+Wired:
+	Extreme Networks switch (8port)
+	TP-Link unmanaged switch
+
+
+Wireless:
+	Ruckus R350 Access Point 	-	Currently the recommended standard
+	Ubiquiti AC-Pro				-	Functional but lacking WiFi6 support
+	Ubiquiti UAP				-	B/G band WiFi too slow, worked on one or two decoders but performance was spotty
+	Extreme Networks			-	AP needs a standalone mode, many enterprise AP's are not suitable for this reason
+
+Network Cards:
+	Hawking WiFi 6 USB 			-	Functional but USB adds unacceptable overhead
+	Intel Built-In ??			-	No issues
+	Mellanox CX2				-	To be tested (RoCE/RDMA support to further lower latency?)
+
+HDMI Capture Devices:
+	MageWell HDMI Capture Pro 	-	Fully supported.  Can be spotty on HDMI input due to HDCP issues
+	LG USB Capture Cards		-	Fully supported.  Large delay when spinning up V4L2 capture, however.  Less fussy about inputs than the Magewell
+	Decklink					-	On shopping list, would also like to add SDI support
+
+USB Input Devices:
+	IPEVO Ziggy Document Camera - 	Fully supported @ 1080/30fps.   On some machines refuses to capture at above 15fps, however.
+	ELMO document camera		-	not yet tested
+	TESIRA ex-UBT				-	not yet tested (linux support on website isn't alluded to)
+	?							- 	This is likely where we'll see the most devices eventually.
