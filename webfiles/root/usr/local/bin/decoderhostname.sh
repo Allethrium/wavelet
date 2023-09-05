@@ -2,8 +2,6 @@
 # sets a unique (FOR THIS LAN - *NOT* A UUID!) four-char alphanumeric for the hostname
 # The customizer should have already set the wifi password in the line below by utilizing SED for the task.
 # If not, you will need to modify it yourself and re-add this file to the http server's .tar.gz archive.
-wifipassword="xnSLvFKyyzNXd0wuN79lfC0oEBzdhsg4"
-networkssid="Wavelet-1"
 detect_self(){
 UG_HOSTNAME=$(hostname)
 	echo -e "Hostname is $UG_HOSTNAME \n"

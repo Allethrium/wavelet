@@ -1,0 +1,900 @@
+# This file aims to provide a usable base CoreOS image that runs Server tasks.
+# ignition:
+# version: 3.0.0
+---
+variant: fcos
+version: 1.5.0
+kernel_arguments:
+  should_exist:
+    - nosmt
+    - threadirqs
+    - mitigations=off
+    - ip=192.168.1.32::192.168.1.1:255.255.255.0:svr.wavelet.local::on
+    - nameserver=192.168.1.1
+    - nameserver=9.9.9.9
+    # - net.ifnames=0
+    # - biosdevname=0
+# Configure static networking. LAB IP is always 192.168.1.32
+# GW always 192.168.1.1
+# The DNSMasq.conf file is set for same values
+# Changing these will break the install process for everything
+# A bootstrap script may be written to preconfig this.
+# UltraGrid AppImage
+storage:
+  files:
+    - path: /usr/local/bin/UltraGrid.AppImage
+      mode: 0755
+      overwrite: true
+      contents:
+        source: http://192.168.1.254:8080/UltraGrid-1.8.4-x86_64.AppImage
+    # Detect NetworkManager name and set as static script
+    - path: /usr/local/bin/configure_ethernet.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/configure_ethernet.sh
+    # Set hostname
+    - path: /etc/hostname
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: svr.wavelet.local
+    # Skel .bashrc, profile customizations and Q.O.L improvements can go here
+    - path: /etc/skel/.bashrc
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/skel_bashrc.txt
+    - path: /etc/skel/.bash_profile
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/skel_profile.txt
+    # Wavelet user (b/c default doesn't use skel b/c we aren't using useradd -m)
+    - path: /home/wavelet/.bashrc
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/skel_bashrc.txt
+    - path: /home/wavelet/.bash_profile
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/skel_profile.txt
+    # Registries.conf to define local container registry
+    # may change with prod. certs
+    - path: /etc/containers/registries.conf.d/10-wavelet.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/10-wavelet.conf
+    # Automation to spin up and install HTTPD server in a container
+    - path: /usr/local/bin/build_httpd.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/build_httpd.sh
+    # Automation to spin up and install nginx/php for control surface
+    - path: /usr/local/bin/build_nginx_php.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/build_nginx_php.sh
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    # Web files for the control component
+    - path: /home/wavelet/http-php.tar.xz
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/http-php.tar.xz
+    # WiFi Password
+    - path: /var/wifipw.creds
+      mode: 0664
+      overwrite: true
+      contents:
+        inline: |
+         xnSLvFKyyzNXd0wuN79lfC0oEBzdhsg4
+    # Enable proxy for dnf.conf for all the good it may do us..
+    - path: /etc/dnf/dnf.conf
+      mode: 0664
+      overwrite: true
+      contents:
+        inline: |
+         [main]
+         gpgcheck=True
+         installonly_limit=3
+         clean_requirements_on_remove=True
+         best=False
+         skip_if_unavailable=True
+         fastestmirror=1
+         max_parallel_downloads=2
+    # Intel OneAPI RPM Repository
+    - path: /etc/yum.repos.d/oneAPI.repo
+      mode: 0664
+      overwrite: true
+      contents:
+        inline: |
+         [oneAPI]
+         name=Intel® oneAPI repository
+         baseurl=https://yum.repos.intel.com/oneapi
+         enabled=0
+         gpgcheck=1
+         repo_gpgcheck=1
+         gpgkey=https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+    # Local "Index" repo - for server only.  This vastly accelerates the speed at which the imaging process operates!
+    - path: /etc/yum.repos.d/index.repo
+      mode: 0664
+      overwrite: true
+      contents:
+        inline: |
+         [index]
+         name=Index local repo
+         baseurl=http://192.168.1.254:8080/
+         enabled=1
+         gpgcheck=0
+         repo_gpgcheck=0
+         priority = 1
+         module_hotfixes = 1
+    # PolKit entries for systemd services the wavelet user is allowed to manage
+    - path: /etc/polkit-1/rules.d/1337-wavelet.rules
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          polkit.addRule(function(action, subject) {
+          if (action.id == "org.freedesktop.systemd1.manage-units") {
+              polkit.log("action=" + action)
+              polkit.log("subject=" + subject)
+              polkit.log("unit="+action.lookup("unit"))
+              polkit.log("verb="+action.lookup("verb"))
+              if (action.lookup("unit") == "systemd-resolved.service" ||
+                  action.lookup("unit") == "dnsmasq.service") {
+                  var verb = action.lookup("verb");
+                  if (verb == "start" || verb == "stop" || verb == "restart" || verb == "enable" || verb == "disable") {
+                      polkit.log("returning YES")
+                      return polkit.Result.YES;
+                  }
+              }
+          }
+          polkit.log("returning NO") });
+    # PolKit entries for systemd services the wavelet user is allowed to manage
+    - path: /etc/polkit-1/rules.d/1338-wavelet-wifi.rules
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          [Allow wi-fi scans for all users]
+          Identity=unix-user:*
+          Action=org.freedesktop.NetworkManager.wifi.scan
+          ResultAny=yes
+          ResultInactive=yes
+          ResultActive=yes
+    # Wavelet user does NOT have access to change hostname on the server
+    # hence missing the polkit entry that's in the decoder ignition file!
+    # disable systemd-resolved to free up port 53 and allow dnsmasq to launch
+    - path: /etc/systemd/resolved.conf.d/10-dnsmasq.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          [Resolve]
+          DNSStubListener=no
+    # dnsmasq.conf to define local DNS server environment
+    - path: /etc/dnsmasq.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/dnsmasq.conf
+    # Automation to spin up and install dnsmasq as a SYSTEM service
+    - path: /usr/local/bin/build_dnsmasq.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/build_dnsmasq.sh
+    # Define system performance settings
+    - path: /etc/sysctl.d/90-sysrq.conf
+      mode: 0644
+      contents:
+        inline: |
+          kernel.sysrq = 0
+    - path: /etc/sysctl.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          net.core.wmem_max = 8388608
+          net.core.rmem_max = 72990720   # for uncompressed 8K
+          net.ipv4.ip_unprivileged_port_start=53
+    - path: /etc/modprobe.d/i915.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          options i915 enable_guc=2
+    # Prevent SSHD from generating older key types
+    - path: /etc/ssh/sshd_config.d/20-enable-passwords.conf
+      mode: 0644
+      contents:
+        inline: |
+          # Fedora CoreOS disables SSH password login by default.
+          # Enable it.
+          # This file must sort before 40-disable-passwords.conf.
+          PasswordAuthentication yes
+    # Prevent SSHD from accepting anything other than modern ed25519 keytypes.
+    - path: /etc/ssh/sshd_config.d/30-ed25519-only.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          PubkeyAcceptedKeyTypes ssh-ed25519-cert-v01@openssh.com,ssh-ed25519
+    # We don't want rolling updates enabled via Zincati, as this is an offline appliance
+    - path: /etc/zincati/config.d/90-disable-auto-updates.toml
+      mode: 0644
+      contents:
+        inline: |
+          # Disable Zincati service auto-updates
+          [updates]
+          enabled = false
+    # Setup script for RPMFusion depends
+    - path: /usr/local/bin/overlay_rpm.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/overlay_rpm.sh
+    # Setup script for local RPM repo
+    - path: /usr/local/bin/local_rpm.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/local_rpm.sh
+    # Setup script for local RPM repo
+    - path: /usr/local/bin/rpmfusion_repo.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/rpmfusion_repo.sh
+    # Define Udev rules for USB inputs, download appropriate scriptfiles
+    - path: /etc/udev/rules.d/80-wavelet-encoder.rules
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          ACTION=="add", ENV{ID_BUS}=="usb", SUBSYSTEM=="usb", RUN+="/usr/local/bin/udev_call.sh"
+          ACTION=="remove", ENV{ID_BUS}=="usb", SUBSYSTEM=="usb", RUN+="/usr/local/bin/removedevice.sh"
+    - path: /usr/local/bin/udev_call.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/udev_call.sh
+    # Handles USB device detection, effectively the 'driver' for display inputs.
+    - path: /usr/local/bin/detectv4l.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/detectv4l.sh
+    # Should be called by udev and clean up removed devices upon USB disconnection.
+    - path: /usr/local/bin/removedevice.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/removedevice.sh
+    # Shell script to test encoderflag and reset value once actioned
+    - path: /usr/local/bin/monitor_encoderflag.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/monitor_encoderflag.sh
+    - path: /usr/local/bin/wavelet_client_poll.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/wavelet_client_poll.sh
+    - path: /usr/local/bin/wavelet_reflector.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/wavelet_reflector.sh
+    - path: /usr/local/bin/wavelet_controller.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/wavelet_controller.sh
+    - path: /usr/local/bin/wavelet_encoder.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/wavelet_encoder.sh
+    - path: /usr/local/bin/wavelet_textgen.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/wavelet_textgen.sh
+    - path: /usr/local/bin/start_reflector.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/start_reflector.sh
+    - path: /usr/local/bin/start_appimage.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/start_appimage.sh
+    # Automation to download and install UltraGrid in a container w/ multiplatform support
+    - path: /usr/local/bin/build_controller.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/build_controller.sh
+    # run_ug.sh script that configures and calls UG launchers
+    - path: /usr/local/bin/run_ug.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/run_ug.sh
+    # run_ug.sh script that configures and calls UG launchers
+    - path: /usr/local/bin/wavelet_livestream.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/wavelet_livestream.sh
+    # Installation script to DL UG appimage and set systemd user units
+    - path: /usr/local/bin/build_ug.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/build_ug.sh
+    - path: /usr/local/bin/decoderhostname.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/decoderhostname.sh
+    - path: /usr/local/bin/promote_to_server.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/promote_to_server.sh
+    - path: /usr/local/bin/wavelet_init.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/wavelet_init.sh
+    - path: /usr/local/bin/interaction_script.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/interaction_script.sh
+    # Sway config
+    # Installation script to DL UG appimage and set systemd user units
+    - path: /home/wavelet/.config/sway/config
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/config.sway
+    - path: /home/wavelet/.config/waybar/config
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/config.waybar
+    # For SWAY - StyleS.css is for the controller surface elsewhere..
+    - path: /home/wavelet/.config/waybar/style.css
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/style.css
+    - path: /home/wavelet/.config/waybar/time.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/time.sh
+    # Image file, NY state seal
+    - path: /home/wavelet/seal.mp4
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://www.andymelville.net/wavelet/seal.mp4
+# Systemd user units
+    # systemD user unit for wavelet initialization
+    # Called with other initializations when Sway is executed from;
+    # autologin@tty1->.bashrc->sway->build_ug->run_ug->init
+    - path: /home/wavelet/.config/systemd/user/wavelet_init.service
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+         [Unit]
+         Description=Wavelet Controller Service
+         After=network-online.target etcd-member.service
+         Wants=network-online.target
+         [Service]
+         Type=simple
+         ExecStart=/usr/local/bin/wavelet_init.sh
+         [Install]
+         WantedBy=default.target
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    # Etcd watch controller input channel service
+    - path: /home/wavelet/.config/systemd/user/wavelet_controller.service
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=Wavelet Controller - etcd input triggers orchestration
+          After=network-online.target etcd-member.service
+          Wants=network-online.target
+          [Service]
+          Environment=ETCDCTL_API=3
+          RemainAfterExit=yes
+          ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch input -w simple -- sh -c "/usr/local/bin/wavelet_controller.sh"
+          [Install]
+          WantedBy=default.target
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    # Etcd watch reflectorflag service
+    - path: /home/wavelet/.config/systemd/user/watch_reflectorreload.service
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=Watches etcd for encoder restart
+          After=network-online.target etcd-member.service
+          Wants=network-online.target
+          [Service]
+          Environment=ETCDCTL_API=3
+          ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch --prefix decoderip/ -w simple -- sh -c "/usr/local/bin/wavelet_client_poll.sh"
+          [Install]
+          WantedBy=default.target
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    # Etcd watch encoderflag service
+    - path: /home/wavelet/.config/systemd/user/watch_encoderflag.service
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=Watches etcd for encoder restart
+          After=network-online.target etcd-member.service
+          Wants=network-online.target
+          [Service]
+          Environment=ETCDCTL_API=3
+          ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch encoder_restart -w simple -- sh -c "/usr/local/bin/monitor_encoderflag.sh"
+          [Install]
+          WantedBy=default.target
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    # UltraGrid AppImage Launcher - this is a placeholder unit file, it's always overwritten by the script calling it.
+    - path: /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=UltraGrid AppImage executable
+          After=network-online.target etcd-member.service
+          Wants=network-online.target
+          [Service]
+          Environment=ETCDENDPOINT=192.168.1.32:2379
+          ExecStart=/usr/local/bin/UltraGrid.AppImage $(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/UG_ARGS --print-value-only)
+          [Install]
+          WantedBy=default.target
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    # Wavelet Encoder - runs the encoder.sh script which calls UltraGrid.AppImage and wavelet_textgen as necessary.
+    - path: /home/wavelet/.config/systemd/user/wavelet_encoder.service
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=Encoder service
+          After=network-online.target etcd-member.service
+          Wants=network-online.target
+          [Service]
+          ExecStart=/usr/local/bin/wavelet_encoder.sh
+          [Install]
+          WantedBy=default.target
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    # Reflector script service - populates all reflector data, sets flags, calls Reflector proper.
+    - path: /home/wavelet/.config/systemd/user/wavelet_reflector.service
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=UltraGrid AppImage executable
+          After=network-online.target etcd-member.service
+          Wants=network-online.target
+          [Service]
+          ExecStart=/usr/local/bin/wavelet_reflector.sh
+          [Install]
+          WantedBy=default.target
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    # UltraGrid reflector - placeholder, it's overwritten in the reflector script, like the AppImage unit file!
+    - path: /home/wavelet/.config/systemd/user/UltraGrid.Reflector.service
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=UltraGrid AppImage executable
+          After=network-online.target etcd-member.service
+          Wants=network-online.target
+          [Service]
+          Environment=ETCDENDPOINT=192.168.1.32:2379
+          ExecStart=/usr/local/bin/UltraGrid.AppImage $(etcdctl --endpoints=${ETCDENDPOINT} get REFLECTOR_ARGS --print-value-only)
+          [Install]
+          WantedBy=default.target
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    # run_ug.sh determines system local functions and calls the AppImage launcher as appropriate.
+    - path: /home/wavelet/.config/systemd/user/run_ug.service
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=Wavelet Encoder/Decoder runner
+          After=network-online.target etcd-member.service
+          Wants=network-online.target
+          [Service]
+          ExecStart=/usr/local/bin/run_ug.sh
+          [Install]
+          WantedBy=default.target
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    # build_ug.sh determines system local functions and preconfigures the user systemd services appropriately for next boot
+    - path: /home/wavelet/.config/systemd/user/build_ug.service
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=Wavelet Initial Setup Service
+          After=network-online.target etcd-member.service
+          Wants=network-online.target
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/bin/build_ug.sh
+          [Install]
+          WantedBy=default.target
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    # .htaccess dynamic index listing
+    - path: /home/wavelet/http/.htaccess
+      mode: 0664
+      overwrite: true
+      contents:
+        inline: |
+         Options +Indexes
+         <Limit GET POST>
+         order deny,allow
+         deny from all
+         allow from 192.168.1.0/24
+         </Limit>
+         IndexIgnore tabele_remote.php
+         IndexIgnore demo.txt
+         IndexIgnore functions.php
+         IndexIgnore config.php
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    # Linger services for containers/systemd units which the wavelet user is required to access
+    - path: /var/lib/systemd/linger/wavelet
+      mode: 0644
+  directories:
+    - path: /home/wavelet/.config/systemd/user/default.target.wants
+      mode: 0755
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    - path: /etc/systemd/resolved.conf.d
+      mode: 0644
+    - path: /home/wavelet/.config
+      mode: 0755
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    - path: /home/wavelet/dnsmasq
+      mode: 0755
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    - path: /home/wavelet/.config/systemd
+      mode: 0755
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    - path: /home/wavelet/.config/systemd/user
+      mode: 0755
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    - path: /home/wavelet/registry
+      mode: 0755
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    - path: /home/wavelet/etcd
+      mode: 0755
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    - path: /home/wavelet/buildah
+      mode: 0755
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    - path: /home/wavelet/http
+      mode: 0755
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    - path: /home/wavelet/http-php/html
+      mode: 0755
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    - path: /home/wavelet/http-php/nginx
+      mode: 0755
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    - path: /home/wavelet/http/ignition
+      mode: 0755
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    - path: /var/tftpboot
+      mode: 0755
+      user:
+        name: dnsmasq
+      group:
+        name: dnsmasq
+# user accounts, passwords and pubkeys
+passwd:
+  users:
+    - name: wavelet-root
+      uid: 9337
+      groups:
+        - wheel
+        - sudo
+      password_hash: waveletrootpassword
+      home_dir: /home/wavelet-root
+    - name: wavelet
+      uid: 1337
+      # N.B ignition can't yet create groups properly as of 1.5
+      # This might need to be done via postinstall.sh
+      groups:
+        # - wavelet
+        # - audio
+        # - video
+        # - render
+        # - rdma
+        # - kvm
+      password_hash: waveletuserpassword
+      ssh_authorized_keys:
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHZUyuVxgJINkkdZ9qHf7MlwPYvIRIuSJTUgk7XSQ23f
+      home_dir: /home/wavelet
+# Configure SYSTEM systemd units
+systemd:
+  units:
+    # Install necessary base files
+    - name: configure_svr_ip.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Configures desired server IP address
+        ConditionFirstBoot=yes
+        Wants=network-online.target
+        After=network-online.target
+        After=multi-user.target
+        [Service]
+        Type=oneshot
+        ExecStart=-/usr/local/bin/configure_ethernet.sh
+        [Install]
+        WantedBy=multi-user.target
+    # Installs necessary OS packages (non-patent encumbered)
+    - name: install-overlayed-rpms.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Install Overlay Packages
+        ConditionFirstBoot=yes
+        Wants=network-online.target
+        After=network-online.target
+        After=install-overlayed-rpms-rpmfusion-repo.service
+        After=multi-user.target
+        [Service]
+        Type=oneshot
+        ExecStart=rpm-ostree install -A wget fontawesome-fonts wl-clipboard nnn \
+        mako sway bemenu rofi-wayland lxsession sway-systemd waybar \
+        foot vim powerline powerline-fonts vim-powerline \
+        NetworkManager-wifi iw wireless-regdb wpa_supplicant \
+        cockpit-bridge cockpit-networkmanager cockpit-system cockpit-ostree cockpit-podman \
+        buildah rdma git iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd \
+        dnf yum-utils createrepo \
+        libsrtp python3-pip srt srt-libs libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
+        ImageMagick oneapi-level-zero oneVPL oneVPL-intel-gpu intel-opencl \
+        intel-mediasdk mesa-dri-drivers mesa-vulkan-drivers \
+        mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
+        mesa-libxatracker libva libva-utils intel-gmmlib intel-ocloc
+        ExecStartPost=touch /var/rpm-ostree-overlay.complete
+        [Install]
+        WantedBy=multi-user.target
+    # Installs additional OS packages w/ RPMFusion.
+    - name: install-overlayed-rpms-rpmfusion-repo.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Install RPMFusion Repository
+        Wants=network-online.target
+        After=network-online.target
+        After=dnsmasq.service
+        After=multi-user.target
+        Before=install-overlayed-rpms.service
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/local/bin/rpmfusion_repo.sh
+        ExecStartPost=touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
+        [Install]
+        WantedBy=multi-user.target
+    - name: install-overlayed-rpms-rpmfusion-pkgs.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Install RPMFusion Repository
+        Wants=network-online.target
+        After=network-online.target
+        After=dnsmasq.service
+        After=multi-user.target
+        ConditionPathExists=!/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+        ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.repo.complete
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/local/bin/overlay_rpm.sh
+        ExecStartPost=touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+        [Install]
+        WantedBy=multi-user.target
+    # Cockpit for remote management
+    - name: cockpit.enable.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Enable Cockpit WS
+        After=network-online.target check_and_wait_rpmfusion_pkgs.target
+        Wants=network-online.target
+        [Service]
+        Type=oneshot
+        ExecStartPre=podman pull quay.io/cockpit/ws
+        ExecStartPre=podman container runlabel INSTALL quay.io/cockpit/ws:latest
+        ExecStart=systemctl enable cockpit.service --now
+        [Install]
+        WantedBy=multi-user.target
+    # Container registry to host and serve containers to local clients
+    - name: registry.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Run local container registry
+        After=network-online.target
+        Wants=network-online.target check_and_wait.target
+        [Service]
+        Type=forking
+        Restart=on-failure
+        RemainAfterExit=yes
+        ExecStartPre=-/bin/podman kill registry
+        ExecStartPre=-/bin/podman rm registry
+        ExecStart=/bin/podman run --privileged -d --name registry -p 5000:5000 -v /home/wavelet/registry/:/var/lib/registry/:z --restart=always registry:2
+        ExecStop=/bin/podman stop registry
+        [Install]
+        WantedBy=multi-user.target
+# Disable resolved, enable dnsmasq
+    - name: switch-resolved-to-dnsmasq.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Switch DNS resolution to DNSmasq
+        After=network-online.target check_and_wait.target
+        Wants=network-online.target
+        [Service]
+        Type=oneshot
+        ExecStartPre=systemctl stop systemd-resolved.service
+        ExecStart=systemctl enable dnsmasq.service --now
+        ExecStartPost=systemctl start systemd-resolved.service
+        [Install]
+        WantedBy=multi-user.target
+    - name: local_rpm.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Sets up a local RPM repo
+        After=network-online.target check_and_wait.target
+        Wants=network-online.target
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/local/bin/local_rpm.sh
+        ExecStartPost=-touch /var/local_rpm.complete
+        [Install]
+        WantedBy=multi-user.target
+    - name: http-php-files.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Extracts the controller surface files
+        After=network-online.target check_and_wait.target
+        Wants=network-online.target
+        [Service]
+        Type=oneshot
+        ExecStart=tar -xf /home/wavelet/http-php.tar.xz -C /home/wavelet/http-php/
+        ExecStartPost=-touch /var/nginx.complete
+        ExecStartPost=chown -R wavelet:wavelet /home/wavelet
+        [Install]
+        WantedBy=multi-user.target
+    # Mask docker entirely
+    - name: docker.service
+      mask: true
+    # Mask irqbalance
+    - name: irqbalance.service
+      mask: true
+    # Unmask dnsmasq
+    - name: dnsmasq.service
+      mask: false
+    # Mask NetworkManager-wait-online.service
+    # - name: NetworkManager-wait-online.service
+    #   mask: true
+    # Autologin dropin service
+    # Causes a login loop until appropriate packages are installed
+    # Service will start a sequence that will launch the Sway DM
+    # Calls a number of user systemd units which provision Wavelet services.
+    # check_and_wait.target
+    - name: check_and_wait.target
+      contents: |
+       [Unit]
+       TimeoutStartSec=infinity
+       ConditionPathExists=/var/rpm-ostree-overlay.complete
+       ExecStart=/usr/bin/sleep 1000
+       RemainAfterExit=yes
+    # Actual unit
+    - name: getty@tty1.service
+      dropins:
+        - name: autologin-core.conf
+          contents: |
+           [Unit]
+           Wants=check_and_wait.target
+           After=check_and_wait.target
+           [Service]
+           # Override Execstart in main unit
+           ExecStart=
+           # Add new Execstart with `-` prefix to ignore failure`
+           ExecStart=-/usr/sbin/agetty --autologin wavelet --noclear %I $TERM
