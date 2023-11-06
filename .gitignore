@@ -26,3 +26,7 @@ fedora-coreos-38.20230722.3.0-live.x86_64.iso.sig
 decoder.ign
 server.ign
 TODOS
+decoder_custom.yml
+encoder_custom.yml
+wavelet_server.iso
+wavelet_decoder.iso
