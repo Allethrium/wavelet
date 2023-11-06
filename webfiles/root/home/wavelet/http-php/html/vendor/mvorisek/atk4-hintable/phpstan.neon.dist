@@ -1,0 +1,91 @@
+includes:
+    - phar://phpstan.phar/conf/bleedingEdge.neon
+    # remove once https://github.com/phpstan/extension-installer/issues/36 is fixed
+    - phpstan-ext.neon
+
+services:
+    -
+        factory: Mvorisek\Atk4\Hintable\Phpstan\SeedDmrtExtension(Mvorisek\Atk4\Hintable\Tests\Phpstan\SeedDemo\Bodyshop, acceptCar, 1)
+        tags:
+            - phpstan.broker.dynamicMethodReturnTypeExtension
+    -
+        factory: Mvorisek\Atk4\Hintable\Phpstan\SeedDmrtExtension(Mvorisek\Atk4\Hintable\Tests\Phpstan\SeedDemo\Car, fromSeed, 0)
+        tags:
+            - phpstan.broker.dynamicStaticMethodReturnTypeExtension
+
+parameters:
+    level: 6
+    paths:
+        - .
+    excludePaths:
+        - vendor
+
+    ignoreErrors:
+        # relax strict rules
+        - '~^Variable (static )?(property access|method call) on .+\.~'
+
+        # TODO https://github.com/phpstan/phpstan/issues/8311#issuecomment-1509916189
+        -
+            message: '~^Doing instanceof PHPStan\\Type\\Constant\\ConstantStringType is error-prone and deprecated\. Use Type::getConstantStrings\(\) instead\.$~'
+            path: 'src/Phpstan/AssertSamePhpstanTypeRule.php'
+            count: 1
+        -
+            message: '~^Doing instanceof PHPStan\\Type\\IntersectionType is error-prone and deprecated\.$~'
+            path: 'src/Phpstan/SeedDmrtExtension.php'
+            count: 1
+        -
+            message: '~^Doing instanceof PHPStan\\Type\\ObjectType is error-prone and deprecated\. Use Type::isObject\(\) or Type::getObjectClassNames\(\) instead\.$~'
+            path: 'src/Phpstan/SeedDmrtExtension.php'
+            count: 1
+        -
+            message: '~^Doing instanceof PHPStan\\Type\\Constant\\ConstantArrayType is error-prone and deprecated\. Use Type::getConstantArrays\(\) instead\.$~'
+            path: 'src/Phpstan/SeedDmrtExtension.php'
+            count: 1
+        -
+            message: '~^Doing instanceof PHPStan\\Type\\Constant\\ConstantStringType is error-prone and deprecated\. Use Type::getConstantStrings\(\) instead\.$~'
+            path: 'src/Phpstan/SeedDmrtExtension.php'
+            count: 1
+        -
+            message: '~^Doing instanceof PHPStan\\Type\\Generic\\GenericClassStringType is error-prone and deprecated\. Use Type::isClassStringType\(\) and Type::getClassStringObjectType\(\) instead\.$~'
+            path: 'src/Phpstan/SeedDmrtExtension.php'
+            count: 1
+
+        # https://github.com/phpstan/phpstan/issues/4945
+        # https://github.com/phpstan/phpstan/issues/6175
+        -
+            message: '~^Method Mvorisek\\Atk4\\Hintable\\Tests\\Core\\MethodMock::(methodName|methodNameFull|methodClosure|methodClosureProtected)\(\) should return Mvorisek\\Atk4\\Hintable\\Core\\MagicMethod<static\(Mvorisek\\Atk4\\Hintable\\Tests\\Core\\MethodMock\), (string|Closure)> but returns Mvorisek\\Atk4\\Hintable\\Core\\MagicMethod<\$this\(Mvorisek\\Atk4\\Hintable\\Tests\\Core\\MethodMock\), (string|Closure)>\.$~'
+            path: 'src/Core/MethodTrait.php'
+            count: 4
+        -
+            message: '~^Method Mvorisek\\Atk4\\Hintable\\Tests\\Core\\PropMock::(propName|propNameFull)\(\) should return Mvorisek\\Atk4\\Hintable\\Core\\MagicProp<static\(Mvorisek\\Atk4\\Hintable\\Tests\\Core\\PropMock\), string> but returns Mvorisek\\Atk4\\Hintable\\Core\\MagicProp<\$this\(Mvorisek\\Atk4\\Hintable\\Tests\\Core\\PropMock\), string>\.$~'
+            path: 'src/Core/PropTrait.php'
+            count: 2
+
+        -
+            message: '~^Function class_uses\(\) is a runtime reflection concept that might not work in PHPStan because it uses fully static reflection engine\. Use objects retrieved from ReflectionProvider instead\.$~'
+            path: 'src/Phpstan/AssertSamePhpstanTypeRule.php'
+            count: 1
+        -
+            message: '~^Trait Mvorisek\\Atk4\\Hintable\\Data\\HintableModelTrait is used zero times and is not analysed\.$~'
+            path: 'src/Data/HintableModelTrait.php'
+            count: 1
+        -
+            message: '~^Creating new ReflectionMethod is a runtime reflection concept that might not work in PHPStan because it uses fully static reflection engine\. Use objects retrieved from ReflectionProvider instead\.$~'
+            path: 'src/Phpstan/SeedDmrtExtension.php'
+            count: 1
+        -
+            message: '~^Extending PHPStan\\Reflection\\Annotations\\AnnotationMethodReflection is not covered by backward compatibility promise\. The class might change in a minor PHPStan version\.$~'
+            path: 'src/Phpstan/WrapMethodReflection.php'
+            count: 1
+        -
+            message: '~^Calling PHPStan\\Reflection\\Annotations\\AnnotationMethodReflection::__construct\(\) is not covered by backward compatibility promise\. The method might change in a minor PHPStan version\.$~'
+            path: 'src/Phpstan/WrapMethodReflection.php'
+            count: 1
+        -
+            message: '~^Extending PHPStan\\Reflection\\Annotations\\AnnotationPropertyReflection is not covered by backward compatibility promise\. The class might change in a minor PHPStan version\.$~'
+            path: 'src/Phpstan/WrapPropertyReflection.php'
+            count: 1
+        -
+            message: '~^Calling PHPStan\\Reflection\\Annotations\\AnnotationPropertyReflection::__construct\(\) is not covered by backward compatibility promise\. The method might change in a minor PHPStan version\.$~'
+            path: 'src/Phpstan/WrapPropertyReflection.php'
+            count: 1

@@ -102,6 +102,8 @@ event_encoder(){
 	echo -e "reloading systemctl user daemon, moving to run_ug"
 	systemctl --user daemon-reload
 	systemctl --user enable run_ug.service --now
+	echo -e "Enabling watch_inputdevices.service, it is now appropriate to attach and remove USB video capture devices"
+	systemctl --user enable watch_inputdevices.service --now
 	etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/wavelet_build_completed" -- "${KEYVALUE}"
 	sleep 2
 }

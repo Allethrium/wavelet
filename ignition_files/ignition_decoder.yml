@@ -14,6 +14,7 @@ kernel_arguments:
     - nosmt
     - threadirqs
     - mitigations=off
+    # - preempt=full
 storage:
   files:
     # UltraGrid AppImage
@@ -138,7 +139,7 @@ storage:
       overwrite: true
       contents:
         inline: |
-          PubkeyAcceptedKeyTypes ssh-ed25519-cert-v01@openssh.com,ssh-ed25519
+          PubkeyAcceptedKeyTypes ssh-ed25519-cert-v01@openssh.com,ssh-ed25519 
     # We don't want rolling updates enabled via Zincati, as this is an offline appliance
     - path: /etc/zincati/config.d/90-disable-auto-updates.toml
       mode: 0644
@@ -420,7 +421,7 @@ passwd:
         # - kvm
       password_hash: waveletuserpassword
       ssh_authorized_keys:
-        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHZUyuVxgJINkkdZ9qHf7MlwPYvIRIuSJTUgk7XSQ23f
+        - PUBKEYGOESHERE
       home_dir: /home/wavelet
 #
 # Configure SYSTEM systemd units
@@ -464,10 +465,11 @@ systemd:
         buildah rdma git iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd \
         dnf yum-utils createrepo \
         libsrtp python3-pip srt srt-libs libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
-        ImageMagick oneapi-level-zero oneVPL oneVPL-intel-gpu intel-opencl \
-        intel-mediasdk mesa-dri-drivers mesa-vulkan-drivers \
+        ImageMagick oneapi-level-zero oneVPL oneVPL-intel-gpu intel-opencl intel-level-zero \
+        intel-media-driver intel-mediasdk mesa-dri-drivers mesa-vulkan-drivers \
         mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
-        mesa-libxatracker libva libva-utils intel-gmmlib intel-ocloc
+        mesa-libxatracker libva libva-utils intel-gmmlib intel-ocloc \
+        wireplumber
         ExecStartPost=touch /var/rpm-ostree-overlay.complete
         [Install]
         WantedBy=multi-user.target

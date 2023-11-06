@@ -22,6 +22,10 @@ event_vp9sw="E"
 event_vp9hw="F"
 event_rav1esw="G"
 event_av1hw="H"
+event_foursplit="W"
+event_twosplit="X"
+event_pip1="Y"
+event_pip2="Z"
 
 # Define standard default variables for encoders
 uv_videoport="5004"
@@ -29,9 +33,9 @@ uv_audioport="5006"
 uv_reflector="192.168.1.32"
 uv_obs="192.168.1.31"
 uv_livestream="192.168.1.30"
-uv_encoder="-c libavcodec:encoder=libx265:gop=60:bitrate=10M"
-uv_gop="30"
-uv_bitrate="10M"
+uv_encoder="-c libavcodec:encoder=h264_vaapi:gop=12:bitrate=20M"
+uv_gop="12"
+uv_bitrate="20M"
 uv_islivestreaming="0"
 
 
@@ -135,6 +139,13 @@ case $event in
 	(F)		event_vp9hw 	&& echo "VP-9 Hardware video codec selected, updating encoder variables";;
 	(G)		event_rav1esw	&& echo "|*****||EXPERIMENTAL AV1 RAV1E codec selected, updating encoder vaiables||****|";;
 	(H)		event_av1hw		&& echo "|*****||EXPERIMENTAL AV1 VA-API codec selected, updating encoder vaiables||****|";;
+	#
+	# Multiple input modes go here (I wonder if there's a better, matrix-based approach to this?)
+	#
+	(W) echo "Four-way panel split activated \n"						;current_event="event_foursplit"	;wavelet-foursplit;;
+	(X) echo "Two-way panel split activated \n"							;current_event="event_twosplit"		;wavelet-twosplit;;
+	(Y) echo "Picture-in-Picture 1 activated \n"						;current_event="event_pip1"		;wavelet-pip1;;
+	(Z) echo "Picture-in-Picture 2 activated \n"						;current_event="event_pip2"		;wavelet-pip2;;
 esac
 }
 
@@ -365,45 +376,45 @@ wavelet-courtroomcam() {
 
 event_x264hw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=h264_vaapi:gop=12:bitrate=33M"
+	KEYVALUE="libavcodec:encoder=h264_vaapi:gop=12:bitrate=20M"
 	write_etcd_global
-	echo -e "x264 Software acceleration activated, Bitrate 330M \n"
+	echo -e "x264 Software acceleration activated, Bitrate 20M \n"
 }
 
 event_x264sw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx264:gop=12:bitrate=33M"
+	KEYVALUE="libavcodec:encoder=libx264:gop=12:bitrate=20M"
 	write_etcd_global
-	echo -e "x264 Software acceleration activated, Bitrate 33M \n"
+	echo -e "x264 Software acceleration activated, Bitrate 20M \n"
 }
 
 event_x265sw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx265:gop=12:bitrate=33M:subsampling=444:q=12:bpp=10"
+	KEYVALUE="libavcodec:encoder=libx265:gop=12:bitrate=15M:subsampling=444:q=12:bpp=10"
 	write_etcd_global
-	echo -e "x265 Software acceleration activated, Bitrate 33M \n"
+	echo -e "x265 Software acceleration activated, Bitrate 15M \n"
 }	
 
 event_x265hw() {
 # working on tweaking these values to something as reliable as possible.
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=hevc_qsv:gop=12:bitrate=33M:bpp=10:subsampling=444:q=0:scenario=remotegaming:profile=main10"
+	KEYVALUE="libavcodec:encoder=hevc_qsv:gop=12:bitrate=15M:bpp=10:subsampling=444:q=0:scenario=remotegaming:profile=main10"
 	write_etcd_global
-	echo -e "x265 Hardware acceleration activated, Bitrate 33M \n"
+	echo -e "x265 Hardware acceleration activated, Bitrate 15M \n"
 }
 
 event_vp9sw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libvpx-vp9:gop=12:bitrate=33M"
+	KEYVALUE="libavcodec:encoder=libvpx-vp9:gop=12:bitrate=20M"
 	write_etcd_global
-	echo -e "VP9 Software acceleration activated, Bitrate 33M \n"
+	echo -e "VP9 Software acceleration activated, Bitrate 20M \n"
 }
 
 event_vp9hw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=vp9_qsv:gop=12:bitrate=33M:q=0:subsampling=444:bpp=10"
+	KEYVALUE="libavcodec:encoder=vp9_qsv:gop=12:bitrate=20M:q=0:subsampling=444:bpp=10"
 	write_etcd_global
-	echo -e "VP9 Hardware acceleration activated, Bitrate 33M \n"
+	echo -e "VP9 Hardware acceleration activated, Bitrate 20M \n"
 }
 
 event_rav1esw() {
@@ -415,11 +426,64 @@ event_rav1esw() {
 
 event_av1hw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=av1_qsv"
+	KEYVALUE="libavcodec:encoder=av1_qsv:preset=veryfast"
 	write_etcd_global
 	echo -e "AV1 Hardware acceleration activated \n"
 }
 
+wavelet-foursplit() {
+# W
+# Witness Camera setup appropriately for detail view on Counsel/Witness/area to ensure Witness is not being coached etc.
+	current_event="wavelet-foursplit"
+	KEYNAME=uv_input
+	KEYVALUE=FOURSPLIT
+	write_etcd_global
+        # Set encoder restart flag to 1
+        KEYNAME=encoder_restart
+        KEYVALUE="1"
+        write_etcd_global
+}
+
+wavelet-twosplit() {
+# W
+# Witness Camera setup appropriately for detail view on Counsel/Witness/area to ensure Witness is not being coached etc.
+	current_event="wavelet-twosplit"
+	KEYNAME=uv_input
+	KEYVALUE=TWOSPLIT
+	write_etcd_global
+        # Set encoder restart flag to 1
+        KEYNAME=encoder_restart
+        KEYVALUE="1"
+        write_etcd_global
+}
+
+wavelet-pip1() {
+# W
+# Witness Camera setup appropriately for detail view on Counsel/Witness/area to ensure Witness is not being coached etc.
+# Doesn't currently work, so disable.
+	current_event="wavelet-pip1"
+	KEYNAME=uv_input
+	KEYVALUE=PIP1
+	write_etcd_global
+        # Set encoder restart flag to 1
+        KEYNAME=encoder_restart
+        KEYVALUE="1"
+        write_etcd_global
+}
+
+wavelet-pip2() {
+# W
+# Witness Camera setup appropriately for detail view on Counsel/Witness/area to ensure Witness is not being coached etc.
+# Doesn't currently work, so disable.
+	current_event="wavelet-pip2"
+	KEYNAME=uv_input
+	KEYVALUE=PIP2
+	write_etcd_global
+        # Set encoder restart flag to 1
+        KEYNAME=encoder_restart
+        KEYVALUE="1"
+        write_etcd_global
+}
 
 ###
 #

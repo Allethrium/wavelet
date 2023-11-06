@@ -11,6 +11,11 @@ read_etcd(){
         echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
 }
 
+read_etcd_inputs(){
+        printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/inputs/${KEYNAME} --print-value-only)
+        echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
+}
+
 read_etcd_prefix(){
         printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix $(hostname)/${KEYNAME} --print-value-only)
         echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
@@ -41,6 +46,7 @@ read_etcd_clients_ip() {
 
 event_encoder(){
 # Register yourself with etcd as an encoder and your IP address
+# 10/23 can add if/then logic + increment to support multiple encoders in future?
 KEYNAME=encoder_ip_address
 KEYVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
 write_etcd_global
@@ -81,6 +87,14 @@ read_etcd
 			;;
 			COURTROOM) 				echo -e "Re-encoding stream from a wide-angle Courtroom Camera"			&& encoder_event_set_courtroom
 			;;
+			FOURSPLIT) 				echo -e "Four-way panel split activated \n"								&& encoder_event_set_fourway
+			;;
+			TWOSPLIT)				echo -e "Four-way panel split activated \n"								&& encoder_event_set_twoway
+			;;
+			PIP1)					echo -e "Four-way panel split activated \n"								&& encoder_event_set_pip1
+			;;
+			PIP2)					echo -e "Four-way panel split activated \n"								&& encoder_event_set_pip2
+			;;
 			*) 						echo -e "Input Key is incorrect, quitting"								&& :
 			;;
 			esac
@@ -103,7 +117,7 @@ read_etcd
 			write_etcd
 		}
 		encoder_event_set_seal(){
-			# Always set this to SW x265, everything else breaks due to pixel format issues w/ FFMPEG/lavc
+			# Always set this to SW x265, *everything else breaks* due to pixel format issues w/ FFMPEG/lavc
 			KEYNAME=uv_encoder
 			KEYVALUE="libavcodec:encoder=libx265:gop=12:bitrate=33M:subsampling=444:q=12:bpp=10"
 			write_etcd_global
@@ -118,7 +132,7 @@ read_etcd
 	# If it's not under my hostname, do nothing and terminate here, let the encoder with that device deal with it."
 		encoder_event_set_documentcam(){
 			KEYNAME=v4lDocumentCam
-			read_etcd
+			read_etcd_inputs
 			KEYNAME=uv_input_cmd
 			KEYVALUE=$printvalue
 				case ${printvalue} in
@@ -129,13 +143,12 @@ read_etcd
 					"")				echo -e "The there is no Document Camera on this machine, or there is no video input present at all, ending."; exit 0
 					;;
 				esac
-			write_etcd
 			/usr/local/bin/wavelet_textgen.sh
 		}
 		encoder_event_set_hdmi1(){
 			# assumed a Logitech HDMI-USB adapter for Counsel
 			KEYNAME=hdmi_logitech
-			read_etcd
+			read_etcd_inputs
 			KEYNAME=uv_input_cmd
 			KEYVALUE=$printvalue
 				case ${printvalue} in
@@ -149,7 +162,7 @@ read_etcd
 		}
 		encoder_event_set_hdmi2(){
 			KEYNAME=hdmi_magewell
-			read_etcd
+			read_etcd_inputs
 			KEYNAME=uv_input_cmd
 			KEYVALUE=$printvalue
 				case ${printvalue} in
@@ -163,7 +176,7 @@ read_etcd
 		}
 		encoder_event_set_hybrid(){
 			KEYNAME=hdmi3
-			read_etcd
+			read_etcd_inputs
 			KEYNAME=uv_input_cmd
 			KEYVALUE=$printvalue
 				case ${printvalue} in
@@ -178,7 +191,7 @@ read_etcd
 		encoder_event_set_witness(){
 			# If we do this right, this should be a Decklink/SDI input at some point.
 			KEYNAME=close_camera
-			read_etcd
+			read_etcd_inputs
 			KEYNAME=uv_input_cmd
 			KEYVALUE=$printvalue
 				case ${printvalue} in
@@ -194,7 +207,7 @@ read_etcd
 			# If we do this right, this should be a Decklink/SDI input at some point.
 			# Might be worth investigating remote PTZ options to configure a camera for long shots appropriately.
 			KEYNAME=far_camera
-			read_etcd
+			read_etcd_inputs
 			KEYNAME=uv_input_cmd
 			KEYVALUE="-t rtsp://admin:cmiNDI2021@192.168.1.20/live/stream0"
 			write_etcd
@@ -206,6 +219,183 @@ read_etcd
 					;;
 				esac
 	}
+		encoder_event_set_fourway(){
+		# This block will attempt various four-way panel configurations depending on available devices
+		# We need to get a little bit cleverer about how we parse all of these so that they can be assembled dynamically.
+		# List all devices from etcd_inputs, parse and then assign them randomly to a panel?
+		# That way, if someone is not satisfied with the layout, hitting it again will change the order of the inputs..
+			KEYNAME=v4lDocumentCam
+			read_etcd_inputs
+				case ${printvalue} in
+					*)	echo -e "This device has a Document Camera connected, proceeding.."
+									PANEL1=$printvalue
+					;;
+					"")				echo -e "The there is no Document Camera on this machine, a blank panel displayed instead."; exit 0
+					;;
+				esac
+			printvalue=""	
+			KEYNAME=hdmi_logitech
+			read_etcd_inputs
+				case ${printvalue} in
+					*)	echo -e "This device has a Logitech HDMI input connected, proceeding.."
+									PANEL2=$printvalue
+					;;
+					"")				echo -e "The there is no LG Input on this machine, a blank panel displayed instead."; exit 0
+					;;
+				esac
+			KEYNAME=hdmi_logitech_1
+			read_etcd_inputs
+				case ${printvalue} in
+					*)	echo -e "This device has a Logitech HDMI input connected, proceeding.."
+									PANEL2=$printvalue
+					;;
+					"")				echo -e "The there is no 2nd LG Input on this machine, a blank panel displayed instead."; exit 0
+					;;
+				esac
+			KEYNAME=hdmi_magewell
+			read_etcd_inputs
+				case ${printvalue} in
+					*)	echo -e "This device has a Magewell HDMI input connected, proceeding.."
+									PANEL3=$printvalue
+					;;
+					"")				echo -e "The there is no Magewell input on this machine, a blank panel displayed instead."; exit 0
+									#Can't use the seal image because it causes UG to crash in swmix mode
+									PANEL3=""
+					;;
+				esac
+
+			KEYNAME=hdmi_magewell_1
+			read_etcd_inputs
+				case ${printvalue} in
+					*)	echo -e "This device has an additional Magewell HDMI input connected, proceeding.."
+									PANEL4=$printvalue
+					;;
+					"")				echo -e "The there is no 2nd Magewell input on this machine, a blank panel displayed instead."; exit 0
+									#PANEL3="-t file:/home/wavelet/seal.mp4:loop"
+									PANEL4=""
+					;;
+				esac
+			KEYNAME=uv_input_cmd
+			KEYVALUE="-t swmix:1920:1080:30 ${PANEL1} ${PANEL2} ${PANEL3} ${PANEL4}"
+			write_etcd
+			/usr/local/bin/wavelet_textgen.sh
+		}
+		encoder_event_set_twoway(){
+		# This block will attempt various four-way panel configurations depending on available devices
+			KEYNAME=v4lDocumentCam
+			read_etcd_inputs
+				case ${printvalue} in
+					*)	echo -e "This device has a Document Camera connected, proceeding.."
+									PANEL1=$printvalue
+					;;
+					"")				echo -e "The there is no Document Camera on this machine, a blank panel displayed instead."; exit 0
+					;;
+				esac
+
+			KEYNAME=hdmi_logitech
+			read_etcd_inputs
+				case ${printvalue} in
+					*)	echo -e "This device has a Logitech HDMI input connected, proceeding.."
+									PANEL2=$printvalue
+					;;
+					"")				echo -e "The there is no LG Input on this machine, a blank panel displayed instead."; exit 0
+					;;
+				esac
+
+			KEYNAME=hdmi_magewell
+			read_etcd_inputs
+				case ${printvalue} in
+					*)	echo -e "This device has a Magewell HDMI input connected, proceeding.."
+									PANEL3=$printvalue
+					;;
+					"")				echo -e "The there is no Magewell input on this machine, a blank panel displayed instead."; exit 0
+					;;
+				esac
+
+			KEYNAME=uv_input_cmd
+			KEYVALUE="-t swmix:1920:1080:30:UYVY ${PANEL1} ${PANEL2}"
+			write_etcd
+			/usr/local/bin/wavelet_textgen.sh
+		}
+		encoder_event_set_pip1(){
+		# This block will attempt various four-way panel configurations depending on available devices
+		# Doesn't seem to work - I think we need UG to be able to define a path because it is not where the .rc file needs to be.
+			KEYNAME=v4lDocumentCam
+			read_etcd_inputs
+				case ${printvalue} in
+					*)	echo -e "This device has a Document Camera connected, proceeding.."
+									PANEL1=$printvalue
+					;;
+					"")				echo -e "The there is no Document Camera on this machine, seal image will be displayed instead."; exit 0
+					;;
+				esac
+			KEYNAME=hdmi_logitech
+			read_etcd_inputs
+				case ${printvalue} in
+					*)	echo -e "This device has a Logitech HDMI input connected, proceeding.."
+									PANEL2=$printvalue
+					;;
+					"")				echo -e "The there is no LG Input on this machine, seal image will be displayed instead."; exit 0
+					;;
+				esac
+			KEYNAME=hdmi_magewell
+			read_etcd_inputs
+				case ${printvalue} in
+					*)	echo -e "This device has a Magewell HDMI input connected, proceeding.."
+									PANEL3=$printvalue
+					;;
+					"")				echo -e "The there is no Magewell input on this machine, seal image will be displayed instead."; exit 0
+					;;
+				esac
+			echo "1920:1080:30
+${PANEL1} 0	0	1920	1080
+${PANEL2} 1620	780	1900	1060" > /home/wavelet/.ug-swmix.rc
+			KEYNAME=uv_input_cmd
+			KEYVALUE="-t swmix:file=/home/wavelet/.ug-swmix.rc"
+			write_etcd
+			/usr/local/bin/wavelet_textgen.sh
+		}
+		encoder_event_set_pip2(){
+		# This block will attempt various four-way panel configurations depending on available devices
+		# Doesn't seem to work - I think we need UG to be able to define a path because it is not where the .rc file needs to be.
+			KEYNAME=v4lDocumentCam
+			read_etcd_inputs
+				case ${printvalue} in
+					*)	echo -e "This device has a Document Camera connected, proceeding.."
+									PANEL1=$printvalue
+					;;
+					"")				echo -e "The there is no Document Camera on this machine, seal image will be displayed instead."; exit 0
+									#PANEL1="-t file:/home/wavelet/seal.mp4:loop"
+					;;
+				esac
+			KEYNAME=hdmi_logitech
+			read_etcd_inputs
+				case ${printvalue} in
+					*)	echo -e "This device has a Logitech HDMI input connected, proceeding.."
+									PANEL2=$printvalue
+					;;
+					"")				echo -e "The there is no LG Input on this machine, seal image will be displayed instead."; exit 0
+					;;
+				esac
+			KEYNAME=hdmi_magewell
+			read_etcd_inputs
+				case ${printvalue} in
+					*)	echo -e "This device has a Magewell HDMI input connected, proceeding.."
+									PANEL3=$printvalue
+					;;
+					"")				echo -e "The there is no Magewell input on this machine, seal image will be displayed instead."; exit 0
+					;;
+				esac
+			echo "1920:1080:30
+${PANEL2}   0   0 1920 1080
+${PANEL3} 1620 780 1900 1060" > /home/wavelet/.ug-swmix.rc
+			KEYNAME=uv_input_cmd
+			KEYVALUE="-t swmix:file=/home/wavelet/.ug-swmix.rc"
+			write_etcd
+			/usr/local/bin/wavelet_textgen.sh
+		}
+
+
 
 
 # Main
@@ -243,8 +433,9 @@ destinationipv4="192.168.1.32"
 
 # Currently -f V:rs:200:250 on the end specifies reed-solomon forward error correction 
 # Audio runs as a multiplied stream, if enabled at all.
-echo -e "Assembled command is: \n --tool uv $filtervar -f V:rs:200:250 ${inputvar} -c ${encodervar} -P ${uv_videoport} -m 9000 ${destinationipv4} \n"
-ugargs="--tool uv $filtervar -f V:rs:200:255 ${inputvar} -c ${encodervar} -P ${video_port} -m 9000 ${destinationipv4}"
+# Disabled traffic shaping for additional speed
+echo -e "Assembled command is: \n --tool uv $filtervar -f V:rs:200:250 -l unlimited ${inputvar} -c ${encodervar} -P ${uv_videoport} -m 9000 ${destinationipv4} \n"
+ugargs="--tool uv $filtervar -f V:rs:200:255 -l unlimited ${inputvar} -c ${encodervar} -P ${video_port} -m 9000 ${destinationipv4}"
 KEYNAME=UG_ARGS
 KEYVALUE=${ugargs}
 write_etcd

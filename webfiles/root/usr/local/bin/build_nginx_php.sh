@@ -31,6 +31,11 @@ mv pod-http-php.service ${SCRHOME}/.config/systemd/user
 
 chown wavelet:wavelet ${SCRHOME}/.config/systemd/user
 
+# Apparently, I broke decompressing the web server components someplace else, this fixes that until I can determine what's going on
+d /home/wavelet
+rm -rf http-php
+tar -xvf http-php.tar.xz
+chown -R wavelet:wavelet http-php
 
 systemctl --user daemon-reload
 systemctl --user enable pod-http-php.service --now

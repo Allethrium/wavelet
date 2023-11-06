@@ -2,9 +2,7 @@
 #
 # Upon the connection of a new USB device, this script is called by Udev rules.  Note Udev calls a bootstrap script which THEN calls this script,
 # because the usb subsystem is locked until the rule execution is completed!
-# It will attempt to list the most recently installed v4l device
-
-# Can also call UltraGrid directly to try and use the same mechanism to parse available devices, explore this route..
+# It will attempt to make sense of available v4l devices and update etcd, which should then call another set of services to update the WebUI.
 
 #Etcd Interaction
 ETCDURI=http://192.168.1.32:2379/v2/keys
@@ -24,6 +22,11 @@ write_etcd(){
         echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
 }
 
+write_etcd_inputs(){
+        etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/inputs/${KEYNAME}" -- "${KEYVALUE}"
+        echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname) /inputs/"
+}
+
 write_etcd_global(){
         etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
         echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
@@ -37,6 +40,7 @@ read_etcd_clients_ip() {
         return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
 }
 
+
 sense_device() {
 # Old, only here to laugh at.	
 	sleep .25
@@ -47,8 +51,8 @@ sense_device() {
 	# store device path in a variable 
 	v4l_device_path=$(ls -Artl /dev/v4l/by-id | tail -n 2 | awk '{print $11}' | sort -nk 2 | head -1 | awk -F/ '{print $3}')
 	echo $v4l_device_path
-}
 
+}
 sense_devices() {
 # Alternate sense which refreshes ALL usb devices every time something new is plugged in - may work better?
 # Probably also here to laugh at, but is how it works currently.
@@ -61,14 +65,28 @@ sense_devices() {
 	array=("${array[@]}")
 	echo -e "Looping through array.."
 	for i in "${array[@]}"
-	do
-		device_string_long=$i
-        echo -e "Finding /dev/video$ symlink for $i"
-        v4l_device_path=$(ls -Artl $i* | awk '{print $11}' | awk -F/ '{print $3}')
-        echo -e "Device path ${v4l_device_path} located for $i \n"
-        detect
-	done
+		do
+			device_string_long=$i
+        	echo -e "Finding /dev/video$ symlink for $i"
+        	v4l_device_path=$(ls -Artl $i* | awk '{print $11}' | awk -F/ '{print $3}')
+        	echo -e "Device path ${v4l_device_path} located for $i \n"
+        	detect
+		done
 	shopt -u nullglob
+}
+
+sense_devices_ug() {
+# Another alternate method that calls and parses UltraGrid's input to generate a list of available devices.
+# MIGHT work better with multiple devices from the same vendor
+string=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t v4l2:help | grep /dev/video &&)
+readarray -td '' array< <(awk '{ gsub(/Device /,"\0"); print; }' <<<"$string, "); unset 'array[0]';
+for i in "${array[@]}";
+        do
+			v4l_device_path=$(echo $i | awk '/dev/video {match($0, /video/); print substr($0, RSTART - 5, RLENGTH + 6);}')
+			echo -e "${v4l_device_path} located for ${i} \n"
+			device_string_long=${i}
+			event_newdevice
+        done
 }
 
 
@@ -81,26 +99,29 @@ sense_devices() {
 # NOTE - *Integrated_Webcam_HD*)  is IGNORED in the event you want to run a server off the laptop and 
 # NOT have it run as an encoder.
 detect() {
-	echo "Device string is ${device_string_long}"
-	case $device_string_long in
-	*IPEVO*) 					echo -e "IPEVO Document Camera device detected \n" && event_ipevo
-	;;
-	*Logitech_Screen_Share*)			echo -e "Logitech HDMI-USB Capture device detected \n" && event_lghdmi
-	;;
-	*Magewell*)					echo -e "Magewell USB Capture HDMI device detected \n" && event_magewellhdmi
-	;;
-	usb-Intel_R__RealSense_TM__Depth_Camera_435*)	echo -e "Intel Realsense D435 Detected \n" && event_realsense_d435
-	;;
-	*) 						echo -e "This device is not yet documented, or not a video USB device. Unsupported. If you think the device should be supported, contact the project maintainers.\n" && exit 0
-	;;
-	esac
+        echo "Device string is ${device_string_long}"
+        case $device_string_long in
+        *IPEVO*)                                        echo -e "IPEVO Document Camera device detected \n" && event_ipevo
+        ;;
+        *"Logitech Screen Share"*)                      echo -e "Logitech HDMI-USB Capture device detected \n" && event_logitech
+        ;;
+        *'USB Capture HDMI:'*)                          echo -e "Magewell USB Capture HDMI device detected \n" && event_magewellhdmi
+        ;;
+        *"USB Capture HDMI+"*)                          echo -e "Magewell USB Capture HDMI device + detected \n" && event_magewellhdmi
+        ;;
+        usb-Intel_R__RealSense_TM__Depth_Camera_435*)   echo -e "Intel Realsense D435 Detected \n" && event_realsense_d435
+        ;;
+        *)                                              echo -e "This device is not yet documented, or not a video USB device. Unsupported. If you think the device should be supported, contact the project maintainers.\n" && exit 0
+        ;;
+        esac
 }
+
 
 event_ipevo() {
 # each of these blocks contains specific configuration options that must be preset for each device
-	KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:convert=RGB:device=/dev/${v4l_device_path}"
+	KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"
 	KEYNAME=v4lDocumentCam
-	write_etcd
+	write_etcd_inputs
 	KEYNAME=INPUT_DEVICE_PRESENT
 	KEYVALUE=1
 	write_etcd
@@ -127,22 +148,73 @@ event_elmo() {
 }
 
 event_lghdmi() {
-	KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=/dev/${v4l_device_path}"
-	KEYNAME=hdmi_logitech
-	write_etcd
-	KEYNAME=INPUT_DEVICE_PRESENT
-	KEYVALUE="1"
-	write_etcd
+#	KEYNAME=${device_string_long}
+#	read_etcd
+#	if [ -n "${printvalue}" ]; then
+#		echo "there is already a Logitech HDMI capture device attached, incrementing inputs"
+#		KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"
+#		KEYNAME=hdmi_logitech_1
+#		write_etcd_inputs
+#		# We do not need to write INPUT_DEVICE_PRESENT, as this should already be tagged
+#	else
+#		echo "This etcd key is empty, therefore no Logitech HDMI device is present and we can continue normally.."
+
+
+		KEYNAME=${device_string_long}
+		KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"
+#		KEYNAME=hdmi_logitech
+		write_etcd_inputs
+		KEYNAME=INPUT_DEVICE_PRESENT
+		KEYVALUE="1"
+		write_etcd
+		# We will implement another etcd watcher service that will update the webui every time something changes
+		KEYNAME="/interface/${device_string_long}"
+		KEYVALUE="enabled"
+		write_etcd
+	fi
+}
+
+event_newdevice() {
+	# 10/27/2023 - new idea - just use the actual device string as the key and find some way to update it directly in the webUI?
+		#
+		v4lshort=$(echo $v4l_device_path | sed 's|/dev/||g')
+		
+		KEYNAME=${device_string_long}
+		KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"
+		write_etcd_inputs
+		KEYNAME=INPUT_DEVICE_PRESENT
+		KEYVALUE="1"
+		write_etcd
+		# We will implement another etcd watcher service that will update the webui every time something changes within this prefix
+		KEYNAME="/interface/${device_string_long}"
+		KEYVALUE="$(hostname)/$v4l_device_path"
+		write_etcd_global
+		KEYNAME=new_device_attached
+		KEYVALUE=1
+		write_etcd_global
+	fi	
 }
 
 event_magewellhdmi() {
 # The Magewell supports 1080p @ 60FPS, so we will set that here
-	KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/60:convert=RGB:device=/dev/${v4l_device_path}"
+# I write something here to increment for multiple inputs.
 	KEYNAME=hdmi_magewell
-	write_etcd
-	KEYNAME=INPUT_DEVICE_PRESENT
-	KEYVALUE="1"
-	write_etcd
+	read_etcd
+	if [ -n "${printvalue}" ]; then
+    	echo "there is already a MageWell HDMI capture device attached, incrementing inputs"
+    	KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/60:convert=RGB:device=${v4l_device_path}"
+		KEYNAME=hdmi_magewell_1
+		write_etcd_inputs
+		# We do not need to write INPUT_DEVICE_PRESENT, as this should already be tagged
+	else
+    	echo "This etcd key is empty, therefore no MageWell HDMI device is present and we can continue normally.."
+		KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/60:convert=RGB:device=${v4l_device_path}"
+		KEYNAME=hdmi_magewell
+		write_etcd_inputs
+		KEYNAME=INPUT_DEVICE_PRESENT
+		KEYVALUE="1"
+		write_etcd
+	fi
 }
 
 event_realsense_d435() {
@@ -157,7 +229,7 @@ event_realsense_d435() {
 # 7) the Controller script would need modding to actually utilize this..
 	KEYVALUE="-t v4l2:codec=YUYV:size=1280x720:tpf=1/10:convert=RGB:device=/dev/video6"
 	KEYNAME=realsensed435
-	write_etcd
+	write_etcd_inputs
 	KEYNAME=INPUT_DEVICE_PRESENT
 	KEYVALUE="1"
 	write_etcd	
@@ -166,7 +238,7 @@ event_realsense_d435() {
 event_unk() {
 	# placeholder for future devices to be cut and pasted in - write_etc for input device present is disabled here
 	# we don't want any old unknown device messing with operation.
-	KEYVALUE="-t v4l2:codec=?:size=1920x1080:tpf=1/30:convert=RGB:device=/dev/${v4l_device_path}"
+	KEYVALUE="-t v4l2:codec=?:size=1920x1080:tpf=1/30:convert=RGB:device={v4l_device_path}"
 	KEYNAME=unknown_input_placeholder
 	write_etcd
 	KEYNAME=INPUT_DEVICE_PRESENT
@@ -174,9 +246,6 @@ event_unk() {
 	#write_etcd
 }
 
-id
-whoami
-exec >/home/wavelet/v4ldevices.log 2>&1
+exec >/home/wavelet/detectv4l.log 2>&1
 set -x
-sense_devices
-detect
+sense_devices_ug

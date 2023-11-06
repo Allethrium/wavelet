@@ -8,8 +8,11 @@ exec >/home/wavelet/udev_call.log 2>&1
 echo "Udev sorter invoked by USB activity, waiting 2 seconds and calling sorter.."
 sleep .5
 check=$@
-if [ "${check}" = "removed" ]; then
-	/bin/su -c "/usr/local/bin/removedevice.sh" - wavelet &
+if [ "${check}" = "remove" ]; then
+	echo -e " \n UDEV called with remove, executing device enumeration to remove stale devices.\n  
+				Note all devices with v4l paths which do not exist will be pruned.. \n"
+	/bin/su -c "/usr/local/bin/wavelet_removedevice.sh" - wavelet &
 	else
-	/bin/su -c "/usr/local/bin/detectv4l.sh" - wavelet &
+	echo -e " \n UDEV called without remove, assuming device has been added, calling detectv4l.sh \n"
+	/bin/su -c "/usr/local/bin/wavelet_detectv4l.sh" - wavelet &
 fi

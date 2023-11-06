@@ -4,7 +4,9 @@ $input = $_POST['inVar'];
 $memory = memory_get_usage();
 $strlength = strlen($input);
 
-if ($strlength >= 2) {
+
+// Sanitize inputs - hard to do anything nefarious with three chars
+if ($strlength >= 3) {
         echo nl2br("Input exceeds maximum post value, ending process.");
 } else
     echo nl2br("\n Input is {$input}\n ");

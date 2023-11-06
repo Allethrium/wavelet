@@ -9,6 +9,8 @@ Redistribution and use in any form is permitted provided that the following cond
 
 3. Use of this system in a commercial or for-profit context requires written permission
 
+# Determine licensing restrictions for CoreOS, etcd, vaapi/oneAPI and other core dependencies
+# Credit hardware platform stuff once we scope it in.
 
 
 UltraGrid - A High Definition Collaboratory

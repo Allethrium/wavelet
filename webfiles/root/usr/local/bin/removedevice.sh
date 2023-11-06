@@ -11,12 +11,18 @@ ETCDURI=http://192.168.1.32:2379/v2/keys
 ETCDENDPOINT=192.168.1.32:2379
 read_etcd(){
         printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME} --print-value-only)
-        echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
+        echo -e "Key Name ${KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
 }
 
 read_etcd_global(){
         printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
-        echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for Global value"
+        echo -e "Key Name ${KEYNAME} read from etcd for value ${printvalue} for Global value"
+}
+
+read_etcd_inputs_list(){
+		# If we are clean, this should generate a nice list of /dev/video devices we can test
+		mapfile -t my_array < <etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/inputs/"" --prefix)
+		echo -e "list of values ${printvalue} read for ${keyname} within the /inputs/ directory on this hostname folder"
 }
 
 write_etcd(){
@@ -43,9 +49,10 @@ delete_etcd(){
 
 
 detect_etcd(){
-	KEYNAME=v4lDocumentCam
-	read_etcd
+# 10/27/2023 this needs complete rewrite, it's horrible
+	read_etcd_inputs_list
 	echo -e "${printvalue} has been returned in etcd query \n"
+	# probably really want these in an array, then foreach test and remove if no longer there
 	workingpath=$(echo $printvalue | awk -F 'device=' 'NF>1{ sub(/^ */,"",$NF); sub(/ .*/,"",$NF); print $NF }')
 	echo -e "\n extracted ${workingpath} from detectv4l.sh set command line..\n"
 	if [ ! -d ${workingpath} ]; then

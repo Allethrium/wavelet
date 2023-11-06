@@ -1,13 +1,15 @@
-<!doctype html>
+<!DOCTYPE html>
 <link rel="stylesheet" href="styles.css">
 <html>
 <head>
+<script src="jquery-1.11.3.min.js"></script>
 </head>
-<body>
 <form action="interface.php" method="post">
-<div>
+<div id="INPUT_SECTION">
 <div id="inputs_section">
-        Select Input:
+    <br>
+    &nbsp;Select Input:
+    <br>
         <li class="class.inputs">
         <ul class="">
         <li><button class="inputs" name="inVar" type="submit" value="1" onclick=\"myForm.action='./page.php';return true;\">Blank Screen</li>
@@ -18,22 +20,63 @@
         <li><button class="inputs" name="inVar" type="submit" value="0" onclick=\"myForm.action='./page.php';return true;\">Toggle Livestreaming</li>
         </ul>
 </div>
+<div id="IMAGE_ROUTING">
+<div id="image_routing">
+ <header>  
+    &nbsp;Multiple Image Feeds:
+    <br>
+    <div>
+    </div>
+    <li class="class.inputs">
+    <ul class="">
+    <li><button class="inputs" name="inVar" type="submit" value="W" onclick=\"myForm.action='./page.php';return true;\">Four Panel Split</li>
+    <li><button class="inputs" name="inVar" type="submit" value="X" onclick=\"myForm.action='./page.php';return true;\">Two Panel Vertical Split</li>
+<!-- These options currently do not work due to input limitations on UG. -->
+<!--    <li><button class="inputs" name="inVar" type="submit" value="Y" onclick=\"myForm.action='./page.php';return true;\">Picture-In-Picture 1</li>
+    <li><button class="inputs" name="inVar" type="submit" value="Z" onclick=\"myForm.action='./page.php';return true;\">Picture-In-Picture 2</li>
+-->
+    </li>
+    </ul>
+</div>
+</div>
 <br>
 <br>
 <div id="codecs_section">
-         Select Codec:
+    <br>
+    &nbsp;Codec Selection:
+    <div>
+    </div>
         <li class="class.codecs">
         <ul class="">
         <li><button class="codecs" name="inVar" type="submit" value="A" onclick=\"myForm.action='./page.php';return true;\">H.264 SW</li>
-        <li><button class="codecs" name="inVar" type="submit" value="B" onclick=\"myForm.action='./page.php';return true;\">H.264 QSV</li>
+        <li><button class="codecs" name="inVar" type="submit" value="B" onclick=\"myForm.action='./page.php';return true;\">H.264 QSV (recommended)</li>
         <li><button class="codecs" name="inVar" type="submit" value="C" onclick=\"myForm.action='./page.php';return true;\">HEVC SW</li>
         <li><button class="codecs" name="inVar" type="submit" value="D" onclick=\"myForm.action='./page.php';return true;\">HEVC QSV</li>
         <li><button class="codecs" name="inVar" type="submit" value="E" onclick=\"myForm.action='./page.php';return true;\">VP9 SW</li>
-        <li><button class="codecs" name="inVar" type="submit" value="F" onclick=\"myForm.action='./page.php';return true;\">VP9 HW</li>
+        <li><button class="codecs" name="inVar" type="submit" value="F" onclick=\"myForm.action='./page.php';return true;\">VP9 QSV</li>
+        <li><button class="codecs" name="inVar" type="submit" value="H" onclick=\"myForm.action='./page.php';return true;\">AV1 QSV</li>
         </ul>
-        Note some codec options may not combine well with some video input sources.
-        x264 or HEVC Software (SW) modes are the most widely compatible.
+            <br>
+            &nbsp;Note some codec options may not combine well with some video input sources.<br>
+            &nbsp;x264 or HEVC Software (SW) modes are the most widely compatible.<br>
+            &nbsp;AV1 is a very new, experimental codec.<br>
+            <br>
 </div>
 </form>
 </body>
+<script>
+function updatePage() {
+  $.ajax({
+    url: "http://192.168.1.32:8180/update.php",
+    success: function(data) {
+      $("#output").text(data);
+    },
+  });
+}
+</script>
 </html>
+
+
+Use javascript templating library to render php returns via AJAX into html -->
+Mustache
+Handlebars

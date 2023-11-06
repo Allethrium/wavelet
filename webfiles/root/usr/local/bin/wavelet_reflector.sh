@@ -76,6 +76,24 @@ wavelet_reflector() {
                 KEYNAME=reload_reflector
                 KEYVALUE=0
                 write_etcd_global
+        #       Audio reflector, IP settings identical to video reflector so we don't need to do all that again
+                KEYNAME=AUDIO_REFLECTOR_ARGS
+                ugargs="--tool hd-rum-transcode 8M 5006 ${processed_clients_ip}"
+                KEYVALUE="${ugargs}"
+                write_etcd_global
+                echo "
+                [Unit]
+                Description=UltraGrid AppImage Audio Reflector
+                After=network-online.target
+                Wants=network-online.target
+                [Service]
+                ExecStart=/usr/local/bin/UltraGrid.AppImage ${ugargs}
+                [Install]
+                WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.Audio.Reflector.service
+                systemctl --user daemon-reload
+                systemctl --user restart UltraGrid.Audio.Reflector.service
+                echo -e "Reload_reflector flag is being set to 0.."
+
         else
                 echo -e "It appears there are no populated client IP's for the reflector, sleeping for two minutes and exiting.  The reflector reload watcher will re-launch this script at that time."
                 sleep 120
