@@ -1,4 +1,9 @@
-
+TODOS
+TODO-OCT
+testedhardware.list
+wavelet.pub
+wavelet_id_ed25519.pub
+fedora-coreos-38.20230722.3.0-live.x86_64.iso
 wavelet_decoders
 wavelet_encoders
 wavelet_evidence
@@ -30,3 +35,5 @@ decoder_custom.yml
 encoder_custom.yml
 wavelet_server.iso
 wavelet_decoder.iso
+fedora-coreos-38.20230722.3.0-live.x86_64.iso.sig
+1q
