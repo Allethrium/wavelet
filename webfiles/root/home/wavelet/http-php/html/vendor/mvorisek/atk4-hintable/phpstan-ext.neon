@@ -1,0 +1,10 @@
+services:
+    # help PHPStan to understand our magic (needed for level >= 5)
+    -
+        class: Mvorisek\Atk4\Hintable\Phpstan\MagicReflectionExtension
+        tags:
+            - phpstan.broker.propertiesClassReflectionExtension
+            - phpstan.broker.methodsClassReflectionExtension
+
+rules:
+    - Mvorisek\Atk4\Hintable\Phpstan\AssertSamePhpstanTypeRule

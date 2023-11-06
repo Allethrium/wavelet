@@ -1,0 +1,5 @@
+sphinx<5
+sphinx-rtd-theme
+sphinxcontrib-phpdomain @ git+https://github.com/markstory/sphinxcontrib-phpdomain@f785b8b333
+myst-parser
+linkify-it-py

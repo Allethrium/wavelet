@@ -6,7 +6,8 @@ kernel_arguments:
   should_exist: 
     - nosmt 
     - threadirqs 
-    - mitigations=off 
+    - mitigations=off
+    # - preempt=full 
 storage:
   files:
 # Sets hostname (PRECONFIGURED by initial setup script in actual deployment, or you can edit it here and generate an ignition file with butane..)
@@ -172,18 +173,31 @@ passwd:
           - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBmo+nVPHtnqrKp7YubD5fT9TnLlbQp22SBxKaGco/sZ wavelet@wavelet.local
 systemd:
   units:
-  - name: install-overlayed-rpms.service
-    enabled: true
-    contents: |
+    - name: install-overlayed-rpms.service
+      enabled: true
+      contents: |
         [Unit]
         Description=Install Overlay Packages
         ConditionFirstBoot=yes
         Wants=network-online.target
         After=network-online.target
+        After=install-overlayed-rpms-rpmfusion-repo.service
         After=multi-user.target
         [Service]
         Type=oneshot
-        ExecStart=rpm-ostree install sway rofi-wayland sway-systemd waybar foot vim powerline powerline-fonts vim-powerline NetworkManager-wifi iw wireless-regdb wpa_supplicant cockpit-networkmanager cockpit-system cockpit-ostree cockpit-podman rdma GraphicsMagick wget --reboot
+        ExecStart=rpm-ostree install -A wget fontawesome-fonts wl-clipboard nnn \
+        mako sway bemenu rofi-wayland lxsession sway-systemd waybar \
+        foot vim powerline powerline-fonts vim-powerline \
+        NetworkManager-wifi iw wireless-regdb wpa_supplicant \
+        cockpit-bridge cockpit-networkmanager cockpit-system cockpit-ostree cockpit-podman \
+        buildah rdma git iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd \
+        dnf yum-utils createrepo \
+        libsrtp python3-pip srt srt-libs libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
+        ImageMagick oneapi-level-zero oneVPL oneVPL-intel-gpu intel-opencl intel-level-zero \
+        intel-media-driver intel-mediasdk mesa-dri-drivers mesa-vulkan-drivers \
+        mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
+        mesa-libxatracker libva libva-utils intel-gmmlib intel-ocloc
+        ExecStartPost=touch /var/rpm-ostree-overlay.complete
         [Install]
         WantedBy=multi-user.target
 # Enable RPMFusion-OStree (necessary for Intel Video Acceleration)

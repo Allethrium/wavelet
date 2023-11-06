@@ -86,6 +86,26 @@ read_uv_filter() {
 									filter="○  Courtroom ${lsflag}"
 									generate_image
 			;;
+			FOURSPLIT) 	color="rgba(65, 105, 225, 0.2)"
+									filter_is_livestreaming
+									filter="○  4-panel mixdown ${lsflag}"
+									generate_image
+			;;
+			TWOSPLIT) 	color="rgba(65, 105, 225, 0.2)"
+									filter_is_livestreaming
+									filter="○  2-panel mixdown ${lsflag}"
+									generate_image
+			;;
+			PIP1) 				color="rgba(65, 105, 225, 0.2)"
+									filter_is_livestreaming
+									filter="○  Picture-in-Picture 1 ${lsflag}"
+									generate_image
+			;;
+			PIP2) 				color="rgba(65, 105, 225, 0.2)"
+									filter_is_livestreaming
+									filter="○  Picture-in-Picture 2 ${lsflag}"
+									generate_image
+			;;
 			*) 						echo -e "Input Key is incorrect, quitting"; :
 			;;
 			esac
