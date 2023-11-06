@@ -43,3 +43,6 @@ echo -e "Podmans container generated, service has been enabled in systemd, and w
 echo -e "The control service should be available via web browser on port 8180 I.E -\n http://svr.wavelet.local:8180 \n"
 pwd
 etcdctl --endpoints=${ETCDENDPOINT} put ${KEYNAME} -- ${KEYVALUE}
+
+
+podman pod create --infra=true --name http-php --publish 8180:80 -v /var/www/html:/var/www/html:Z -v /var/www/nginx:/etc/nginx/conf.d/:Z

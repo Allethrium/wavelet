@@ -1,82 +1,177 @@
 <!DOCTYPE html>
 <link rel="stylesheet" href="styles.css">
+<meta charset="utf-8" />
 <html>
 <head>
 <script src="jquery-1.11.3.min.js"></script>
+<title>Wavelet System User Interface</title>
 </head>
-<form action="interface.php" method="post">
-<div id="INPUT_SECTION">
-<div id="inputs_section">
+
+<body>
+<div id="title">
     <br>
-    &nbsp;Select Input:
+    &nbsp;Wavelet System User Interface
     <br>
-        <li class="class.inputs">
-        <ul class="">
-        <li><button class="inputs" name="inVar" type="submit" value="1" onclick=\"myForm.action='./page.php';return true;\">Blank Screen</li>
-        <li><button class="inputs" name="inVar" type="submit" value="2" onclick=\"myForm.action='./page.php';return true;\">NY State Seal</li>
-        <li><button class="inputs" name="inVar" type="submit" value="3" onclick=\"myForm.action='./page.php';return true;\">Evidence Camera</li>
-        <li><button class="inputs" name="inVar" type="submit" value="4" onclick=\"myForm.action='./page.php';return true;\">Counsel, HDMI 1</li>
-        <li><button class="inputs" name="inVar" type="submit" value="5" onclick=\"myForm.action='./page.php';return true;\">Input, HDMI 2</li>
-        <li><button class="inputs" name="inVar" type="submit" value="0" onclick=\"myForm.action='./page.php';return true;\">Toggle Livestreaming</li>
-        </ul>
+    <br>
 </div>
-<div id="IMAGE_ROUTING">
-<div id="image_routing">
- <header>  
-    &nbsp;Multiple Image Feeds:
+<br>
+
+<div id="inputs">
+    <header> 
     <br>
-    <div>
-    </div>
+    &nbsp;Select Single Input:
+    <br>
+    </header>
+    <form method="post" action="interface.php" id="myForm"
     <li class="class.inputs">
     <ul class="">
-    <li><button class="inputs" name="inVar" type="submit" value="W" onclick=\"myForm.action='./page.php';return true;\">Four Panel Split</li>
-    <li><button class="inputs" name="inVar" type="submit" value="X" onclick=\"myForm.action='./page.php';return true;\">Two Panel Vertical Split</li>
-<!-- These options currently do not work due to input limitations on UG. -->
-<!--    <li><button class="inputs" name="inVar" type="submit" value="Y" onclick=\"myForm.action='./page.php';return true;\">Picture-In-Picture 1</li>
-    <li><button class="inputs" name="inVar" type="submit" value="Z" onclick=\"myForm.action='./page.php';return true;\">Picture-In-Picture 2</li>
--->
-    </li>
+        <li><button class="inputs" name="inVar" type="submit" value="1">Blank Screen</li>
+        <li><button class="inputs" name="inVar" type="submit" value="2">NY State Seal</li>
+        <li><button class="inputs" name="inVar" type="submit" value="3">Evidence Camera</li>
+        <li><button class="inputs" name="inVar" type="submit" value="4">Counsel, HDMI 1</li>
+        <li><button class="inputs" name="inVar" type="submit" value="5">Input, HDMI 2</li>
+        <br>
+        <br>
+        <li><button class="inputs" name="inVar" type="submit" value="0">Toggle Livestreaming</li>
     </ul>
-</div>
+    </form>
 </div>
 <br>
+
 <br>
 <div id="codecs_section">
+<details>
+    <summary>
+    &nbsp;Multiple Input Selection
+    <span class="icon"></span>
+    </summary>
     <br>
-    &nbsp;Codec Selection:
-    <div>
-    </div>
+    <p>
+    <form method="post" action="interface.php" id="myForm"
+        <li class="class.codecs">
+    <ul class="">
+        <li><button class="inputs" name="inVar" type="submit" value="W">Two Inputs (Click again to shuffle)</li>
+        <li><button class="inputs" name="inVar" type="submit" value="X">Four Inputs (Click again to shuffle)</li>
+    </ul>
+    </form>
+    </p>
+    </details>
+</div>
+
+<br>
+<div id="codecs_section">
+<details>
+    <summary>
+    &nbsp;Codec Selection
+    <span class="icon"></span>
+    </summary>
+    <br>
+    <p>
+    <form method="post" action="interface.php" id="myForm"
         <li class="class.codecs">
         <ul class="">
-        <li><button class="codecs" name="inVar" type="submit" value="A" onclick=\"myForm.action='./page.php';return true;\">H.264 SW</li>
-        <li><button class="codecs" name="inVar" type="submit" value="B" onclick=\"myForm.action='./page.php';return true;\">H.264 QSV (recommended)</li>
-        <li><button class="codecs" name="inVar" type="submit" value="C" onclick=\"myForm.action='./page.php';return true;\">HEVC SW</li>
-        <li><button class="codecs" name="inVar" type="submit" value="D" onclick=\"myForm.action='./page.php';return true;\">HEVC QSV</li>
-        <li><button class="codecs" name="inVar" type="submit" value="E" onclick=\"myForm.action='./page.php';return true;\">VP9 SW</li>
-        <li><button class="codecs" name="inVar" type="submit" value="F" onclick=\"myForm.action='./page.php';return true;\">VP9 QSV</li>
-        <li><button class="codecs" name="inVar" type="submit" value="H" onclick=\"myForm.action='./page.php';return true;\">AV1 QSV</li>
+        <li><button class="inputs" name="inVar" type="submit" value="A">H.264 SW</li>
+        <li><button class="codecs" name="inVar" type="submit" value="B">H.264 QSV (recommended)</li>
+        <li><button class="codecs" name="inVar" type="submit" value="C">HEVC SW</li>
+        <li><button class="codecs" name="inVar" type="submit" value="D">HEVC QSV</li>
+        <li><button class="codecs" name="inVar" type="submit" value="E">VP9 QSV</li>
+        <li><button class="codecs" name="inVar" type="submit" value="H">AV1 QSV</li>
         </ul>
             <br>
             &nbsp;Note some codec options may not combine well with some video input sources.<br>
             &nbsp;x264 or HEVC Software (SW) modes are the most widely compatible.<br>
             &nbsp;AV1 is a very new, experimental codec.<br>
             <br>
+        </form>
+    </p>
+    </details>
 </div>
-</form>
 </body>
-<script>
-function updatePage() {
-  $.ajax({
-    url: "http://192.168.1.32:8180/update.php",
-    success: function(data) {
-      $("#output").text(data);
+
+
+<script type="text/javascript">
+$.ajax({
+    url: "interface.php",
+    type: "post",
+    dataType: "json",
+    data: ({
+        code: code_entered,
+    }),
+    context: this,
+    success : function(response) {
+        console.log(response);
+        //OPTIONAL_FUNCTION_TO_DO_SOMETHING_WITH_THE_RESPONSE(response);
     },
-  });
+    error: function(jqXHR,textStatus,errorThrown){
+        console.log(jqXHR);
+        //OPTIONAL_FUNCTION_TO_DO_SOMETHING_WITH_THE_ERROR(jqXHR);
+    }
+});
+</script>
+
+<script type="text/javascript">
+    // handles the click event for link 1, sends the query
+    function getOutput() {
+     getRequest(
+         'myAjax.php', // URL for the PHP file
+           drawOutput,  // handle successful request
+        drawError    // handle error
+    );
+    return false;
+    }  
+    // handles drawing an error message
+    function drawError() {
+        var container = document.getElementById('output');
+        container.innerHTML = 'Bummer: there was an error!';
+    }
+    // handles the response, adds the html
+    function drawOutput(responseText) {
+        var container = document.getElementById('output');
+        container.innerHTML = responseText;
+    }
+    // helper function for cross-browser request object
+    function getRequest(url, success, error) {
+        var req = false;
+        try{
+            // most browsers
+            req = new XMLHttpRequest();
+        } catch (e){
+            // IE
+            try{
+                req = new ActiveXObject("Msxml2.XMLHTTP");
+            } catch(e) {
+                // try an older version
+                try{
+                    req = new ActiveXObject("Microsoft.XMLHTTP");
+                } catch(e) {
+                    return false;
+                }
+            }
+        }
+        if (!req) return false;
+        if (typeof success != 'function') success = function () {};
+        if (typeof error!= 'function') error = function () {};
+        req.onreadystatechange = function(){
+            if(req.readyState == 4) {
+                return req.status === 200 ? 
+                    success(req.responseText) : error(req.status);
+            }
+        }
+        req.open("GET", url, true);
+        req.send(null);
+        return req;
+    }
+</script>
+
+<script type="text/javascript">
+function printBtn() {
+    for (var i = 0; i < listBrand.length; i++) {
+        var btn = document.createElement("button");
+        var t = document.createTextNode(listBrand[i]);
+        btn.appendChild(t);
+        document.body.appendChild(btn);
+        }
 }
 </script>
-</html>
-
-
-Use javascript templating library to render php returns via AJAX into html -->
-Mustache
-Handlebars
+               
+ </html>
