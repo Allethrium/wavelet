@@ -22,18 +22,16 @@
     &nbsp;Select Single Input:
     <br>
     </header>
-    <form method="post" action="interface.php" id="myForm"
-    <li class="class.inputs">
-    <ul class="">
-        <li><button class="inputs" name="inVar" type="submit" value="1">Blank Screen</li>
-        <li><button class="inputs" name="inVar" type="submit" value="2">NY State Seal</li>
-        <li><button class="inputs" name="inVar" type="submit" value="3">Evidence Camera</li>
-        <li><button class="inputs" name="inVar" type="submit" value="4">Counsel, HDMI 1</li>
-        <li><button class="inputs" name="inVar" type="submit" value="5">Input, HDMI 2</li>
+    <body onload="createButton();">
+    <form method="post" action="interface.php" id="myForm">
+        <button class="inputs" name="inVar" type="submit" value="1">Blank Screen</button>
+        <button class="inputs" name="inVar" type="submit" value="2">NY State Seal</button>
+        <button class="inputs" name="inVar" type="submit" value="3">Evidence Camera</button>
+        <button class="inputs" name="inVar" type="submit" value="4">Counsel, HDMI 1</button>
+        <button class="inputs" name="inVar" type="submit" value="5">Input, HDMI 2</button>
         <br>
         <br>
-        <li><button class="inputs" name="inVar" type="submit" value="0">Toggle Livestreaming</li>
-    </ul>
+        <button class="inputs" name="inVar" type="submit" value="0">Toggle Livestreaming</button>
     </form>
 </div>
 <br>
@@ -86,92 +84,49 @@
     </p>
     </details>
 </div>
+
+
+<!---
+
+K what does JS need to do here?
+
+1) JS needs to POST to interface.php and return an array of available input devices
+2) it needs to format this array into a list of buttons in the Single Inputs section
+3) It needs to provide a relabel function so a user can create a friendly label for the button instead of the populated usbdev data that will be returned from PHP/etcd 
+
+-->
+<script type="text/javascript">
+    /* get array data in JSON from PHP as a function */
+    function createInputsList () {
+        $.ajax({
+            url:"interface.php",    //the page containing php script
+            type: "post",    //request type,
+            dataType: 'json',
+            data: "function=return_inputs_list", 
+            success:function(result){
+                console.log(result.abc);
+            }
+        });
+    }
+
+    function createButton(){
+        /* this actually calls the createInputsList function and stores in availableInputs */
+        var availableInputs = [ action: 'createInputsList'];
+        /* this creates the buttons */
+        for (var i = 0l i < availableInputs; i++) {
+            var newButton = document.createElement('button');
+            var t = document.createTextNode(availableInputs[i]);
+            document.body.appendChild(newButton);    
+        }
+    }
+</script>
+
 </body>
 
 
-<script type="text/javascript">
-$.ajax({
-    url: "interface.php",
-    type: "post",
-    dataType: "json",
-    data: ({
-        code: code_entered,
-    }),
-    context: this,
-    success : function(response) {
-        console.log(response);
-        //OPTIONAL_FUNCTION_TO_DO_SOMETHING_WITH_THE_RESPONSE(response);
-    },
-    error: function(jqXHR,textStatus,errorThrown){
-        console.log(jqXHR);
-        //OPTIONAL_FUNCTION_TO_DO_SOMETHING_WITH_THE_ERROR(jqXHR);
-    }
-});
-</script>
 
-<script type="text/javascript">
-    // handles the click event for link 1, sends the query
-    function getOutput() {
-     getRequest(
-         'myAjax.php', // URL for the PHP file
-           drawOutput,  // handle successful request
-        drawError    // handle error
-    );
-    return false;
-    }  
-    // handles drawing an error message
-    function drawError() {
-        var container = document.getElementById('output');
-        container.innerHTML = 'Bummer: there was an error!';
-    }
-    // handles the response, adds the html
-    function drawOutput(responseText) {
-        var container = document.getElementById('output');
-        container.innerHTML = responseText;
-    }
-    // helper function for cross-browser request object
-    function getRequest(url, success, error) {
-        var req = false;
-        try{
-            // most browsers
-            req = new XMLHttpRequest();
-        } catch (e){
-            // IE
-            try{
-                req = new ActiveXObject("Msxml2.XMLHTTP");
-            } catch(e) {
-                // try an older version
-                try{
-                    req = new ActiveXObject("Microsoft.XMLHTTP");
-                } catch(e) {
-                    return false;
-                }
-            }
-        }
-        if (!req) return false;
-        if (typeof success != 'function') success = function () {};
-        if (typeof error!= 'function') error = function () {};
-        req.onreadystatechange = function(){
-            if(req.readyState == 4) {
-                return req.status === 200 ? 
-                    success(req.responseText) : error(req.status);
-            }
-        }
-        req.open("GET", url, true);
-        req.send(null);
-        return req;
-    }
-</script>
 
-<script type="text/javascript">
-function printBtn() {
-    for (var i = 0; i < listBrand.length; i++) {
-        var btn = document.createElement("button");
-        var t = document.createTextNode(listBrand[i]);
-        btn.appendChild(t);
-        document.body.appendChild(btn);
-        }
-}
-</script>
+
+
                
  </html>
