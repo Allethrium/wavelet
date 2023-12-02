@@ -34,11 +34,17 @@ read_etcd_clients_ip() {
 }
 
 
-event_x264hw() {
-        KEYNAME=uv_encoder
-        KEYVALUE="libavcodec:encoder=h264_vaapi:gop=12:bitrate=20M"
-        write_etcd_global
-        echo -e "x264 Software acceleration activated, Bitrate 20M \n"
+event_x265sw() {
+	KEYNAME=uv_encoder
+	KEYVALUE="libavcodec:encoder=libx265:gop=6:bitrate=15M:subsampling=444"
+	write_etcd_global
+	KEYNAME=uv_gop
+	KEYVALUE=6
+	write_etcd_global
+	KEYNAME=uv_bitrate
+	KEYVALUE="15M"
+	write_etcd_global
+	echo -e "x265 Software acceleration activated, GOP 6 frames,  Bitrate 15M \n"
 }
 
 # Populate standard values into etcd
@@ -61,11 +67,9 @@ echo -e "Enabling monitor services.."
 systemctl --user enable wavelet_controller.service --now
 systemctl --user enable watch_reflectorreload.service --now
 systemctl --user enable watch_encoderflag.service --now
-systemctl --user enable watch_inputdevices.service --now
 echo -e "Values populated, starting reflector"
 systemctl --user enable UltraGrid.Reflector.service --now
-systemctl --user enable UltraGrid.Audio.Reflector.service --now
-event_x264hw
+event_x265sw
 # Runs wavelet_controller.sh directly because otherwise, it will wait for values to be populated.  
 # During Init, we want to run it on its own.
 /usr/local/bin/wavelet_controller.sh

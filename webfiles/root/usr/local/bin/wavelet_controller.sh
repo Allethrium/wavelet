@@ -4,15 +4,10 @@
 
 
 # Define event parameters
+# 3-8 are all dynamic devices that are populated dependent on what an encoder has attached, and how it has informed the etcd cluster of its presence.
 event_livestream="0"
 event_blank="1"
 event_seal="2"
-event_evidence="4"
-event_hdmi="4"
-event_evidence_hdmi="5"
-event_hybrid="6"
-event_witnesscam="7"
-event_courtroomcam="8"
 event_recordtoggle="9"
 event_x264sw="A"
 event_x264hw="B"
@@ -33,9 +28,9 @@ uv_audioport="5006"
 uv_reflector="192.168.1.32"
 uv_obs="192.168.1.31"
 uv_livestream="192.168.1.30"
-uv_encoder="-c libavcodec:encoder=h264_vaapi:gop=12:bitrate=20M"
-uv_gop="12"
-uv_bitrate="20M"
+uv_encoder="-c libavcodec:encoder=libx265:gop=16:bitrate=10M"
+uv_gop="16"
+uv_bitrate="10M"
 uv_islivestreaming="0"
 
 
@@ -54,20 +49,19 @@ UG_HOSTNAME=$(hostname)
 	;;
 	dec*)					echo -e "I am a Decoder \n" && echo -e "Cannot run the controller on a decoder, exiting.."; exit 0
 	;;
-	livestream*)			echo -e "I am a Livestreamer \n" && echo -e "Cannot run the controller on a livestreamer, exiting.."; exit 0
+	livestream*)				echo -e "I am a Livestreamer \n" && echo -e "Cannot run the controller on a livestreamer, exiting.."; exit 0
 	;;
 	gateway*)				echo -e "I am an input Gateway for another video streaming system \n"  && echo -e "Cannot run the controller on a gateway, exiting.."; exit 0
 	;;
 	svr*)					echo -e "I am a Server. Proceeding..."  && event_server
 	;;
-	*) 						echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
+	*) 					echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
 	;;
 	esac
 }
 
 
 event_server(){
-set -x
 echo -e "\n Controller Called, checking input key and acting accordingly..\n"
 # Now called by etcd so inputting standard values to etcd would overwrite everything every time an event happened.  
 # These are populated by wavelet_init.sh
@@ -76,7 +70,17 @@ main
 
 
 main() {
-KEYNAME=input
+# 11/2023 - now reads uv_hash_select key for inputdata
+KEYNAME=input_update
+        echo -e "\n Task completed, resetting input_update key to 0.. \n"
+read_etcd_global
+if [[ "${printvalue}" == 1 ]]; then
+	echo -e "input_update key is set to 1, continuing with task.. \n"
+else
+	echo -e "input_update key is set to 0, doing nothing.. \n"
+	exit 0
+fi
+KEYNAME=uv_hash_select
 read_etcd_global
 event=${printvalue}
 waveletcontroller
@@ -85,48 +89,24 @@ waveletcontroller
 
 waveletcontroller() {
 # Tests event input and runs appropriate event
+# 11/2023 - note that hardcoded inputs are no longer used here, the case $event in line just tests static buttons from the webUI.  The rest is handled between detectv4l and wavelet_encoder, for the most part.
 case $event in
 	# 1
-	(1) echo -e "Option One, Blank activated\n"							;current_event="wavelet-blank"			;wavelet-blank;;
+	(1) echo -e "Option One, Blank activated\n"							;current_event="wavelet-blank"		;wavelet-blank;;
 	# Display a black screen on all devices
 	# 2
-	(2) echo -e "Option Two, Seal activated\n"							;current_event="wavelet-seal"			;wavelet-seal;;
+	(2) echo -e "Option Two, Seal activated\n"							;current_event="wavelet-seal"		;wavelet-seal;;
 	# Display a static image of a court seal (find a better image!)
-	# 3
-	(3) echo -e "Option Three, Document Camera activated\n"				;current_event="wavelet-evidence"		;wavelet-evidence;;
-	# Feed from USB Document Camera attached to encoder
-	# 4
-	(4) echo -e "Option Four, Counsel HDMI Input Activated\n"			;current_event="wavelet-hdmi"			;wavelet-hdmi;;
-	# Feed from HDMI Input, generally anticipated to be an HDMI switcher from the Defendent/Plaintiff tables and display from Counsel's laptop
-	# 5
-	(5) echo -e "Option Five, HDMI Capture Input activated\n"			;current_event="wavelet-evidence-hdmi"	;wavelet-evidence-hdmi;;
-	# An additional HDMI feed from another device.  Can be installed or not, anticipate some kind of permanently present Media Player or similar
-	# Probably too interchangable with counsel's HDMI input but strikes me as useful enough to maintain here.
-	# 6
-	(6) echo -e "Option Six, Hybrid Mode activated\n"					;current_event="wavelet-hybrid"			;wavelet-hybrid;;
-	# Switch to a screen capture pulling a Teams meeting window via HDMI input.  
-	# Target machine should have HDMI Input to grab Waveket Output from a decoder box as a video source
-	# Target machine should have HDMI output to Wavelet so the teams gallery can be seen, think HDMI-USB dongle
-	# Needs configuring by installation engineers
-	# 7
-	(7) echo -e "Option Seven, Witness cam activated\n"					;current_event="wavelet-witness"		;wavelet-witness;;
-	# feed from Webcam or any kind of RTP/RTSP stream, generally anticipated to capture the Witness Box and Well for detail view
-	# Needs configuring by installation engineers
-	# 8
-	(8) echo -e "Option Eight, Courtroom Wide-angle activated\n"		;current_event="wavelet-courtroomcam"	;wavelet-courtroomcam;;
-	# feed from wide-angle Courtroom camera generally anticipated to capture the Well + Jury zone, perhaps front row of gallery
-	# Needs configuring by installation engineers
+	# 3-8 are all dynamic inputs populated from v4l2 (or in the future, hopefully Decklink)
 	# 9
-	(9) echo "Not implemented"											;is_recording=false;;
+	(9) echo "Recording currently Not implemented"												;is_recording=false;;
 #	if [ $recording = true ]; then
 #		echo "Recording to archive file" && recording=true && wavelet_record_start
 #	if [ $recording = false ]; then
 #		($false) echo "Recording to archive file" && recording=true && wavelet_record_start;; 
-	# does not kill any streams, instead copies stream and appends to a labeled MKV file (not implemented)
-	#
+	# does not kill any streams, instead copies stream and appends to a labeled MKV file (not implemented unless we get a real server w/ STORAGE)
 	# 0
-	#
-	(0)	echo "LiveStream toggle set.."									;event_livestream;;
+	(0)	echo "LiveStream toggle set.."													;event_livestream;;
 	# starts and stops livestreaming as a toggle, then sets livestreamer variable appropriately.
 	#
 	# video codec selection
@@ -135,17 +115,18 @@ case $event in
 	(B)		event_x264hw 	&& echo "x264 VA-API video codec selected, updating encoder variables";;
 	(C)		event_x265sw 	&& echo "HEVC Software video codec selected, updating encoder variables";;
 	(D)		event_x265hw	&& echo "HEVC VA-API video codec selected, updating encoder variables";;
-	(E)		event_vp9sw		&& echo "VP-9 Software video codec selected, updating encoder variables";;
+	(E)		event_vp9sw	&& echo "VP-9 Software video codec selected, updating encoder variables";;
 	(F)		event_vp9hw 	&& echo "VP-9 Hardware video codec selected, updating encoder variables";;
 	(G)		event_rav1esw	&& echo "|*****||EXPERIMENTAL AV1 RAV1E codec selected, updating encoder vaiables||****|";;
-	(H)		event_av1hw		&& echo "|*****||EXPERIMENTAL AV1 VA-API codec selected, updating encoder vaiables||****|";;
+	(H)		event_av1hw	&& echo "|*****||EXPERIMENTAL AV1 VA-API codec selected, updating encoder vaiables||****|";;
 	#
 	# Multiple input modes go here (I wonder if there's a better, matrix-based approach to this?)
 	#
 	(W) echo "Four-way panel split activated \n"						;current_event="event_foursplit"	;wavelet-foursplit;;
-	(X) echo "Two-way panel split activated \n"							;current_event="event_twosplit"		;wavelet-twosplit;;
+	(X) echo "Two-way panel split activated \n"						;current_event="event_twosplit"		;wavelet-twosplit;;
 	(Y) echo "Picture-in-Picture 1 activated \n"						;current_event="event_pip1"		;wavelet-pip1;;
 	(Z) echo "Picture-in-Picture 2 activated \n"						;current_event="event_pip2"		;wavelet-pip2;;
+	(*) echo "Unknown input, passing hash to encoders.. \n"					;current_event="dynamic"		;wavelet-dynamic;;
 esac
 }
 
@@ -195,23 +176,23 @@ event_livestream() {
 	KEYNAME=uv_islivestreaming
 	read_etcd_global
 	livestreaming=$printvalue
-			if [[ "$livestreaming" = 0 ]]; then
-				echo "Livestreaming is off, setting LiveStreaming flag to Enabled"
-				KEYNAME=uv_islivestreaming
-	    	    KEYVALUE="1"
-	    	    write_etcd_global
-	    	    KEYNAME=encoder_restart
-	    	    KEYVALUE="1"
-	    	    write_etcd_global
-			else
-				echo "Livestreaming is on, setting LiveStreaming flag to Disabled"
-	    	    KEYNAME=uv_islivestreaming
-	    	    KEYVALUE="0"
-	    	    write_etcd_global
-	    	    KEYNAME=encoder_restart
-	    	    KEYVALUE="1"
-	    	    write_etcd_global
-fi
+	if [[ "$livestreaming" = 0 ]]; then
+		echo "Livestreaming is off, setting LiveStreaming flag to Enabled"
+		KEYNAME=uv_islivestreaming
+		KEYVALUE="1"
+	    	write_etcd_global
+	    	KEYNAME=encoder_restart
+	    	KEYVALUE="1"
+	    	write_etcd_global
+	else
+		echo "Livestreaming is on, setting LiveStreaming flag to Disabled"
+		KEYNAME=uv_islivestreaming
+	    	KEYVALUE="0"
+	    	write_etcd_global
+	    	KEYNAME=encoder_restart
+	    	KEYVALUE="1"
+	    	write_etcd_global
+	fi
 }
 
 wavelet_kill_all() {
@@ -251,10 +232,15 @@ wavelet_kill_livestream() {
 wavelet-blank() {
 # 1
 # Displays a black jpg to blank the screen fully
+# This needs to be changed to run here, on the server without bothering encoders
 	current_event="wavelet-blank"
 	KEYNAME=uv_input
 	KEYVALUE="BLANK"
 	write_etcd_global
+	KEYNAME=uv_input_cmd
+	KEYVALUE="-t testcard:pattern=blank"
+	/usr/local/bin/wavelet_textgen.sh
+	write_etcd
 	# Set encoder restart flag to 1
 	KEYNAME=encoder_restart
 	KEYVALUE="1"
@@ -268,106 +254,90 @@ wavelet-seal() {
 	KEYNAME=uv_input
 	KEYVALUE="SEAL"
 	write_etcd_global
-        # Set encoder restart flag to 1
+	# Always set this to SW x265, everything else breaks due to pixel format issues w/ FFMPEG/lavc
+	encodervar="libavcodec:encoder=libx265:gop=6:bitrate=15M:subsampling=444:bpp=10"
+	inputvar="-t file:/home/wavelet/seal.mp4:loop"
+	/usr/local/bin/wavelet_textgen.sh
+	cd /home/wavelet/
+	ffmpeg -y -s 900x900 -video_size cif -i ny-stateseal.jpg -c:v libx265 seal.mp4
+	write_etcd
+	# Kill existing streaming on the SERVER
+        systemctl --user stop UltraGrid.AppImage.service
+        # Set encoder restart flag to 1 - this will kill other videosources
         KEYNAME=encoder_restart
         KEYVALUE="1"
         write_etcd_global
+	# Now we setup a systemd unit for the encoder on the SERVER which will handle the generation of the seal stream.  Simple systemd unit.
+        KEYNAME=uv_videoport
+        read_etcd_global
+        video_port=${printvalue}
+        # Destination IP is the IP address of the UG Reflector
+        destinationipv4="192.168.1.32"
+        ugargs="--tool uv $filtervar -f V:rs:200:240 -l unlimited ${inputvar} -c ${encodervar} -P ${video_port} -m 9000 ${destinationipv4}"
+        KEYNAME=UG_ARGS
+        KEYVALUE=${ugargs}
+        write_etcd
+        echo -e "Verifying stored command line"
+        read_etcd
+        echo "
+        [Unit]
+        Description=UltraGrid AppImage executable
+        After=network-online.target
+        Wants=network-online.target
+        [Service]
+        ExecStart=/usr/local/bin/UltraGrid.AppImage ${ugargs}
+        KillSignal=SIGTERM
+        [Install]
+        WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
+        systemctl --user daemon-reload
+        systemctl --user restart UltraGrid.AppImage.service
+        echo -e "Encoder systemd units instructed to start..\n"
 }
 
-wavelet-evidence() {
-# 3
-# Evidence camera 
-# run_ug.sh & detectv4l.sh on the encoder system decides specifics
-	current_event="wavelet-evidence"
-#	KEYNAME=uv_islivestreaming
-#	read_etcd_global
-#	livestreaming=$printvalue
-#			if [[ "$livestreaming" = "0" ]]; then
-#				echo "Livestreaming is off, setting standard value for $current_event"
-#				KEYNAME=uv_filter
-#	    	    KEYVALUE="FilterEvidenceCam"
-#	    	    write_etcd_global
-#			else
-#				echo "Livestreaming is enabled, setting Livestream value for $current_event"
-#	    	    KEYNAME=uv_filter
-#	    	    KEYVALUE="FilterEvidenceCamLiveStream"
-#	    	    write_etcd_global
-#			fi
+wavelet-dynamic() {
+	# processes device hashes submitted from the WebUI through to the encoder
+	# This is really all handled on the encoder side, the only thing the controller is doing here ought to be notifying the controller of a restart..
+	current_event="wavelet-dynamic"
 	KEYNAME=uv_input
-	KEYVALUE="EVIDENCECAM1"
-	write_etcd_global
-    # Set encoder restart flag to 1
-    KEYNAME=encoder_restart
+	read_etcd_global
+	controllerInputLabel=${printvalue}
+	KEYNAME=uv_hash_select
+	read_etcd_global
+	controllerInputHash=${printvalue}
+	echo -e "\n \n Controller notified that input hash ${controllerInputHash} has been selected from webUI with the input label ${controllerInputLabel}, encoder restart commencing.. \n \n"
+	# Kill existing streaming on the SERVER
+	systemctl --user stop UltraGrid.AppImage.service 
+	# Set encoder restart flag to 1
+	KEYNAME=encoder_restart
 	KEYVALUE="1"
-    write_etcd_global
+	write_etcd_global
+	KEYNAME=input_update
+	KEYVALUE="0"
+	echo -e "\n Task completed, resetting input_update key to 0.. \n"
+	write_etcd_global
 }
 
-wavelet-hdmi() {
-# 4
-# Counsel HDMI Input, anticipating a hardened HDMI switcher A-B input, C Output direct to HDMI Capture device on encoder
-	current_event="wavelet-hdmi"
+wavelet_foursplit() {
+	current_event="wavelet_foursplit"
 	KEYNAME=uv_input
-	KEYVALUE=HDMI1
+	KEYVALUE="Multi source mix"
 	write_etcd_global
+	controllerInputLabel=${printvalue}
+	KEYNAME=uv_hash_select
+	read_etcd_global
+	controllerInputHash=${printvalue}
+	echo -e "\n \n Controller notified that the Four-way split input hash has been selected from the WebUI.  Encoder will do its best to generate a software mix of up to four available input devices. \n \n "
+	# Kill existing streaming on the SERVER
+        systemctl --user stop UltraGrid.AppImage.service
         # Set encoder restart flag to 1
         KEYNAME=encoder_restart
         KEYVALUE="1"
         write_etcd_global
-}
-
-wavelet-evidence-hdmi() {
-# 5
-# Counsel HDMI Input, anticipating a hardened HDMI switcher A-B input, C Output direct to HDMI Capture device on encoder
-	current_event="wavelet-evidence-hdmi"
-	KEYNAME=uv_input
-	KEYVALUE=HDMI2
-	write_etcd_global
-        # Set encoder restart flag to 1
-        KEYNAME=encoder_restart
-        KEYVALUE="1"
+        KEYNAME=input_update
+        KEYVALUE="0"
+        echo -e "\n Task completed, resetting input_update key to 0.. \n"
         write_etcd_global
 }
-
-wavelet-hybrid() {
-# 6
-# Hybrid mode.  This involves using dual HDMI capture cards or a dual-home Windows PC to allow UG inputs and outputs with a live Teams call.  
-# Care needs to be taken during operation re; Hall of Mirrors effect due to recursion in the video streams.
-	current_event="wavelet-hybrid"
-	KEYNAME=uv_input
-	KEYVALUE=HYBRID
-	write_etcd_global
-        # Set encoder restart flag to 1
-        KEYNAME=encoder_restart
-        KEYVALUE="1"
-        write_etcd_global
-}
-
-wavelet-witnesscam() {
-# 7
-# Witness Camera setup appropriately for detail view on Counsel/Witness/area to ensure Witness is not being coached etc.
-	current_event="wavelet-witnesscam"
-	KEYNAME=uv_input
-	KEYVALUE=WITNESS
-	write_etcd_global
-        # Set encoder restart flag to 1
-        KEYNAME=encoder_restart
-        KEYVALUE="1"
-        write_etcd_global
-}
-
-wavelet-courtroomcam() {
-# 8
-# Wide-angle Courtroom camera capturing the entire well + some of the gallery, typically would be a wall / ceiling installation.  
-	current_event="wavelet-courtroomcam"
-	KEYNAME=uv_input
-	KEYVALUE=COURTOOM
-	write_etcd_global
-        # Set encoder restart flag to 1
-        KEYNAME=encoder_restart
-        KEYVALUE="1"
-        write_etcd_global
-}
-
 # These events contain additional codec-specific settings that have been found to work acceptably well on the system.
 # Since they are tuned by hand, you probably won't want to modify them unless you know exactly what you're doing.
 # Proper operation depends on bandwidth, latency, network quality, encoder speed.  It's highly hardware dependent.
@@ -376,16 +346,16 @@ wavelet-courtroomcam() {
 
 event_x264hw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=h264_vaapi:gop=12:bitrate=20M"
+	KEYVALUE="libavcodec:encoder=h264_qsv:gop=12:bitrate=25M"
 	write_etcd_global
-	echo -e "x264 Software acceleration activated, Bitrate 20M \n"
+	echo -e "x264 Hardware acceleration activated, Bitrate 25M \n"
 }
 
 event_x264sw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx264:gop=12:bitrate=20M"
+	KEYVALUE="libavcodec:encoder=libx264:gop=12:bitrate=25M"
 	write_etcd_global
-	echo -e "x264 Software acceleration activated, Bitrate 20M \n"
+	echo -e "x264 Software acceleration activated, Bitrate 25M \n"
 }
 
 event_x265sw() {
@@ -398,9 +368,10 @@ event_x265sw() {
 event_x265hw() {
 # working on tweaking these values to something as reliable as possible.
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=hevc_qsv:gop=12:bitrate=15M:bpp=10:subsampling=444:q=0:scenario=remotegaming:profile=main10"
+	KEYVALUE="libavcodec:encoder=hevc_qsv:bitrate=7M:gop=6:subsampling=444"
+#	KEYVALUE="libavcodec:encoder=hevc_qsv:gop=12:bitrate=15M:bpp=10:subsampling=444:q=0:scenario=remotegaming:profile=main10"
 	write_etcd_global
-	echo -e "x265 Hardware acceleration activated, Bitrate 15M \n"
+	echo -e "x265 Hardware acceleration activated, Bitrate 20M \n"
 }
 
 event_vp9sw() {
@@ -426,14 +397,13 @@ event_rav1esw() {
 
 event_av1hw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=av1_qsv:preset=veryfast"
+	KEYVALUE="libavcodec:encoder=av1_qsv"
 	write_etcd_global
 	echo -e "AV1 Hardware acceleration activated \n"
 }
 
 wavelet-foursplit() {
 # W
-# Witness Camera setup appropriately for detail view on Counsel/Witness/area to ensure Witness is not being coached etc.
 	current_event="wavelet-foursplit"
 	KEYNAME=uv_input
 	KEYVALUE=FOURSPLIT
@@ -443,10 +413,8 @@ wavelet-foursplit() {
         KEYVALUE="1"
         write_etcd_global
 }
-
 wavelet-twosplit() {
 # W
-# Witness Camera setup appropriately for detail view on Counsel/Witness/area to ensure Witness is not being coached etc.
 	current_event="wavelet-twosplit"
 	KEYNAME=uv_input
 	KEYVALUE=TWOSPLIT
@@ -456,10 +424,7 @@ wavelet-twosplit() {
         KEYVALUE="1"
         write_etcd_global
 }
-
 wavelet-pip1() {
-# W
-# Witness Camera setup appropriately for detail view on Counsel/Witness/area to ensure Witness is not being coached etc.
 # Doesn't currently work, so disable.
 	current_event="wavelet-pip1"
 	KEYNAME=uv_input
@@ -470,10 +435,7 @@ wavelet-pip1() {
         KEYVALUE="1"
         write_etcd_global
 }
-
 wavelet-pip2() {
-# W
-# Witness Camera setup appropriately for detail view on Counsel/Witness/area to ensure Witness is not being coached etc.
 # Doesn't currently work, so disable.
 	current_event="wavelet-pip2"
 	KEYNAME=uv_input
@@ -491,6 +453,5 @@ wavelet-pip2() {
 #
 ###
 
-set -x
 exec >/home/wavelet/controller.log 2>&1
 detect_self

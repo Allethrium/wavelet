@@ -1,11 +1,23 @@
 #!/bin/bash
 #
-# Upon the connection of a new USB device, this script is called by Udev rules.  Note Udev calls a bootstrap script which THEN calls this script,
+# Upon the connection of a new USB device, this script is called by Udev rules.  
+# Note Udev calls a bootstrap script which THEN calls this script,
 # because the usb subsystem is locked until the rule execution is completed!
-# It will attempt to make sense of available v4l devices and update etcd, which should then call another set of services to update the WebUI.
+# It will attempt to make sense of available v4l devices and update etcd
+# It will then call another set of services to update the WebUI.
+
+
+
+# WHAT AM I DOING HERE?
+# 	Further making everything less device-dependent, Im rewriting the generation script to check for device hashes before we continue to do anything.
+# 	This prevents the webUI for making duplicates
+# 	It also ensures old devices w/ same data "become" the same when they are plugged back into the same port
+# 	Still need suitable mechanism for entirely deleting old devices!
+
+
+
 
 #Etcd Interaction
-ETCDURI=http://192.168.1.32:2379/v2/keys
 ETCDENDPOINT=http://192.168.1.32:2379
 read_etcd(){
         printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME} --print-value-only)
@@ -13,7 +25,7 @@ read_etcd(){
 }
 
 read_etcd_global(){
-        printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
+        printdetectvalueglobal=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
         echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for Global value"
 }
 
@@ -23,8 +35,8 @@ write_etcd(){
 }
 
 write_etcd_inputs(){
-        etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/inputs/${KEYNAME}" -- "${KEYVALUE}"
-        echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname) /inputs/"
+	etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/inputs${KEYNAME}" -- "${KEYVALUE}"
+        echo -e "Set ${KEYVALUE} for /inputs/$(hostname)${KEYNAME}"
 }
 
 write_etcd_global(){
@@ -40,212 +52,194 @@ read_etcd_clients_ip() {
         return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
 }
 
-
-sense_device() {
-# Old, only here to laugh at.	
-	sleep .25
-	device_string_long=$(ls -Artl /dev/v4l/by-id | tail -n 2 | awk '{print $9,$11}')
-	echo -e 'Last device plugged in is: \n'
-	echo '${device_string_long}' 
-	# select lowest value (usually correct device)
-	# store device path in a variable 
-	v4l_device_path=$(ls -Artl /dev/v4l/by-id | tail -n 2 | awk '{print $11}' | sort -nk 2 | head -1 | awk -F/ '{print $3}')
-	echo $v4l_device_path
-
-}
 sense_devices() {
-# Alternate sense which refreshes ALL usb devices every time something new is plugged in - may work better?
-# Probably also here to laugh at, but is how it works currently.
-	shopt -s nullglob
-	declare -a array=(/dev/v4l/by-id/*)
-	echo -e "\n \n Our array contains some duplicates which we don't want, so we'll remove them..\n"
-	for index in "${!array[@]}" ; do 
-		[[ ${array[$index]} =~ -index1$ ]] && unset -v 'array[$index]' ; done
-	echo -e "\n reassign array indices so they make sense.. \n"
-	array=("${array[@]}")
-	echo -e "Looping through array.."
-	for i in "${array[@]}"
-		do
-			device_string_long=$i
-        	echo -e "Finding /dev/video$ symlink for $i"
-        	v4l_device_path=$(ls -Artl $i* | awk '{print $11}' | awk -F/ '{print $3}')
-        	echo -e "Device path ${v4l_device_path} located for $i \n"
-        	detect
-		done
-	shopt -u nullglob
+        shopt -s nullglob
+        declare -a v4lArray=(/dev/v4l/by-id/*)
+        for index in "${!v4lArray[@]}" ; do
+                [[ ${v4lArray[$index]} =~ -index1$ ]] && unset -v 'v4lArray[$index]' ; done
+        array=("${v4lArray[@]}")
+        for i in "${v4lArray[@]}"
+                do
+                        device_string_long=$i
+	                v4l_device_path="/dev/$(ls -Artl $i* | awk '{print $11}' | awk -F/ '{print $3}')"
+	                echo -e "Device path ${v4l_device_path} located for ${device_string_long} \n"
+			# generate device hashes and proceed to next step
+			generate_device_info
+                done
+        shopt -u nullglob
 }
 
-sense_devices_ug() {
-# Another alternate method that calls and parses UltraGrid's input to generate a list of available devices.
-# MIGHT work better with multiple devices from the same vendor
-string=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t v4l2:help | grep /dev/video &&)
-readarray -td '' array< <(awk '{ gsub(/Device /,"\0"); print; }' <<<"$string, "); unset 'array[0]';
-for i in "${array[@]}";
-        do
-			v4l_device_path=$(echo $i | awk '/dev/video {match($0, /video/); print substr($0, RSTART - 5, RLENGTH + 6);}')
-			echo -e "${v4l_device_path} located for ${i} \n"
-			device_string_long=${i}
-			event_newdevice
-        done
+generate_device_info() {
+	echo -e "\n \nNow generating device info for each item presently located in /dev/v4l/by-id..\n"
+	echo -e "Working on ${device_string_long}\n"
+	device_string_short=$(echo "${device_string_long}" | sed 's/.*usb-//')
+        info=$(v4l2-ctl -D -d ${v4l_device_path})
+        # here we parse this information
+        cardType=$(echo "${info}" | awk -F ":" '/Card type/ { print $2 }')
+        # Bus info (first instance only, it's repeated oftentimes)
+        bus_info=$(echo "${info}" | awk -F ":" '/Bus info/ { print $4;exit; }')
+        # Serial (if exists)
+        serial=$(echo "${info}" | awk -F ":" '/Serial/ { print $2 }')
+        echo -e "device name is: ${device_string_short}"
+        echo -e "card type is: $cardType"
+        echo -e "bus address is: $bus_info"
+        echo -e "device serial is: $serial"
+        deviceHash=$(echo "$device_string_short, $cardType , $bus_info, $serial" | sha256sum)
+        echo -e "generated device hash: $deviceHash \n"
+	device_string_short=$(echo "${device_string_long}" | sed 's/.*usb-//')
+	# Let's look for the device hash in the /interface prefix to make sure it doesn't already exist!
+	# First delete empty /hash/ values that might be there incorrectly (WHY???)
+	etcdctl --endpoints=http://192.168.1.32:2379 del "/hash/"
+	output_return=$(etcdctl --endpoints=http://192.168.1.32:2379 get "/hash/${deviceHash}")
+	if [[ $output_return == "" ]] then
+		echo -e "\n${deviceHash} not located within etcd, assuming we have a new device and continuing with process to set parameters.. \n"
+		set_device
+	else
+		echo -e "\n${deviceHash} located in etcd: \n \n${output_return} \n \n, terminating process. \nIf you wish for the device to be properly redetected from scratch, please move it to a different USB port. \n"
+		# we run device_cleanup regardless!!
+		device_cleanup
+
+	fi
 }
 
-
-# Here we detect valid devices, and need to maintain a database of usable devices and their appropriate types
-# The concept is just a string match from whatever was last plugged into a USB port, 
-# which triggers a udev rule to call this script.
-# Currently because of the way the logic works, we really only support a single device of each type.
-# I.E. you can have an IPEVO document camera with a Logitech HDMI-USB input capture device, and a Magewell USB capture device
-# You can't have two logitechs at once because the computer has no way of knowing which is which.
-# NOTE - *Integrated_Webcam_HD*)  is IGNORED in the event you want to run a server off the laptop and 
-# NOT have it run as an encoder.
-detect() {
-        echo "Device string is ${device_string_long}"
-        case $device_string_long in
-        *IPEVO*)                                        echo -e "IPEVO Document Camera device detected \n" && event_ipevo
-        ;;
-        *"Logitech Screen Share"*)                      echo -e "Logitech HDMI-USB Capture device detected \n" && event_logitech
-        ;;
-        *'USB Capture HDMI:'*)                          echo -e "Magewell USB Capture HDMI device detected \n" && event_magewellhdmi
-        ;;
-        *"USB Capture HDMI+"*)                          echo -e "Magewell USB Capture HDMI device + detected \n" && event_magewellhdmi
-        ;;
-        usb-Intel_R__RealSense_TM__Depth_Camera_435*)   echo -e "Intel Realsense D435 Detected \n" && event_realsense_d435
-        ;;
-        *)                                              echo -e "This device is not yet documented, or not a video USB device. Unsupported. If you think the device should be supported, contact the project maintainers.\n" && exit 0
-        ;;
-        esac
-}
-
-
-event_ipevo() {
-# each of these blocks contains specific configuration options that must be preset for each device
-	KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"
-	KEYNAME=v4lDocumentCam
-	write_etcd_inputs
-	KEYNAME=INPUT_DEVICE_PRESENT
+set_device() {
+	# called from generate_device_info from the nested if loop checking for pre-existing deviceHash in etcd /hash/
+        # populated device_string_short with hash value, this is used by the interface webUI component - device_string_short is effectively the webui Label and banner text.
+	# Because we cannot query etcd by keyvalue, we must create a reverse lookup prefix for everything we want to be able to clean up!!
+	KEYNAME="/interface/${device_string_short}"
+        KEYVALUE="${deviceHash}"
+	write_etcd_global	
+	# And the reverse lookup prefix - N.B this is updated from set_label.php when the webUI changes a device label/banner string! 
+	KEYNAME="/short_hash/${deviceHash}"
+	KEYVALUE=${device_string_short}
+	write_etcd_global
+	# We need this to perform cleanup "gracefully"
+	KEYNAME="/long_interface${device_string_long}"
+	KEYVALUE=${deviceHash}
+        write_etcd_global
+        # This will enable us to find the device from its hash value, along with the registered host encoder, like a reverse DNS lookup..
+        # GLOBAL value\
+        echo -e "Attempting to set keyname ${deviceHash} for $(hostname)${device_string_long}"
+        KEYNAME="/hash/${deviceHash}"
+        # Stores the device data under hostname/inputs/device_string_long
+	KEYVALUE="$(hostname)/inputs${device_string_long}"
+        write_etcd_global
+        # notify watcher that input device configuration has changed
+        KEYNAME=new_device_attached
+        KEYVALUE=1
+        write_etcd_global
+        echo -e "resetting variables to null."
+        deviceHash=""
+        device_string_short=""
+	KEYNAME=/INPUT_DEVICE_PRESENT
 	KEYVALUE=1
 	write_etcd
+	# Let us eventually do something clever here to try and set useful video caps.
+	detect
 }
 
-event_elmo() {
-# this is still here because 1)i don't have an elmo camera handy to test, 2) it's the old way I did it, as an example.
-# because this is designed to run on an immutable filesystem, symlinks aren't persistent between reboots.
-        DEVPATH=/dev/v4l_document_camera_0
-		if test -f "$DEVPATH"; then
-			echo "${DEVPATH} already exists, linking $v4l_device_path to /dev/v4l_document_camera_1"
-			ln -sf /dev/"${v4l_device_path}" /dev/v4l_document_camera_1
-			DEVPATH=/dev/v4l_document_camera_1
-			DetectetcdValue=$DEVPATH
-			etcdKeyName=v4lcam1
-			write_etcd
-			else
-				echo "New device, Document camera linked to /dev/v4l_document_camera_0"
-				ln -sf /dev/"${v4l_device_path}" /dev/v4l_document_camera_0
-				DetectetcdValue=$DEVPATH
-				etcKeyName=v4lcam0
-				write_etcd
-		fi
-}
-
-event_lghdmi() {
-#	KEYNAME=${device_string_long}
-#	read_etcd
-#	if [ -n "${printvalue}" ]; then
-#		echo "there is already a Logitech HDMI capture device attached, incrementing inputs"
-#		KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"
-#		KEYNAME=hdmi_logitech_1
-#		write_etcd_inputs
-#		# We do not need to write INPUT_DEVICE_PRESENT, as this should already be tagged
-#	else
-#		echo "This etcd key is empty, therefore no Logitech HDMI device is present and we can continue normally.."
-
-
-		KEYNAME=${device_string_long}
-		KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"
-#		KEYNAME=hdmi_logitech
-		write_etcd_inputs
-		KEYNAME=INPUT_DEVICE_PRESENT
-		KEYVALUE="1"
-		write_etcd
-		# We will implement another etcd watcher service that will update the webui every time something changes
-		KEYNAME="/interface/${device_string_long}"
-		KEYVALUE="enabled"
-		write_etcd
-	fi
-}
-
-event_newdevice() {
-	# 10/27/2023 - new idea - just use the actual device string as the key and find some way to update it directly in the webUI?
-		#
-		v4lshort=$(echo $v4l_device_path | sed 's|/dev/||g')
-		
-		KEYNAME=${device_string_long}
-		KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"
-		write_etcd_inputs
-		KEYNAME=INPUT_DEVICE_PRESENT
-		KEYVALUE="1"
-		write_etcd
-		# We will implement another etcd watcher service that will update the webui every time something changes within this prefix
-		KEYNAME="/interface/${device_string_long}"
-		KEYVALUE="$(hostname)/$v4l_device_path"
-		write_etcd_global
-		KEYNAME=new_device_attached
-		KEYVALUE=1
-		write_etcd_global
-	fi	
-}
-
-event_magewellhdmi() {
-# The Magewell supports 1080p @ 60FPS, so we will set that here
-# I write something here to increment for multiple inputs.
-	KEYNAME=hdmi_magewell
-	read_etcd
-	if [ -n "${printvalue}" ]; then
-    	echo "there is already a MageWell HDMI capture device attached, incrementing inputs"
-    	KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/60:convert=RGB:device=${v4l_device_path}"
-		KEYNAME=hdmi_magewell_1
-		write_etcd_inputs
-		# We do not need to write INPUT_DEVICE_PRESENT, as this should already be tagged
+device_cleanup() {
+# always the last thing we do here, compares /dev/v4l/by-id to /hash/ and /interface/, removes "dead" devices
+# Generate an associative array from etcd's /hash/ and /interface/ prefixes
+# It effectively shouldn't be possible for v4lArray to be longer than interfaceLongArray, if this is the case then something has gone wrong
+# This is because we should be cleaning up unused devices, and the pruning happens every time a device is plugged in, or a button is pressed.
+#
+declare -a interfaceLongArray=$(etcdctl --endpoints=${ETCDENDPOINT} get /long_interface/ --prefix --keys-only | sed 's/\/long_interface// ')
+	leftOversArray=(`printf '%s\n' "${interfaceLongArray[@]}" "${v4lArray[@]}" | sort | uniq -u`)
+	if (( ${#leftOversArray[@]} == 0 )); then
+	    echo -e "Array is empty, there is no discrepancy between detected device paths and available devices in Wavelet.  Terminating process.. \n"
+	    :
 	else
-    	echo "This etcd key is empty, therefore no MageWell HDMI device is present and we can continue normally.."
-		KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/60:convert=RGB:device=${v4l_device_path}"
-		KEYNAME=hdmi_magewell
-		write_etcd_inputs
-		KEYNAME=INPUT_DEVICE_PRESENT
-		KEYVALUE="1"
-		write_etcd
+		echo -e "Orphaned devices located: \n"
+	        printf "%s\n" "${leftOversArray[@]}"
+		for i in "${leftOversArray[@]}"
+                	do
+				cleanupStringLong=$i
+				echo -e "\n\nCleanup device is ${cleanupStringLong}"
+
+				# delete the input caps key for the missing device
+				echo -e "Deleting $(hostname)/inputs${cleanupStringLong}  entry"
+				etcdctl --endpoints=${ETCDENDPOINT} del "$(hostname)/inputs${cleanupStringLong}"
+				
+				# find the device hash 
+				cleanupHash=$(etcdctl --endpoints=${ETCDENDPOINT} get "/long_interface${cleanupStringLong}" --print-value-only)
+				echo -e "Device hash located as ${cleanupHash}"
+				
+				# delete from long_interface prefix
+				echo -e "Deleting /long_interface${cleanupStringLong} entry"
+				etcdctl --endpoints=${ETCDENDPOINT} del /long_interface${cleanupStringLong}
+				
+				# delete from hash prefix
+				echo -e "Deleting /hash/${cleanupHash} entry"
+				etcdctl --endpoints=${ETCDENDPOINT} del "/hash/${cleanupHash}"
+				
+				# finally, find and delete from interface prefix - Guess we need ANOTHER lookup table to manage to keep all of this straight..
+				cleanupInterface=$(etcdctl --endpoints=${ETCDENDPOINT} get "/short_hash/${cleanupHash}" --print-value-only)
+				echo -e "Device UI Interface label located in /short_hash/${cleanupHash} for the value ${cleanupInterface}"
+				echo -e "Deleting /interface/${cleanupInterface} entry"
+				etcdctl --endpoints=${ETCDENDPOINT} del "/interface/${cleanupInterface}"
+				echo -e "Deleting /short_hash/${cleanupHash}  entry"
+				etcdctl --endpoints=${ETCDENDPOINT} del "/short_hash/${cleanupHash}"
+				echo -e "Device entry ${cleanupStringLong} should be removed along with all references to ${cleanupHash}\n\n"
+	                done
 	fi
 }
 
-event_realsense_d435() {
-# The Intel RealSense webcam is a 3D depthsensing webcam.  It's not really useful here, but it's all I had at home to test..
-# This is an example of how i'd add a new device
-# 1) plug it in
-# 2) determine what was added by v4l by ls /dev/v4l/by-id
-# 3) clear && v4l2-ctl -d /dev/video$ -D --list-formats-ext
-# 4) determine a reasonable resolution to utilize
-# 5) test streaming with UG, with any luck there won't be any odd quirks.
-# 6) took me about ten minutes for this..
-# 7) the Controller script would need modding to actually utilize this..
-	KEYVALUE="-t v4l2:codec=YUYV:size=1280x720:tpf=1/10:convert=RGB:device=/dev/video6"
-	KEYNAME=realsensed435
+
+detect() {
+# we still need this fairly simple approach, as the Logitech screen share USB devices have no serial number, making multiple inputs hard to handle.
+# is called in a foreach loop from detect_ug devices, therefore it is already instanced for each device
+	echo -e "Device string is ${device_string_long} \n"
+	case ${device_string_long} in
+	*IPEVO*)						echo -e "IPEVO Document Camera device detected.. \n"		&& event_ipevo
+	;;
+	*"Logitech Screen Share"*)				echo -e "Logitech HDMI-USB Capture device detected.. \n"	&& event_logitech_hdmi
+	;;
+	*)							echo -e "Unknown device detected, attempting to process..\n"	&& event_unknowndevice
+	;;
+	esac
+}
+
+
+# -t v4l2[:device=<dev>][:codec=<pixel_fmt>][:size=<width>x<height>][:tpf=<tpf>|:fps=<fps>][:buffers=<bufcnt>][:convert=<conv>][:permissive]
+
+event_ipevo() {
+# each of these blocks contains specific configuration options that must be preset for each device in order for them to work.  
+# We will have to add to this over time to support more devices appropriately.
+# Specifically this camera supports MJPG so we will use that instead of YUYV for the capture pixel format
+	echo -e "IPEVO Camera detection running..\n"
+	KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"
+	KEYNAME=${device_string_long}
 	write_etcd_inputs
-	KEYNAME=INPUT_DEVICE_PRESENT
-	KEYVALUE="1"
-	write_etcd	
+	echo -e "\nDetection completed for IPEVO device.. \n \n \n \n"
+	device_cleanup
 }
 
-event_unk() {
-	# placeholder for future devices to be cut and pasted in - write_etc for input device present is disabled here
-	# we don't want any old unknown device messing with operation.
-	KEYVALUE="-t v4l2:codec=?:size=1920x1080:tpf=1/30:convert=RGB:device={v4l_device_path}"
-	KEYNAME=unknown_input_placeholder
-	write_etcd
-	KEYNAME=INPUT_DEVICE_PRESENT
-	KEYVALUE="1"
-	#write_etcd
+event_logitech_hdmi() {
+# here as a legacy setting, it's basically the same as the MageWell devices.
+	KEYNAME=${device_string_long}
+	KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"
+	write_etcd_inputs
+	echo -e "\nDetection completed for Logitech HDMI Capture device.. \n \n \n \n"
+	device_cleanup
 }
 
+event_unknowndevice() {
+# 30fps is a compatibility setting, this is called for Magewell capture cards which can do 60fps, but as its a catch all for other devices we will leave at 30.
+	echo -e "The connected device has not been previously assigned an input ID for the UI component.  Storing hash.\n"
+	KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:device=${v4l_device_path}:permissive:convert=RGB"
+        KEYNAME="${device_string_long}"
+	write_etcd_inputs
+	echo -e "\nDetection completed for device.. \n \n \n \n"
+	device_cleanup
+}
+
+
+####
+#
+# Main loop
+#
+###
 exec >/home/wavelet/detectv4l.log 2>&1
-set -x
-sense_devices_ug
+echo -e "\n \n \nBegin device detection and registration process... \n \n \n"
+sense_devices

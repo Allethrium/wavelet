@@ -1,82 +1,73 @@
 <!DOCTYPE html>
 <link rel="stylesheet" href="styles.css">
-<html>
-<head>
-<script src="jquery-1.11.3.min.js"></script>
-</head>
-<form action="interface.php" method="post">
-<div id="INPUT_SECTION">
-<div id="inputs_section">
-    <br>
-    &nbsp;Select Input:
-    <br>
-        <li class="class.inputs">
-        <ul class="">
-        <li><button class="inputs" name="inVar" type="submit" value="1" onclick=\"myForm.action='./page.php';return true;\">Blank Screen</li>
-        <li><button class="inputs" name="inVar" type="submit" value="2" onclick=\"myForm.action='./page.php';return true;\">NY State Seal</li>
-        <li><button class="inputs" name="inVar" type="submit" value="3" onclick=\"myForm.action='./page.php';return true;\">Evidence Camera</li>
-        <li><button class="inputs" name="inVar" type="submit" value="4" onclick=\"myForm.action='./page.php';return true;\">Counsel, HDMI 1</li>
-        <li><button class="inputs" name="inVar" type="submit" value="5" onclick=\"myForm.action='./page.php';return true;\">Input, HDMI 2</li>
-        <li><button class="inputs" name="inVar" type="submit" value="0" onclick=\"myForm.action='./page.php';return true;\">Toggle Livestreaming</li>
-        </ul>
+<meta charset="utf-8">
+<html lang="en">
+<head><title>Wavelet System User Interface</title></head><div id="page title" class="title">Wavelet System User Interface</div>
+<div id="livestreaming" class="input_divider">
+	<h3>Livestream Settings</h3>
+	<div id="livestreaming_inner" class="input_divider_inner">
+	<button id="0" class="lsButton inputStaticButtons" value="0" type="button">Toggle Livestreaming</button><br>
+        &emsp;<details><summary>Livestream target, API Key<span class="icon"></span></summary>
+        <p>
+	<label for="lsurl">Livestream URL target:</label>
+	<input type="text" id="lsurl" name="lsurl">&ensp;
+	<label for="lsapikey">API Key:</label>
+        <input type="text" id="lsapikey" name="lsapikey">
+	<br>
+	<button id="lsApplyButton" class="inputButton inputStaticButtons lsApplyButton" value="AP" type="button">Apply</button><br>
+	</p>
+	</details>
+	</div>
 </div>
-<div id="IMAGE_ROUTING">
-<div id="image_routing">
- <header>  
-    &nbsp;Multiple Image Feeds:
-    <br>
-    <div>
-    </div>
-    <li class="class.inputs">
-    <ul class="">
-    <li><button class="inputs" name="inVar" type="submit" value="W" onclick=\"myForm.action='./page.php';return true;\">Four Panel Split</li>
-    <li><button class="inputs" name="inVar" type="submit" value="X" onclick=\"myForm.action='./page.php';return true;\">Two Panel Vertical Split</li>
-<!-- These options currently do not work due to input limitations on UG. -->
-<!--    <li><button class="inputs" name="inVar" type="submit" value="Y" onclick=\"myForm.action='./page.php';return true;\">Picture-In-Picture 1</li>
-    <li><button class="inputs" name="inVar" type="submit" value="Z" onclick=\"myForm.action='./page.php';return true;\">Picture-In-Picture 2</li>
--->
-    </li>
-    </ul>
+
 </div>
+
+<body onload="handlePageLoad();" class="defaultBody">
+
+<div id="static_inputs_section" class="input_divider">
+	<h3>Common Input Options</h3>
+	<div id="static_inputs_section_inner" class="input_divider_inner">
+	<button id="1" class="inputButton inputStaticButtons" value="1" type="button">Blank Screen</button>
+	<button id="2" class="inputButton inputStaticButtons" value="2" type="button">NY State Seal</button><br>
+	</div>
 </div>
-<br>
-<br>
-<div id="codecs_section">
-    <br>
-    &nbsp;Codec Selection:
-    <div>
-    </div>
-        <li class="class.codecs">
-        <ul class="">
-        <li><button class="codecs" name="inVar" type="submit" value="A" onclick=\"myForm.action='./page.php';return true;\">H.264 SW</li>
-        <li><button class="codecs" name="inVar" type="submit" value="B" onclick=\"myForm.action='./page.php';return true;\">H.264 QSV (recommended)</li>
-        <li><button class="codecs" name="inVar" type="submit" value="C" onclick=\"myForm.action='./page.php';return true;\">HEVC SW</li>
-        <li><button class="codecs" name="inVar" type="submit" value="D" onclick=\"myForm.action='./page.php';return true;\">HEVC QSV</li>
-        <li><button class="codecs" name="inVar" type="submit" value="E" onclick=\"myForm.action='./page.php';return true;\">VP9 SW</li>
-        <li><button class="codecs" name="inVar" type="submit" value="F" onclick=\"myForm.action='./page.php';return true;\">VP9 QSV</li>
-        <li><button class="codecs" name="inVar" type="submit" value="H" onclick=\"myForm.action='./page.php';return true;\">AV1 QSV</li>
-        </ul>
-            <br>
-            &nbsp;Note some codec options may not combine well with some video input sources.<br>
-            &nbsp;x264 or HEVC Software (SW) modes are the most widely compatible.<br>
-            &nbsp;AV1 is a very new, experimental codec.<br>
-            <br>
+
+<div id="dynamic_inputs" class="input_divider">
+	<h3>Detected Input Devices</h3>
+	<div id="dynamicInputsWrapper" class="wrapper">
+		<div id="dynamicInputs" div class="dynamicInputsTarget">
+		</div>
+	</div>
 </div>
-</form>
+
+<div id="multiple_inputs_section" class="input_divider">
+	<h3>Multiple Input Selection</h3>
+        <div id="multiple_inputs_inner" class="input_divider_inner">
+	&emsp;<details><summary>Multiple Input Selection<span class="icon"></span></summary>
+	<p>
+	<button id="W" class="inputButton inputStaticButtons" value="W" type="button">Activate Multi Inputs</button>
+	</p>
+	</details>
+	</div>
+</div>
+
+<div id="codecs_section" class="input_divider">
+	<h3>Codec Selection</h3>
+	<div id="codecs_section_inner" class="input_divider_inner">
+	&emsp;<details><summary>Codec Selection<span class="icon"></span></summary>
+	<p>
+	<button class="codecButton inputStaticButtons" value="A">H.264 SW
+	<button class="codecButton inputStaticButtons" value="B">H.264 QSV (recommended)
+	<button class="codecButton inputStaticButtons" value="C">HEVC SW
+	<button class="codecButton inputStaticButtons" value="D">HEVC QSV
+	<button class="codecButton inputStaticButtons" value="E">VP9 QSV
+	<button class="codecButton inputStaticButtons" value="H">AV1 QSV
+	</p>
+	</details>
+	</div>
+</div>
+
+<script src="index.js"></script>
 </body>
-<script>
-function updatePage() {
-  $.ajax({
-    url: "http://192.168.1.32:8180/update.php",
-    success: function(data) {
-      $("#output").text(data);
-    },
-  });
-}
-</script>
 </html>
 
-
-Use javascript templating library to render php returns via AJAX into html -->
-Mustache
-Handlebars
