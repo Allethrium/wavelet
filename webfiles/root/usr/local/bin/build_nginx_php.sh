@@ -31,11 +31,9 @@ mv pod-http-php.service ${SCRHOME}/.config/systemd/user
 
 chown wavelet:wavelet ${SCRHOME}/.config/systemd/user
 
-# Apparently, I broke decompressing the web server components someplace else, this fixes that until I can determine what's going on
-d /home/wavelet
+cd /home/wavelet
 rm -rf http-php
 tar -xvf http-php.tar.xz
-chown -R wavelet:wavelet http-php
 
 systemctl --user daemon-reload
 systemctl --user enable pod-http-php.service --now
@@ -43,6 +41,3 @@ echo -e "Podmans container generated, service has been enabled in systemd, and w
 echo -e "The control service should be available via web browser on port 8180 I.E -\n http://svr.wavelet.local:8180 \n"
 pwd
 etcdctl --endpoints=${ETCDENDPOINT} put ${KEYNAME} -- ${KEYVALUE}
-
-
-podman pod create --infra=true --name http-php --publish 8180:80 -v /var/www/html:/var/www/html:Z -v /var/www/nginx:/etc/nginx/conf.d/:Z

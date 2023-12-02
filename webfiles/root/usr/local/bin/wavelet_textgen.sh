@@ -12,7 +12,7 @@ read_etcd(){
 }
 
 read_etcd_global(){
-        printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
+        printvalue="$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)"
         echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for Global value"
 }
 
@@ -40,79 +40,21 @@ filter_is_livestreaming(){
 
 
 read_uv_filter() {
-	# reads the control key for filter and sets appropriate values in this table directly, then adds livestream notification as appropriate
+	# 11/2023  uv_input is now a textlabel set by the user from the webUI.  This is because the alternatives with the new dynamic system were nonsense like
+	# deviceStringLong or deviceStringShort which all look like "IPEVO_Inc._IPEVO_Ziggi-HD_Plus" - which won't be presentable.
 	# Capture filter is set on REFLECTOR or on DECODERS, it is too expensive/finnicky to work properly on Encoders.
 		KEYNAME=uv_input
 		read_etcd_global
-		filterselection=${printvalue}
-			case $filterselection in
-			BLANK) 					color="rgba(65, 105, 225, 0.2)"
-									filter_is_livestreaming
-									filter="○ BLANK ${lsflag}"
-									generate_image
-			;;
-			SEAL)					color="rgba(65, 105, 225, 0.2)"
-									filter_is_livestreaming
-									filter="○ State Seal ${lsflag}"
-									generate_image
-			;;
-			EVIDENCECAM1)				color="rgba(65, 105, 225, 0.2)"
-									filter_is_livestreaming
-									filter="☺ Evidence Cam ${lsflag}"
-									generate_image
-			;;
-			HDMI1)					color="rgba(65, 105, 225, 0.2)"
-									filter_is_livestreaming
-									filter="○ HDMI In 1 ${lsflag}"
-									generate_image
-			;;
-			HDMI2)					color="rgba(65, 105, 225, 0.2)"
-									filter_is_livestreaming
-									filter="○ HDMI In 2 ${lsflag}"
-									generate_image
-			;;
-			HYBRID) 				color="rgba(65, 105, 225, 0.2)"
-									filter_is_livestreaming
-									filter="○ Hybrid ${lsflag}"
-									generate_image
-			;;
-			WITNESS) 				color="rgba(65, 105, 225, 0.2)"
-									filter_is_livestreaming
-									filter="○  Witness Camera ${lsflag}"
-									generate_image
-			;;
-			COURTROOM) 				color="rgba(65, 105, 225, 0.2)"
-									filter_is_livestreaming
-									filter="○  Courtroom ${lsflag}"
-									generate_image
-			;;
-			FOURSPLIT) 	color="rgba(65, 105, 225, 0.2)"
-									filter_is_livestreaming
-									filter="○  4-panel mixdown ${lsflag}"
-									generate_image
-			;;
-			TWOSPLIT) 	color="rgba(65, 105, 225, 0.2)"
-									filter_is_livestreaming
-									filter="○  2-panel mixdown ${lsflag}"
-									generate_image
-			;;
-			PIP1) 				color="rgba(65, 105, 225, 0.2)"
-									filter_is_livestreaming
-									filter="○  Picture-in-Picture 1 ${lsflag}"
-									generate_image
-			;;
-			PIP2) 				color="rgba(65, 105, 225, 0.2)"
-									filter_is_livestreaming
-									filter="○  Picture-in-Picture 2 ${lsflag}"
-									generate_image
-			;;
-			*) 						echo -e "Input Key is incorrect, quitting"; :
-			;;
-			esac
+		filterselection="${printvalue}"
+		color="rgba(65, 105, 225, 0.2)"
+		filter_is_livestreaming
+		filter="○ ${filterselection} ${lsflag}"
+		generate_image
 	}
 
 generate_image(){
-	We MUST generate a BMP - generating a PNG or other format does horrible things when converted to PAM.
+	# We MUST generate a BMP - generating a PNG or other format does horrible things when converted to PAM.
+	# working colorspace sRGB
 	convert -size 600x50 --pointsize 30 -background "${color}" -bordercolor "rgba(25, 65, 185, 0.1)" -border 1 -gravity West -fill white label:"%-  ${filter}" -colorspace sRGB /home/wavelet/banner.bmp
 	mogrify -format pam /home/wavelet/banner.bmp
 	echo -e "\n banner.pam generated for value ${filter}. \n"

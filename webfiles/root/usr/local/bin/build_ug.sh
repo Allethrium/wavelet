@@ -1,7 +1,6 @@
 #!/bin/bash
 # Builds UltraGrid systemD user unit files and configures other basic parameters during initial deployment
-# This is launched in userspace.  The service is called each logon from Sway, checks to see if already built
-# Then calls other scripts as required.
+# This is launched in userspace.  The service is called each logon from Sway, checks to see if already built, then calls other scripts as required.
 # it launches run_ug if hostname/config flag are set.
 # 
 # run_ug.sh initially started out doing some of this.
@@ -55,6 +54,10 @@ UG_HOSTNAME=$(hostname)
 }
 
 # These codeblocks directly enable the appropriate service immediately.
+# run_ug.sh will perform its own autodetection logic, this might seem redundant and probably is.
+# It was written before the need for this script became apparent.
+# OK and now it won't let us enable anything like it's supposed to?  have to do this manually in Ignition via hardlinks?????
+# to run systemd as another user (IE from root) do systemctl --user -M wavelet@  service.service
 
 event_gateway(){
 	echo -e "Not yet implemented.. \n"; exit 0
@@ -94,7 +97,23 @@ event_livestreamer(){
 event_decoder(){
 	echo -e "Decoder routine started.  Attempting to connect to preprovisioned WiFi.."
 	# Finding the correct BSSID is VERY fussy, hence we do so many redundant rescans.
-	/usr/local/bin/connectwifi.sh
+	nmcli dev wifi rescan
+	sleep 1
+	nmcli dev wifi rescan
+	sleep 1
+	nmcli dev wifi rescan
+	sleep 1
+	nmcli dev wifi rescan
+	sleep 1
+	nmcli dev wifi connect Wavelet-1
+	sleep 1
+	# need to do this twice - WiFi network *should* have already been provisioned by decoderhostname.sh
+	nmcli dev wifi connect Wavelet-1
+	echo -e "Setting up systemd services to be a decoder, moving to run_ug"
+	systemctl --user daemon-reload
+	systemctl --user enable run_ug.service --now
+	etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/wavelet_build_completed" -- "${KEYVALUE}"
+	sleep 2
 }
 
 
@@ -102,15 +121,15 @@ event_encoder(){
 	echo -e "reloading systemctl user daemon, moving to run_ug"
 	systemctl --user daemon-reload
 	systemctl --user enable run_ug.service --now
-	echo -e "Enabling watch_inputdevices.service, it is now appropriate to attach and remove USB video capture devices"
-	systemctl --user enable watch_inputdevices.service --now
 	etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/wavelet_build_completed" -- "${KEYVALUE}"
 	sleep 2
 }
 
 
 event_server(){
-# Sets up all server-related services
+# We're setting up a local http server so that subordinate devices don't have to copy and re-download everything.
+# Ultimately if we're feeling clever we might want to setup an RPM caching mirror here to service clients for system packages
+# This will need securing with HTTPS certificates ideally.
 	systemctl --user start container-etcd-member.service
 	sleep 10
 	
@@ -141,7 +160,7 @@ server_bootstrap(){
 		echo -e "Generating HTTPD server and copying/compressing wavelet files to server directory.."
 		cd /home/wavelet/http
 		cp /usr/local/bin/{overlay_rpm.sh,rpmfusion_repo.sh} /home/wavelet/http/
-		tar -czf wavelet-files.tar.gz /etc/dnsmasq.conf /etc/skel/.bash_profile /etc/skel/.bashrc /etc/containers/registries.conf.d/10-wavelet.conf /home/wavelet/{.bash_profile,.bashrc,seal.mp4} /home/wavelet/.config/systemd/user/{watch_encoderflag.service,watch_reflectorreload.service,wavelet_encoder.service} /home/wavelet/.config/sway/config /home/wavelet/.config/waybar/{config,style.css,time.sh} /usr/local/bin/{build_dnsmasq.sh,build_httpd.sh,build_ug.sh,configure_ethernet.sh,decoderhostname.sh,detectv4l.sh,monitor_encoderflag.sh,promote_to_server.sh,removedevice.sh,run_ug.sh,start_appimage.sh,start_reflector.sh,udev_call.sh,wavelet_client_poll.sh,wavelet_controller.sh,wavelet_reflector.sh,wavelet_livestream.sh,connectwifi.sh,wavelet_encoder.sh,wavelet_textgen.sh,monitor_encoderflag.sh}
+		tar -czf wavelet-files.tar.gz /etc/dnsmasq.conf /etc/skel/.bash_profile /etc/skel/.bashrc /etc/containers/registries.conf.d/10-wavelet.conf /home/wavelet/{.bash_profile,.bashrc,seal.mp4} /home/wavelet/.config/sway/config /home/wavelet/.config/waybar/{config,style.css,time.sh} /usr/local/bin/{build_dnsmasq.sh,build_httpd.sh,build_ug.sh,configure_ethernet.sh,decoderhostname.sh,detectv4l.sh,monitor_encoderflag.sh,promote_to_server.sh,removedevice.sh,run_ug.sh,start_appimage.sh,start_reflector.sh,udev_call.sh,wavelet_client_poll.sh,wavelet_controller.sh,wavelet_reflector.sh,wavelet_livestream.sh}
 		# http server for PXE, archives, RPM repo etc.
 		cp /usr/local/bin/UltraGrid.AppImage /home/wavelet/http
 		/usr/local/bin/build_httpd.sh	

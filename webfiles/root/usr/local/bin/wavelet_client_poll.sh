@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# This script is launched from systemd and acts as a detection sense for alive/dead hosts.  
-# Originally part of the reflector logic in the controller,
+# This script is launched from systemd and acts as a detection sense for alive/dead hosts.  Originally part of the reflector logic in the controller,
+# moved to systemd-basis for better job control.   The systemd unit will run once, it's up to another event to call it as often as needed.
 # Currently as of 8/1/23 it's called by a systemd etcdctl watch unit every time the IP list changes.
 
 #Etcd Interaction
@@ -39,7 +39,7 @@ read_etcd_clients_ip() {
 reflector_monitor() {
 # Runs in the background pinging clients and updating the reflector list if they are not alive
 # This is designed to kill streams to dead clients in order to save system bandwidth
-# Combined with the self-registration/connection logic on the subordinate devices
+# Combined with the self-registration/connection logic on the subordinate devices, it forms a limited self-healing capability within the system
 	reflector_generate_lists() {
 	# CURL's reflector list every second and updates client list if inconsistent with existing IPs
 			FILE=/home/wavelet/reflector_clients_ip.txt
@@ -55,8 +55,10 @@ reflector_monitor() {
         	fi
 	}
 	reflector_testisalive() {
-	# Tests the etcd master list with the monitor list, if there's a discrepancy, 
-    # will set an etcd flag for the wavelet_kill_all routine to restart the reflector to reflect the client IP pool changes
+	# This runs every n seconds as define by "while sleep $;"" above.  It doesn't need to happen too fast because this is just for housekeeping to avoid the reflector generating too many unicast streams.
+	# First, tests whether the etcd flag is already set, if so does nothing because the reflector will be reloaded the next time the system state changes.
+	# It tests the etcd master list with the monitor list, if there's a discrepancy it will set an etcd flag for the wavelet_kill_all routine to restart the reflector to reflect the client IP pool changes
+	# Otherwise, this component sends a single ping with a 2 second TTL, returns an alive or dead value.
 				KEYNAME="reload_reflector"
 				read_etcd_global
 				if [[ "$printvalue" -eq 1 ]]; then
@@ -75,9 +77,8 @@ reflector_monitor() {
 	}
 	reflector_pingme() {
 	# Pings the current list of IP addresses associated with Decoders, Livestreams or other clients.
-	# If a ping comes back unreachable, it deletes the host registration key from ETCD 
-    # The next generate_lists pass will register it as dead and remove it from the client list
-    # Finally, sets Reflector reload flag.
+	# If a ping comes back unreachable, it deletes the host registration key from ETCD and the next generate_lists pass will register it as dead,
+    # then set the Reflector reload flag.
 	exec 3</home/wavelet/monitor_list.txt
 	while read -u3 line
 	do

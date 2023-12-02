@@ -1,132 +1,73 @@
 <!DOCTYPE html>
 <link rel="stylesheet" href="styles.css">
-<meta charset="utf-8" />
-<html>
-<head>
-<script src="jquery-1.11.3.min.js"></script>
-<title>Wavelet System User Interface</title>
-</head>
-
-<body>
-<div id="title">
-    <br>
-    &nbsp;Wavelet System User Interface
-    <br>
-    <br>
-</div>
-<br>
-
-<div id="inputs">
-    <header> 
-    <br>
-    &nbsp;Select Single Input:
-    <br>
-    </header>
-    <body onload="createButton();">
-    <form method="post" action="interface.php" id="myForm">
-        <button class="inputs" name="inVar" type="submit" value="1">Blank Screen</button>
-        <button class="inputs" name="inVar" type="submit" value="2">NY State Seal</button>
-        <button class="inputs" name="inVar" type="submit" value="3">Evidence Camera</button>
-        <button class="inputs" name="inVar" type="submit" value="4">Counsel, HDMI 1</button>
-        <button class="inputs" name="inVar" type="submit" value="5">Input, HDMI 2</button>
-        <br>
-        <br>
-        <button class="inputs" name="inVar" type="submit" value="0">Toggle Livestreaming</button>
-    </form>
-</div>
-<br>
-
-<br>
-<div id="codecs_section">
-<details>
-    <summary>
-    &nbsp;Multiple Input Selection
-    <span class="icon"></span>
-    </summary>
-    <br>
-    <p>
-    <form method="post" action="interface.php" id="myForm"
-        <li class="class.codecs">
-    <ul class="">
-        <li><button class="inputs" name="inVar" type="submit" value="W">Two Inputs (Click again to shuffle)</li>
-        <li><button class="inputs" name="inVar" type="submit" value="X">Four Inputs (Click again to shuffle)</li>
-    </ul>
-    </form>
-    </p>
-    </details>
+<meta charset="utf-8">
+<html lang="en">
+<head><title>Wavelet System User Interface</title></head><div id="page title" class="title">Wavelet System User Interface</div>
+<div id="livestreaming" class="input_divider">
+	<h3>Livestream Settings</h3>
+	<div id="livestreaming_inner" class="input_divider_inner">
+	<button id="0" class="lsButton inputStaticButtons" value="0" type="button">Toggle Livestreaming</button><br>
+        &emsp;<details><summary>Livestream target, API Key<span class="icon"></span></summary>
+        <p>
+	<label for="lsurl">Livestream URL target:</label>
+	<input type="text" id="lsurl" name="lsurl">&ensp;
+	<label for="lsapikey">API Key:</label>
+        <input type="text" id="lsapikey" name="lsapikey">
+	<br>
+	<button id="lsApplyButton" class="inputButton inputStaticButtons lsApplyButton" value="AP" type="button">Apply</button><br>
+	</p>
+	</details>
+	</div>
 </div>
 
-<br>
-<div id="codecs_section">
-<details>
-    <summary>
-    &nbsp;Codec Selection
-    <span class="icon"></span>
-    </summary>
-    <br>
-    <p>
-    <form method="post" action="interface.php" id="myForm"
-        <li class="class.codecs">
-        <ul class="">
-        <li><button class="inputs" name="inVar" type="submit" value="A">H.264 SW</li>
-        <li><button class="codecs" name="inVar" type="submit" value="B">H.264 QSV (recommended)</li>
-        <li><button class="codecs" name="inVar" type="submit" value="C">HEVC SW</li>
-        <li><button class="codecs" name="inVar" type="submit" value="D">HEVC QSV</li>
-        <li><button class="codecs" name="inVar" type="submit" value="E">VP9 QSV</li>
-        <li><button class="codecs" name="inVar" type="submit" value="H">AV1 QSV</li>
-        </ul>
-            <br>
-            &nbsp;Note some codec options may not combine well with some video input sources.<br>
-            &nbsp;x264 or HEVC Software (SW) modes are the most widely compatible.<br>
-            &nbsp;AV1 is a very new, experimental codec.<br>
-            <br>
-        </form>
-    </p>
-    </details>
 </div>
 
+<body onload="handlePageLoad();" class="defaultBody">
 
-<!---
+<div id="static_inputs_section" class="input_divider">
+	<h3>Common Input Options</h3>
+	<div id="static_inputs_section_inner" class="input_divider_inner">
+	<button id="1" class="inputButton inputStaticButtons" value="1" type="button">Blank Screen</button>
+	<button id="2" class="inputButton inputStaticButtons" value="2" type="button">NY State Seal</button><br>
+	</div>
+</div>
 
-K what does JS need to do here?
+<div id="dynamic_inputs" class="input_divider">
+	<h3>Detected Input Devices</h3>
+	<div id="dynamicInputsWrapper" class="wrapper">
+		<div id="dynamicInputs" div class="dynamicInputsTarget">
+		</div>
+	</div>
+</div>
 
-1) JS needs to POST to interface.php and return an array of available input devices
-2) it needs to format this array into a list of buttons in the Single Inputs section
-3) It needs to provide a relabel function so a user can create a friendly label for the button instead of the populated usbdev data that will be returned from PHP/etcd 
+<div id="multiple_inputs_section" class="input_divider">
+	<h3>Multiple Input Selection</h3>
+        <div id="multiple_inputs_inner" class="input_divider_inner">
+	&emsp;<details><summary>Multiple Input Selection<span class="icon"></span></summary>
+	<p>
+	<button id="W" class="inputButton inputStaticButtons" value="W" type="button">Activate Multi Inputs</button>
+	</p>
+	</details>
+	</div>
+</div>
 
--->
-<script type="text/javascript">
-    /* get array data in JSON from PHP as a function */
-    function createInputsList () {
-        $.ajax({
-            url:"interface.php",    //the page containing php script
-            type: "post",    //request type,
-            dataType: 'json',
-            data: "function=return_inputs_list", 
-            success:function(result){
-                console.log(result.abc);
-            }
-        });
-    }
+<div id="codecs_section" class="input_divider">
+	<h3>Codec Selection</h3>
+	<div id="codecs_section_inner" class="input_divider_inner">
+	&emsp;<details><summary>Codec Selection<span class="icon"></span></summary>
+	<p>
+	<button class="codecButton inputStaticButtons" value="A">H.264 SW
+	<button class="codecButton inputStaticButtons" value="B">H.264 QSV (recommended)
+	<button class="codecButton inputStaticButtons" value="C">HEVC SW
+	<button class="codecButton inputStaticButtons" value="D">HEVC QSV
+	<button class="codecButton inputStaticButtons" value="E">VP9 QSV
+	<button class="codecButton inputStaticButtons" value="H">AV1 QSV
+	</p>
+	</details>
+	</div>
+</div>
 
-    function createButton(){
-        /* this actually calls the createInputsList function and stores in availableInputs */
-        var availableInputs = [ action: 'createInputsList'];
-        /* this creates the buttons */
-        for (var i = 0l i < availableInputs; i++) {
-            var newButton = document.createElement('button');
-            var t = document.createTextNode(availableInputs[i]);
-            document.body.appendChild(newButton);    
-        }
-    }
-</script>
-
+<script src="index.js"></script>
 </body>
+</html>
 
-
-
-
-
-
-               
- </html>
