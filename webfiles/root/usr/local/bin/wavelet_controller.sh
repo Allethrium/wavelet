@@ -5,7 +5,6 @@
 
 # Define event parameters
 # 3-8 are all dynamic devices that are populated dependent on what an encoder has attached, and how it has informed the etcd cluster of its presence.
-event_livestream="0"
 event_blank="1"
 event_seal="2"
 event_recordtoggle="9"
@@ -72,17 +71,31 @@ main
 main() {
 # 11/2023 - now reads uv_hash_select key for inputdata
 KEYNAME=input_update
-        echo -e "\n Task completed, resetting input_update key to 0.. \n"
 read_etcd_global
 if [[ "${printvalue}" == 1 ]]; then
-	echo -e "input_update key is set to 1, continuing with task.. \n"
+	echo -e "\ninput_update key is set to 1, continuing with task.. \n"
 else
-	echo -e "input_update key is set to 0, doing nothing.. \n"
+	echo -e "\ninput_update key is set to 0, doing nothing.. \n"
 	exit 0
 fi
 KEYNAME=uv_hash_select
 read_etcd_global
 event=${printvalue}
+# Check livestream toggle UI value
+KEYNAME=/livestream/enabled
+read_etcd_global
+livestream_state=${printvalue}
+	if [[ "${livestream_state}" = 0 ]]; then
+		echo "Livestreaming is off, setting LiveStreaming flag to disabled"
+		KEYNAME=uv_islivestreaming
+		KEYVALUE="0"
+	   	write_etcd_global
+	else
+		echo "Livestreaming is on, setting LiveStreaming flag to enabled"
+		KEYNAME=uv_islivestreaming
+	    KEYVALUE="1"
+    	write_etcd_global
+	fi
 waveletcontroller
 }
 
@@ -100,16 +113,12 @@ case $event in
 	# 3-8 are all dynamic inputs populated from v4l2 (or in the future, hopefully Decklink)
 	# 9
 	(9) echo "Recording currently Not implemented"												;is_recording=false;;
+	(T) echo "Test Card activated"									;current_event="wavelet-testcard"	;wavelet-testcard;;
 #	if [ $recording = true ]; then
 #		echo "Recording to archive file" && recording=true && wavelet_record_start
 #	if [ $recording = false ]; then
 #		($false) echo "Recording to archive file" && recording=true && wavelet_record_start;; 
 	# does not kill any streams, instead copies stream and appends to a labeled MKV file (not implemented unless we get a real server w/ STORAGE)
-	# 0
-	(0)	echo "LiveStream toggle set.."													;event_livestream;;
-	# starts and stops livestreaming as a toggle, then sets livestreamer variable appropriately.
-	#
-	# video codec selection
 	# HW and SW modes selected for compatibility reasons - some decoders don't like HW encoded video.  SW encoding will need a *FAST* CPU unless you like latency, dropped frames and glitches.
 	(A)		event_x264sw	&& echo "x264 Software video codec selected, updating encoder variables";;
 	(B)		event_x264hw 	&& echo "x264 VA-API video codec selected, updating encoder variables";;
@@ -122,11 +131,11 @@ case $event in
 	#
 	# Multiple input modes go here (I wonder if there's a better, matrix-based approach to this?)
 	#
-	(W) echo "Four-way panel split activated \n"						;current_event="event_foursplit"	;wavelet-foursplit;;
-	(X) echo "Two-way panel split activated \n"						;current_event="event_twosplit"		;wavelet-twosplit;;
+	(W) echo "Four-way panel split activated \n"						;current_event="event_foursplit";wavelet-foursplit;;
+	(X) echo "Two-way panel split activated \n"							;current_event="event_twosplit"	;wavelet-twosplit;;
 	(Y) echo "Picture-in-Picture 1 activated \n"						;current_event="event_pip1"		;wavelet-pip1;;
 	(Z) echo "Picture-in-Picture 2 activated \n"						;current_event="event_pip2"		;wavelet-pip2;;
-	(*) echo "Unknown input, passing hash to encoders.. \n"					;current_event="dynamic"		;wavelet-dynamic;;
+	(*) echo "Unknown predefined input, passing hash to encoders.. \n"	;current_event="dynamic"		;wavelet-dynamic;;
 esac
 }
 
@@ -169,32 +178,6 @@ read_etcd_clients_ip() {
 #
 ###
 
-
-event_livestream() {
-# Livestream switches an additional dedicated livestream decoder ON.
-# GLOBAL flag for entire system
-	KEYNAME=uv_islivestreaming
-	read_etcd_global
-	livestreaming=$printvalue
-	if [[ "$livestreaming" = 0 ]]; then
-		echo "Livestreaming is off, setting LiveStreaming flag to Enabled"
-		KEYNAME=uv_islivestreaming
-		KEYVALUE="1"
-	    	write_etcd_global
-	    	KEYNAME=encoder_restart
-	    	KEYVALUE="1"
-	    	write_etcd_global
-	else
-		echo "Livestreaming is on, setting LiveStreaming flag to Disabled"
-		KEYNAME=uv_islivestreaming
-	    	KEYVALUE="0"
-	    	write_etcd_global
-	    	KEYNAME=encoder_restart
-	    	KEYVALUE="1"
-	    	write_etcd_global
-	fi
-}
-
 wavelet_kill_all() {
 # Sets global flags for encoders and reflectors to restart
 KEYNAME=reload_reflector
@@ -209,30 +192,9 @@ write_etcd_global
 echo -e "Processes kill flags set, services should restart within ~5 seconds \n"
 }
 
-wavelet_kill_livestream() {
-# A dedicated routine to kill FFMPEG and UG on the livestream box
-	KEYNAME=uv_islivestreaming
-	read_etcd_global
-			if [[ "$livestreaming" = "0" ]]; then
-				echo "Livestreaming is off, nothing to do!"
-				:
-			else
-				echo "Livestreaming is enabled, killing processes on livestreamer device"
-				# placeholder either ssh or run systemctl to kill ffmpeg + uv as necessary on livestream box
-				# either that or kill the IP address on the reflector.  It's the only way to be sure..
-	    	    KEYNAME=uv_islivestreaming
-	    	    KEYVALUE="0"
-	    	    write_etcd_global
-		    KEYNAME=encoder_restart
-	    	    KEYVALUE="1"
-	    	    write_etcd_global
-			fi
-}
-
 wavelet-blank() {
 # 1
 # Displays a black jpg to blank the screen fully
-# This needs to be changed to run here, on the server without bothering encoders
 	current_event="wavelet-blank"
 	KEYNAME=uv_input
 	KEYVALUE="BLANK"
@@ -292,6 +254,22 @@ wavelet-seal() {
         systemctl --user daemon-reload
         systemctl --user restart UltraGrid.AppImage.service
         echo -e "Encoder systemd units instructed to start..\n"
+}
+
+wavelet-testcard() {
+# T
+        current_event="wavelet-testcard"
+        KEYNAME=uv_input
+        KEYVALUE="BLANK"
+        write_etcd_global
+        KEYNAME=uv_input_cmd
+        KEYVALUE="-t testcard:pattern=smpte_bars"
+        /usr/local/bin/wavelet_textgen.sh
+        write_etcd
+        # Set encoder restart flag to 1
+        KEYNAME=encoder_restart
+        KEYVALUE="1"
+        write_etcd_global
 }
 
 wavelet-dynamic() {
@@ -455,3 +433,4 @@ wavelet-pip2() {
 
 exec >/home/wavelet/controller.log 2>&1
 detect_self
+

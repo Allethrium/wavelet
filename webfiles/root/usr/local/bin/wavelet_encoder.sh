@@ -88,9 +88,11 @@ event_encoder(){
 		read_etcd_global
 		encoderDeviceHash="${printvalue}"
 		case ${encoderDeviceHash} in
-		(1)	echo "blank screen activated, as set from controller."; exit 0
+		(1)	echo "Blank screen activated, as set from controller."; exit 0
 		;;
-		(2)	echo "seal image activate, as set from controller"; exit 0
+		(2)	echo "Seal image activated, as set from controller"; exit 0
+		;;
+		(T)	echo "Testcard generation activated, as set from controller"; exit 0
 		;;
 		(W) 	echo "Four Panel split activated, attempting multidisplay swmix";	encoder_event_setfourway 
 		;;

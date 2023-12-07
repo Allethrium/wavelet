@@ -27,7 +27,7 @@ storage:
       mode: 0755
       overwrite: true
       contents:
-        source: http://192.168.1.254:8080/UltraGrid-1.8.4-x86_64.AppImage
+        source: https://github.com/CESNET/UltraGrid/releases/download/v1.8.7/UltraGrid-1.8.7-x86_64.AppImage
     # Detect NetworkManager name and set as static script
     - path: /usr/local/bin/configure_ethernet.sh
       mode: 0755
@@ -276,11 +276,11 @@ storage:
       contents:
         source: https://www.andymelville.net/wavelet/wavelet_detectv4l.sh
     # Should be called by udev and clean up removed devices upon USB disconnection.
-    - path: /usr/local/bin/removedevice.sh
+    - path: /usr/local/bin/wavelet_removedevice.sh
       mode: 0755
       overwrite: true
       contents:
-        source: https://www.andymelville.net/wavelet/removedevice.sh
+        source: https://www.andymelville.net/wavelet/wavelet_removedevice.sh
     # Shell script to test encoderflag and reset value once actioned
     - path: /usr/local/bin/monitor_encoderflag.sh
       mode: 0755
