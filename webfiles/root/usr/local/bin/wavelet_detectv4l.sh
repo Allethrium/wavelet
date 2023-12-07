@@ -6,7 +6,8 @@
 # It will attempt to make sense of available v4l devices and update etcd
 # WebUI updates, and is updated from, many of these keys.
 # 11/21/2023	-	Device detection, relabeling and removal now works appropriately.
-
+# 12/05/2023	-	Need to make sure device labels are properly generated with hostname to support multiple encoders.
+# 12/06/2023	-	added detect_self to ensure we don't run device detection on incorrect devices.
 
 #Etcd Interaction
 ETCDENDPOINT=http://192.168.1.32:2379
@@ -65,7 +66,7 @@ sense_devices() {
 generate_device_info() {
 	echo -e "\n \n \n Now generating device info for each item presently located in /dev/v4l/by-id.. \n"
 	echo -e "Working on ${device_string_long}\n"
-	device_string_short=$(echo "${device_string_long}" | sed 's/.*usb-//')
+	device_string_short=$(echo $(hostname)/"${device_string_long}" | sed 's/.*usb-//')
         info=$(v4l2-ctl -D -d ${v4l_device_path})
         # here we parse this information
         cardType=$(echo "${info}" | awk -F ":" '/Card type/ { print $2 }')
@@ -225,6 +226,31 @@ event_unknowndevice() {
 	device_cleanup
 }
 
+
+
+detect_self(){
+UG_HOSTNAME=$(hostname)
+	echo -e "Hostname is $UG_HOSTNAME \n"
+	case $UG_HOSTNAME in
+	enc*) 					echo -e "I am an Encoder, allowing device sense to proceed.. \n"; sense_devices
+	;;
+	decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.  An error has occurred at some point, and needs troubleshooting.\n Terminating process. \n"; exit 0
+	;;
+	dec*)					echo -e "I am a Decoder \n"; exit 0
+	;;
+	livestream*)			echo -e "I am a Livestream ouput gateway \n"; exit 0
+	;;
+	gateway*)				echo -e "I am an input Gateway for another video streaming system \n"; exit 0
+	;;
+	svr*)					echo -e "I am a Server, allowing device sense to proceed.."; sense_devices
+	;;
+	*) 						echo -e "This device Hostname is not set approprately, I don't know what I am.  Exiting \n"; exit 0
+	;;
+	esac
+}
+
 exec >/home/wavelet/detectv4l.log 2>&1
+# check to see if I'm a server or an encoder
+
 echo -e "\n \n \n ********Begin device detection and registration process...******** \n \n \n"
-sense_devices
+detect_self

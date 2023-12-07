@@ -38,3 +38,5 @@ wavelet_server.iso
 wavelet_decoder.iso
 fedora-coreos-38.20230722.3.0-live.x86_64.iso.sig
 1q
+webfiles/root/usr/local/bin/detectv4l.sh
+webfiles/root/usr/local/bin/old_detectv4l.sh

@@ -7,7 +7,7 @@ echo "Udev sorter invoked by USB activity, waiting 2 seconds and calling sorter.
 sleep .1
 check=$@
 if [ "${check}" = "remove" ]; then
-	/bin/su -c "/usr/local/bin/removedevice.sh" - wavelet &
+	/bin/su -c "/usr/local/bin/wavelet_removedevice.sh" - wavelet &
 	else
-	/bin/su -c "/usr/local/bin/detectv4l.sh" - wavelet &
+	/bin/su -c "/usr/local/bin/wavelet_detectv4l.sh" - wavelet &
 fi

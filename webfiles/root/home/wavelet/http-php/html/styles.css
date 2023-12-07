@@ -1,9 +1,13 @@
 .defaultBody {
-background-color: grey;
+	background-color: grey;
+	font-size: large;
+	text-transform: uppercase;
+	font-family: Verdana, Helvetica, sans-serif;
+
 }
 .title {
 	background:#4381f4;
-	padding: 10px 10px 10px 10px;
+	padding: 16px 16px 16px 16px;
 	margin: 5px 5px 5px 5px;
 	border:1px solid white;
 	border-radius:1em;
@@ -15,8 +19,19 @@ background-color: grey;
 	font-family: Verdana, Helvetica, sans-serif;
 }
 /* class for main sections */
-.input_divider
-{
+.body_divider {
+        background:grey;
+        padding: 1px 1px 1px 1px;
+        margin: 1px 1px 1px 1px;
+	border: 4px solid grey;
+	border-radius:1em;
+        width:95%;
+        font-family: Verdana, Helvetica, sans-serif;
+        font-size:small;
+        text-transform:uppercase;
+        text-align:left;
+}
+.input_divider {
 	background:#4381f4;
 	transition:0.6s;
 	border:1px solid white;
@@ -24,16 +39,15 @@ background-color: grey;
 	padding: 10px 10px 10px 10px;
 	margin: 5px 5px 5px 5px;
 	color:white;
-	transition:0.6s;
 	width:90%;
 	font-family: Verdana, Helvetica, sans-serif;
+	font-size:small;
 	text-transform:uppercase;
 	text-align:center;
-	margin: 5 auto;
 }
 .input_divider_inner {
-        background:#4381f4;
-        padding: 5px 5px 5px 5px;
+        background:#6699ff;
+        padding: 8px 8px 8px 8px;
         border-radius:1em;
         text-transform: uppercase;
         font-size:small;
@@ -43,42 +57,167 @@ background-color: grey;
 }
 #dynamicInputsWrapper {
 	background:#4381f4;
-	margin: 1px 1px 1px 1px;
-	padding: 1px 1px 1px 1px;
+	padding: 8px 8px 8px 8px;
 	border-radius:1em;
 	text-transform: uppercase;
 	font-size:small;
 	font-family: Verdana, Helvetica, sans-serif;
+	text-align:left;
 }
 #dynamicInputs {
-	background:#4381f4;
-	padding: 5px 5px 5px 5px;
-	border-radius:1em;
-	text-transform: uppercase;
-	font-size:small;
-	font-family: Verdana, Helvetica, sans-serif;
-	border: .5px solid white;
+        background:#6699ff;
+        padding: 8px 8px 8px 8px;
+        border-radius:1em;
+        text-transform: uppercase;
+        font-size:small;
+        font-family: Verdana, Helvetica, sans-serif;
+        text-align:left;
+        border: .5px solid white;
+
 }
 /* buttons styles */
 .inputButton{
-	border-radius: 1.5em;
-	padding: 5px 15px;
-	background: grey;
-	text-transform: uppercase;
-	font-family: Verdana, Helvetica, sans-serif;
-	font-size: small;
-	display: block;
-}
-.dynamicInputButton{
-	border-radius: 1.5em;
-	padding: 15px 15px;
-	background: grey;
-	text-transform: uppercase;
+	box-shadow:inset -2px -2px 2px -3px #ffffff;
+	background:linear-gradient(to bottom, #707070 5%, #575757 100%);
+	background-color:#707070;
+	border-radius:1.5em;
+	border:1px solid #ffffff;
+	display:block;
+	cursor:pointer;
+	color:#ffffff;
 	font-family: Verdana, Helvetica, sans-serif;
 	font-size:small;
-	display: block;
+	padding:6px 16px;
+	margin:3px 3px 3px 3px;
+	text-decoration:none;
+	text-shadow:0px 1px 2px #000000;
+	text-align: left;
 }
-.lsButton{
+.inputButton:hover{
+	background:linear-gradient(to bottom, #575757 5%, #707070 100%);
+	background-color:#575757;
+}
+.inputButton:active{
+	position:relative;
+	top:1px;
+	background-color: black;
+	color:red;
+}
+.dynamicInputButton{
+        box-shadow:inset -2px -2px 2px -3px #ffffff;
+        background:linear-gradient(to bottom, #707070 5%, #575757 100%);
+        background-color:#707070;
+        border-radius:1.5em;
+        border:1px solid #ffffff;
+        display:inline-block;
+        cursor:pointer;
+        color:#ffffff;
+        font-family: Verdana, Helvetica, sans-serif;
+        font-size:small;
+        padding:6px 16px;
+	margin:3px 3px 3px 3px;
+        text-decoration:none;
+        text-shadow:0px 1px 2px #000000;
+	text-align: left;
+}
+.dynamicInputButton:hover{
+	background:linear-gradient(to bottom, #575757 5%, #707070 100%);
+	background-color:#575757;	
+}
+.dynamicInputButton:active{
+	position:relative;
+	top:1px;
+        background-color: black;
+        color:red;
+}
+
+.renameButton{
+        box-shadow:inset -2px -2px 2px -3px #ffffff;
+        background:linear-gradient(to bottom, #0039e6 5%, #668cff 100%);
+        background-color:#0039e6;
+        border-radius:1.5em;
+        border:1px solid #ffffff;
+        display: inline-block;
+        cursor:pointer;
+        color:#ffffff;
+        font-family: Verdana, Helvetica, sans-serif;
+        font-size:small;
+        padding:6px 16px;
+        margin:3px 3px 3px 3px;
+        text-decoration:none;
+        text-shadow:0px 1px 2px #000000;
+        text-align: left;
+}
+.renameButton:hover{
+        background:linear-gradient(to bottom, #575757 5%, #707070 100%);
+        background-color:#575757;
+}
+.renameButton:active{
+        position:relative;
+        top:1px;
+        background-color: black;
+        color:red;
+}
+
+
+/* The switch - the box around the slider */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+}
+
+/* Hide default HTML checkbox */
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* The slider */
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 15px;
+  width: 15px;
+  left: 2px;
+  bottom: 3px;
+  background-color: white;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+input:checked + .slider {
+  background-color: #f3212d;
+}
+input:focus + .slider {
+  box-shadow: 0 0 3px #a6a6a6;
+}
+input:checked + .slider:before {
+  -webkit-transform: translateX(20px);
+  -ms-transform: translateX(20px);
+  transform: translateX(20px);
+}
+/* Rounded sliders */
+.slider.round {
+  border-radius: 15px;
+}
+.slider.round:before {
+  border-radius: 50%;
+} 
+
+.lsApplyButton{
 	border-radius: 1.5em;
 	padding: 5px 15px;
 	background: grey;
@@ -95,4 +234,3 @@ background-color: grey;
 	font-size: small;
 	display: block;
 }
-

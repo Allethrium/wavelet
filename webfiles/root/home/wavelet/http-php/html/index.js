@@ -5,12 +5,45 @@ document.getElementsByTagName('head')[0].appendChild(script);
 var dynamicInputs = document.getElementById("dynamicInputs");
 dynamicInputs.innerHTML = '';
 
-
-
 function handlePageLoad() {
+	var livestreamValue = getLivestreamStatus(livestreamValue);
+	/* getLivestreamURLdata(); */
+	// Adding classes and attributes to the prepopulated 'static' buttons on the webUI
 	const staticInputElements = document.querySelectorAll(".inputStaticButtons");
 	staticInputElements.forEach(el => 
 		el.addEventListener("click", sendPHPID, setButtonActiveStyle, true));
+	// Apply event listener to Livestream toggle
+	$("#lstoggleinput").change
+		(function() {
+			if ($(this).is(':checked')) {
+						$.ajax({
+							type: "POST",
+							url: "/enable_livestream.php",
+							data: {
+								lsonoff: "1"
+								},
+							success: function(response){
+							console.log(response);
+							}
+						});
+
+				} else {
+                                                $.ajax({
+                                                        type: "POST",
+                                                        url: "/enable_livestream.php",
+                                                        data: {
+                                                                lsonoff: "0"
+                                                                },
+                                                        success: function(response){
+                                                        console.log(response);
+                                                        }
+                                                });
+
+				}
+	});
+	
+
+	// get dynamic devices from etcd, and call createNewButton function to generate them
 	$.ajax({
 		type: "POST",
 		url: "get_inputs.php",
@@ -25,32 +58,68 @@ function handlePageLoad() {
 					var keyFull = item['keyFull']; 
 					createNewButton(key, value, keyFull);
 	                                })
-			}
-    	})
+		}
+    	});
 }
 
+function getLivestreamStatus(livestreamValue) {
+	// this function gets the livestream status from etcd and sets the livestream toggle button on/off
+	$.ajax({
+		type: "POST",
+		url: "get_livestream_status.php",
+		dataType: "json",
+		success: function(returned_data) {
+		const livestreamValue = JSON.parse(returned_data);
+			if (livestreamValue == "1" ) {
+		        console.log ("Livestream value is 1, enabling toggle automatically.");
+		        $("#lstoggleinput")[0].checked=true; // set HTML checkbox to checked
+		        } else {
+		        console.log ("Livestream value is NOT 1, disabling checkbox toggle.");
+		        $("#lstoggleinput")[0].checked=false; // set HTML checkbox to unchecked
+		        }
+		}
+	})
+}
+
+
 function createNewButton(key, value, keyFull) {
-	/* first we need to check if the button already exists in persistent storage. 
-	 * If so, restore it, test it against etcd to ensure it's still there,  and do nothing.
-	 * This way, previously set button labels are persistent across clients/browser refreshes, and need to be set only once.
-	 * We need to test for dead devices so we don't get exponentially increasing labels!
-	 */
-	
-	/* else, create a new button object */
-	var button 		= 	document.createElement("Button");
+	var divEntry		=	document.createElement("Div");
+	var dynamicButton 	= 	document.createElement("Button");
+	var renameButton	=	document.createElement("Button");
 	const text		=	document.createTextNode(key);
 	const id		=	document.createTextNode(counter + 1);
-	button.id		=	counter;
-	button.appendChild(text);
-	button.setAttribute("value", value);
-        button.setAttribute("type", "button");
-	button.setAttribute("data-fulltext", keyFull);
-	button.classList.add("clickableButton", "dynamicInputButton");
-	button.addEventListener("click", sendPHPID, setButtonActiveStyle, true);
-	button.addEventListener("dblclick", relabelElement, true);
-	dynamicInputs.appendChild(button);
+	dynamicButton.id	=	counter;
+	/* create a div container, where the button, relabel button and any other associated elements reside */
+	dynamicInputs.appendChild(divEntry);
+	divEntry.setAttribute("divDeviceHash", value);
+	divEntry.setAttribute("data-fulltext", keyFull);
+	divEntry.setAttribute("divDevID", dynamicButton.id);
+	divEntry.classList.add("dynamicInputButtonDiv");
+	console.log("dynamic video source div created for device hash: " + value);
+	/* add rename button */
+	function createRenameButton() {
+		var $btn = $('<button/>', {
+				type: 'button',
+				text: 'Rename',
+				class: 'renameButton clickableButton',
+				id: 'btn_rename'
+		}).click(relabelElement);
+	return $btn;
+	}
+	$(divEntry).append(createRenameButton());
+//	divEntry.appendChild(renameButton);
+        /* create the button */
+        dynamicButton.appendChild(text);
+        dynamicButton.setAttribute("value", value);
+        dynamicButton.setAttribute("type", "button");
+        dynamicButton.setAttribute("data-fulltext", keyFull);
+        dynamicButton.classList.add("clickableButton", "dynamicInputButton");
+        dynamicButton.addEventListener("click", sendPHPID, setButtonActiveStyle(this, true));
+        divEntry.appendChild(dynamicButton);
+	/* set counter +1 for button ID */
 	counter++;
 }
+
 
 function sendPHPID(event) {
 	postValue = (this.value);
@@ -68,18 +137,19 @@ function sendPHPID(event) {
 		});
 }
 
+
 function relabelElement() {
-	selectedElement		= (this.button);
-	buttonID		= (this.id);
-	const hash		= (this.value);
-	const oldGenText	= (document.getElementById(buttonID).getAttribute("data-fulltext"));
-	const newTextInput = prompt("Enter new text for the 'id' button:");
-	console.log("Button ID is:" +buttonID);
+	const selectedDivHash		=	$(this).parent().attr('divDeviceHash');
+						console.log("the found hash is: " + selectedDivHash);
+	const relabelTarget		=	$(this).parent().attr('divDevID');
+						console.log("the found button ID is: " + relabelTarget);
+	const oldGenText		=	$(this).parent().attr('data-fulltext');
+	const newTextInput		=	prompt("Enter new text label for this device:");
         console.log("Device full label is:" + oldGenText);
 	console.log("New input label is:" +newTextInput);
 	if (newTextInput !== null && newTextInput !== "") {
-		document.getElementById(buttonID).innerText = newTextInput;
-		document.getElementById(buttonID).oldGenText = oldGenText;
+		document.getElementById(relabelTarget).innerText = newTextInput;
+		document.getElementById(relabelTarget).oldGenText = oldGenText;
 		console.log("Button text successfully applied as:" + newTextInput);
 		console.log("The originally generated device field from Wavelet was: " + oldGenText);
 		console.log("The button must be activated for any changes to reflect on the video banner!");
@@ -87,7 +157,7 @@ function relabelElement() {
                         type: "POST",
                         url: "/set_label.php",
                         data: {
-                                value: hash,
+                                value: selectedDivHash,
                                 label: newTextInput,
 				oldvl: oldGenText
                               },
@@ -95,37 +165,30 @@ function relabelElement() {
                                 console.log(response);
                         }
                 });
-		/* little concerned about this:
-		 * find + overwrite on an etcd key in a client side function could be used to inject goodness knows what
-		 * so we need to sanitize the input data from the web form
-		 * limit to hash value length? 
-		 */
 	} else {
 		return;
 	}
 }
 
-function setButtonActiveStyle() {
-	name.style.color = "red";
+
+function setButtonActiveStyle(button) {
+	$(this).removeClass('active');
+        $(this).addClass('active');
 }
 
 function applyLivestreamSettings() {
-/* Here we onClick POST livestream settings through to another dedicated PHP handler which updates the livestream URL and APIkey.  Read only by dedicated livestream box. 
- *
- * consider not exposing the livestream DIV at all, unless the livestream box is registered on wavelet?  Would require this to also become dynamic content.
- *
- * */	
         postValue = (this.value);
-                $.ajax({
-                        type: "POST",
-                        url: "/apply_livestream.php",
-                        data: {
-                                lsurl: postLSURL,
-                                apikey: postLSapiKey
-                              },
-                        success: function(response){
-                                console.log(response);
+        var vlsurl = $("#lsurl").val();
+        var vapikey = $("#lsapikey").val();
+        $.ajax({
+                type: "POST",
+                url: "/apply_livestream.php",
+                data: {
+                        lsurl: vlsurl,
+                        apikey: vapikey
+                        },
+                success: function(response){
+                        console.log(response);
                         }
-                });
-
+        });
 }
