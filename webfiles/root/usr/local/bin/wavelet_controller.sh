@@ -48,13 +48,13 @@ UG_HOSTNAME=$(hostname)
 	;;
 	dec*)					echo -e "I am a Decoder \n" && echo -e "Cannot run the controller on a decoder, exiting.."; exit 0
 	;;
-	livestream*)				echo -e "I am a Livestreamer \n" && echo -e "Cannot run the controller on a livestreamer, exiting.."; exit 0
+	livestream*)			echo -e "I am a Livestreamer \n" && echo -e "Cannot run the controller on a livestreamer, exiting.."; exit 0
 	;;
 	gateway*)				echo -e "I am an input Gateway for another video streaming system \n"  && echo -e "Cannot run the controller on a gateway, exiting.."; exit 0
 	;;
 	svr*)					echo -e "I am a Server. Proceeding..."  && event_server
 	;;
-	*) 					echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
+	*) 						echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
 	;;
 	esac
 }
@@ -70,33 +70,33 @@ main
 
 main() {
 # 11/2023 - now reads uv_hash_select key for inputdata
-KEYNAME=input_update
-read_etcd_global
-if [[ "${printvalue}" == 1 ]]; then
-	echo -e "\ninput_update key is set to 1, continuing with task.. \n"
-else
-	echo -e "\ninput_update key is set to 0, doing nothing.. \n"
-	exit 0
-fi
-KEYNAME=uv_hash_select
-read_etcd_global
-event=${printvalue}
-# Check livestream toggle UI value
-KEYNAME=/livestream/enabled
-read_etcd_global
-livestream_state=${printvalue}
-	if [[ "${livestream_state}" = 0 ]]; then
-		echo "Livestreaming is off, setting LiveStreaming flag to disabled"
-		KEYNAME=uv_islivestreaming
-		KEYVALUE="0"
-	   	write_etcd_global
+	KEYNAME=input_update
+	read_etcd_global
+	if [[ "${printvalue}" == 1 ]]; then
+		echo -e "\ninput_update key is set to 1, continuing with task.. \n"
 	else
-		echo "Livestreaming is on, setting LiveStreaming flag to enabled"
-		KEYNAME=uv_islivestreaming
-	    KEYVALUE="1"
-    	write_etcd_global
+		echo -e "\ninput_update key is set to 0, doing nothing.. \n"
+		exit 0
 	fi
-waveletcontroller
+	KEYNAME=uv_hash_select
+	read_etcd_global
+	event=${printvalue}
+	# Check livestream toggle UI value
+	KEYNAME=/livestream/enabled
+	read_etcd_global
+	livestream_state=${printvalue}
+		if [[ "${livestream_state}" = 0 ]]; then
+			echo "Livestreaming is off, setting LiveStreaming flag to disabled"
+			KEYNAME=uv_islivestreaming
+			KEYVALUE="0"
+	   		write_etcd_global
+		else
+			echo "Livestreaming is on, setting LiveStreaming flag to enabled"
+			KEYNAME=uv_islivestreaming
+	    	KEYVALUE="1"
+    		write_etcd_global
+		fi
+	waveletcontroller
 }
 
 
@@ -105,37 +105,43 @@ waveletcontroller() {
 # 11/2023 - note that hardcoded inputs are no longer used here, the case $event in line just tests static buttons from the webUI.  The rest is handled between detectv4l and wavelet_encoder, for the most part.
 case $event in
 	# 1
-	(1) echo -e "Option One, Blank activated\n"							;current_event="wavelet-blank"		;wavelet-blank;;
+	(1) 	echo -e "Option One, Blank activated\n"						;current_event="wavelet-blank"			;wavelet-blank							;;
 	# Display a black screen on all devices
 	# 2
-	(2) echo -e "Option Two, Seal activated\n"							;current_event="wavelet-seal"		;wavelet-seal;;
+	(2) 	echo -e "Option Two, Seal activated\n"						;current_event="wavelet-seal"			;wavelet-seal							;;
 	# Display a static image of a court seal (find a better image!)
 	# 3-8 are all dynamic inputs populated from v4l2 (or in the future, hopefully Decklink)
 	# 9
-	(9) echo "Recording currently Not implemented"												;is_recording=false;;
-	(T) echo "Test Card activated"									;current_event="wavelet-testcard"	;wavelet-testcard;;
+	(9)		echo -e "Recording currently Not implemented"				;is_recording=false																;;
+	(T)		echo "Test Card activated"									;current_event="wavelet-testcard"		;wavelet-testcard						;;
+	# System control options
+	(DR)	echo -e "Decoders instructed to reload\n"					;current_event="wavelet-decoder-reboot"	;wavelet-decoder-reset					;;
+	(ER)	echo -e "Encoders instructed to reload\n"					;current_event="wavelet-encoder-reboot"	;wavelet-encoder-reboot					;;
+	(SR)	echo -e "Whole system reboot\n"								;current_event="wavelet-system-reboot"	;wavelet-system-reboot					;;
+	(CL)	echo -e "Clearing All Input Sources from keystore..\n"		;current_event="wavelet-clear-inputs"	;wavelet-clear-inputs					;;
+	(RD)	echo -e "Running re-detection of source devices..\n"		;current_event="wavelet-detect-inputs"	;/usr/local/bin/wavelet_detectv4l.sh	;;
 #	if [ $recording = true ]; then
 #		echo "Recording to archive file" && recording=true && wavelet_record_start
 #	if [ $recording = false ]; then
 #		($false) echo "Recording to archive file" && recording=true && wavelet_record_start;; 
 	# does not kill any streams, instead copies stream and appends to a labeled MKV file (not implemented unless we get a real server w/ STORAGE)
 	# HW and SW modes selected for compatibility reasons - some decoders don't like HW encoded video.  SW encoding will need a *FAST* CPU unless you like latency, dropped frames and glitches.
-	(A)		event_x264sw	&& echo "x264 Software video codec selected, updating encoder variables";;
-	(B)		event_x264hw 	&& echo "x264 VA-API video codec selected, updating encoder variables";;
-	(C)		event_x265sw 	&& echo "HEVC Software video codec selected, updating encoder variables";;
-	(D)		event_x265hw	&& echo "HEVC VA-API video codec selected, updating encoder variables";;
-	(E)		event_vp9sw	&& echo "VP-9 Software video codec selected, updating encoder variables";;
-	(F)		event_vp9hw 	&& echo "VP-9 Hardware video codec selected, updating encoder variables";;
-	(G)		event_rav1esw	&& echo "|*****||EXPERIMENTAL AV1 RAV1E codec selected, updating encoder vaiables||****|";;
-	(H)		event_av1hw	&& echo "|*****||EXPERIMENTAL AV1 VA-API codec selected, updating encoder vaiables||****|";;
+	(A)		event_x264sw	&& echo "x264 Software video codec selected, updating encoder variables"													;;
+	(B)		event_x264hw 	&& echo "x264 VA-API video codec selected, updating encoder variables"														;;
+	(C)		event_x265sw 	&& echo "HEVC Software video codec selected, updating encoder variables"													;;
+	(D)		event_x265hw	&& echo "HEVC VA-API video codec selected, updating encoder variables"														;;
+	(E)		event_vp9sw	&& echo "VP-9 Software video codec selected, updating encoder variables"														;;
+	(F)		event_vp9hw 	&& echo "VP-9 Hardware video codec selected, updating encoder variables"													;;
+	(G)		event_rav1esw	&& echo "|*****||EXPERIMENTAL AV1 RAV1E codec selected, updating encoder vaiables||****|"									;;
+	(H)		event_av1hw	&& echo "|*****||EXPERIMENTAL AV1 VA-API codec selected, updating encoder vaiables||****|"										;;
 	#
 	# Multiple input modes go here (I wonder if there's a better, matrix-based approach to this?)
 	#
-	(W) echo "Four-way panel split activated \n"						;current_event="event_foursplit";wavelet-foursplit;;
-	(X) echo "Two-way panel split activated \n"							;current_event="event_twosplit"	;wavelet-twosplit;;
-	(Y) echo "Picture-in-Picture 1 activated \n"						;current_event="event_pip1"		;wavelet-pip1;;
-	(Z) echo "Picture-in-Picture 2 activated \n"						;current_event="event_pip2"		;wavelet-pip2;;
-	(*) echo "Unknown predefined input, passing hash to encoders.. \n"	;current_event="dynamic"		;wavelet-dynamic;;
+	(W) echo "Four-way panel split activated \n"						;current_event="event_foursplit";wavelet-foursplit								;;
+	(X) echo "Two-way panel split activated \n"							;current_event="event_twosplit"	;wavelet-twosplit								;;
+	(Y) echo "Picture-in-Picture 1 activated \n"						;current_event="event_pip1"		;wavelet-pip1									;;
+	(Z) echo "Picture-in-Picture 2 activated \n"						;current_event="event_pip2"		;wavelet-pip2									;;
+	(*) echo "Unknown predefined input, passing hash to encoders.. \n"	;current_event="dynamic"		;wavelet-dynamic								;;
 esac
 }
 
@@ -425,6 +431,55 @@ wavelet-pip2() {
         write_etcd_global
 }
 
+
+wavelet-decoder-reset() {
+# Finds all decoders and sets client reSET flag.  This restarts UltraGrid without a full system reboot.
+	return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --keys-only)
+	for host in ${return_etcd_clients_ip}; do
+		etcdctl --endpoints=${ETCDENDPOINT} put "${host}/DECODER_RESET" -- "1"
+		echo -e "DECODER_RESET flag enabled for ${host}..\n"
+	done
+	echo -e "Decoder tasks instructed to reset on all attached decoders.\n"
+}
+
+wavelet-encoder-reboot() {
+# Finds all encoders and sets client reboot flag (need to implement reboot watcher service)
+# re-use the reflector code and then foreach hostname set it to reboot encoders
+# UltraGrid encoder task will SIGTERM every time a source is changed, this on the other hand reboots the WHOLE encoder.
+	etcdctl --endpoints=${ETCDENDPOINT} put "ENCODER_REBOOT" -- "1"
+	echo -e "Encoder reboot flag enabled, encoders will hard reset momentarily.."
+}
+
+wavelet-system-reboot() {
+# This hard reboots everything, including the server.
+# set reboot flag on every host in etcd
+	etcdctl --endpoints=${ETCDENDPOINT} put "SYSTEM_REBOOT" -- "1"
+	echo -e "All hosts instructed to hard reset.  Server and all reachable devices will restart immediately..\n"
+}
+
+wavelet-clear-inputs() {
+# Removes all input devices from their appropriate prefixes.
+# Until I fix the detection/removal stuff so that it works perfectly, this will effectively clean out any cruft from 'stuck'
+# source devices which no longer exist, but still populate on the UI.
+# bad solution
+	etcdctl --endpoints=http://192.168.1.32:2379 del "interface" --prefix
+  	etcdctl --endpoints=http://192.168.1.32:2379 del "/interface" --prefix
+  	etcdctl --endpoints=http://192.168.1.32:2379 del "/hash" --prefix
+  	etcdctl --endpoints=http://192.168.1.32:2379 del "/short" --prefix
+  	etcdctl --endpoints=http://192.168.1.32:2379 del "/long" --prefix
+  	echo -e "All interface devices and their configuration data, as well as labels have been deleted\n
+  	Plugging in a new device will cause the detection module to run again.\n"
+}
+
+wavelet-detect-inputs() {
+# Tells detectv4l to run on everything
+  	echo -e "\nAll devices now redetecting available input video sources..\n"
+  	etcdctl --endpoints=http://192.168.1.32:2379 set "DEVICE_REDETECT" -- "1"
+
+}
+
+
+
 ###
 #
 # execute main function
@@ -433,4 +488,3 @@ wavelet-pip2() {
 
 exec >/home/wavelet/controller.log 2>&1
 detect_self
-

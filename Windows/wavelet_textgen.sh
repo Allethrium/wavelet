@@ -65,7 +65,6 @@ generate_image(){
 }
 
 # Main
-rm -rf /home/wavelet/banner.bmp, /home/wavelet/banner.pam
 set -x
 exec >/home/wavelet/textgen.log 2>&1
 read_uv_filter

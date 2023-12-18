@@ -27,7 +27,7 @@ storage:
       mode: 0755
       overwrite: true
       contents:
-        source: http://192.168.1.254:8080/UltraGrid-1.8.4-x86_64.AppImage
+        source: https://github.com/CESNET/UltraGrid/releases/download/v1.8.7/UltraGrid-1.8.7-x86_64.AppImage
     # Detect NetworkManager name and set as static script
     - path: /usr/local/bin/configure_ethernet.sh
       mode: 0755
@@ -270,17 +270,17 @@ storage:
       contents:
         source: https://www.andymelville.net/wavelet/udev_call.sh
     # Handles USB device detection, effectively the 'driver' for display inputs.
-    - path: /usr/local/bin/detectv4l.sh
+    - path: /usr/local/bin/wavelet_detectv4l.sh
       mode: 0755
       overwrite: true
       contents:
-        source: https://www.andymelville.net/wavelet/detectv4l.sh
+        source: https://www.andymelville.net/wavelet/wavelet_detectv4l.sh
     # Should be called by udev and clean up removed devices upon USB disconnection.
-    - path: /usr/local/bin/removedevice.sh
+    - path: /usr/local/bin/wavelet_removedevice.sh
       mode: 0755
       overwrite: true
       contents:
-        source: https://www.andymelville.net/wavelet/removedevice.sh
+        source: https://www.andymelville.net/wavelet/wavelet_removedevice.sh
     # Shell script to test encoderflag and reset value once actioned
     - path: /usr/local/bin/monitor_encoderflag.sh
       mode: 0755
@@ -466,6 +466,24 @@ storage:
           [Service]
           Environment=ETCDCTL_API=3
           ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch encoder_restart -w simple -- sh -c "/usr/local/bin/monitor_encoderflag.sh"
+          [Install]
+          WantedBy=default.target
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    # Etcd watch inputdevices service
+    - path: /home/wavelet/.config/systemd/user/watch_inputdevices.service
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=Watches etcd for new devices from detectv4l.sh
+          After=network-online.target etcd-member.service
+          Wants=network-online.target
+          [Service]
+          Environment=ETCDCTL_API=3
+          ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch new_device_attached -w simple -- sh -c "/usr/local/bin/monitor_inputdevices.sh"
           [Install]
           WantedBy=default.target
       user:
@@ -689,7 +707,7 @@ passwd:
       groups:
         - wheel
         - sudo
-      password_hash: $y$j9T$S6d4D2PropO5rNpV/3zcq/$8BUwkq1L5H7MY7n3cBz7RpxfBdDMoSL/lLPz.2INf1.
+      password_hash: $y$j9T$fjgxRGCgi39psn4Yg/.Dl/$ZdlpV2jySrL6ZSxNVy8QgFIIi2yWalRLpZhg78ZeJjB
       home_dir: /home/wavelet-root
     - name: wavelet
       uid: 1337
@@ -702,9 +720,9 @@ passwd:
         # - render
         # - rdma
         # - kvm
-      password_hash: $y$j9T$nrGArdGnQKfPSRz.QFjir/$T7GKJb/T6hG1/cESJ5BM.TNpo.G.X.DxDH0LAibKTl4
+      password_hash: $y$j9T$jBgypgS/v0oib80VK7UEB1$RbWGOrEtU.qxlj0pjExTI4/zAIn6y70lJhIV49R1uu/
       ssh_authorized_keys:
-        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIChAjYhmH05XFhrfjAnnsJ9dToPewAbd93PmUyHcbSz8 wavelet@wavelet.local
+        - PUBKEYGOESHERE
       home_dir: /home/wavelet
 # Configure SYSTEM systemd units
 systemd:
@@ -747,8 +765,9 @@ systemd:
         libsrtp python3-pip srt srt-libs libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
         ImageMagick oneapi-level-zero oneVPL oneVPL-intel-gpu intel-opencl intel-level-zero \
         intel-media-driver intel-mediasdk mesa-dri-drivers mesa-vulkan-drivers \
-        mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL bluez-tools \
-        mesa-libxatracker libva libva-utils intel-gmmlib intel-ocloc
+        mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
+        mesa-libxatracker libva libva-utils intel-gmmlib intel-ocloc \
+        alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools
         ExecStartPost=touch /var/rpm-ostree-overlay.complete
         [Install]
         WantedBy=multi-user.target
