@@ -6,12 +6,14 @@ var dynamicInputs = document.getElementById("dynamicInputs");
 dynamicInputs.innerHTML = '';
 
 function handlePageLoad() {
-	var livestreamValue = getLivestreamStatus(livestreamValue);
+	var livestreamValue	=	getLivestreamStatus(livestreamValue);
+	var bannerValue		=	getBannerStatus(bannerValue);
 	/* getLivestreamURLdata(); */
 	// Adding classes and attributes to the prepopulated 'static' buttons on the webUI
 	const staticInputElements = document.querySelectorAll(".inputStaticButtons");
 	staticInputElements.forEach(el => 
 		el.addEventListener("click", sendPHPID, setButtonActiveStyle, true));
+
 	// Apply event listener to Livestream toggle
 	$("#lstoggleinput").change
 		(function() {
@@ -41,7 +43,36 @@ function handlePageLoad() {
 
 				}
 	});
-	
+
+	// Apply event listener to banner toggle
+	$("#banner_toggle_checkbox").change
+		(function() {
+			if ($(this).is(':checked')) {
+						$.ajax({
+							type: "POST",
+							url: "/enable_banner.php",
+							data: {
+								banneronoff: "1"
+								},
+							success: function(response){
+							console.log(response);
+							}
+						});
+
+				} else {
+                        $.ajax({
+                    	type: "POST",
+                        url: "/enable_banner.php",
+                        data: {
+                        	banneronoff: "0"
+                            	},
+							success: function(response){
+							console.log(response);
+							}
+						});
+
+				}
+	});
 
 	// get dynamic devices from etcd, and call createNewButton function to generate them
 	$.ajax({
@@ -59,11 +90,11 @@ function handlePageLoad() {
 					createNewButton(key, value, keyFull);
 	                                })
 		}
-    	});
+    });
 }
 
 function getLivestreamStatus(livestreamValue) {
-	// this function gets the livestream status from etcd and sets the livestream toggle button on/off
+	// this function gets the livestream status from etcd and sets the livestream toggle button on/off upon page load
 	$.ajax({
 		type: "POST",
 		url: "get_livestream_status.php",
@@ -81,6 +112,24 @@ function getLivestreamStatus(livestreamValue) {
 	})
 }
 
+function getBannerStatus(bannerValue) {
+	// this function gets the banner status from etcd and sets the banner toggle button on/off upon page load
+	$.ajax({
+		type: "POST",
+		url: "get_banner_status.php",
+		dataType: "json",
+		success: function(returned_data) {
+		const bannerValue = JSON.parse(returned_data);
+			if (bannerValue == "1" ) {
+		        console.log ("Banner value is 1, enabling toggle automatically.");
+		        $("#bannertoggleinput")[0].checked=true; // set HTML checkbox to checked
+		        } else {
+		        console.log ("Banner value is NOT 1, disabling checkbox toggle.");
+		        $("#bannertoggleinput")[0].checked=false; // set HTML checkbox to unchecked
+		        }
+		}
+	})
+}
 
 function createNewButton(key, value, keyFull) {
 	var divEntry		=	document.createElement("Div");

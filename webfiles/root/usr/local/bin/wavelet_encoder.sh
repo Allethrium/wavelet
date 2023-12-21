@@ -94,7 +94,7 @@ event_encoder(){
 		;;
 		(T)	echo "Testcard generation activated, as set from controller"; exit 0
 		;;
-		(W) 	echo "Four Panel split activated, attempting multidisplay swmix";	encoder_event_setfourway 
+		(W) echo "Four Panel split activated, attempting multidisplay swmix";	encoder_event_setfourway 
 		;;
 		*) single dynamic input device, run code below:
 		KEYNAME="/hash/${encoderDeviceHash}"

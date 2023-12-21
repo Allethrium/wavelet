@@ -1,6 +1,6 @@
 #!/bin/bash
 # Designed to be called by sway's build_ug.sh exec command.
-# This spins up the server's control interface for any wifi client to access.
+# This spins up the server's control interface for any wifi client to access.  Files should already be prepopulated on EVERY device from Ignition.
 # Need to amend this to generate or utilize proper certificates
 ETCDENDPOINT=192.168.1.32:2379
 KEYNAME=SERVER_HTTP-PHP_BOOTSTRAP_COMPLETED
@@ -16,9 +16,6 @@ USER=wavelet
 SCRHOME=/home/wavelet
 podman pod create --infra=true --name http-php --publish 8180:80 -v ${SCRHOME}/http-php/html:/var/www/html:Z -v ${SCRHOME}/http-php/nginx:/etc/nginx/conf.d/:Z -v ${SCRHOME}/http-php/html:/var/www/html:Z
 echo -e "Generating nginx simple configuration, and systemd service files.."
-# Can't echo because it loses critical charactesr in the conf file.
-# should be done in ignition now.
-# wget -P /home/wavelet/http-php/nginx/ https://www.andymelville.net/wavelet/nginx.conf
 podman create --name nginx --pod http-php docker://docker.io/library/nginx:alpine
 podman create --name php-fpm --pod http-php docker://docker.io/library/php:fpm
 
@@ -30,10 +27,6 @@ mv container-php-fpm.service ${SCRHOME}/.config/systemd/user
 mv pod-http-php.service ${SCRHOME}/.config/systemd/user
 
 chown wavelet:wavelet ${SCRHOME}/.config/systemd/user
-
-cd /home/wavelet
-rm -rf http-php
-tar -xvf http-php.tar.xz
 
 systemctl --user daemon-reload
 systemctl --user enable pod-http-php.service --now

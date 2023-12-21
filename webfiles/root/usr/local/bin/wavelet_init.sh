@@ -64,13 +64,17 @@ recording="0"
 KEYNAME=uv_input
 KEYVALUE="SEAL"
 write_etcd_global
-echo -e "Enabling monitor services.."
-systemctl --user enable wavelet_controller.service --now
+KEYNAME="uv_hash_select"
+KEYVALUE="2"
+write_etcd_global
+echo -e "Enabling monitor services..\n"
 systemctl --user enable watch_reflectorreload.service --now
 systemctl --user enable watch_encoderflag.service --now
-echo -e "Values populated, starting reflector"
+echo -e "Values populated, monitor services launched.  Starting reflector\n\n"
 systemctl --user enable UltraGrid.Reflector.service --now
 event_x264hw
-# Runs wavelet_controller.sh directly because otherwise, it will wait for values to be populated.  
-# During Init, we want to run it on its own.
-/usr/local/bin/wavelet_controller.sh
+systemctl --user enable wavelet_controller.service --now
+wait 2
+KEYNAME=input_update
+KEYVALUE=1
+write_etcd_global

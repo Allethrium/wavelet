@@ -139,14 +139,13 @@ event_server(){
 # Ultimately if we're feeling clever we might want to setup an RPM caching mirror here to service clients for system packages
 # This will need securing with HTTPS certificates ideally.
 	systemctl --user start container-etcd-member.service
-	sleep 10
-	
+	sleep 10	
 	if service_exists container-etcd-member; then
-		echo -e "Etcd service present, checking for bootstrap key"
+		echo -e "Etcd service present, checking for bootstrap key\n"
 			KEYNAME=SERVER_BOOTSTRAP_COMPLETED
 			result=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
 				if [[ "${result}" = 1 ]]; then
-					echo -e "Server bootstrap is already completed, starting services and terminating process.."
+					echo -e "Server bootstrap is already completed, starting services and terminating process..\n"
 					systemctl --user start watch_reflectorreload.service
 					systemctl --user start wavelet_init.service
 					# N.B - the encoder reset flag script is supposed to run only on an active encoder
@@ -156,7 +155,7 @@ event_server(){
 					server_bootstrap
 				fi
 	else
-		echo -e "Etcd service is not present, cannot check for bootstrap key and assuming that bootstrap has not been run. E xecuting bootstrap process.."
+		echo -e "Etcd service is not present, cannot check for bootstrap key and assuming that bootstrap has not been run. Executing bootstrap process..\n"
 		server_bootstrap
 	fi
 	event_reboot
@@ -169,7 +168,7 @@ server_bootstrap(){
 		echo -e "Generating HTTPD server and copying/compressing wavelet files to server directory.."
 		cd /home/wavelet/http
 		cp /usr/local/bin/{overlay_rpm.sh,rpmfusion_repo.sh} /home/wavelet/http/
-		tar -czf wavelet-files.tar.gz /etc/dnsmasq.conf /etc/skel/.bash_profile /etc/skel/.bashrc /etc/containers/registries.conf.d/10-wavelet.conf /home/wavelet/{.bash_profile,.bashrc,seal.mp4} /home/wavelet/.config/sway/config /home/wavelet/.config/waybar/{config,style.css,time.sh} /usr/local/bin/{build_dnsmasq.sh,build_httpd.sh,build_ug.sh,configure_ethernet.sh,decoderhostname.sh,detectv4l.sh,monitor_encoderflag.sh,promote_to_server.sh,removedevice.sh,run_ug.sh,start_appimage.sh,start_reflector.sh,udev_call.sh,wavelet_client_poll.sh,wavelet_controller.sh,wavelet_reflector.sh,wavelet_livestream.sh}
+		tar -czf wavelet-files.tar.gz /etc/dnsmasq.conf /etc/skel/.bash_profile /etc/skel/.bashrc /etc/containers/registries.conf.d/10-wavelet.conf /home/wavelet/{.bash_profile,.bashrc,seal.mp4} /home/wavelet/.config/sway/config /home/wavelet/.config/waybar/{config,style.css,time.sh} /usr/local/bin/{build_dnsmasq.sh,build_httpd.sh,build_ug.sh,configure_ethernet.sh,decoderhostname.sh,wavelet_detectv4l.sh,monitor_encoderflag.sh,promote_to_server.sh,wavelet_removedevice.sh,run_ug.sh,start_appimage.sh,start_reflector.sh,udev_call.sh,wavelet_client_poll.sh,wavelet_controller.sh,wavelet_reflector.sh,wavelet_livestream.sh}
 		# http server for PXE, archives, RPM repo etc.
 		cp /usr/local/bin/UltraGrid.AppImage /home/wavelet/http
 		/usr/local/bin/build_httpd.sh	

@@ -20,3 +20,4 @@ chown -R wavelet:wavelet /home/wavelet/http/repo_mirror
 # If doing this intelligently, it SHOULD be its own unit
 # Sets the CPU scaling to performance, which boosts CPU clockspeed across the board.
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+touch /var/local_rpm_setup.complete
