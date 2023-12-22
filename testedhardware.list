@@ -5,6 +5,9 @@ PC's:
 	12th Gen Intel Core-I5 or better CPU
 	Required for VA-API / QuickSync video core
 
+	For low-power, good results on Alder-Lake based SBC boards such as upcoming ZimaBlade, ZX05 etc.
+	HW acceleration necesary due to tight CPU constraints.  Probably make stellar low-cost decoders!
+
 	WiFi 6 networking via PCIe is highly recommended, 5ghz wifi capability is effectively a requirement. USB works, however does introduce some overhead.
 	B/G Band WiFi works, but very poorly.
 
