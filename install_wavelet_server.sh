@@ -64,7 +64,7 @@ sed -i "s/192.168.1.32/${STATICIP}/g" ${INPUTFILES}
 INPUTFILES="server_custom.yml encoder_custom.yml decoder_custom.yml"
 sed -i "s/192.168.1.32/${FQDN}/g" ${INPUTFILES}
 INPUTFILES=./webfiles/root/etc/dnsmasq.conf
-sed -i "s/192.168.1.32/${FQDN}/g" ${INPUTFILES}
+sed -i "s/192.168.1.32\/${FQDN}/g" ${INPUTFILES}
 customization
 }
 

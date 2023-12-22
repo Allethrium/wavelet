@@ -14,18 +14,18 @@ wait 5
 foot vim powerline powerline-fonts vim-powerline NetworkManager-wifi iw wireless-regdb wpa_supplicant \
 cockpit-bridge cockpit-networkmanager cockpit-system cockpit-ostree cockpit-podman buildah rdma git \
 iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd dnf yum-utils createrepo \
-libsrtp python3-pip srt srt-libs libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
-ImageMagick oneapi-level-zero oneVPL oneVPL-intel-gpu intel-opencl intel-level-zero \
-intel-mediasdk mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
-mesa-libxatracker libva libva-utils intel-gmmlib intel-ocloc alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools
+libsrtp libdrm python3-pip srt srt-libs libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
+ImageMagick  intel-opencl mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
+mesa-libxatracker alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools
 echo -e "Base RPM Packages installed, waiting for 5 seconds..\n"
 wait 5
 
 /usr/bin/rpm-ostree install -A --idempotent intel-media-driver \
-intel-gpu-tools intel-compute-runtime oneVPL-intel-gpu intel-media-driver intel-gmmlib \
-intel-mediasdk ocl-icd opencl-headers mpv libsrtp mesa-dri-drivers \
-intel-opencl mesa-libOpenCL python3-pip srt srt-libs ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
-ImageMagick oneapi-level-zero oneVPL intel-gmmlib libva-utils mplayer firefox
+intel-gpu-tools intel-compute-runtime intel-basekit oneVPL-intel-gpu intel-media-driver intel-gmmlib \
+intel-level-zero oneapi-level-zero oneVPL intel-mediasdk libva libva-utils libva-v4l2-request intel-ocloc \
+ocl-icd opencl-headers mpv libsrtp mesa-dri-drivers intel-opencl \
+mesa-libOpenCL python3-pip srt srt-libs ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
+ImageMagick mplayer firefox
 echo -e "RPMFusion Media Packages installed, waiting for 5 seconds..\n"
 wait 5
 }

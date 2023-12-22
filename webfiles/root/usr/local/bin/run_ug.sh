@@ -90,7 +90,6 @@ event_server(){
 		echo -e "\nNote this routine calls wavelet_init.service which sets default video settings and clears previous settings! \n"
 		systemctl --user start wavelet_init.service
 	fi
-	foot firefox http://localhost:8180 &
 }
 
 

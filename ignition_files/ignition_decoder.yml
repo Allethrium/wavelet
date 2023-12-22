@@ -29,22 +29,6 @@ storage:
       overwrite: true
       contents:
         inline: decX.wavelet.local
-    # .htaccess dynamic index listing
-    - path: /home/wavelet/http/.htaccess
-      mode: 0664
-      overwrite: true
-      contents:
-        inline: |
-         Options +Indexes
-         <Limit GET POST>
-         order deny,allow
-         deny from all
-         allow from 192.168.1.0/24
-         </Limit>
-         IndexIgnore tabele_remote.php
-         IndexIgnore demo.txt
-         IndexIgnore functions.php
-         IndexIgnore config.php
 # PolKit entries for systemd services the wavelet user is allowed to manage
     - path: /etc/polkit-1/rules.d/1337-wavelet.rules
       mode: 0644
@@ -148,12 +132,6 @@ storage:
           # Disable Zincati service auto-updates
           [updates]
           enabled = false
-    # Setup script for local RPM repo
-    - path: /usr/local/bin/rpmfusion_repo.sh
-      mode: 0755
-      overwrite: true
-      contents:
-        source: https://192.168.1.32:8080/rpmfusion_repo.sh
     # Define Udev rules for USB inputs, download appropriate scriptfiles
     - path: /etc/udev/rules.d/80-wavelet-encoder.rules
       mode: 0644
@@ -163,20 +141,22 @@ storage:
           ACTION=="add", ENV{ID_BUS}=="usb", SUBSYSTEM=="usb", RUN+="/usr/local/bin/udev_call.sh"
           ACTION=="remove", ENV{ID_BUS}=="usb", SUBSYSTEM=="usb", RUN+="/usr/local/bin/udev_call.sh removed"
     # Remainder files to be served from a previously configured Wavelet server.
-    - path: /home/wavelet/wavelet-files.tar.gz
+    - path: /home/wavelet/wavelet-files.tar.xz
       mode: 0755
       overwrite: true
       contents:
-        source: http://192.168.1.32:8080/wavelet-files.tar.gz
+        source: http://192.168.1.32:8080/ignition/wavelet-files.tar.xz
     # Setup script for RPMFusion depends
-    - path: /usr/local/bin/overlay_rpm.sh
+    - path: /usr/local/bin/wavelet_installer_xf.sh
       mode: 0755
       overwrite: true
       contents:
-        source: https://192.168.1.32:8080/overlay_rpm.sh
+        source: http://192.168.1.32:8080/ignition/wavelet_installer_xf.sh
 # Systemd user units
-    # systemD user unit for wavelet controller
-    - path: /home/wavelet/.config/systemd/user/wavelet_controller.service
+    # systemD user unit for wavelet initialization
+    # Called with other initializations when Sway is executed from;
+    # autologin@tty1->.bashrc->sway->build_ug->run_ug->init
+    - path: /home/wavelet/.config/systemd/user/wavelet_init.service
       mode: 0644
       overwrite: true
       contents:
@@ -186,59 +166,70 @@ storage:
          After=network-online.target etcd-member.service
          Wants=network-online.target
          [Service]
-         ExecStart=/usr/local/bin/wavelet_controller.sh
+         Type=simple
+         ExecStart=/usr/local/bin/wavelet_init.sh
          [Install]
          WantedBy=default.target
       user:
         name: wavelet
       group:
         name: wavelet
-    # systemD user unit for wavelet reflector
-    - path: /home/wavelet/.config/systemd/user/wavelet_reflector.service
+    # Etcd watch controller input channel service
+    - path: /home/wavelet/.config/systemd/user/wavelet_controller.service
       mode: 0644
       contents:
         inline: |
           [Unit]
-          Description=Wavelet Reflector - script populates params
+          Description=Wavelet Controller - etcd input triggers orchestration
           After=network-online.target etcd-member.service
           Wants=network-online.target
           [Service]
-          ExecStart=/usr/local/bin/wavelet_reflector.sh
+          Environment=ETCDCTL_API=3
+          RemainAfterExit=yes
+          ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch input_update -w simple -- sh -c "/usr/local/bin/wavelet_controller.sh"
+          [Install]
+          WantedBy=default.target
       user:
         name: wavelet
       group:
         name: wavelet
-    # systemD user unit for wavelet peer monitor service
-    - path: /home/wavelet/.config/systemd/user/wavelet_client_poll.service
+    # Etcd watch reflectorflag service
+    - path: /home/wavelet/.config/systemd/user/watch_reflectorreload.service
       mode: 0644
       contents:
         inline: |
           [Unit]
-          Description=Wavelet Peer Monitor
+          Description=Watches etcd for encoder restart
           After=network-online.target etcd-member.service
           Wants=network-online.target
           [Service]
-          ExecStart=/usr/local/bin/wavelet_client_poll.sh
+          Environment=ETCDCTL_API=3
+          ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch --prefix decoderip/ -w simple -- sh -c "/usr/local/bin/wavelet_client_poll.sh"
+          [Install]
+          WantedBy=default.target
       user:
         name: wavelet
       group:
         name: wavelet
-    # systemD user unit for wavelet encoder restart flag
-    - path: /home/wavelet/.config/systemd/user/wavelet_encoderflag.service
+    # Etcd watch encoderflag service
+    - path: /home/wavelet/.config/systemd/user/watch_encoderflag.service
       mode: 0644
       contents:
         inline: |
           [Unit]
-          Description=Wavelet Peer Monitor
+          Description=Watches etcd for encoder restart
           After=network-online.target etcd-member.service
           Wants=network-online.target
           [Service]
-          ExecStart=/usr/local/bin/monitor_encoderflag.sh
+          Environment=ETCDCTL_API=3
+          ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch encoder_restart -w simple -- sh -c "/usr/local/bin/monitor_encoderflag.sh"
+          [Install]
+          WantedBy=default.target
       user:
         name: wavelet
       group:
         name: wavelet
-    # UltraGrid AppImage Launcher
+    # UltraGrid AppImage Launcher - this is a placeholder unit file, it's always overwritten by the script calling it.
     - path: /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
       mode: 0644
       contents:
@@ -256,7 +247,41 @@ storage:
         name: wavelet
       group:
         name: wavelet
-    # UltraGrid reflector - only calls data from etcd REFLECTOR_ARGS global
+    # Wavelet Encoder - runs the encoder.sh script which calls UltraGrid.AppImage and wavelet_textgen as necessary.
+    - path: /home/wavelet/.config/systemd/user/wavelet_encoder.service
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=Encoder service
+          After=network-online.target etcd-member.service
+          Wants=network-online.target
+          [Service]
+          ExecStart=/usr/local/bin/wavelet_encoder.sh
+          [Install]
+          WantedBy=default.target
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    # Reflector script service - populates all reflector data, sets flags, calls Reflector proper.
+    - path: /home/wavelet/.config/systemd/user/wavelet_reflector.service
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=UltraGrid AppImage executable
+          After=network-online.target etcd-member.service
+          Wants=network-online.target
+          [Service]
+          ExecStart=/usr/local/bin/wavelet_reflector.sh
+          [Install]
+          WantedBy=default.target
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    # UltraGrid reflector - placeholder, it's overwritten in the reflector script, like the AppImage unit file!
     - path: /home/wavelet/.config/systemd/user/UltraGrid.Reflector.service
       mode: 0644
       contents:
@@ -284,25 +309,7 @@ storage:
           After=network-online.target etcd-member.service
           Wants=network-online.target
           [Service]
-          Type=simple
           ExecStart=/usr/local/bin/run_ug.sh
-          [Install]
-          WantedBy=default.target
-      user:
-        name: wavelet
-      group:
-        name: wavelet
-    # Wavelet Encoder - runs the encoder.sh script which calls UltraGrid.AppImage and wavelet_textgen as necessary.
-    - path: /home/wavelet/.config/systemd/user/wavelet_encoder.service
-      mode: 0644
-      contents:
-        inline: |
-          [Unit]
-          Description=Encoder service
-          After=network-online.target etcd-member.service
-          Wants=network-online.target
-          [Service]
-          ExecStart=/usr/local/bin/wavelet_encoder.sh
           [Install]
           WantedBy=default.target
       user:
@@ -323,6 +330,26 @@ storage:
           ExecStart=/usr/local/bin/build_ug.sh
           [Install]
           WantedBy=default.target
+      user:
+        name: wavelet
+      group:
+        name: wavelet
+    # .htaccess dynamic index listing
+    - path: /home/wavelet/http/.htaccess
+      mode: 0664
+      overwrite: true
+      contents:
+        inline: |
+         Options +Indexes
+         <Limit GET POST>
+         order deny,allow
+         deny from all
+         allow from 192.168.1.0/24
+         </Limit>
+         IndexIgnore tabele_remote.php
+         IndexIgnore demo.txt
+         IndexIgnore functions.php
+         IndexIgnore config.php
       user:
         name: wavelet
       group:
@@ -423,136 +450,24 @@ passwd:
       ssh_authorized_keys:
         - PUBKEYGOESHERE
       home_dir: /home/wavelet
-#
-# Configure SYSTEM systemd units
-#
 # Configure SYSTEM systemd units
 systemd:
   units:
-    # Install necessary base files
-    - name: configure_svr_ip.service
+    # Decompress Wavelet files and install necessary pkgs.
+    # Note, this creates all the /var/.complete files in script.
+    - name: wavelet_installer.service
       enabled: true
       contents: |
         [Unit]
-        Description=Configures desired server IP address
+        Description=Decompress Wavelet files
         ConditionFirstBoot=yes
-        Wants=network-online.target
-        After=network-online.target
         After=multi-user.target
         [Service]
         Type=oneshot
-        ExecStart=-/usr/local/bin/configure_ethernet.sh
+        ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_installer_xf.sh"
+        ExecStartPost=-touch /var/extract.target
         [Install]
         WantedBy=multi-user.target
-     # Installs necessary OS packages (non-patent encumbered)
-    - name: install-overlayed-rpms.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Install Overlay Packages
-        ConditionFirstBoot=yes
-        Wants=network-online.target
-        After=network-online.target
-        After=install-overlayed-rpms-rpmfusion-repo.service
-        After=multi-user.target
-        [Service]
-        Type=oneshot
-        ExecStart=rpm-ostree install -A wget fontawesome-fonts wl-clipboard nnn \
-        mako sway bemenu rofi-wayland lxsession sway-systemd waybar \
-        foot vim powerline powerline-fonts vim-powerline \
-        NetworkManager-wifi iw wireless-regdb wpa_supplicant \
-        cockpit-bridge cockpit-networkmanager cockpit-system cockpit-ostree cockpit-podman \
-        buildah rdma git iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd \
-        dnf yum-utils createrepo \
-        libsrtp python3-pip srt srt-libs libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
-        ImageMagick oneapi-level-zero oneVPL oneVPL-intel-gpu intel-opencl intel-level-zero \
-        intel-media-driver intel-mediasdk mesa-dri-drivers mesa-vulkan-drivers \
-        mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
-        mesa-libxatracker libva libva-utils intel-gmmlib intel-ocloc \
-        wireplumber
-        ExecStartPost=touch /var/rpm-ostree-overlay.complete
-        [Install]
-        WantedBy=multi-user.target
-    # Installs additional OS packages w/ RPMFusion.
-    - name: install-overlayed-rpms-rpmfusion-repo.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Install RPMFusion Repository
-        Wants=network-online.target
-        After=network-online.target
-        After=dnsmasq.service
-        After=multi-user.target
-        Before=install-overlayed-rpms.service
-        [Service]
-        Type=oneshot
-        ExecStart=/usr/local/bin/rpmfusion_repo.sh
-        ExecStartPost=touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
-        [Install]
-        WantedBy=multi-user.target
-    - name: install-overlayed-rpms-rpmfusion-pkgs.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Install RPMFusion Repository
-        Wants=network-online.target
-        After=network-online.target
-        After=dnsmasq.service
-        After=multi-user.target
-        ConditionPathExists=!/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-        ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.repo.complete
-        [Service]
-        Type=oneshot
-        ExecStart=/usr/local/bin/overlay_rpm.sh
-        ExecStartPost=touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-        [Install]
-        WantedBy=multi-user.target
-    # Cockpit for remote management
-    - name: cockpit.enable.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Enable Cockpit WS
-        After=network-online.target check_and_wait_rpmfusion_pkgs.target
-        Wants=network-online.target
-        [Service]
-        Type=oneshot
-        ExecStartPre=podman pull quay.io/cockpit/ws
-        ExecStartPre=podman container runlabel INSTALL quay.io/cockpit/ws:latest
-        ExecStart=systemctl enable cockpit.service --now
-        [Install]
-        WantedBy=multi-user.target
-    # Container registry to host and serve containers to local clients
-    - name: registry.service
-      enabled: false
-      contents: |
-          [Unit]
-          Description=Run local container registry
-          After=network-online.target
-          Wants=network-online.target
-          [Service]
-          Type=forking
-          Restart=on-failure
-          RemainAfterExit=yes
-          ExecStartPre=-/bin/podman kill registry
-          ExecStartPre=-/bin/podman rm registry
-          ExecStart=/bin/podman run --privileged -d --name registry -p 5000:5000 -v /home/wavelet/registry/:/var/lib/registry/:z --restart=always registry:2
-          ExecStop=/bin/podman stop registry
-          [Install]
-          WantedBy=multi-user.target
-    # Decompress wavelet_files
-    - name: wavelet-archive.service
-      enabled: true
-      contents: |
-          [Unit]
-          Description=Decompress wavelet files
-          After=network-online.target
-          Wants=network-online.target
-          [Service]
-          Type=oneshot
-          ExecStart=tar xf /home/wavelet/wavelet-files.tar.gz -C /
-          [Install]
-          WantedBy=multi-user.target
     # service to call decoderhostname randomizer (interactive auth required so this is a TEST to make it work from root!)
     - name: decoderhostname.service
       enabled: true
@@ -566,21 +481,6 @@ systemd:
           ExecStart=-/usr/local/bin/decoderhostname.sh
           [Install]
           WantedBy=default.target
-    # Disable resolved, enable dnsmasq (server only, disabled in subordinate device..)
-    - name: switch-resolved-to-dnsmasq.service
-      enabled: false
-      contents: |
-          [Unit]
-          Description=Switch DNS resolution to DNSmasq
-          After=network-online.target check_and_wait.target
-          Wants=network-online.target
-          [Service]
-          Type=oneshot
-          ExecStartPre=systemctl stop systemd-resolved.service
-          ExecStart=systemctl enable dnsmasq.service --now
-          ExecStartPost=systemctl start systemd-resolved.service
-          [Install]
-          WantedBy=multi-user.target
     # Mask docker entirely
     - name: docker.service
       mask: true
@@ -596,7 +496,7 @@ systemd:
       contents: |
        [Unit]
        TimeoutStartSec=infinity
-       ConditionPathExists=/var/rpm-ostree-overlay.complete
+       ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
        ExecStart=/usr/bin/sleep 1000
        RemainAfterExit=yes
     # Actual unit

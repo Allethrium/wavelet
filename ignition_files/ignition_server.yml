@@ -180,6 +180,7 @@ storage:
     # Prevent SSHD from generating older key types
     - path: /etc/ssh/sshd_config.d/20-enable-passwords.conf
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           # Fedora CoreOS disables SSH password login by default.
@@ -196,6 +197,7 @@ storage:
     # We don't want rolling updates enabled via Zincati, as this is an offline appliance
     - path: /etc/zincati/config.d/90-disable-auto-updates.toml
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           # Disable Zincati service auto-updates
@@ -258,6 +260,7 @@ storage:
     # Etcd watch controller input channel service
     - path: /home/wavelet/.config/systemd/user/wavelet_controller.service
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           [Unit]
@@ -277,6 +280,7 @@ storage:
     # Etcd watch reflectorflag service
     - path: /home/wavelet/.config/systemd/user/watch_reflectorreload.service
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           [Unit]
@@ -295,6 +299,7 @@ storage:
     # Etcd watch encoderflag service
     - path: /home/wavelet/.config/systemd/user/watch_encoderflag.service
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           [Unit]
@@ -313,6 +318,7 @@ storage:
     # UltraGrid AppImage Launcher - this is a placeholder unit file, it's always overwritten by the script calling it.
     - path: /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           [Unit]
@@ -331,6 +337,7 @@ storage:
     # Wavelet Encoder - runs the encoder.sh script which calls UltraGrid.AppImage and wavelet_textgen as necessary.
     - path: /home/wavelet/.config/systemd/user/wavelet_encoder.service
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           [Unit]
@@ -348,6 +355,7 @@ storage:
     # Reflector script service - populates all reflector data, sets flags, calls Reflector proper.
     - path: /home/wavelet/.config/systemd/user/wavelet_reflector.service
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           [Unit]
@@ -365,6 +373,7 @@ storage:
     # UltraGrid reflector - placeholder, it's overwritten in the reflector script, like the AppImage unit file!
     - path: /home/wavelet/.config/systemd/user/UltraGrid.Reflector.service
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           [Unit]
@@ -383,6 +392,7 @@ storage:
     # run_ug.sh determines system local functions and calls the AppImage launcher as appropriate.
     - path: /home/wavelet/.config/systemd/user/run_ug.service
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           [Unit]
@@ -400,6 +410,7 @@ storage:
     # build_ug.sh determines system local functions and preconfigures the user systemd services appropriately for next boot
     - path: /home/wavelet/.config/systemd/user/build_ug.service
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           [Unit]
@@ -560,7 +571,7 @@ systemd:
         [Service]
         Type=oneshot
         ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_installer_xf.sh"
-        ExecStartPost=-touch /usr/local/bin/extract.target
+        ExecStartPost=-touch /var/extract.target
         [Install]
         WantedBy=multi-user.target
     # Install necessary base files
@@ -639,7 +650,7 @@ systemd:
         [Service]
         Type=oneshot
         ExecStart=/usr/local/bin/local_rpm.sh
-        ExecStartPost=-touch /var/local_rpm.complete
+        ExecStartPost=touch /var/local_rpm.complete
         [Install]
         WantedBy=multi-user.target
     # Mask docker entirely

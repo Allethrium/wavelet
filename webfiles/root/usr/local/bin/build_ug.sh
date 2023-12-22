@@ -135,9 +135,6 @@ event_encoder(){
 
 
 event_server(){
-# We're setting up a local http server so that subordinate devices don't have to copy and re-download everything.
-# Ultimately if we're feeling clever we might want to setup an RPM caching mirror here to service clients for system packages
-# This will need securing with HTTPS certificates ideally.
 	systemctl --user start container-etcd-member.service
 	sleep 10	
 	if service_exists container-etcd-member; then
@@ -167,18 +164,19 @@ server_bootstrap(){
     	KEYNAME=SERVER_HTTP_BOOTSTRAP_COMPLETED
 		echo -e "Generating HTTPD server and copying/compressing wavelet files to server directory.."
 		cd /home/wavelet/http
-		cp /usr/local/bin/{overlay_rpm.sh,rpmfusion_repo.sh} /home/wavelet/http/
-		tar -czf wavelet-files.tar.gz /etc/dnsmasq.conf /etc/skel/.bash_profile /etc/skel/.bashrc /etc/containers/registries.conf.d/10-wavelet.conf /home/wavelet/{.bash_profile,.bashrc,seal.mp4} /home/wavelet/.config/sway/config /home/wavelet/.config/waybar/{config,style.css,time.sh} /usr/local/bin/{build_dnsmasq.sh,build_httpd.sh,build_ug.sh,configure_ethernet.sh,decoderhostname.sh,wavelet_detectv4l.sh,monitor_encoderflag.sh,promote_to_server.sh,wavelet_removedevice.sh,run_ug.sh,start_appimage.sh,start_reflector.sh,udev_call.sh,wavelet_client_poll.sh,wavelet_controller.sh,wavelet_reflector.sh,wavelet_livestream.sh}
-		# http server for PXE, archives, RPM repo etc.
+		cp /home/wavelet/wavelet_files.tar.xz /home/wavelet/http/
 		cp /usr/local/bin/UltraGrid.AppImage /home/wavelet/http
 		/usr/local/bin/build_httpd.sh	
+		sleep 5
 	}
+
 	bootstrap_nginx_php(){
 		# http PHP server for control interface	
 		KEYNAME=SERVER_HTTP-PHP_BOOTSTRAP_COMPLETED
 		/usr/local/bin/build_nginx_php.sh
-		sleep 10
+		sleep 5
 	}
+
 	echo -e "Pulling etcd and generating systemd services.."
 	cd /home/wavelet/.config/systemd/user/
 	/bin/podman pull quay.io/coreos/etcd:v3.5.9
@@ -227,6 +225,12 @@ server_bootstrap(){
 		echo "HTTP server bootstrap failed, ending.."
 		exit 1
 	fi
+	# uncomment a firefox exec command into sway config, this will bring up the management console on the server in a new sway window, as a backup control surface.
+	sed -i '/exec firefox/s/^# *//' config $HOME/.config/sway/config
+	#same for dnsmasq because it inexplicably stopped working.
+	sed -i '/exec systemctl restart dnsmasq.service/s/^# *//' config $HOME/.config/sway/config
+	#
+	sed -i '/exec \/usr\/local\/bin\/local_rpm.sh/s/^# *//' config $HOME/.config/sway/config
 }
 
 service_exists() {

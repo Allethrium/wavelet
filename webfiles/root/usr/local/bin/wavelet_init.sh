@@ -51,14 +51,14 @@ event_x264hw() {
 # Populate standard values into etcd
 set -x
 echo -e "Populating standard values into etcd, the last step will trigger the Controller and Reflector functions, bringing the system up.\n"
-KEYNAME=uv_videoport
-KEYVALUE=5004
+KEYNAME="uv_videoport"
+KEYVALUE="5004"
 write_etcd_global
-KEYNAME=uv_audioport
-KEYVALUE=5006
+KEYNAME="uv_audioport"
+KEYVALUE="5006"
 write_etcd_global
-KEYNAME=uv_islivestreaming
-KEYVALUE=0
+KEYNAME="/livestream/enabled"
+KEYVALUE="0"
 write_etcd_global
 recording="0"
 KEYNAME=uv_input
@@ -67,8 +67,12 @@ write_etcd_global
 KEYNAME="uv_hash_select"
 KEYVALUE="2"
 write_etcd_global
+KEYNAME="/banner/enabled"
+KEYVALUE="0"
+write_etcd_global
 echo -e "Enabling monitor services..\n"
 systemctl --user enable watch_reflectorreload.service --now
+systemctl --user enable wavelet_reflector.service --now
 systemctl --user enable watch_encoderflag.service --now
 echo -e "Values populated, monitor services launched.  Starting reflector\n\n"
 systemctl --user enable UltraGrid.Reflector.service --now
@@ -78,3 +82,4 @@ wait 2
 KEYNAME=input_update
 KEYVALUE=1
 write_etcd_global
+systemctl --user restart wavelet_reflector.service --now
