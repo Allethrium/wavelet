@@ -46,20 +46,20 @@ read_etcd_clients_ip() {
 
 
 sense_devices() {
-        shopt -s nullglob
-        declare -a v4lArray=(/dev/v4l/by-id/*)
-        for index in "${!v4lArray[@]}" ; do
-                [[ ${v4lArray[$index]} =~ -index1$ ]] && unset -v 'v4lArray[$index]' ; done
-        array=("${v4lArray[@]}")
-        for i in "${v4lArray[@]}"
-                do
-                        device_string_long=$i
-	                v4l_device_path="/dev/$(ls -Artl $i* | awk '{print $11}' | awk -F/ '{print $3}')"
-	                echo -e "Device path ${v4l_device_path} located for ${device_string_long} \n"
-			# generate device hashes and proceed to next step
-			generate_device_info
-                done
-        shopt -u nullglob
+	shopt -s nullglob
+	declare -a v4lArray=(/dev/v4l/by-id/*)
+	for index in "${!v4lArray[@]}" ; do
+		[[ ${v4lArray[$index]} =~ -index1$ ]] && unset -v 'v4lArray[$index]';
+	done
+	array=("${v4lArray[@]}")
+	for i in "${v4lArray[@]}"; do
+		device_string_long=$i
+		v4l_device_path="/dev/$(ls -Artl $i* | awk '{print $11}' | awk -F/ '{print $3}')"
+		echo -e "Device path ${v4l_device_path} located for ${device_string_long} \n"
+		# generate device hashes and proceed to next step
+		generate_device_info
+	done
+	shopt -u nullglob
 }
 
 
@@ -67,19 +67,19 @@ generate_device_info() {
 	echo -e "\n \n \n Now generating device info for each item presently located in /dev/v4l/by-id.. \n"
 	echo -e "Working on ${device_string_long}\n"
 	device_string_short=$(echo $(hostname)/"${device_string_long}" | sed 's/.*usb-//')
-        info=$(v4l2-ctl -D -d ${v4l_device_path})
-        # here we parse this information
-        cardType=$(echo "${info}" | awk -F ":" '/Card type/ { print $2 }')
-        # Bus info (first instance only, it's repeated oftentimes)
-        bus_info=$(echo "${info}" | awk -F ":" '/Bus info/ { print $4;exit; }')
-        # Serial (if exists)
-        serial=$(echo "${info}" | awk -F ":" '/Serial/ { print $2 }')
-        echo -e "device name is: ${device_string_short}"
-        echo -e "card type is: $cardType"
-        echo -e "bus address is: $bus_info"
-        echo -e "device serial is: $serial"
-        deviceHash=$(echo "$device_string_short, $cardType , $bus_info, $serial" | sha256sum)
-        echo -e "generated device hash: $deviceHash \n"
+    info=$(v4l2-ctl -D -d ${v4l_device_path})
+    # here we parse this information
+	cardType=$(echo "${info}" | awk -F ":" '/Card type/ { print $2 }')
+	# Bus info (first instance only, it's repeated oftentimes)
+	bus_info=$(echo "${info}" | awk -F ":" '/Bus info/ { print $4;exit; }')
+	# Serial (if exists)
+	serial=$(echo "${info}" | awk -F ":" '/Serial/ { print $2 }')
+	echo -e "device name is: ${device_string_short}"
+	echo -e "card type is: $cardType"
+	echo -e "bus address is: $bus_info"
+	echo -e "device serial is: $serial"
+	deviceHash=$(echo "$device_string_short, $cardType , $bus_info, $serial" | sha256sum)
+	echo -e "generated device hash: $deviceHash \n"
 	device_string_short=$(echo "${device_string_long}" | sed 's/.*usb-//')
 	# Let's look for the device hash in the /interface prefix to make sure it doesn't already exist!
 	# First delete empty /hash/ values that might be there incorrectly (WHY???)
@@ -99,33 +99,33 @@ generate_device_info() {
 
 set_device() {
 	# called from generate_device_info from the nested if loop checking for pre-existing deviceHash in etcd /hash/
-        # populated device_string_short with hash value, this is used by the interface webUI component - device_string_short is effectively the webui Label and banner text.
+	# populated device_string_short with hash value, this is used by the interface webUI component - device_string_short is effectively the webui Label and banner text.
 	# Because we cannot query etcd by keyvalue, we must create a reverse lookup prefix for everything we want to be able to clean up!!
-	KEYNAME="/interface/${device_string_short}"
-        KEYVALUE="${deviceHash}"
+	KEYNAME="/interface/$(hostname)/${device_string_short}"
+	KEYVALUE="${deviceHash}"
 	write_etcd_global	
 	# And the reverse lookup prefix - N.B this is updated from set_label.php when the webUI changes a device label/banner string! 
 	KEYNAME="/short_hash/${deviceHash}"
-	KEYVALUE=${device_string_short}
+	KEYVALUE=$(hostname)/${device_string_short}
 	write_etcd_global
 	# We need this to perform cleanup "gracefully"
 	KEYNAME="/long_interface${device_string_long}"
 	KEYVALUE=${deviceHash}
-        write_etcd_global
-        # This will enable us to find the device from its hash value, along with the registered host encoder, like a reverse DNS lookup..
-        # GLOBAL value\
-        echo -e "Attempting to set keyname ${deviceHash} for $(hostname)${device_string_long}"
-        KEYNAME="/hash/${deviceHash}"
-        # Stores the device data under hostname/inputs/device_string_long
+	write_etcd_global
+	# This will enable us to find the device from its hash value, along with the registered host encoder, like a reverse DNS lookup..
+	# GLOBAL value\
+	echo -e "Attempting to set keyname ${deviceHash} for $(hostname)${device_string_long}"
+	KEYNAME="/hash/${deviceHash}"
+	# Stores the device data under hostname/inputs/device_string_long
 	KEYVALUE="$(hostname)/inputs${device_string_long}"
-        write_etcd_global
-        # notify watcher that input device configuration has changed
-        KEYNAME=new_device_attached
-        KEYVALUE=1
-        write_etcd_global
-        echo -e "resetting variables to null."
-        deviceHash=""
-        device_string_short=""
+	write_etcd_global
+	# notify watcher that input device configuration has changed
+	KEYNAME=new_device_attached
+	KEYVALUE=1
+	write_etcd_global
+	echo -e "resetting variables to null."
+	deviceHash=""
+	device_string_short=""
 	KEYNAME=INPUT_DEVICE_PRESENT
 	KEYVALUE=1
 	write_etcd
@@ -173,7 +173,7 @@ declare -a interfaceLongArray=$(etcdctl --endpoints=${ETCDENDPOINT} get /long_in
 				cleanupInterface=$(etcdctl --endpoints=${ETCDENDPOINT} get "/short_hash/${cleanupHash}" --print-value-only)
 				echo -e "Device UI Interface label located in /short_hash/${cleanupHash} for the value ${cleanupInterface}"
 				echo -e "Deleting /interface/${cleanupInterface} entry"
-				etcdctl --endpoints=${ETCDENDPOINT} del "/interface/${cleanupInterface}"
+				etcdctl --endpoints=${ETCDENDPOINT} del "/interface/$${cleanupInterface}"
 				echo -e "Deleting /short_hash/${cleanupHash}  entry"
 				etcdctl --endpoints=${ETCDENDPOINT} del "/short_hash/${cleanupHash}"
 				echo -e "Device entry ${cleanupStringLong} should be removed along with all references to ${cleanupHash}\n\n"

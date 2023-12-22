@@ -19,6 +19,12 @@ Static Inputs<br><br>
 <div id="dynamic_inputs" class="input_divider">
 Video Sources<br><br>
 <div id="dynamicInputs" div class="dynamicInputsTarget"></div>
+<br>
+Toggle Banner <label class="switch" id="banner_toggle">
+<input type ="checkbox" id="banner_toggle_checkbox">
+<span class="slider round"></span>
+</label>
+<br>
 </div>
 <div id="multiple_inputs_section" class="input_divider">
 <div id="multiple_inputs_inner" class="input_divider_inner">
@@ -57,9 +63,11 @@ Toggle Livestreaming <label class="switch" id="lstoggle">
 <div id="multiple_inputs_inner" class="input_divider_inner">
 <details><summary>System Controls<span class="icon"></span></summary>
 <p>
-<button id="DR" class="inputButton inputStaticButtons" value="DR" type="button">Decoder Restart (all)</button>
-<button id="ER" class="inputButton inputStaticButtons" value="ER" type="button">Encoder Restart (all)</button>
-<button id="SR" class="inputButton inputStaticButtons" value="CR" type="button">System Restart (all)</button><br>
+<button id="DR" class="inputButton inputStaticButtons" value="DR" type="button">Decoder Task Restart (all)</button>
+<button id="ER" class="inputButton inputStaticButtons" value="ER" type="button">Encoder Hard Reset (all)</button>
+<button id="SR" class="inputButton inputStaticButtons" value="SR" type="button">Hard Reset (all)</button>
+<button id="SR" class="inputButton inputStaticButtons" value="CL" type="button">Clear Video Sources</button>
+<button id="RD" class="inputButton inputStaticButtons" value="RD" type="button">Refresh Video Sources</button><br>
 </p>
 </details>
 </div>

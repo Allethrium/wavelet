@@ -2,13 +2,13 @@
 # Attempts to find and join a Wavelet network if it's available
 
 # DEFAULTS - edit these to your system's specs
-networkssid="Wavelet-wifi5g"
-wifipassword="a-secure-password"
-wifi_ap_mac="The-partial-MAC-of-your-wifi-AP"
+networkssid="Wavelet-1"
+wifipassword="xnSLvFKyyzNXd0wuN79lfC0oEBzdhsg4"
+wifi_ap_mac="70:47:"
 
 connectwifi(){
-	read -p "Please enter WiFi SSID" networkssid
-	read -p "Please enter Wifi Network Password:" wifipassword
+	#read -p "Please enter WiFi SSID" networkssid
+	#read -p "Please enter Wifi Network Password:" wifipassword
 	# noticed on the test systems it takes a couple of tries to successfully connect
 	nmcli dev wifi rescan
 	sleep 5

@@ -22,5 +22,6 @@ systemctl stop systemd-resolved.service
 systemctl enable dnsmasq.service --now
 # Can run SystemD-resolved with StubListener set appropriately.
 systemctl start systemd-resolved.service
+systemctl restart dnsmasq.service
 
 # 8/2023 - Might replace all of this with a full iDM running BIND, especially if we need WPA2-ENT

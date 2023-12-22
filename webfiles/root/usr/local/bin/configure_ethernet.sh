@@ -1,4 +1,27 @@
 #!/bin/bash
+
+detect_self(){
+systemctl --user daemon-reload
+UG_HOSTNAME=$(hostname)
+	echo -e "Hostname is $UG_HOSTNAME \n"
+	case $UG_HOSTNAME in
+	enc*) 					event_subordinate
+	;;
+	dec*)					event_subordinate
+	;;
+	svr*)					event_server
+	;;
+	*) 						echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
+	;;
+	esac
+}
+
+
+detect_self
+
+
+event_server(){
+# Ensures static IP is set on the server
 VAR=$(nmcli -g name connection show | grep "Wired" | head -1)
 nmcli connection mod '${VAR}' \
         ipv4.method manual \
@@ -10,4 +33,19 @@ nmcli connection mod '${VAR}' \
         connection.autoconnect yes
 nmcli con down ${VAR}
 nmcli con up ${VAR}
-echo "Ethernet connection configuration applied.."
+echo "Static Ethernet connection configuration applied.."
+}
+
+event_subordinate(){
+VAR=$(nmcli -g name connection show | grep "Wired" | head -1)
+# Forces DNS configuration 
+nmcli connection mod '${VAR}' \
+        ipv4.method auto \
+        ipv4.dns 192.168.1.32 \
+        +ipv4.dns 192.168.1.1 \
+        +ipv4.dns 9.9.9.9 \
+        connection.autoconnect yes
+nmcli con down ${VAR}
+nmcli con up ${VAR}
+echo "Static Ethernet connection configuration applied.."
+}

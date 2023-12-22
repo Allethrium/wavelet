@@ -40,7 +40,7 @@
         "format": " {}",
         "interval": 5,
         "return-type": "json",
-        "exec": "~/.config/waybar/modules/time.sh"
+        "exec": "~/.config/waybar/time.sh"
     },
     "tray": {
         "icon-size": 18

@@ -10,6 +10,10 @@ cp ./ignition_files/ignition_server.yml ./server_custom.yml
 cp ./ignition_files/ignition_decoder.yml ./decoder_custom.yml
 cp ./ignition_files/ignition_encoder.yml ./encoder_custom.yml
 # IPv6 mode eventually? Just to be snazzy?
+# remove old iso files
+rm -rf $HOME/Downloads/wavelet_server.iso
+rm -rf $HOME/Downloads/wavelet_decoder.iso
+rm -rf $HOME/Downloads/wavelet_encoder.iso
 
 client_networks(){
 	echo -e "System configured to be run on a larger network."
@@ -60,7 +64,7 @@ sed -i "s/192.168.1.32/${STATICIP}/g" ${INPUTFILES}
 INPUTFILES="server_custom.yml encoder_custom.yml decoder_custom.yml"
 sed -i "s/192.168.1.32/${FQDN}/g" ${INPUTFILES}
 INPUTFILES=./webfiles/root/etc/dnsmasq.conf
-sed -i "s/192.168.1.32/${FQDN}/g" ${INPUTFILES}
+sed -i "s/192.168.1.32\/${FQDN}/g" ${INPUTFILES}
 customization
 }
 
@@ -68,8 +72,11 @@ customization(){
 	echo -e "Generating ignition files with appropriate settings.."
 	INPUTFILES="server_custom.yml encoder_custom.yml decoder_custom.yml"
 	# Yes, I know this is terribly insecure, however if attackers are watching what you're doing on the bootstrap server you may have bigger problems..
-	read -p "Please input a password for the wavelet-root user: "  wvltroot_pw
-	read -p "Please input a password for the Wavelet user: " wavelet_pw
+	# Sick of typing this is for now..
+	#read -p "Please input a password for the wavelet-root user: "  wvltroot_pw
+	#read -p "Please input a password for the Wavelet user: " wavelet_pw
+	wvltroot_pw="TestLab032023@"
+	wavelet_pw="WvltU$R60C"
 	rootpw=$(mkpasswd --method=yescrypt ${wvltroot_pw})
 	waveletpw=$(mkpasswd --method=yescrypt ${wavelet_pw})
 	echo -e "Password hashes generated..\n"
