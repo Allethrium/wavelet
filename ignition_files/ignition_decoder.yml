@@ -29,7 +29,29 @@ storage:
       overwrite: true
       contents:
         inline: decX.wavelet.local
-# PolKit entries for systemd services the wavelet user is allowed to manage
+    # Skel .bashrc, profile customizations and Q.O.L improvements can go here
+    - path: /etc/skel/.bashrc
+      mode: 0644
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/skel_bashrc.txt
+    - path: /etc/skel/.bash_profile
+      mode: 0644
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/skel_profile.txt
+    # Wavelet user (b/c default doesn't use skel b/c we aren't using useradd -m)
+    - path: /home/wavelet/.bashrc
+      mode: 0644
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/skel_bashrc.txt
+    - path: /home/wavelet/.bash_profile
+      mode: 0644
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/skel_profile.txt
+    # PolKit entries for systemd services the wavelet user is allowed to manage
     - path: /etc/polkit-1/rules.d/1337-wavelet.rules
       mode: 0644
       overwrite: true
@@ -127,6 +149,7 @@ storage:
     # We don't want rolling updates enabled via Zincati, as this is an offline appliance
     - path: /etc/zincati/config.d/90-disable-auto-updates.toml
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           # Disable Zincati service auto-updates
@@ -486,6 +509,9 @@ systemd:
       mask: true
     # Mask irqbalance
     - name: irqbalance.service
+      mask: true
+    # Mask zincati entirely
+    - name: zincati.service
       mask: true
     # Autologin dropin service
     # Causes a login loop until appropriate packages are installed

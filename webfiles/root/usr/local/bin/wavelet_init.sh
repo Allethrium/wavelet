@@ -34,9 +34,9 @@ read_etcd_clients_ip() {
 }
 
 
-event_x264hw() {
+event_x264sw() {
         KEYNAME=uv_encoder
-        KEYVALUE="libavcodec:encoder=h264_qsv:gop=12:bitrate=25"
+        KEYVALUE="libavcodec:encoder=libx264:gop=12:bitrate=25"
         write_etcd_global
         KEYNAME=uv_gop
         KEYVALUE=12
@@ -76,7 +76,7 @@ systemctl --user enable wavelet_reflector.service --now
 systemctl --user enable watch_encoderflag.service --now
 echo -e "Values populated, monitor services launched.  Starting reflector\n\n"
 systemctl --user enable UltraGrid.Reflector.service --now
-event_x264hw
+event_x264sw
 systemctl --user enable wavelet_controller.service --now
 wait 2
 KEYNAME=input_update

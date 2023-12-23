@@ -1,4 +1,5 @@
 #!/bin/bash
+exec >/home/wavelet/local_rpm.log 2>&1
 echo -e "ensuring DNSmasq is operating and available.."
 systemctl enable dnsmasq.service --now
 echo -e "Setting Date/Time to default inception location America/New_York.."
