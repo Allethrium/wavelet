@@ -149,7 +149,8 @@ event_encoder(){
 	Wants=network-online.target
 	[Service]
 	ExecStart=/usr/local/bin/UltraGrid.AppImage ${ugargs}
-	KillSignal=SIGTERM
+	KillMode=mixed
+	TimeoutStopSec=0.25
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 	systemctl --user daemon-reload

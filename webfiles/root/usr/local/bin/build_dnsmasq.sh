@@ -13,6 +13,26 @@ systemctl daemon-reload
 chcon -R -t tftpdir_rw -t ppublic_content_t /var/lib/tftpboot
 restorecon -Rv /var/tftp
 
+# Overwrite DNSmasq unit file adding restart=on-fail
+echo "[Unit]
+Description=DNS caching server.
+Before=nss-lookup.target
+Wants=nss-lookup.target
+After=network.target
+; Use bind-dynamic or uncomment following to listen on non-local IP address
+;After=network-online.target
+
+[Service]
+ExecStart=/usr/sbin/dnsmasq
+Restart=on-failure
+Type=forking
+PIDFile=/run/dnsmasq.pid
+ExecStartPost=-touch /var/dnsmasq_terminated.notice
+
+[Install]
+WantedBy=multi-user.target
+" > /usr/lib/systemd/system/dnsmasq.service
+
 # Download base images, maybe leave this to the client generation scripts as it's not really necessary during server spinup.
 #podman run --security-opt label=disable --pull=always --rm -v .:/data -w /data quay.io/coreos/coreos-installer:release download -f iso
 #coreos-installer download -s stable -p metal -C /var/tftpboot
