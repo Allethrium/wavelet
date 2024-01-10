@@ -331,46 +331,46 @@ wavelet_foursplit() {
 
 event_x264hw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=h264_qsv:gop=12:bitrate=25M"
+	KEYVALUE="libavcodec:encoder=h264_qsv:gop=6:bitrate=30M"
 	write_etcd_global
 	echo -e "x264 Hardware acceleration activated, Bitrate 25M \n"
 }
 
 event_x264sw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx264:gop=12:bitrate=25M"
+	KEYVALUE="libavcodec:encoder=libx264:gop=6:bitrate=30M"
 	write_etcd_global
-	echo -e "x264 Software acceleration activated, Bitrate 25M \n"
+	echo -e "x264 Software acceleration activated, Bitrate 30M \n"
 }
 
 event_x265sw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx265:gop=12:bitrate=15M:subsampling=444:q=12:bpp=10"
+	KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=10:qp-20:pred_struct=0:gop=6:bitrate=30"
 	write_etcd_global
-	echo -e "x265 Software acceleration activated, Bitrate 15M \n"
+	echo -e "x265 SVT Software acceleration activated, Bitrate 30M \n"
 }	
 
 event_x265hw() {
 # working on tweaking these values to something as reliable as possible.
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=hevc_qsv:bitrate=7M:gop=6:subsampling=444"
+	KEYVALUE="libavcodec:encoder=hevc_qsv:bitrate=30M:gop=6:subsampling=444"
 #	KEYVALUE="libavcodec:encoder=hevc_qsv:gop=12:bitrate=15M:bpp=10:subsampling=444:q=0:scenario=remotegaming:profile=main10"
 	write_etcd_global
-	echo -e "x265 Hardware acceleration activated, Bitrate 20M \n"
+	echo -e "x265 Hardware acceleration activated, Bitrate 30M \n"
 }
 
 event_vp9sw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libvpx-vp9:gop=12:bitrate=20M"
+	KEYVALUE="libavcodec:encoder=libvpx-vp9:gop=12:bitrate=30M"
 	write_etcd_global
-	echo -e "VP9 Software acceleration activated, Bitrate 20M \n"
+	echo -e "VP9 Software acceleration activated, Bitrate 30M \n"
 }
 
 event_vp9hw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=vp9_qsv:gop=12:bitrate=20M:q=0:subsampling=444:bpp=10"
+	KEYVALUE="libavcodec:encoder=vp9_qsv:gop=12:bitrate=30M:q=0:subsampling=444:bpp=10"
 	write_etcd_global
-	echo -e "VP9 Hardware acceleration activated, Bitrate 20M \n"
+	echo -e "VP9 Hardware acceleration activated, Bitrate 30M \n"
 }
 
 event_rav1esw() {
