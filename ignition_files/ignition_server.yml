@@ -88,6 +88,13 @@ storage:
          skip_if_unavailable=True
          fastestmirror=1
          max_parallel_downloads=2
+    # Ensure ipa server is enabled in hosts
+    - path: /etc/hosts
+      mode: 0664
+      overwrite: true
+      contents:
+        inline: |
+         192.168.1.32   ipa.wavelet.local ipa
     # Intel OneAPI RPM Repository
     - path: /etc/yum.repos.d/oneAPI.repo
       mode: 0664
@@ -653,6 +660,24 @@ systemd:
         ExecStartPost=touch /var/local_rpm.complete
         [Install]
         WantedBy=multi-user.target
+    # Reboot service
+    - name: server-reboot.timer
+      enabled: true
+      contents: |
+          [Unit]
+          Description=Daily Reboot
+          [Timer]
+          OnCalendar=*-*-* 06:00:00
+          [Install]
+          WantedBy=timers.target
+    # Reboot service timer
+    - name: server-reboot.service
+      contents: |
+          [Unit]
+          Description=Daily Reboot
+          [Service]
+          Type=simple
+          ExecStart=/usr/bin/systemctl --force reboot
     # Mask docker entirely
     - name: docker.service
       mask: true

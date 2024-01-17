@@ -504,6 +504,24 @@ systemd:
           ExecStart=-/usr/local/bin/decoderhostname.sh
           [Install]
           WantedBy=default.target
+    # Reboot service
+    - name: decoder-reboot.timer
+      enabled: true
+      contents: |
+          [Unit]
+          Description=Daily Reboot
+          [Timer]
+          OnCalendar=*-*-* 6:03:00
+          [Install]
+          WantedBy=timers.target
+    # Reboot service timer
+    - name: decoder-reboot.service
+      contents: |
+          [Unit]
+          Description=Daily Reboot
+          [Service]
+          Type=simple
+          ExecStart=/usr/bin/systemctl --force reboot
     # Mask docker entirely
     - name: docker.service
       mask: true

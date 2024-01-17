@@ -18,9 +18,12 @@ function poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit) {
         }
         curl_close($ch);
         $dataArray = json_decode($result, true); // this decodes the JSON string as an associative array
-        foreach ($dataArray['kvs'] as $x => $item) {
+	foreach ($dataArray['kvs'] as $x => $item) {
+		// This forms the "pretty" label, the value that gets changed when the relabel key is picked.
 		$decodedKeyShort = (str_replace("-video-index0", "", (str_replace("/interface/", "", (base64_decode($item['key']))))));
+		// This is the hash value of the device, and is used to track the device state if it is unplugged/plugged back in to the same port
 		$decodedKey = base64_decode($item['key']);
+		// This is the "long" device name which is used as a reverse lookup w/ the device hash
 		$decodedValue = base64_decode($item['value']);
 
                 $newData[] = [

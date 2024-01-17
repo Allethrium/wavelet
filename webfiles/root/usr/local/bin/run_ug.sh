@@ -106,17 +106,45 @@ event_decoder(){
 # Registers self as a decoder in etcd for the reflector to query & include in its client args
 
 KEYVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
+# Can be modified from webUI, populates with hostname by default
+ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put decoderlabel/$(hostname) "$(hostname)"
 write_etcd_clientip
 
-# Run ultragrid 
+# Install reset and reveal watcher services
+echo "
+[Unit]
+Description=Decoder Reset Watcher
+After=network-online.target
+Wants=network-online.target
+[Service]
+ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch $(hostname)/DECODER_RESET -w simple -- sh -c "/usr/local/bin/wavelet_decoder_reset.sh"
+Restart=Always
+[Install]
+WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_monitor_decoder_reset.service
+
+echo "
+[Unit]
+Description=Decoder Reveal Watcher
+After=network-online.target
+Wants=network-online.target
+[Service]
+ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch $(hostname)/DECODER_REVEAL -w simple -- sh -c "/usr/local/bin/wavelet_decoder_reveal.sh"
+Restart=Always
+[Install]
+WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_monitor_decoder_reveal.service
+
+systemctl daemon-reload
+systemctl --user enable wavelet_monitor_decoder_reset.service --now
+systemctl --user enable wavelet_monitor_decoder_reveal.service --now
+
+# Note - ExecStartPre=-swaymsg workspace 2 is a failable command 
+# It will always send the UG output to a second display.  If not connected the primary display will be used
+# This is an impoverished version of a multihead display management system.
 KEYNAME=UG_ARGS
 ug_args="--tool uv -d vulkan_sdl2:fs --param use-hw-accel"
 KEYVALUE="${ug_args}"
 write_etcd
-rm -rf /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
-# Note - ExecStartPre=-swaymsg workspace 2 is a failable command 
-# It will always send the UG output to a second display.  If not connected the primary display will be used
-# This is an impoverished version of a multihead display management system.
+
 echo "
 [Unit]
 Description=UltraGrid AppImage executable
@@ -125,8 +153,7 @@ Wants=network-online.target
 [Service]
 ExecStartPre=-swaymsg workspace 2
 ExecStart=/usr/local/bin/UltraGrid.AppImage ${ug_args}
-ExecStopPost=/usr/local/bin/exit_handler.sh
-Restart=Always
+Restart=always
 [Install]
 WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 systemctl --user daemon-reload
@@ -149,7 +176,6 @@ if [[ ${return} -eq !0 ]]; then
 	[Service]
 	ExecStartPre=-swaymsg workspace 2
 	ExecStart=/usr/local/bin/UltraGrid.AppImage ${ug_args}
-	ExecStopPost=/usr/local/bin/exit_handler.sh
 	Restart=always
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
@@ -172,7 +198,6 @@ if [[ ${return} -eq !0 ]]; then
 		[Service]
 		ExecStartPre=-swaymsg workspace 2
 		ExecStart=/usr/local/bin/UltraGrid.AppImage ${ug_args}
-		ExecStopPost=/usr/local/bin/exit_handler.sh
 		Restart=always
 		[Install]
 		WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
@@ -182,7 +207,6 @@ if [[ ${return} -eq !0 ]]; then
 else
 	:
 fi
-
 # Perhaps add an etcd watch or some kind of server "isalive" function here
 # The decoders should reboot on their own if the server is down
 # assumption would be server was getting replaced, and they'd need to reregister on boot?
@@ -199,7 +223,6 @@ event_livestream(){
 	Wants=network-online.target
 	[Service]
 	ExecStart=ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch uv_islivestreaming -w simple -- sh -c "/usr/local/bin/wavelet_livestream.sh"
-	ExecStopPost=/usr/local/bin/exit_handler.sh
 	Restart=always
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-livestream.service
