@@ -198,7 +198,7 @@ function createNewHost(key, value) {
 		var deleteButton        =       document.createElement("Button");
 		var restartButton       =       document.createElement("Button");
 		var rebootButton        =       document.createElement("Button");
-                var identifyButton      =       document.createElement("Button");
+		var identifyButton      =       document.createElement("Button");
 		const text              =       document.createTextNode(value);
 		const id                =       document.createTextNode(counter + 1);
 		dynamicButton.id        =       counter;
@@ -236,7 +236,7 @@ function createNewHost(key, value) {
 		function createIdentifyButton() {
 				var $btn = $('<button/>', {
 								type: 'button',
-								text: 'Identify Decoder (15s)',
+								text: 'Identify Host (15s)',
 								class: 'renameButton clickableButton',
 								id: 'btn_identify'
 				}).click(function(){
@@ -260,7 +260,7 @@ function createNewHost(key, value) {
 		function createRestartButton() {
 				var $btn = $('<button/>', {
 								type: 'button',
-								text: 'Restart Decoder Task',
+								text: 'Restart Codec Task',
 								class: 'renameButton clickableButton',
 								id: 'btn_restart'
 				}).click(function(){
@@ -280,20 +280,31 @@ function createNewHost(key, value) {
 				})
 				return $btn;
 		}
-
 		/* add decoder reboot button */
 		function createRebootButton() {
 				var $btn = $('<button/>', {
 								type: 'button',
-								text: 'Reboot Decoder',
+								text: 'Reboot Host',
 								class: 'renameButton clickableButton',
 								id: 'btn_reboot'
 				}).click(function(){
-						$(this).parent().console.log("Host instructed to reboot:" + value);
-				})
+						console.log("Host instructed to reboot:" + key + "," + value);
+						$.ajax({
+								type: "POST",
+								url: "/reboot_host.php",
+								data: {
+										key: key,
+										value: "1"
+										},
+								success: function(response){
+								console.log(response);
+										}
+						});
 
-		return $btn;
+				})
+				return $btn;
 		}
+		
 		$(divEntry).append(createRenameButton());
 		$(divEntry).append(createDeleteButton());	
 		$(divEntry).append(createRestartButton());
@@ -342,16 +353,16 @@ function relabelInputElement() {
 		console.log("The originally generated device field from Wavelet was: " + oldGenText);
 		console.log("The button must be activated for any changes to reflect on the video banner!");
 		$.ajax({
-						type: "POST",
-						url: "/set_input_label.php",
-						data: {
-								value: selectedDivHash,
-								label: newTextInput,
-				oldvl: oldGenText
-							  },
-						success: function(response){
-								console.log(response);
-						}
+				type: "POST",
+				url: "/set_input_label.php",
+				data: {
+						value: selectedDivHash,
+						label: newTextInput,
+						oldvl: oldGenText
+					  },
+				success: function(response){
+					console.log(response);
+				}
 				});
 	} else {
 		return;
@@ -360,12 +371,12 @@ function relabelInputElement() {
 
 
 function relabelHostElement() {
-		const selectedDivHost	=	$(this).parent().attr('divDeviceHostName');
-												console.log("the found hostname is: " + selectedDivHost);
-		const relabelTarget             =       $(this).parent().attr('divDevID');
-												console.log("the found button ID is: " + relabelTarget);
-		const oldGenText                =       $(this).parent().attr('deviceLabel');
-		const newTextInput              =       prompt("Enter new text label for this device:");
+		const selectedDivHost		=		$(this).parent().attr('divDeviceHostName');
+											console.log("the found hostname is: " + selectedDivHost);
+		const relabelTarget			=       $(this).parent().attr('divDevID');
+											console.log("the found button ID is: " + relabelTarget);
+		const oldGenText			=       $(this).parent().attr('deviceLabel');
+		const newTextInput			=	prompt("Enter new text label for this device:");
 		console.log("Device old label is:" + oldGenText);
 		console.log("New device label is:" +newTextInput);
 		if (newTextInput !== null && newTextInput !== "") {
@@ -411,4 +422,3 @@ function applyLivestreamSettings() {
 						}
 		});
 }
-

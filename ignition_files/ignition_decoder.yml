@@ -209,7 +209,7 @@ storage:
           [Service]
           Environment=ETCDCTL_API=3
           RemainAfterExit=yes
-          ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch input_update -w simple -- sh -c "/usr/local/bin/wavelet_controller.sh"
+          ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch "input_update" -w simple -- sh -c "/usr/local/bin/wavelet_controller.sh"
           [Install]
           WantedBy=default.target
       user:
@@ -539,10 +539,7 @@ systemd:
     - name: check_and_wait.target
       contents: |
        [Unit]
-       TimeoutStartSec=infinity
        ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-       ExecStart=/usr/bin/sleep 1000
-       RemainAfterExit=yes
     # Actual unit
     - name: getty@tty1.service
       dropins:

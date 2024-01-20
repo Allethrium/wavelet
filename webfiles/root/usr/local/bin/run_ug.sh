@@ -27,36 +27,36 @@ UG_HOSTNAME=$(hostname)
 ETCDURI=http://192.168.1.32:2379/v2/keys
 ETCDENDPOINT=192.168.1.32:2379
 read_etcd(){
-        ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME} --print-value-only)
-        echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
+		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME} --print-value-only)
+		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
 }
 
 read_etcd_prefix(){
-        ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix $(hostname)/${KEYNAME} --print-value-only)
-        echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
+		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix $(hostname)/${KEYNAME} --print-value-only)
+		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
 }
 
 read_etcd_global(){
-        ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
-        echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for Global value"
+		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
+		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for Global value"
 }
 
 write_etcd(){
-        ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
-        echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
+		echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
 }
 
 write_etcd_global(){
-        ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
-        echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
+		echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
 }
 
 write_etcd_clientip(){
-        ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${KEYVALUE}"
-        echo -e "$(hostname) set to ${KEYVALUE} for Global value"
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${KEYVALUE}"
+		echo -e "$(hostname) set to ${KEYVALUE} for Global value"
 }
 read_etcd_clients_ip() {
-        ETCDCTL_API=3 return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
+		ETCDCTL_API=3 return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
 }
 
 
@@ -104,38 +104,25 @@ event_decoder(){
 # Tries three possible GPU outputs before failing.
 # If it crashes, you have hw/driver issues someplace or an improperly configured display env.
 # Registers self as a decoder in etcd for the reflector to query & include in its client args
-
 KEYVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
-# Can be modified from webUI, populates with hostname by default
-ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put decoderlabel/$(hostname) "$(hostname)"
 write_etcd_clientip
 
-# Install reset and reveal watcher services
-echo "
-[Unit]
-Description=Decoder Reset Watcher
-After=network-online.target
-Wants=network-online.target
-[Service]
-ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch $(hostname)/DECODER_RESET -w simple -- sh -c "/usr/local/bin/wavelet_decoder_reset.sh"
-Restart=Always
-[Install]
-WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_monitor_decoder_reset.service
+# Can be modified from webUI, populates with hostname by default
+ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put decoderlabel/$(hostname) "$(hostname)"
 
-echo "
-[Unit]
-Description=Decoder Reveal Watcher
-After=network-online.target
-Wants=network-online.target
-[Service]
-ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch $(hostname)/DECODER_REVEAL -w simple -- sh -c "/usr/local/bin/wavelet_decoder_reveal.sh"
-Restart=Always
-[Install]
-WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_monitor_decoder_reveal.service
+KEYVALUE="0"
+KEYNAME=$(hostname)/DECODER_RESET
+write_etcd_global
+KEYNAME=$(hostname)/DECODER_REVEAL
+write_etcd_global
+KEYNAME=$(hostname)/DECODER_REBOOT
+write_etcd_global
 
-systemctl daemon-reload
+
 systemctl --user enable wavelet_monitor_decoder_reset.service --now
 systemctl --user enable wavelet_monitor_decoder_reveal.service --now
+systemctl --user enable wavelet_monitor_decoder_reboot.service --now
+
 
 # Note - ExecStartPre=-swaymsg workspace 2 is a failable command 
 # It will always send the UG output to a second display.  If not connected the primary display will be used
@@ -157,9 +144,12 @@ Restart=always
 [Install]
 WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 systemctl --user daemon-reload
+
 systemctl --user start UltraGrid.AppImage.service
 echo -e "Decoder systemd units instructed to start..\n"
-sleep 5
+sleep 3
+
+
 return=$(systemctl --user is-active --quiet UltraGrid.AppImage.service)
 if [[ ${return} -eq !0 ]]; then
 	echo "SystemD unit failed with Vulkan_sdl2 driver for hwaccel, trying with GL driver.."

@@ -54,6 +54,8 @@ Environment=ip-address=192.168.1.32
 WantedBy=multi-user.target default.target
 " > /etc/containers/systemd/freeipa.container
 
+# Disable dnsmasq, as with FreeIPA we will be using integrated BIND for DNS.
+systemctl disable dnsmasq --now
 
 # Initialize the podman container
 echo -e "\nFreeIPA Podman container generated, service has been enabled in systemd, and will start on next reboot.\n"

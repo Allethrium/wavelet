@@ -12,36 +12,36 @@
 #Etcd Interaction
 ETCDENDPOINT=http://192.168.1.32:2379
 read_etcd(){
-        printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME} --print-value-only)
-        echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
+		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME} --print-value-only)
+		echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
 }
 
 read_etcd_global(){
-        printdetectvalueglobal=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
-        echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for Global value"
+		printdetectvalueglobal=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
+		echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for Global value"
 }
 
 write_etcd(){
-        etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
-        echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
+		etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
+		echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
 }
 
 write_etcd_inputs(){
 	etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/inputs${KEYNAME}" -- "${KEYVALUE}"
-        echo -e "Set ${KEYVALUE} for /inputs/$(hostname)${KEYNAME}"
+		echo -e "Set ${KEYVALUE} for /inputs/$(hostname)${KEYNAME}"
 }
 
 write_etcd_global(){
-        etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
-        echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
+		etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
+		echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
 }
 
 write_etcd_clientip(){
-        etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${KEYVALUE}"
-        echo -e "$(hostname) set to ${KEYVALUE} for Global value"
+		etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${KEYVALUE}"
+		echo -e "$(hostname) set to ${KEYVALUE} for Global value"
 }
 read_etcd_clients_ip() {
-        return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
+		return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
 }
 
 
@@ -67,8 +67,8 @@ generate_device_info() {
 	echo -e "\n \n \n Now generating device info for each item presently located in /dev/v4l/by-id.. \n"
 	echo -e "Working on ${device_string_long}\n"
 	device_string_short=$(echo $(hostname)/"${device_string_long}" | sed 's/.*usb-//')
-    info=$(v4l2-ctl -D -d ${v4l_device_path})
-    # here we parse this information
+	info=$(v4l2-ctl -D -d ${v4l_device_path})
+	# here we parse this information
 	cardType=$(echo "${info}" | awk -F ":" '/Card type/ { print $2 }')
 	# Bus info (first instance only, it's repeated oftentimes)
 	bus_info=$(echo "${info}" | awk -F ":" '/Bus info/ { print $4;exit; }')
@@ -143,13 +143,13 @@ device_cleanup() {
 declare -a interfaceLongArray=$(etcdctl --endpoints=${ETCDENDPOINT} get /long_interface/ --prefix --keys-only | sed 's/\/long_interface// ')
 	leftOversArray=(`printf '%s\n' "${interfaceLongArray[@]}" "${v4lArray[@]}" | sort | uniq -u`)
 	if (( ${#leftOversArray[@]} == 0 )); then
-	    echo -e "Array is empty, there is no discrepancy between detected device paths and available devices in Wavelet.  Terminating process.. \n"
-	    :
+		echo -e "Array is empty, there is no discrepancy between detected device paths and available devices in Wavelet.  Terminating process.. \n"
+		:
 	else
 		echo -e "Orphaned devices located: \n"
-	        printf "%s\n" "${leftOversArray[@]}"
+			printf "%s\n" "${leftOversArray[@]}"
 		for i in "${leftOversArray[@]}"
-                	do
+					do
 				cleanupStringLong=$i
 				echo -e "\n\nCleanup device is ${cleanupStringLong}"
 
@@ -177,7 +177,7 @@ declare -a interfaceLongArray=$(etcdctl --endpoints=${ETCDENDPOINT} get /long_in
 				echo -e "Deleting /short_hash/${cleanupHash}  entry"
 				etcdctl --endpoints=${ETCDENDPOINT} del "/short_hash/${cleanupHash}"
 				echo -e "Device entry ${cleanupStringLong} should be removed along with all references to ${cleanupHash}\n\n"
-	                done
+					done
 	fi
 }
 
@@ -220,7 +220,7 @@ event_unknowndevice() {
 # 30fps is a compatibility setting, this is called for Magewell capture cards which can do 60fps, but as its a catch all for other devices we will leave at 30.
 	echo -e "The connected device has not been previously assigned an input ID for the UI component.  Storing hash.\n"
 	KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"
-        KEYNAME="${device_string_long}"
+		KEYNAME="${device_string_long}"
 	write_etcd_inputs
 	echo -e "\n Detection completed for device.. \n \n \n \n"
 	device_cleanup

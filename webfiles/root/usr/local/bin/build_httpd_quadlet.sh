@@ -2,6 +2,7 @@
 # Designed to be called by sway's build_ug.sh exec command.
 # Need to amend this to generate or utilize proper certificates
 # Called from build_ug.sh when hostname is svr.wavelet.local
+# Updated 1/2024 to use quadlets instead of podman-generate-systemd
 ETCDENDPOINT=192.168.1.32:2379
 KEYNAME=SERVER_HTTP_BOOTSTRAP_COMPLETED
 KEYVALUE=1
@@ -13,12 +14,30 @@ exec >/home/wavelet/build_httpd.log 2>&1
 
 # Needs to be configured with proper TLS certs to be deployment ready.
 echo -e "Generating Apache Podman container and systemd service file"
-podman create --name httpd -p 8080:80 -v /home/wavelet/http:/usr/local/apache2/htdocs:Z docker://docker.io/library/httpd
-cd /home/wavelet/.config/systemd/user
-podman generate systemd --restart-policy=always -t 5 --name httpd --files
-cp container-httpd.service ${SCRHOME}/.config/systemd/user
-chown wavelet:wavelet ${SCRHOME}/.config/systemd/user
-systemctl --user enable container-httpd.service
+
+# Generate Quadlet
+echo -e "[Unit]
+Description=HTTPD Quadlet
+After=local-fs.target
+
+[Container]
+ContainerName=httpd
+Image=docker://docker.io/library/httpd
+PublishPort=8080:80
+Volume=/home/wavelet/http:/usr/local/apache2/htdocs:Z
+Tmpfs=/run
+Tmpfs=/tmp
+Exec=httpd-foreground
+
+[Service]
+TimeOutStartSec=300
+Restart=always
+RestartSec=5
+
+[Install]
+# Start by default on boot
+WantedBy=default.target" > /home/wavelet/.config/containers/systemd/httpd.container
+
 echo -e "\nApache Podman container generated, service has been enabled in systemd, and will start on next reboot.\n"
 etcdctl --endpoints=${ETCDENDPOINT} put ${KEYNAME} -- ${KEYVALUE}
 # populate necessary files for decoder spinup
@@ -29,8 +48,7 @@ cp /usr/local/bin/wavelet_installer_xf.sh /home/wavelet/http/ignition/
 cp /home/wavelet/.bashrc /home/wavelet/http/ignition/skel_bashrc.txt
 cp /home/wavelet/.bash_profile /home/wavelet/http/ignition/skel_profile.txt
 chown -R wavelet:wavelet /home/wavelet/http
-chmod x /home/wavelet/http
-pwd
+chmod +x /home/wavelet/http
 exit 0
 
 fail(){

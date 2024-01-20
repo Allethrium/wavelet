@@ -646,20 +646,6 @@ systemd:
         ExecStartPost=systemctl start systemd-resolved.service
         [Install]
         WantedBy=multi-user.target
-    - name: local_rpm.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Sets up a local RPM repo
-        After=network-online.target
-        Wants=network-online.target
-        ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-        [Service]
-        Type=oneshot
-        ExecStart=/usr/local/bin/local_rpm.sh
-        ExecStartPost=touch /var/local_rpm.complete
-        [Install]
-        WantedBy=multi-user.target
     # Reboot service
     - name: server-reboot.timer
       enabled: true
@@ -696,10 +682,7 @@ systemd:
     - name: check_and_wait.target
       contents: |
        [Unit]
-       TimeoutStartSec=infinity
        ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-       ExecStart=/usr/bin/sleep 1000
-       RemainAfterExit=yes
     # Actual unit
     - name: getty@tty1.service
       dropins:
