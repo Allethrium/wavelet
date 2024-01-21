@@ -36,7 +36,7 @@ read_etcd_clients_ip() {
 
 event_x264sw() {
         KEYNAME=uv_encoder
-        KEYVALUE="libavcodec:encoder=libx264:gop=12:bitrate=25"
+        KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=10:qp=20:pred_struct=0:gop=6:bitrate=25"
         write_etcd_global
         KEYNAME=uv_gop
         KEYVALUE=12
@@ -44,7 +44,7 @@ event_x264sw() {
         KEYNAME=uv_bitrate
         KEYVALUE="25M"
         write_etcd_global
-        echo -e "x264 Software acceleration activated, GOP 12 frames,  Bitrate 25M \n"
+        echo -e "x265 Software acceleration activated (compatibility mode), GOP 6 frames,  Bitrate 30M \n"
 }
 
 

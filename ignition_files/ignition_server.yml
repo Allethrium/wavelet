@@ -88,6 +88,13 @@ storage:
          skip_if_unavailable=True
          fastestmirror=1
          max_parallel_downloads=2
+    # Ensure ipa server is enabled in hosts
+    - path: /etc/hosts
+      mode: 0664
+      overwrite: true
+      contents:
+        inline: |
+         192.168.1.32   ipa.wavelet.local ipa
     # Intel OneAPI RPM Repository
     - path: /etc/yum.repos.d/oneAPI.repo
       mode: 0664
@@ -639,20 +646,24 @@ systemd:
         ExecStartPost=systemctl start systemd-resolved.service
         [Install]
         WantedBy=multi-user.target
-    - name: local_rpm.service
+    # Reboot service
+    - name: server-reboot.timer
       enabled: true
       contents: |
-        [Unit]
-        Description=Sets up a local RPM repo
-        After=network-online.target
-        Wants=network-online.target
-        ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-        [Service]
-        Type=oneshot
-        ExecStart=/usr/local/bin/local_rpm.sh
-        ExecStartPost=touch /var/local_rpm.complete
-        [Install]
-        WantedBy=multi-user.target
+          [Unit]
+          Description=Daily Reboot
+          [Timer]
+          OnCalendar=*-*-* 06:00:00
+          [Install]
+          WantedBy=timers.target
+    # Reboot service timer
+    - name: server-reboot.service
+      contents: |
+          [Unit]
+          Description=Daily Reboot
+          [Service]
+          Type=simple
+          ExecStart=/usr/bin/systemctl --force reboot
     # Mask docker entirely
     - name: docker.service
       mask: true
@@ -671,10 +682,7 @@ systemd:
     - name: check_and_wait.target
       contents: |
        [Unit]
-       TimeoutStartSec=infinity
        ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-       ExecStart=/usr/bin/sleep 1000
-       RemainAfterExit=yes
     # Actual unit
     - name: getty@tty1.service
       dropins:

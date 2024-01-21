@@ -4,7 +4,7 @@
 # TODO - Add TLS and password security
 
 echo -e "[Unit]
-Description=The sleep container
+Description=etcd member service container
 After=local-fs.target
 
 [Container]
@@ -26,10 +26,10 @@ Environment=--initial-cluster-state existing
 Exec=/usr/local/bin/etcd
 
 [Service]
-# Restart service when sleep finishes
+TimeOutStartSec=300
 Restart=always
 
 [Install]
 # Start by default on boot
 WantedBy=multi-user.target default.target
-" > /etc/containers/systemd/etcd.container
+" > /home/wavelet/.config/containers/systemd/etcd.container
