@@ -34,17 +34,21 @@ read_etcd_clients_ip() {
 }
 
 
-event_x264sw() {
+event_x265sw() {
+        # NB zerolatency disables frame parallelism, can't use multicore!
+        # Feedback from deployment:
+        # The decoders HATE libx265 (massive dropped frames), we need to use libsvt_hevc instead.
         KEYNAME=uv_encoder
-        KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=10:qp=20:pred_struct=0:gop=6:bitrate=25"
+        #KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:tune=zerolatency:qp=26:gop=6:bitrate=25"
+        KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=10:pred_struct=0:crf=20:gop=6:bitrate=25"
         write_etcd_global
         KEYNAME=uv_gop
-        KEYVALUE=12
+        KEYVALUE=6
         write_etcd_global
         KEYNAME=uv_bitrate
         KEYVALUE="25M"
         write_etcd_global
-        echo -e "x265 Software acceleration activated (compatibility mode), GOP 6 frames,  Bitrate 30M \n"
+        echo -e "x265 Software acceleration activated (compatibility mode), GOP 6 frames,  Bitrate 25M \n"
 }
 
 
@@ -76,7 +80,7 @@ systemctl --user enable wavelet_reflector.service --now
 systemctl --user enable watch_encoderflag.service --now
 echo -e "Values populated, monitor services launched.  Starting reflector\n\n"
 systemctl --user enable UltraGrid.Reflector.service --now
-event_x264sw
+event_x265sw
 systemctl --user enable wavelet_controller.service --now
 wait 2
 KEYNAME=input_update

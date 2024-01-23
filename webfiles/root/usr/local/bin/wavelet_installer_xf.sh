@@ -41,6 +41,8 @@ event_server(){
 	extract_base
 	extract_home && extract_usrlocalbin
 	rpm_ostree_install
+	# not functional yet, needs a lot of work
+	# install_decklink
 	/usr/local/bin/local_rpm.sh
 }
 
@@ -53,7 +55,7 @@ cockpit-bridge cockpit-networkmanager cockpit-system cockpit-ostree cockpit-podm
 iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd dnf yum-utils createrepo \
 libsrtp libdrm python3-pip srt srt-libs libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
 ImageMagick  intel-opencl mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
-mesa-libxatracker alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools
+mesa-libxatracker alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools dkms kernel-headers
 echo -e "Base RPM Packages installed, waiting for 2 seconds..\n"
 sleep 5
 
@@ -116,6 +118,57 @@ extract_usrlocalbin(){
 	chmod +x /usr/local/bin
 	chmod 0755 /usr/local/bin/*
 	echo -e "Wavelet application modules setup successfully..\n"
+}
+
+install_decklink(){
+	# adapted from https://github.com/coreos/layering-examples/tree/main/loading-kernel-module
+	# Download Decklink software, extract and install base RPM's (required for Decklink support)
+	cd /home/wavelet/
+
+	podman build --build-arg KERNEL_VERSION=$(uname -r) -t quay.io/fedora/fedora-coreos:stable:kmm-kmod -f Containerfile
+
+	FROM fedora:39 as builder
+	ARG KERNEL_VERSION
+
+	RUN dnf install -y \
+	    git \
+	    make
+
+	WORKDIR /home
+
+	# Get the kernel-headers
+	RUN KERNEL_XYZ=$(echo ${KERNEL_VERSION} | cut -d"-" -f1) && \
+    KERNEL_DISTRO=$(echo ${KERNEL_VERSION} | cut -d"-" -f2 | cut -d"." -f-2) && \
+    KERNEL_ARCH=$(echo ${KERNEL_VERSION} | cut -d"-" -f2 | cut -d"." -f3) && \
+    dnf install -y \
+    https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-${KERNEL_VERSION}.rpm \
+    https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-core-${KERNEL_VERSION}.rpm \
+    https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-modules-${KERNEL_VERSION}.rpm \
+    https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-modules-core-${KERNEL_VERSION}.rpm \
+    https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/x86_64/kernel-devel-${KERNEL_VERSION}.rpm
+
+    # Here is where we'd want to copy the blackmagic DKMS modules into our container
+	RUN git clone https://github.com/kubernetes-sigs/kernel-module-management
+	RUN wget https://www.andymelville.net/wavelet/desktopvideo-12.7.1a1.x86_64.rpm
+	# Extract RPM
+
+
+	WORKDIR /home/kernel-module-management/ci/kmm-kmod
+
+	RUN KERNEL_SRC_DIR=/lib/modules/${KERNEL_VERSION}/build make all
+
+	FROM quay.io/fedora/fedora-coreos:stable
+	ARG KERNEL_VERSION
+
+	# Copy into overlay
+	COPY --from=builder /home/kernel-module-management/ci/kmm-kmod/kmm_ci_a.ko /usr/lib/modules/${KERNEL_VERSION}/
+
+	# This is needed in order to autoload the module at boot time.
+	RUN depmod -a "${KERNEL_VERSION}" && echo kmm_ci_a > /etc/modules-load.d/kmm_ci_a.conf
+
+	# Commit to ostree
+	RUN rpm-ostree install strace && rm -rf /var/cache && \
+  	ostree container commit
 }
 
 # Perhaps add a checksum to make sure nothing's been tampered with here..

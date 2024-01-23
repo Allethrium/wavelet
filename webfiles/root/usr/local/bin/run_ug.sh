@@ -127,8 +127,10 @@ systemctl --user enable wavelet_monitor_decoder_reboot.service --now
 # Note - ExecStartPre=-swaymsg workspace 2 is a failable command 
 # It will always send the UG output to a second display.  If not connected the primary display will be used
 # This is an impoverished version of a multihead display management system.
+
+# simple display with fullscreen, software decoding for reliability.
 KEYNAME=UG_ARGS
-ug_args="--tool uv -d vulkan_sdl2:fs --param use-hw-accel"
+ug_args="--tool uv -d gl:fs"
 KEYVALUE="${ug_args}"
 write_etcd
 
@@ -147,56 +149,78 @@ systemctl --user daemon-reload
 
 systemctl --user start UltraGrid.AppImage.service
 echo -e "Decoder systemd units instructed to start..\n"
-sleep 3
+sleep 1
 
 
-return=$(systemctl --user is-active --quiet UltraGrid.AppImage.service)
-if [[ ${return} -eq !0 ]]; then
-	echo "SystemD unit failed with Vulkan_sdl2 driver for hwaccel, trying with GL driver.."
-	KEYNAME=UG_ARGS
-	ug_args="--tool uv -d gl:fs --param use-hw-accel"
-	KEYVALUE="${ug_args}"
-	write_etcd
-	rm -rf /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
-	echo "
-	[Unit]
-	Description=UltraGrid AppImage executable
-	After=network-online.target
-	Wants=network-online.target
-	[Service]
-	ExecStartPre=-swaymsg workspace 2
-	ExecStart=/usr/local/bin/UltraGrid.AppImage ${ug_args}
-	Restart=always
-	[Install]
-	WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
-	systemctl --user daemon-reload
-	systemctl --user start UltraGrid.AppImage.service
-	echo -e "Decoder systemd units instructed to start..\n"
-	return=$(systemctl --user is-active --quiet UltraGrid.AppImage.service)
-	if [[ ${return} -eq !0 ]]; then
-		echo "Decoder failed to start, there may be something wrong with the system. \n Trying SDL as a fallback and then failing for good.."
-		KEYNAME=UG_ARGS
-		ug_args="--tool uv -d sdl:fs --param use-hw-accel"
-		KEYVALUE="${ug_args}"
-		write_etcd
-		rm -rf /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
-		echo "
-		[Unit]
-		Description=UltraGrid AppImage executable
-		After=network-online.target
-		Wants=network-online.target
-		[Service]
-		ExecStartPre=-swaymsg workspace 2
-		ExecStart=/usr/local/bin/UltraGrid.AppImage ${ug_args}
-		Restart=always
-		[Install]
-		WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
-	else
-		:
-	fi
-else
-	:
-fi
+#KEYNAME=UG_ARGS
+#ug_args="--tool uv -d vulkan_sdl2:fs --param use-hw-accel"
+#KEYVALUE="${ug_args}"
+#write_etcd
+#
+#echo "
+#[Unit]
+#Description=UltraGrid AppImage executable
+#After=network-online.target
+#Wants=network-online.target
+#[Service]
+#ExecStartPre=-swaymsg workspace 2
+#ExecStart=/usr/local/bin/UltraGrid.AppImage ${ug_args}
+#Restart=always
+#[Install]
+#WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
+#systemctl --user daemon-reload
+#
+#systemctl --user start UltraGrid.AppImage.service
+#echo -e "Decoder systemd units instructed to start..\n"
+#sleep 3
+
+#return=$(systemctl --user is-active --quiet UltraGrid.AppImage.service)
+#if [[ ${return} -eq !0 ]]; then
+	#echo "SystemD unit failed with Vulkan_sdl2 driver for hwaccel, trying with GL driver.."
+	#KEYNAME=UG_ARGS
+	#ug_args="--tool uv -d gl:fs --param use-hw-accel"
+	#KEYVALUE="${ug_args}"
+	#write_etcd
+	#rm -rf /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
+	#echo "
+	#[Unit]
+	#Description=UltraGrid AppImage executable
+	#After=network-online.target
+	#Wants=network-online.target
+	#[Service]
+	#ExecStartPre=-swaymsg workspace 2
+	#ExecStart=/usr/local/bin/UltraGrid.AppImage ${ug_args}
+	#Restart=always
+	#[Install]
+	#WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
+	#systemctl --user daemon-reload
+	#systemctl --user start UltraGrid.AppImage.service
+	#echo -e "Decoder systemd units instructed to start..\n"
+	#return=$(systemctl --user is-active --quiet UltraGrid.AppImage.service)
+	#if [[ ${return} -eq !0 ]]; then
+		#echo "Decoder failed to start, there may be something wrong with the system. \n Trying SDL as a fallback and then failing for good.."
+		#KEYNAME=UG_ARGS
+		#ug_args="--tool uv -d sdl:fs --param use-hw-accel"
+		#KEYVALUE="${ug_args}"
+		#write_etcd
+		#rm -rf /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
+		#echo "
+		#[Unit]
+		#Description=UltraGrid AppImage executable
+		#After=network-online.target
+		#Wants=network-online.target
+		#[Service]
+		#ExecStartPre=-swaymsg workspace 2
+		#ExecStart=/usr/local/bin/UltraGrid.AppImage ${ug_args}
+		#Restart=always
+		#[Install]
+		#WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
+	#else
+		#:
+	#fi
+#else
+	#:
+#fi
 # Perhaps add an etcd watch or some kind of server "isalive" function here
 # The decoders should reboot on their own if the server is down
 # assumption would be server was getting replaced, and they'd need to reregister on boot?

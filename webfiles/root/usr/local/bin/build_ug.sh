@@ -229,6 +229,16 @@ server_bootstrap(){
 	sed -i '/exec systemctl restart dnsmasq.service/s/^# *//' config $HOME/.config/sway/config
 	#
 	sed -i '/exec \/usr\/local\/bin\/local_rpm.sh/s/^# *//' config $HOME/.config/sway/config
+
+	# Next, we build the reflector prune function.  This is necessary for removing streams for old decoders and maintaining the long term health of the system
+		# Get decoderIP list
+		# Ping each decoder on list
+		# If dead, ping more intensively for 30s
+		# If still dead, remove from reflector subscription
+
+	# Finally, add a service to prune dead FUSE mountpoints.  Every time the UltraGrid AppImage is restarted, it leaves stale mountpoints.  This timed task will help keep everything clean.
+		# Get "alive mountpoints"
+		# Prune anything !=alive
 }
 
 service_exists() {
