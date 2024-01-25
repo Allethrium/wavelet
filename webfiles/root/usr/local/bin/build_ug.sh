@@ -104,11 +104,7 @@ event_decoder(){
 	nmcli dev wifi rescan
 	sleep 1
 	nmcli dev wifi rescan
-	sleep 1
-	nmcli dev wifi rescan
-	sleep 1
 	nmcli dev wifi connect Wavelet-1
-	sleep 1
 	# need to do this twice - WiFi network *should* have already been provisioned by decoderhostname.sh
 	nmcli dev wifi connect Wavelet-1
 	echo -e "Setting up systemd services to be a decoder, moving to run_ug"
@@ -117,6 +113,7 @@ event_decoder(){
 	event_reveal
 	event_reboot
 	event_reset
+	event_generateHash
 	systemctl --user enable run_ug.service --now
 	etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/wavelet_build_completed" -- "${KEYVALUE}"
 	sleep 1
@@ -351,13 +348,32 @@ event_decoder_reset(){
 	Wants=network-online.target
 	[Service]
 	Environment=ETCDCTL_API=3
-	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch decoderip/$(hostname)/DECODER_RESET -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_reset.sh\"
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch $(hostname)/DECODER_RESET -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_reset.sh\"
 	Restart=always
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-decoder-reset.service
 
 	systemctl --user daemon-reload
 	systemctl --user enable wavelet-decoder-reset.service --now
+}
+
+event_generateHash(){
+	# Can be modified from webUI, populates with hostname by default
+	# We will generate a hash from the root UUID and hostname, which we will use to track the label state
+	# This works much the same way as the label function on the detected input devices.
+	# Might need to do something more intelligent here to determine correct dev to pull UUID from..
+	PARTUUID=$(udevadm info -q all -n /dev/nvme0n1 | grep UUID)
+	echo -e "Partition UUID is: $PARTUUID"
+	echo -e "device hostname is: $(hostname)"
+	hostHash=$(echo "$PARTUUID, $(hostname)" | sha256sum)
+	echo -e "generated device hash: $hostHash \n"
+	# Populate what will initially be used as the label variable from the webUI
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "decoderlabel/$(hostname)" -- "$(hostname)"
+	# And the reverse lookup for the device
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "hostHash/$(hostname)/Hash" -- "$(hostHash)"
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/Hash/$(hostHash)"
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "hostHash/$(hostname)/label" -- "$(hostname)"
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "hostHash/$(hostname)/ipaddr" -- "${KEYVALUE}"
 }
 
 event_device_redetect(){

@@ -74,7 +74,7 @@ intel-level-zero oneapi-level-zero oneVPL intel-mediasdk libva libva-utils libva
 ocl-icd opencl-headers mpv libsrtp mesa-dri-drivers intel-opencl \
 libvdpau-va-gl mesa-vdpau-drivers libvdpau libvdpau-devel \
 ffmpeg ffmpeg-libs libheif-freeworld \
-neofetch \
+neofetch htop \
 mesa-libOpenCL python3-pip srt srt-libs ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
 ImageMagick mplayer
 echo -e "RPMFusion Media Packages installed, waiting for 2 seconds..\n"

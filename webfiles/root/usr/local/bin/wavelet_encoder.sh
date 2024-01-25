@@ -137,7 +137,7 @@ event_encoder(){
 	# Audio runs as a multiplied stream, if enabled at all.
 	# traffic shaping can be disabled by adding '-l unlimited" before inputvar
 	echo -e "Assembled command is: \n --tool uv $filtervar -f LDGM:40% ${inputvar} -c ${encodervar} -P ${uv_videoport} -m 9000 ${destinationipv4} \n"
-	ugargs="--tool uv $filtervar -f V:rs:200:240 -l unlimited ${inputvar} -c ${encodervar} -P ${video_port} -m 9000 ${destinationipv4}"
+	ugargs="--tool uv $filtervar -f LDGM:40% -l unlimited ${inputvar} -c ${encodervar} -P ${video_port} -m 9000 ${destinationipv4}"
 	KEYNAME=UG_ARGS
 	KEYVALUE=${ugargs}
 	write_etcd
