@@ -133,11 +133,11 @@ event_encoder(){
 	destinationipv4="192.168.1.32"
 
 	# Currently -f V:rs:200:240 on the end specifies reed-solomon forward error correction 
-	# For higher btirate streams, we can use "-f LDGM:40%"
+	# For higher btirate streams, we can use "-f LDGM:40%" - must be >2mb frame size!
 	# Audio runs as a multiplied stream, if enabled at all.
 	# traffic shaping can be disabled by adding '-l unlimited" before inputvar
-	echo -e "Assembled command is: \n --tool uv $filtervar -f LDGM:40% ${inputvar} -c ${encodervar} -P ${uv_videoport} -m 9000 ${destinationipv4} \n"
-	ugargs="--tool uv $filtervar -f LDGM:40% -l unlimited ${inputvar} -c ${encodervar} -P ${video_port} -m 9000 ${destinationipv4}"
+	echo -e "Assembled command is: \n --tool uv $filtervar -f V:rs:200:240 ${inputvar} -c ${encodervar} -P ${uv_videoport} -m 9000 ${destinationipv4} \n"
+	ugargs="--tool uv $filtervar -f V:rs:200:240 -l unlimited ${inputvar} -c ${encodervar} -P ${video_port} -m 9000 ${destinationipv4}"
 	KEYNAME=UG_ARGS
 	KEYVALUE=${ugargs}
 	write_etcd

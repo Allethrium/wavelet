@@ -106,7 +106,8 @@ event_decoder(){
 # Registers self as a decoder in etcd for the reflector to query & include in its client args
 KEYVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
 write_etcd_clientip
-ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostHash/$(hostname)/ipaddr "${KEYVALUE}"
+ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "hostHash/$(hostname)/ipaddr" -- "${KEYVALUE}"
+
 # Ensure all reset, reveal and reboot flags are set to 0 so they are
 # 1) populated
 # 2) not active so the new device goes into a reboot/reset/reveal loop
@@ -281,6 +282,7 @@ event_livestream(){
 #				-re -f lavdi -i anullsrc -c:v libx264 -preset veryfast -b:v 1024k -maxrate 1024k -bufsize 4096k \
 #				-vf 'format=yuv420p' -g 60 \
 #				flv rtmp://a.rtmp.youtube.com/live2/${MYAPIKEY}
+ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put ""
 }
 
 event_gateway_in(){

@@ -257,7 +257,8 @@ event_reboot(){
 	[Service]
 	Environment=ETCDCTL_API=3
 	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch \"SYSTEM_REBOOT\" -w simple -- sh -c \"/usr/local/bin/wavelet_reboot.sh\"
-	Restart=always
+	Restart=on-failure
+	RestartSec=2
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-reboot.service
 	# and the same for the host reboot

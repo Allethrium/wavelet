@@ -68,6 +68,7 @@ wavelet_reflector() {
                 Wants=network-online.target
                 [Service]
                 ExecStart=/usr/local/bin/UltraGrid.AppImage ${ugargs}
+                Restart=always
                 [Install]
                 WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.Reflector.service
                 systemctl --user daemon-reload

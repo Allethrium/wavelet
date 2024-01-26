@@ -278,6 +278,8 @@ storage:
           Environment=ETCDCTL_API=3
           RemainAfterExit=yes
           ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch input_update -w simple -- sh -c "/usr/local/bin/wavelet_controller.sh"
+          Restart=on-failure
+          RestartSec=2
           [Install]
           WantedBy=default.target
       user:
@@ -297,6 +299,8 @@ storage:
           [Service]
           Environment=ETCDCTL_API=3
           ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch --prefix decoderip/ -w simple -- sh -c "/usr/local/bin/wavelet_client_poll.sh"
+          Restart=on-failure
+          RestartSec=2
           [Install]
           WantedBy=default.target
       user:
@@ -316,6 +320,8 @@ storage:
           [Service]
           Environment=ETCDCTL_API=3
           ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch encoder_restart -w simple -- sh -c "/usr/local/bin/monitor_encoderflag.sh"
+          Restart=on-failure
+          RestartSec=2
           [Install]
           WantedBy=default.target
       user:
