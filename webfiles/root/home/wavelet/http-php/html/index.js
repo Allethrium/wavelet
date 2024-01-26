@@ -210,7 +210,7 @@ function createNewButton(key, value, keyFull) {
 								},
 						success: function(response){
 						console.log(response);
-						location.reload(true);
+						//location.reload(true);
 						}
 				});
 			})
@@ -253,30 +253,30 @@ function createNewHost(key, value) {
 				}).click(relabelHostElement);
 		return $btn;
 		}
-		/* add delete button */
+				/* add delete button */
 		function createDeleteButton() {
 				var $btn = $('<button/>', {
 								type: 'button',
 								text: 'Remove',
 								class: 'renameButton clickableButton',
-								id: 'btn_delete'
+								id: 'btn_delete',
+									value: value
 				}).click(function(){
-						$(this).parent().remove();
-						console.log("Deleting host entry and all UI elements:" + key);
+						console.log("Host deleted: " + key + "," + value);
 						$.ajax({
 								type: "POST",
 								url: "/remove_host.php",
 								data: {
 										key: key,
-										},
+										value: value
+									},
 								success: function(response){
 								console.log(response);
-								location.reload(true);
-										}
+											}
 						});
 				})
-		return $btn;
-		}
+				return $btn;
+		}				
 		/* add decoder Identify button */
 		function createIdentifyButton() {
 				var $btn = $('<button/>', {

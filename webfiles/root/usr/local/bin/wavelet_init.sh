@@ -40,7 +40,7 @@ event_x265sw() {
         # The decoders HATE libx265 (massive dropped frames), we need to use libsvt_hevc instead.
         KEYNAME=uv_encoder
         #KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:tune=zerolatency:qp=26:gop=6:bitrate=25"
-        KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=10:pred_struct=0:crf=20:gop=6:bitrate=25"
+        KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=10:pred_struct=0:crf=26:gop=6:bitrate=10M"
         write_etcd_global
         KEYNAME=uv_gop
         KEYVALUE=6
@@ -48,7 +48,7 @@ event_x265sw() {
         KEYNAME=uv_bitrate
         KEYVALUE="25M"
         write_etcd_global
-        echo -e "x265 Software acceleration activated (compatibility mode), GOP 6 frames,  Bitrate 25M \n"
+        echo -e "libsvt_hevc Software acceleration activated (compatibility mode), GOP 6 frames,  Bitrate 10M \n"
 }
 
 

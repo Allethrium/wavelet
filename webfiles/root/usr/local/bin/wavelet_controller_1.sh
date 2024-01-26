@@ -27,9 +27,9 @@ uv_audioport="5006"
 uv_reflector="192.168.1.32"
 uv_obs="192.168.1.31"
 uv_livestream="192.168.1.30"
-uv_encoder="libavcodec:encoder=libsvt_hevc:preset=10:pred_struct=0:crf=20:gop=12:bitrate=25"
-uv_gop="12"
-uv_bitrate="25M"
+uv_encoder="libavcodec:encoder=libsvt_hevc:preset=10:qp=20:pred_struct=0:gop=6:bitrate=25"
+uv_gop="16"
+uv_bitrate="10M"
 uv_islivestreaming="0"
 
 
@@ -112,8 +112,8 @@ case $event in
 	# Display a static image of a court seal (find a better image!)
 	# 3-8 are all dynamic inputs populated from v4l2 (or in the future, hopefully Decklink)
 	# 9
-	(9)		echo -e "Recording currently Not implemented"				;is_recording=false													;;
-	(T)		echo "Test Card activated"									;current_event="wavelet-testcard"		;wavelet-testcard				;;
+	(9)		echo -e "Recording currently Not implemented"				;is_recording=false																;;
+	(T)		echo "Test Card activated"									;current_event="wavelet-testcard"		;wavelet-testcard						;;
 	# System control options
 	(DR)	echo -e "Decoders instructed to reload\n"					;current_event="wavelet-decoder-reboot"	;wavelet-decoder-reset					;;
 	(ER)	echo -e "Encoders instructed to reload\n"					;current_event="wavelet-encoder-reboot"	;wavelet-encoder-reboot					;;
@@ -129,10 +129,9 @@ case $event in
 	(A)		event_x264sw				&& echo "x264 Software video codec selected, updating encoder variables"										;;
 	(B)		event_x264hw 				&& echo "x264 VA-API video codec selected, updating encoder variables"											;;
 	(C)		event_libx265sw 			&& echo "HEVC Software libx265 video codec selected, updating encoder variables"								;;
-	(C1)	event_libx265sw 			&& echo "HEVC Software libx265 video codec selected, updating encoder variables"								;;
 	(D)		event_libsvt_hevc_sw		&& echo "HEVC Software svt_hevc video codec selected, updating encoder variables"								;;
 	(D1)	event_x265hw				&& echo "HEVC QSV video codec selected, updating encoder variables"												;;
-	(E)		event_vp9sw					&& echo "VP-9 Software video codec selected, updating encoder variables"									;;
+	(E)		event_vp9sw					&& echo "VP-9 Software video codec selected, updating encoder variables"										;;
 	(F)		event_vp9hw 				&& echo "VP-9 Hardware video codec selected, updating encoder variables"										;;
 	(G)		event_rav1esw				&& echo "|*****||EXPERIMENTAL AV1 RAV1E codec selected, updating encoder variables||****|"						;;
 	(H)		event_av1hw					&& echo "|*****||EXPERIMENTAL AV1 VA-API codec selected, updating encoder variables||****|"						;;
@@ -334,62 +333,50 @@ wavelet_foursplit() {
 
 event_x264hw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=h264_qsv:gop=6:bitrate=20M"
+	KEYVALUE="libavcodec:encoder=h264_qsv:gop=6:bitrate=30M"
 	write_etcd_global
-	echo -e "x264 Hardware acceleration activated, Bitrate 20M, decoder task restart bit set. \n"
+	echo -e "x264 Hardware acceleration activated, Bitrate 25M, decoder task restart bit set. \n"
 	wavelet-decoder-reset
 }
 
 event_x264sw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx264:gop=6:bitrate=20M"
+	KEYVALUE="libavcodec:encoder=libx264:gop=6:bitrate=30M"
 	write_etcd_global
-	echo -e "x264 Software acceleration activated, Bitrate 20M \n"
+	echo -e "x264 Software acceleration activated, Bitrate 30M \n"
 	wavelet-decoder-reset
 }
 
 event_libx265sw() {
-	# Muxing issue with software codec - POC errors on decoders, probably not a great option.
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=28:gop=6:bitrate=10M"
+	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=20:gop=6:bitrate=25"
 	write_etcd_global
-	echo -e "x265 SVT Software mode activated, CRF=28, Bitrate 10M, decoder task restart bit set. \n"
-	wavelet-decoder-reset
-}	
-
-event_libx265sw_low() {
-	# Muxing issue with software codec - POC errors on decoders, probably not a great option.
-	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=34:gop=6:bitrate=7M"
-	write_etcd_global
-	echo -e "x265 SVT Software mode activated, CRF=34, Bitrate 15M, decoder task restart bit set. \n"
+	echo -e "x265 SVT Software mode activated, Bitrate 25M, decoder task restart bit set. \n"
 	wavelet-decoder-reset
 }	
 
 event_libsvt_hevc_sw() {
-	# NB zerolatency disables frame parallelism, can't use multicore!
-	# Feedback from deployment:
-	# The decoders HATE libx265 (massive dropped frames), we need to use libsvt_hevc instead.
+    # NB zerolatency disables frame parallelism, can't use multicore!
+    # Feedback from deployment:
+    # The decoders HATE libx265 (massive dropped frames), we need to use libsvt_hevc instead.
 	KEYNAME=uv_encoder
 	#KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:tune=zerolatency:qp=26:gop=6:bitrate=25"
-	KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=10:pred_struct=0:crf=28:gop=6:bitrate=10M"
+	KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=10:pred_struct=0:crf=20:gop=6:bitrate=25"
 	write_etcd_global
-}
-
-event_libsvt_hevc_sw_zerolatency() {
-	# NB zerolatency disables frame parallelism, can't use multicore!
-	# Feedback from deployment:
-	# The decoders HATE libx265 (massive dropped frames), we need to use libsvt_hevc instead.
-	KEYNAME=uv_encoder
-	#KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:tune=zerolatency:qp=26:gop=6:bitrate=25"
-	KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=10:tune=zerolatency:pred_struct=0:crf=28:gop=6:bitrate=10M"
+	KEYNAME=uv_gop
+	KEYVALUE=6
 	write_etcd_global
+	KEYNAME=uv_bitrate
+	KEYVALUE="25M"
+	write_etcd_global
+	echo -e "x265 Software acceleration activated (compatibility mode), GOP 6 frames,  Bitrate 25M \n"
+	wavelet-decoder-reset
 }	
 
 event_x265hw() {
 # working on tweaking these values to something as reliable as possible.
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=hevc_qsv:low_power=1:gop=30:crf=28"
+	KEYVALUE="libavcodec:encoder=hevc_qsv:rc=qvbr:low_power=1:cqp=20:gop=30"
 #	KEYVALUE="libavcodec:encoder=hevc_qsv:gop=12:bitrate=15M:bpp=10:subsampling=444:q=0:scenario=remotegaming:profile=main10"
 	write_etcd_global
 	echo -e "x265 Hardware acceleration activated, Bitrate 25M, decoder task restart bit set. \n"
@@ -430,9 +417,9 @@ event_av1hw() {
 
 event_libaom_av1() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libaom-av1:usage=realtime:enable-dual-filter=1:cpu-used=7:threads=0"
+	KEYVALUE="libavcodec:encoder=libaom-av1:usage=realtime:tune=professional:enable-dual-filter=1:cpu-used=7:threads=0"
 	write_etcd_global
-	echo -e "LibAOM-AV1 Software compression activated \n"
+	echo -e "AV1 Hardware acceleration activated \n"
 	wavelet-decoder-reset
 }
 
@@ -480,6 +467,7 @@ wavelet-pip2() {
 		KEYVALUE="1"
 		write_etcd_global
 }
+
 
 wavelet-decoder-reset() {
 # Finds all decoders and sets client reSET flag.  This restarts UltraGrid without a full system reboot.
