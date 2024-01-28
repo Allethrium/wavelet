@@ -136,8 +136,12 @@ event_encoder(){
 	# For higher btirate streams, we can use "-f LDGM:40%" - must be >2mb frame size!
 	# Audio runs as a multiplied stream, if enabled at all.
 	# traffic shaping can be disabled by adding '-l unlimited" before inputvar
-	echo -e "Assembled command is: \n --tool uv $filtervar -f V:rs:200:240 ${inputvar} -c ${encodervar} -P ${uv_videoport} -m 9000 ${destinationipv4} \n"
-	ugargs="--tool uv $filtervar -f V:rs:200:240 -l unlimited ${inputvar} -c ${encodervar} -P ${video_port} -m 9000 ${destinationipv4}"
+	# For now, we must use a very small MTU, this is because a packet loss can result-
+	# in the loss of the entire GOP, leading to the display artefacting we've been seeing.
+	# CESNET/UG team aware, working on a fix.
+	UGMTU="768!"
+	echo -e "Assembled command is: \n --tool uv $filtervar -f V:rs:200:240 ${inputvar} -c ${encodervar} -P ${uv_videoport} -m ${UGMTU} ${destinationipv4} \n"
+	ugargs="--tool uv $filtervar -f V:rs:200:240 -l unlimited ${inputvar} -c ${encodervar} -P ${video_port} -m ${UHMTU} ${destinationipv4}"
 	KEYNAME=UG_ARGS
 	KEYVALUE=${ugargs}
 	write_etcd

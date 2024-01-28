@@ -52,7 +52,8 @@ write_etcd_global(){
 }
 
 write_etcd_clientip(){
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${KEYVALUE}"
+		# Variable changed to IPVALUE because the module was picking up incorrect variables and applying them to /decoderip !
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${IPVALUE}"
 		echo -e "$(hostname) set to ${KEYVALUE} for Global value"
 }
 read_etcd_clients_ip() {
@@ -105,11 +106,13 @@ event_encoder(){
 
 
 event_decoder(){
+# Sleep for 5 seconds so we have a chance for the decoder to connect to the network
+sleep 5
 # Registers self as a decoder in etcd for the reflector to query & include in its client args
-KEYVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
+IPVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
 
 # IP value MUST be populated or the decoder writes gibberish into the server
-if [[ "${KEYVALUE}" == "" ]] then
+if [[ "${IPVALUE}" == "" ]] then
 		# sleep for five seconds, then call yourself again
 		echo -e "\nIP Address is null, sleeping and calling function again\n"
 		sleep 5
@@ -125,7 +128,7 @@ if [[ "${KEYVALUE}" == "" ]] then
 				echo "\nIP Address is not valid, sleeping and calling function again\n"
 				event_decoder
 			fi
-		valid_ipv4 "${KEYVALUE}"
+		valid_ipv4 "${IPVALUE}"
 		}
 fi
 
@@ -176,7 +179,7 @@ systemctl --user enable wavelet_monitor_decoder_reboot.service --now
 # Tries three possible GPU outputs in order of efficiency, before failing.
 # If it crashes, you have hw/driver issues someplace or an improperly configured display env.
 	KEYNAME=UG_ARGS
-	ug_args="--tool uv -d gl:fs"
+	ug_args="--tool uv -d vulkan_sdl2:fs:keep-aspect:nocursor:nodecorate"
 	KEYVALUE="${ug_args}"
 	write_etcd
 	rm -rf /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
@@ -197,9 +200,9 @@ systemctl --user enable wavelet_monitor_decoder_reboot.service --now
 	return=$(systemctl --user is-active --quiet UltraGrid.AppImage.service)
 	if [[ ${return} -eq !0 ]]; then
 		echo "Decoder failed to start, there may be something wrong with the system.
-		\nTrying SDL as a fallback, and then failing for good.."
+		\nTrying GL as a fallback, and then failing for good.."
 		KEYNAME=UG_ARGS
-		ug_args="--tool uv -d sdl:fs --param use-hw-accel"
+		ug_args="--tool uv -d gl:fs"
 		KEYVALUE="${ug_args}"
 		write_etcd
 		rm -rf /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service

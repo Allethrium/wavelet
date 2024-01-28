@@ -131,8 +131,9 @@ case $event in
 	(C)		event_libx265sw 			&& echo "HEVC Software libx265 video codec selected, updating encoder variables"								;;
 	(C1)	event_libx265sw 			&& echo "HEVC Software libx265 video codec selected, updating encoder variables"								;;
 	(D)		event_libsvt_hevc_sw		&& echo "HEVC Software svt_hevc video codec selected, updating encoder variables"								;;
+	(D2)	event_libsvt_hevc_sw_zerolatency	&& echo "HEVC Software svt_hevc video codec selected, updating encoder variables"						;;	
 	(D1)	event_x265hw				&& echo "HEVC QSV video codec selected, updating encoder variables"												;;
-	(E)		event_vp9sw					&& echo "VP-9 Software video codec selected, updating encoder variables"									;;
+	(E)		event_vp9sw					&& echo "VP-9 Software video codec selected, updating encoder variables"										;;
 	(F)		event_vp9hw 				&& echo "VP-9 Hardware video codec selected, updating encoder variables"										;;
 	(G)		event_rav1esw				&& echo "|*****||EXPERIMENTAL AV1 RAV1E codec selected, updating encoder variables||****|"						;;
 	(H)		event_av1hw					&& echo "|*****||EXPERIMENTAL AV1 VA-API codec selected, updating encoder variables||****|"						;;
@@ -351,18 +352,18 @@ event_x264sw() {
 event_libx265sw() {
 	# Muxing issue with software codec - POC errors on decoders, probably not a great option.
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=28:gop=6:bitrate=10M"
+	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=18:threads=0:gop=30:bitrate=25M"
 	write_etcd_global
-	echo -e "x265 SVT Software mode activated, CRF=28, Bitrate 10M, decoder task restart bit set. \n"
+	echo -e "x265 SVT Software mode activated, CRF=20, Bitrate 25M, decoder task restart bit set. \n"
 	wavelet-decoder-reset
 }	
 
 event_libx265sw_low() {
 	# Muxing issue with software codec - POC errors on decoders, probably not a great option.
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=34:gop=6:bitrate=7M"
+	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=24:threads=0:gop=30:bitrate=10M"
 	write_etcd_global
-	echo -e "x265 SVT Software mode activated, CRF=34, Bitrate 15M, decoder task restart bit set. \n"
+	echo -e "x265 SVT Software mode activated, CRF=26, Bitrate 10M, decoder task restart bit set. \n"
 	wavelet-decoder-reset
 }	
 
