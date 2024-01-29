@@ -141,7 +141,7 @@ event_encoder(){
 	# CESNET/UG team aware, working on a fix.
 	UGMTU="768!"
 	echo -e "Assembled command is: \n --tool uv $filtervar -f V:rs:200:240 ${inputvar} -c ${encodervar} -P ${uv_videoport} -m ${UGMTU} ${destinationipv4} \n"
-	ugargs="--tool uv $filtervar -f V:rs:200:240 -l unlimited ${inputvar} -c ${encodervar} -P ${video_port} -m ${UHMTU} ${destinationipv4}"
+	ugargs="--tool uv $filtervar -f V:rs:200:240 -l unlimited ${inputvar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}"
 	KEYNAME=UG_ARGS
 	KEYVALUE=${ugargs}
 	write_etcd
