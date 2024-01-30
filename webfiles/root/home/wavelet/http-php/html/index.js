@@ -51,6 +51,44 @@ function secondAjax(){
 
 }
 
+function fetchHostLabelAndUpdateUI(getLabelHostName){
+// This function gets hostname | label from etcd and is repsonsible for telling the server which text labels to produce for each host.
+		$.ajax({
+								type: "POST",
+								url: "get_host_label.php",
+								dataType: "json",
+								success: function(returned_data) {
+												counter = 500;
+												console.log("JSON Hosts data received:");
+												console.log(returned_data);
+												returned_data.forEach(item, index => {
+																				var key  = item['key'];
+										})
+								}
+				});
+
+}
+
+function fetchHostBlankStatusAndUpdateUI(getLabelHostName){
+// This function gets hostname | label from etcd and is repsonsible for telling the server which text labels to produce for each host.
+		$.ajax({
+								type: "POST",
+								url: "get_blank_host_status.php",
+								dataType: "json",
+								success: function(returned_data) {
+												counter = 500;
+												console.log("JSON Hosts data received:");
+												console.log(returned_data);
+												returned_data.forEach(item, index => {
+																				var key  = item['key'];
+																				})
+								}
+				});
+
+}
+
+
+
 function handlePageLoad() {
 	var livestreamValue	=	getLivestreamStatus(livestreamValue);
 	var bannerValue		=	getBannerStatus(bannerValue);
@@ -207,6 +245,7 @@ function createNewButton(key, value, keyFull) {
 						url: "/remove_input.php",
 						data: {
 								key: key,
+								value: value
 								},
 						success: function(response){
 						console.log(response);
@@ -232,10 +271,12 @@ function createNewHost(key, value) {
 		var restartButton		=		document.createElement("Button");
 		var rebootButton		=		document.createElement("Button");
 		var identifyButton		=		document.createElement("Button");
+		var checkbox			=		document.createElement("checkbox");
 		var labelEntry			=		document.createElement("Div");
 		var labelDiv			=		document.createElement("Div");
+		var getLabelHostName		=		"0";
 		const divHostName		=		document.createTextNode(key);
-		const id				=		document.createTextNode(counter + 1);
+		const id			=		document.createTextNode(counter + 1);
 		/* create a div container, where the button, relabel button and any other associated elements reside */
 		dynamicHosts.appendChild(divEntry);
 		divEntry.setAttribute("divDeviceHostName", key);
@@ -347,26 +388,68 @@ function createNewHost(key, value) {
 
 				})
 				return $btn;
-			}
-				// add button elements  
-				/* a subdiv with a text label */
-			function createLabelDiv(value){
+		}
+		/* a subdiv with a text label */
+		function createLabelDiv(value){
 				var labelEntry                  =               document.createElement("Div");
 				var labelText                   =               document.createTextNode(value);
-				labelEntry.classList.add("dynamicInputButtonDiv");
+				labelEntry.classList.add("dynamicInputButtonLabelDiv");
 				labelEntry.innerHTML = ("Device: " + value);
 				labelEntry.id = value;
 				labelEntry.style.display = "inline-block";
 				labelEntry.style.marginRight = "20px";
 				divEntry.appendChild(labelEntry);
-			}
-				// add button elements
+				// This event listener monitors for DOM Nodes inserted
+				// UNDER $dynamicHosts, and checks for .dynamicCheckBox
+				// Effectively it sets the initial status of the blank function
+				// on element creation
+		}
+		// add device blank toggle
+				function createBlankToggle(divHostName) {
+					console.log("Creating blank screen toggle for: " + divHostName);
+					var checkbox = $('<input/>', {
+						type: 'checkbox',
+						text: 'Blank Host',
+						class: 'dynamicHostBlankStatusCheckbox',
+						id: `blank-checkbox${divHostName}`,
+						});
+					checkbox.change(function() {
+						if ($(this).is(':checked')) {
+							$.ajax({
+								type: "POST",
+								url: "/set_blank_host.php",
+								data: {
+								key: divHostName,
+								onoff: "1"
+								},
+								success: function(response){
+								console.log(response);
+								}
+							});
+						} else {
+							$.ajax({
+								type: "POST",
+								url: "/set_blank_host.php",
+								data: {
+								key: divHostName,
+								onoff: "0"
+								},
+								success: function(response){
+								console.log(response);
+								}
+							});
+						}
+					});
+					return checkbox;
+		}
+		// add button elements
 			$(divEntry).append(createLabelDiv(value));
 			$(divEntry).append(createRenameButton());
 			$(divEntry).append(createDeleteButton());
 			$(divEntry).append(createRestartButton());
 			$(divEntry).append(createRebootButton());
 			$(divEntry).append(createIdentifyButton());
+			$(divEntry).append(createBlankToggle(key));
 }
 
 function sendPHPID(event) {
@@ -401,18 +484,18 @@ function relabelInputElement() {
 		console.log("The originally generated device field from Wavelet was: " + oldGenText);
 		console.log("The button must be activated for any changes to reflect on the video banner!");
 		$.ajax({
-				type: "POST",
-				url: "/set_input_label.php",
-				data: {
-						value: selectedDivHash,
-						label: newTextInput,
-						oldvl: oldGenText
-					  },
-				success: function(response){
-					console.log(response);
-					location.reload(true);
-				}
-				});
+			type: "POST",
+			url: "/set_input_label.php",
+			data: {
+					value: selectedDivHash,
+					label: newTextInput,
+					oldvl: oldGenText
+				  },
+			success: function(response){
+				console.log(response);
+				location.reload(true);
+			}
+		});
 	} else {
 		return;
 	}

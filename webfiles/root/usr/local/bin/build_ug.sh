@@ -113,6 +113,7 @@ event_decoder(){
 	event_reveal
 	event_reboot
 	event_reset
+	event_blankhost
 	event_generateHash
 	systemctl --user enable run_ug.service --now
 	etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/wavelet_build_completed" -- "${KEYVALUE}"
@@ -322,6 +323,21 @@ event_reveal(){
 	systemctl --user enable wavelet_monitor_decoder_reveal.service --now
 }
 
+event_blankhost(){
+	# Tells specific host to display a black testcard on the screen, use this for privacy modes as necessary.
+	echo -e "[Unit]
+	Description=Wavelet Task Blank Service
+	After=network-online.target etcd-member.service
+	Wants=network-online.target
+	[Service]
+	Type=simple
+	ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch $(hostname)/DECODER_BLANK -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_blank.sh\"
+	[Install]
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_monitor_decoder_reveal.service
+	systemctl --user daemon-reload
+	systemctl --user enable wavelet_monitor_decoder_reveal.service --now
+}
+
 event_encoder_reboot(){
 	# Encoders have their own reboot flag should watch the system reboot flag for a hard reset
 	echo -e "Generating Encoder Reboot SystemdD unit in /.config/systemd/user.."
@@ -362,10 +378,10 @@ event_generateHash(){
 	# Can be modified from webUI, populates with hostname by default
 	# We will generate a hash from the root UUID and hostname, which we will use to track the label state
 	# This works much the same way as the label function on the detected input devices.
-	# Might need to do something more intelligent here to determine correct dev to pull UUID from..
+	# Might need to do something more intelligent here..rn it's just sha256ing hostname+all partitions..
 	get_os_partition_uuid() {
-	local os_rootfs="/boot" # Replace with your actual OS root filesystem path
-	local uuid=$(lsblk -f | awk '/^'${os_rootfs}'/ && $2 ~ /^[0-9]+$/ && NF == 5 { print $1 }')
+	os_rootfs="/boot" # Replace with your actual OS root filesystem path
+	uuid=$(lsblk -f)
 	echo "${uuid}"
 	}
 	PARTUUID=$(get_os_partition_UUID)
@@ -401,6 +417,7 @@ event_device_redetect(){
 }
 
 # Execution order
+
 set -x
 exec >/home/wavelet/build_ug.log 2>&1
 detect_self

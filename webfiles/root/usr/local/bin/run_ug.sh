@@ -107,7 +107,7 @@ event_encoder(){
 
 event_decoder(){
 # Sleep for 5 seconds so we have a chance for the decoder to connect to the network
-sleep 5
+sleep 2
 # Registers self as a decoder in etcd for the reflector to query & include in its client args
 IPVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
 
@@ -128,8 +128,8 @@ if [[ "${IPVALUE}" == "" ]] then
 				echo "\nIP Address is not valid, sleeping and calling function again\n"
 				event_decoder
 			fi
-		valid_ipv4 "${IPVALUE}"
 		}
+		valid_ipv4 "${IPVALUE}"
 fi
 
 write_etcd_clientip
@@ -147,7 +147,7 @@ KEYNAME=$(hostname)/DECODER_REBOOT
 write_etcd_global
 # The below will be used to generate error messages on screen, once I've written those components
 # For now useful to track hostlabel generation properly and keep the UI synced.
-KEYNAME="decoderlabel/$(hostname)"
+KEYNAME="$(hostname)/decoderlabel"
 read_etcd_global
 echo -e "My device label is ${printvalue}\n"
 deviceLabel=${printvalue}
@@ -224,9 +224,20 @@ systemctl --user enable wavelet_monitor_decoder_reboot.service --now
 # Perhaps add an etcd watch or some kind of server "isalive" function here
 # Decoder should display:
 # - No incoming video
+#	if POC REF = 0 bytes received for > 1m; then
+#	wavelet_errorgen.sh build imagemagick / "Host isn't receiving video data from server, check the reflector process on the server."
 # - Consistent POC errors, codec issue
-# - consistent packet loss, network issue
+#		if POC errors or FEC errors > 1m; then
+#		test ping
+#		if ping fine
+		#	wavelet_errorgen.sh build imagemagick / "Host is experiencing high levels of corrupted frames.  Check network integrity, MTU Value and encoder settings."
+# 		if ping bad
+		# - consistent packet loss, network issue
+		# wavelet_errorgen.sh build imagemagick / "Host is experiencing	network connectivity issues, please check network settings.
+#		if ping DEAD
+		# wavelet_errorgen.sh build imagemagick / "Host has no network connectivity
 # - other possible failure modes
+#	???
 }
 
 
