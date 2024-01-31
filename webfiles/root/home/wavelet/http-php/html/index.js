@@ -70,7 +70,7 @@ function fetchHostLabelAndUpdateUI(getLabelHostName){
 }
 
 function fetchHostBlankStatusAndUpdateUI(getLabelHostName){
-// This function gets hostname | label from etcd and is repsonsible for telling the server which text labels to produce for each host.
+// This function gets blank status | label from etcd and is repsonsible for telling the server when to enable or disable the blanking toggles.
 		$.ajax({
 								type: "POST",
 								url: "get_blank_host_status.php",
@@ -194,6 +194,27 @@ function getBannerStatus(bannerValue) {
 	})
 }
 
+function getBlankStatus(hostValue) {
+	// this function gets the banner status from etcd and sets the banner toggle button on/off upon page load
+	$.ajax({
+		type: "POST",
+		url: "get_blank_host_status.php",
+		dataType: "json",
+		success: function(returned_data) {
+		const bannerValue = JSON.parse(returned_data);
+			if (bannerValue == "1" ) {
+				console.log ("Blank value is 1, enabling toggle automatically.");
+				retValue = "1"; // set HTML checkbox to checked
+				} else {
+				console.log ("Blank value is NOT 1, disabling checkbox toggle.");
+				retValue = "0"; // set HTML checkbox to unchecked
+				}
+		}
+	});
+	return retValue;
+}
+
+
 function createNewButton(key, value, keyFull) {
 	var divEntry		=	document.createElement("Div");
 	var dynamicButton 	= 	document.createElement("Button");
@@ -295,29 +316,31 @@ function createNewHost(key, value) {
 		return $btn;
 		}
 				/* add delete button */
+		//      Create a remove button
 		function createDeleteButton() {
 				var $btn = $('<button/>', {
 								type: 'button',
 								text: 'Remove',
 								class: 'renameButton clickableButton',
-								id: 'btn_delete',
-									value: value
+								id: 'btn_HostDelete'
 				}).click(function(){
-						console.log("Host deleted: " + key + "," + value);
-						$.ajax({
-								type: "POST",
-								url: "/remove_host.php",
-								data: {
-										key: key,
-										value: value
-									},
-								success: function(response){
-								console.log(response);
-											}
-						});
+					console.log("Deleting host entry and associated keys: " + key + "and hash value: " + value);
+					$.ajax({
+						type: "POST",
+						url: "/remove_host.php",
+						data: {
+							key: key,
+							value: value
+							},
+						success: function(response){
+						console.log(response);
+						//location.reload(true);
+						//$(this).parent().remove();
+						}
+					});
 				})
-				return $btn;
-		}				
+			return $btn;
+		}
 		/* add decoder Identify button */
 		function createIdentifyButton() {
 				var $btn = $('<button/>', {
@@ -405,15 +428,23 @@ function createNewHost(key, value) {
 				// on element creation
 		}
 		// add device blank toggle
-				function createBlankToggle(divHostName) {
-					console.log("Creating blank screen toggle for: " + divHostName);
-					var checkbox = $('<input/>', {
-						type: 'checkbox',
-						text: 'Blank Host',
-						class: 'dynamicHostBlankStatusCheckbox',
-						id: `blank-checkbox${divHostName}`,
+		function createBlankToggle(divHostName) {
+				console.log("Creating blank screen toggle for: " + divHostName);
+				var checkbox = $('<input/>', {
+					type: 'checkbox',
+					text: 'Blank Host',
+					class: 'dynamicHostBlankStatusCheckbox',
+					id: `blank-checkbox${divHostName}`,
+					});
+				var blankStatusReturn = getBlankStatus(divHostName);
+					if (blankStatusReturn == "1" ) {
+							$(this).prop('checked', true);
+					} else {
+							$(this).prop('checked', false);						
+					}
+				checkbox.change(function() {
+						console.log(response);
 						});
-					checkbox.change(function() {
 						if ($(this).is(':checked')) {
 							$.ajax({
 								type: "POST",
@@ -439,7 +470,6 @@ function createNewHost(key, value) {
 								}
 							});
 						}
-					});
 					return checkbox;
 		}
 		// add button elements

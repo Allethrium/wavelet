@@ -139,7 +139,7 @@ event_encoder(){
 	# For now, we must use a very small MTU, this is because a packet loss can result-
 	# in the loss of the entire GOP, leading to the display artefacting we've been seeing.
 	# CESNET/UG team aware, working on a fix.
-	UGMTU="768!"
+	UGMTU="512!"
 	echo -e "Assembled command is: \n --tool uv $filtervar -f V:rs:200:240 ${inputvar} -c ${encodervar} -P ${uv_videoport} -m ${UGMTU} ${destinationipv4} \n"
 	ugargs="--tool uv $filtervar -f V:rs:200:240 -l unlimited ${inputvar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}"
 	KEYNAME=UG_ARGS

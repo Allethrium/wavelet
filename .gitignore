@@ -40,3 +40,13 @@ fedora-coreos-38.20230722.3.0-live.x86_64.iso.sig
 1q
 webfiles/root/usr/local/bin/detectv4l.sh
 webfiles/root/usr/local/bin/old_detectv4l.sh
+fedora-coreos-39.20231119.3.0-live.x86_64.iso
+HOSTNAME=fsvr1.birdopolis.andymelville.net
+server_custom.yml
+webfiles/root/usr/local/bin/etcd-member.service_old.sh
+webfiles/root/usr/local/bin/wavelet_controller_1.sh
+Windows.zip
+Windows/Windows_Shartscreen.ps1
+Windows/Wi-Fi-Wavelet-1.xml
+webfiles/root/usr/local/bin/wavelet_controller_1.sh
+webfiles/root/usr/local/bin/etcd-member.service_old.sh
