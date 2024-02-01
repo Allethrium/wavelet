@@ -196,22 +196,24 @@ function getBannerStatus(bannerValue) {
 
 function getBlankStatus(hostValue) {
 	// this function gets the banner status from etcd and sets the banner toggle button on/off upon page load
+	console.log('Attempting to retrieve host blank status for: ' + hostValue)
 	$.ajax({
 		type: "POST",
 		url: "get_blank_host_status.php",
 		dataType: "json",
+		data: {
+			key: hostValue
+		},
 		success: function(returned_data) {
-		const bannerValue = JSON.parse(returned_data);
-			if (bannerValue == "1" ) {
+		var retValue = JSON.parse(returned_data);
+			if (retValue == "1" ) {
 				console.log ("Blank value is 1, enabling toggle automatically.");
-				retValue = "1"; // set HTML checkbox to checked
 				} else {
 				console.log ("Blank value is NOT 1, disabling checkbox toggle.");
 				retValue = "0"; // set HTML checkbox to unchecked
 				}
 		}
 	});
-	return retValue;
 }
 
 
@@ -295,9 +297,9 @@ function createNewHost(key, value) {
 		var checkbox			=		document.createElement("checkbox");
 		var labelEntry			=		document.createElement("Div");
 		var labelDiv			=		document.createElement("Div");
-		var getLabelHostName		=		"0";
+		var getLabelHostName	=		"0";
 		const divHostName		=		document.createTextNode(key);
-		const id			=		document.createTextNode(counter + 1);
+		const id				=		document.createTextNode(counter + 1);
 		/* create a div container, where the button, relabel button and any other associated elements reside */
 		dynamicHosts.appendChild(divEntry);
 		divEntry.setAttribute("divDeviceHostName", key);
@@ -436,7 +438,8 @@ function createNewHost(key, value) {
 					class: 'dynamicHostBlankStatusCheckbox',
 					id: `blank-checkbox${divHostName}`,
 					});
-				var blankStatusReturn = getBlankStatus(divHostName);
+				var hostValue	=	divHostName;
+				var blankStatusReturn = getBlankStatus(hostValue);
 					if (blankStatusReturn == "1" ) {
 							$(this).prop('checked', true);
 					} else {
@@ -445,7 +448,7 @@ function createNewHost(key, value) {
 				checkbox.change(function() {
 						console.log(response);
 						});
-						if ($(this).is(':checked')) {
+						if ($(this.checked)) {
 							$.ajax({
 								type: "POST",
 								url: "/set_blank_host.php",

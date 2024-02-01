@@ -50,5 +50,5 @@ function curl_etcd_hostname($keyTarget, $keyValue) {
 // please note how we have to call the function twice to set the reverse lookup values as well as the fwd values!
 echo "posted data are: \n New Label: $value\n Key: $key \n";
 curl_etcd("$key", "$value");
-curl_etcd_hostname("key", "value");
+curl_etcd_hostname("$key", "$value");
 ?>

@@ -161,7 +161,7 @@ if [[ "${deviceLabel}" == "${deviceHostHashlabel}" ]] then
 	else
 		echo -e "\nDevice label and reverse lookup label DO NOT MATCH,
 		 reverting UI label in keystore and locally..\n"
-		KEYNAME="decoderlabel/$(hostname)"
+		KEYNAME="$(hostname)/decoderlabel"
 		KEYVALUE="${deviceHostHashLabel}"
 		write_etcd_global
 		echo "${deviceHostHashLabel}" > /home/wavelet/hostLabel.txt
