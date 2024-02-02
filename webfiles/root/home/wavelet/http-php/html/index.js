@@ -430,51 +430,47 @@ function createNewHost(key, value) {
 				// on element creation
 		}
 		// add device blank toggle
-		function createBlankToggle(divHostName) {
-				console.log("Creating blank screen toggle for: " + divHostName);
-				var checkbox = $('<input/>', {
-					type: 'checkbox',
-					text: 'Blank Host',
-					class: 'dynamicHostBlankStatusCheckbox',
-					id: `blank-checkbox${divHostName}`,
-					});
-				var hostValue	=	divHostName;
-				var blankStatusReturn = getBlankStatus(hostValue);
-					if (blankStatusReturn == "1" ) {
-							$(this).prop('checked', true);
-					} else {
-							$(this).prop('checked', false);						
-					}
-				checkbox.change(function() {
-						console.log(response);
-						});
-						if ($(this.checked)) {
-							$.ajax({
-								type: "POST",
-								url: "/set_blank_host.php",
-								data: {
-								key: divHostName,
-								onoff: "1"
-								},
-								success: function(response){
-								console.log(response);
-								}
-							});
-						} else {
-							$.ajax({
-								type: "POST",
-								url: "/set_blank_host.php",
-								data: {
-								key: divHostName,
-								onoff: "0"
-								},
-								success: function(response){
-								console.log(response);
-								}
-							});
-						}
-					return checkbox;
-		}
+                /* add a blank button */
+                function createBlankButton() {
+                                var $btn = $('<button/>', {
+                                                                type: 'button',
+                                                                text: 'Blank Screen',
+                                                                class: 'renameButton clickableButton',
+                                                                id: 'btn_blank'
+                                }).click(function(){
+                                        if ($(this).text() == "Blank Screen") {
+                                                console.log("Host instructed to blank screen:" + key);
+                                                $.ajax({
+                                                                type: "POST",
+                                                                url: "/set_blank_host.php",
+                                                                data: {
+                                                                      key: key,
+                                                                      value: 1
+                                                                      },
+                                                                success: function(response){
+                                                                console.log(response);
+                                                                                }
+                                                });
+                                $(this).text('Restore Screen')
+                                } else {
+                                                console.log("Host instructed to restore display:" + key);
+                                                $.ajax({
+                                                                type: "POST",
+                                                                url: "/set_blank_host.php",
+                                                                data: {
+                                                                                key: key,
+                                                                                value: 0
+                                                                                },
+                                                                success: function(response){
+                                                                console.log(response);
+                                                                                }
+                                                });
+                                $(this).text('Blank Screen')
+                                }
+                                });
+                return $btn;
+                }
+
 		// add button elements
 			$(divEntry).append(createLabelDiv(value));
 			$(divEntry).append(createRenameButton());
@@ -482,7 +478,7 @@ function createNewHost(key, value) {
 			$(divEntry).append(createRestartButton());
 			$(divEntry).append(createRebootButton());
 			$(divEntry).append(createIdentifyButton());
-			$(divEntry).append(createBlankToggle(key));
+			$(divEntry).append(createBlankButton);
 }
 
 function sendPHPID(event) {
