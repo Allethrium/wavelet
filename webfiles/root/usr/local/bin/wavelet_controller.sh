@@ -350,27 +350,28 @@ event_x264sw() {
 }
 
 event_libx265sw() {
-	# Muxing issue with software codec - POC errors on decoders, probably not a great option.
+	# disable intra-refresh, enabled threads=o and tweaking MTU seems to help!
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=18:threads=0:gop=30:bitrate=25M"
+	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:tune=zerolatency:threads=0:crf=20:disable_intra_refresh:gop=30"
 	write_etcd_global
-	echo -e "x265 SVT Software mode activated, CRF=20, Bitrate 25M, decoder task restart bit set. \n"
+	echo -e "libx265 Software mode activated, CRF=20, Bitrate 25M, decoder task restart bit set. \n"
 	wavelet-decoder-reset
-}	
+}
 
 event_libx265sw_low() {
-	# Muxing issue with software codec - POC errors on decoders, probably not a great option.
+	# disable intra-refresh, enabled threads=o and tweaking MTU seems to help!
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=24:threads=0:gop=30:bitrate=10M"
+	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=26:threads=0:disable_intra_refresh:gop=30"
 	write_etcd_global
-	echo -e "x265 SVT Software mode activated, CRF=26, Bitrate 10M, decoder task restart bit set. \n"
+	echo -e "x265 SVT Software mode activated, CRF=26, decoder task restart bit set. \n"
 	wavelet-decoder-reset
-}	
+}
 
 event_libsvt_hevc_sw() {
 	# NB zerolatency disables frame parallelism, can't use multicore!
 	# Feedback from deployment:
 	# The decoders HATE libx265 (massive dropped frames), we need to use libsvt_hevc instead.
+	# consider this the default COMPAT mode until we have a handle on things
 	KEYNAME=uv_encoder
 	#KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:tune=zerolatency:qp=26:gop=6:bitrate=25"
 	KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=10:pred_struct=0:crf=28:gop=6:bitrate=10M"

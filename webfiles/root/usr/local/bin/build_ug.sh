@@ -108,7 +108,6 @@ event_decoder(){
 	# need to do this twice - WiFi network *should* have already been provisioned by decoderhostname.sh
 	nmcli dev wifi connect Wavelet-1
 	echo -e "Setting up systemd services to be a decoder, moving to run_ug"
-	event_decoder_restart
 	event_decoder_reset
 	event_reveal
 	event_reboot
@@ -333,9 +332,9 @@ event_blankhost(){
 	Type=simple
 	ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch $(hostname)/DECODER_BLANK -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_blank.sh\"
 	[Install]
-	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_monitor_decoder_reveal.service
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_monitor_decoder_blank.service
 	systemctl --user daemon-reload
-	systemctl --user enable wavelet_monitor_decoder_reveal.service --now
+	systemctl --user enable wavelet_monitor_decoder_blank.service --now
 }
 
 event_encoder_reboot(){
@@ -374,29 +373,40 @@ event_decoder_reset(){
 	systemctl --user enable wavelet-decoder-reset.service --now
 }
 
-event_generateHash(){
-	# Can be modified from webUI, populates with hostname by default
-	# We will generate a hash from the root UUID and hostname, which we will use to track the label state
-	# This works much the same way as the label function on the detected input devices.
-	# Might need to do something more intelligent here..rn it's just sha256ing hostname+all partitions..
-	get_os_partition_uuid() {
-	os_rootfs="/boot" # Replace with your actual OS root filesystem path
-	uuid=$(lsblk -f)
-	echo "${uuid}"
-	}
-	PARTUUID=$(get_os_partition_UUID)
-	echo -e "Partition UUID is: $PARTUUID"
-	echo -e "device hostname is: $(hostname)"
-	hostHash=$(echo "$PARTUUID, $(hostname)" | sha256sum)
-	echo -e "generated device hash: $hostHash \n"
-	# Populate what will initially be used as the label variable from the webUI
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put decoderlabel/$(hostname) -- $(hostname)
-	# And the reverse lookup for the device
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostHash/$(hostname)/Hash -- $(hostHash)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put $(hostname)/Hash/$(hostHash)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostHash/$(hostname)/label -- $(hostname)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostHash/$(hostname)/ipaddr -- ${KEYVALUE}
+get_os_partition_uuid() {
+		os_rootfs="/boot" # Replace with your actual OS root filesystem path
+		uuid=$(lsblk -f)
 }
+
+event_generateHash(){
+		# Can be modified from webUI, populates with hostname by default
+		# We will generate a hash from the root UUID and hostname, which we will use to track the label state
+		# This works much the same way as the label function on the detected input devices.
+		# Might need to do something more intelligent here..rn it's just sha256ing hostname+all partitions..
+		PARTUUID=$(get_os_partition_uuid)
+		echo -e "device hostname is: $(hostname)"
+		hostHash=$(echo "$PARTUUID, $(hostname)" | sha256sum)
+		echo -e "generated device hash: $hostHash \n"
+
+		# Check for pre-existing keys here
+		labelexists=$(ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} get hostHash/$(hostname)/label --print-value-only)
+		if [[ -z "${labelexists}" || ${#labelexists} -le 1 ]] then
+				echo -e "\nLabel value is null, or less than one char, continuing\n"
+				echo -e "\n Label value was set to ${labelexists} \n"
+				# Populate what will initially be used as the label variable from the webUI
+				ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put decoderlabel/$(hostname) -- $(hostname)
+				# And the reverse lookup for the device
+				ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostHash/$(hostname)/Hash -- $(hostHash)
+				ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put $(hostname)/Hash/$(hostHash)
+				ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostHash/$(hostname)/label -- $(hostname)
+				ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostHash/$(hostname)/ipaddr -- ${KEYVALUE}
+		else
+				echo -e "\nLabel value exists as ${labelexists}\nXcoder already populated, doing nothing and moving to run_ug.."
+				:
+		fi
+}
+
+
 
 event_device_redetect(){
 	# Watches for a device redetection flag, then runs detectv4l.sh

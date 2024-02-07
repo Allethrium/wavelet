@@ -30,13 +30,24 @@ read_etcd_global(){
 		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for Global value"
 }
 
+read_etcd_oldkeyname(){
+		ETCDCTL_API=3 oldprintvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${OLDKEYNAME} --print-value-only)
+		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for Global value"
+}
+
+write_etcd_oldkeyname(){
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put ${OLDKEYNAME} -- ${VALUE}
+		echo -e "Key Name {$OLDKEYNAME} set to value ${VALUE} for state tracking.."
+}
+
+
 
 event_decoder_blank(){
 # Kill the systemd monitor task for a few moments
-systemctl --user stop wavelet-decoder-reveal.service
+systemctl --user stop wavelet_decoder_blank.service
 echo -e "\nDecoder Blank flag change detected, switching to blank input...\n\n\n"
 systemctl --user stop UltraGrid.AppImage.service
-mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old
+mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.blank
 # set ug_args to generate and display smpte testcard
 ug_args="--tool uv -t testcard:pattern=blank -d vulkan_sdl2:fs:keep-aspect:nocursor:nodecorate"
 echo -e "
@@ -58,10 +69,10 @@ exit 0
 
 event_decoder_unblank(){
 # Kill the systemd monitor task for a few moments
-systemctl --user stop wavelet-decoder-reveal.service
+systemctl --user stop wavelet-decoder-blank.service
 echo -e "\nDecoder Blank flag change detected, restoring previous input...\n\n\n"
 systemctl --user stop UltraGrid.AppImage.service
-mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
+mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.blank /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 systemctl --user daemon-reload
 systemctl --user start UltraGrid.AppImage.service
 echo -e "\nTask Complete.\n"
@@ -75,15 +86,28 @@ exit 0
 ###
 
 set -x
-exec >/home/wavelet/wavelet_reveal_decoder.log 2>&1
+exec >/home/wavelet/wavelet_blank_decoder.log 2>&1
 
-KEYNAME=$(hostname)/DECODER_REVEAL
-		read_etcd_global
+KEYNAME=$(hostname)/DECODER_BLANK
+read_etcd_global
+OLDKEYNAME=$(hostname)/DECODER_BLANK_PREV
+read_etcd_oldkeyname
+	if [[ ${printvalue} == ${oldprintvalue} ]]; then
+		echo -e "\n Blank setting and previous blank setting match, the webpage has been refreshed, doing nothing..\n"
+		:
+	else
 		if [[ "${printvalue}" == 1 ]]; then
 				echo -e "\ninput_update key is set to 1, setting blank display for this host.. \n"
+				VALUE="1"
+				write_etcd_oldkeyname
 				event_decoder_blank
+				# add ifexists to do nothing if service.old.blank exists, because we don't want the decoders blanking on EVERY web refresh!
+				# orr.. just work out something better here because this won't work well.
+				# use a switcher, have the decoders all running a blank in the background?
 		else
 				echo -e "\ninput_update key is set to 0, reverting to previous display.. \n"
+				VALUE="0"
+				write_etcd_oldkeyname
 				event_decoder_unblank
-				exit 0
 		fi
+	fi

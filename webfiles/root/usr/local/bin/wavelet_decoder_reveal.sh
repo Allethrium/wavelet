@@ -37,7 +37,7 @@ systemctl --user stop wavelet-decoder-reveal.service
 echo -e "\nDecoder Reveal flag change detected, resetting flag and displaying reveal card for 15 seconds..\n\n\n"
 etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/DECODER_REVEAL" -- "0"
 systemctl --user stop UltraGrid.AppImage.service
-mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old
+mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.reveal
 # set ug_args to generate and display smpte testcard
 ug_args="--tool uv -t testcard:pattern=smpte_bars -d vulkan_sdl2:fs --param use-hw-accel"
 echo -e "
@@ -53,9 +53,9 @@ Restart=always
 WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 systemctl --user daemon-reload
 systemctl --user start UltraGrid.AppImage.service
-sleep 15
+sleep 10
 systemctl --user stop UltraGrid.AppImage.service
-mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
+mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.reveal /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 systemctl --user daemon-reload
 systemctl --user start UltraGrid.AppImage.service
 echo -e "\nTask Complete.\n"

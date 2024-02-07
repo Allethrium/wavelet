@@ -54,7 +54,7 @@ write_etcd_global(){
 write_etcd_clientip(){
 		# Variable changed to IPVALUE because the module was picking up incorrect variables and applying them to /decoderip !
 		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${IPVALUE}"
-		echo -e "$(hostname) set to ${KEYVALUE} for Global value"
+		echo -e "decoderip/$(hostname) set to ${IPVALUE} for Global value"
 }
 read_etcd_clients_ip() {
 		ETCDCTL_API=3 return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
@@ -110,7 +110,6 @@ event_decoder(){
 sleep 2
 # Registers self as a decoder in etcd for the reflector to query & include in its client args
 IPVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
-
 # IP value MUST be populated or the decoder writes gibberish into the server
 if [[ "${IPVALUE}" == "" ]] then
 		# sleep for five seconds, then call yourself again
@@ -131,9 +130,10 @@ if [[ "${IPVALUE}" == "" ]] then
 		}
 		valid_ipv4 "${IPVALUE}"
 fi
-
+sleep 1
 write_etcd_clientip
-ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "hostHash/$(hostname)/ipaddr" -- "${KEYVALUE}"
+
+ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/$(hostname)/ipaddr" -- "${IPVALUE}"
 
 # Ensure all reset, reveal and reboot flags are set to 0 so they are
 # 1) populated
@@ -145,13 +145,16 @@ KEYNAME=$(hostname)/DECODER_REVEAL
 write_etcd_global
 KEYNAME=$(hostname)/DECODER_REBOOT
 write_etcd_global
+KEYNAME=$(hostname)/DECODER_BLANK
+write_etcd_global
+sleep 2
 # The below will be used to generate error messages on screen, once I've written those components
 # For now useful to track hostlabel generation properly and keep the UI synced.
 KEYNAME="$(hostname)/decoderlabel"
 read_etcd_global
 echo -e "My device label is ${printvalue}\n"
 deviceLabel=${printvalue}
-KEYNAME="hostHash/$(hostname)/label"
+KEYNAME="/hostHash/$(hostname)/label"
 read_etcd_global
 deviceHostHashlabel=${printvalue}
 echo -e "The reverse lookup label is ${printvalue}\n"
@@ -171,7 +174,7 @@ fi
 systemctl --user enable wavelet_monitor_decoder_reset.service --now
 systemctl --user enable wavelet_monitor_decoder_reveal.service --now
 systemctl --user enable wavelet_monitor_decoder_reboot.service --now
-
+sleep 1
 
 # Note - ExecStartPre=-swaymsg workspace 2 is a failable command 
 # It will always send the UG output to a second display.  
@@ -197,6 +200,7 @@ systemctl --user enable wavelet_monitor_decoder_reboot.service --now
 	systemctl --user daemon-reload
 	systemctl --user start UltraGrid.AppImage.service
 	echo -e "Decoder systemd units instructed to start..\n"
+	sleep 3
 	return=$(systemctl --user is-active --quiet UltraGrid.AppImage.service)
 	if [[ ${return} -eq !0 ]]; then
 		echo "Decoder failed to start, there may be something wrong with the system.

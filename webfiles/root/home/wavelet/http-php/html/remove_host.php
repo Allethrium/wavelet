@@ -22,23 +22,24 @@ function delete_host_labels($key) {
 	echo "$key removed from decoderlabel.";
 }
 
-function delete_host_ip($key) {
-	$prefixstring = "decoderip/$key";
+function delete_hash_labels($key) {
+	$prefixstring = "hostHash/$key";
+	$prefixstringplusOne = "$prefixstring" . "0";
 	$keyPrefix=base64_encode($prefixstring);
+	$keyPrefixPlusOneBit=base64_encode($prefixstringplusOne);
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, 'http://192.168.1.32:2379/v3/kv/deleterange');
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 		curl_setopt($ch, CURLOPT_POST, 1);
-		curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\":\"$keyPrefix\"}");
+		curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\": \"$keyPrefix\", \"range_end\": \"$keyPrefixPlusOneBit\"}");
 	$headers = array();
 		$headers[] = 'Content-Type: application/x-www-form-urlencoded';
-		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+	error_log("Calling delete_input_labels() function for key prefix \"$prefixString\""); // Log the function call
 		$result = curl_exec($ch);
 		if (curl_errno($ch)) {
 			echo 'Error:' . curl_error($ch);
 	}
-		error_log();
-	echo "$key removed from decoder IP List.";
 }
 
 function delete_host_keys($key) {
@@ -62,7 +63,7 @@ function delete_host_keys($key) {
 
 echo "Key received $key";
 delete_host_labels($key);
-delete_host_ip($key);
+delete_hash_labels($value);
 delete_host_keys($key);
 
 

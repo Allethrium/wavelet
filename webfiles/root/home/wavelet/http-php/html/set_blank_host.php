@@ -1,7 +1,7 @@
 <?php
 // POST fields from JS AJAX will only ever single entries.  We extract them both here.
 $hostName	=	$_POST["key"];
-$hostBlankValue	=	$_POST["onoff"];
+$hostBlankValue	=	$_POST["value"];
 
 // create a new cURL resource
     // example of a valid cURL command:

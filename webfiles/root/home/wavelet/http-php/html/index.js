@@ -48,7 +48,6 @@ function secondAjax(){
 										})
 				}
 		});
-
 }
 
 function fetchHostLabelAndUpdateUI(getLabelHostName){
@@ -68,26 +67,6 @@ function fetchHostLabelAndUpdateUI(getLabelHostName){
 				});
 
 }
-
-function fetchHostBlankStatusAndUpdateUI(getLabelHostName){
-// This function gets blank status | label from etcd and is repsonsible for telling the server when to enable or disable the blanking toggles.
-		$.ajax({
-								type: "POST",
-								url: "get_blank_host_status.php",
-								dataType: "json",
-								success: function(returned_data) {
-												counter = 500;
-												console.log("JSON Hosts data received:");
-												console.log(returned_data);
-												returned_data.forEach(item, index => {
-																				var key  = item['key'];
-																				})
-								}
-				});
-
-}
-
-
 
 function handlePageLoad() {
 	var livestreamValue	=	getLivestreamStatus(livestreamValue);
@@ -194,9 +173,11 @@ function getBannerStatus(bannerValue) {
 	})
 }
 
-function getBlankStatus(hostValue) {
+function getHostBlankStatus(hostValue) {
 	// this function gets the banner status from etcd and sets the banner toggle button on/off upon page load
-	console.log('Attempting to retrieve host blank status for: ' + hostValue)
+	console.log('Attempting to retrieve host blank status for: ' + hostValue);
+	let retValue = null;
+
 	$.ajax({
 		type: "POST",
 		url: "get_blank_host_status.php",
@@ -206,14 +187,17 @@ function getBlankStatus(hostValue) {
 		},
 		success: function(returned_data) {
 		var retValue = JSON.parse(returned_data);
-			if (retValue == "1" ) {
-				console.log ("Blank value is 1, enabling toggle automatically.");
+			if (retValue == 1 ) {
+				console.log ("Blank value is:" + retValue)
 				} else {
-				console.log ("Blank value is NOT 1, disabling checkbox toggle.");
-				retValue = "0"; // set HTML checkbox to unchecked
+			console.log ("Blank value is:" + retValue);
 				}
+		},
+		error: function() {
+		reject(new Error('Error fetching blank status'));  // reject promise if an error occurs
 		}
 	});
+	return retValue;
 }
 
 
@@ -262,7 +246,7 @@ function createNewButton(key, value, keyFull) {
 							id: 'btn_delete'
 			}).click(function(){
 		$(this).parent().remove();
-			console.log("Deleting input entry and associated keys:" + key);
+			console.log("Deleting input entry and associated key:" + key + "and value: " + value);
 				$.ajax({
 						type: "POST",
 						url: "/remove_input.php",
@@ -297,9 +281,9 @@ function createNewHost(key, value) {
 		var checkbox			=		document.createElement("checkbox");
 		var labelEntry			=		document.createElement("Div");
 		var labelDiv			=		document.createElement("Div");
-		var getLabelHostName	=		"0";
+		var getLabelHostName		=		0;
 		const divHostName		=		document.createTextNode(key);
-		const id				=		document.createTextNode(counter + 1);
+		const id			=		document.createTextNode(counter + 1);
 		/* create a div container, where the button, relabel button and any other associated elements reside */
 		dynamicHosts.appendChild(divEntry);
 		divEntry.setAttribute("divDeviceHostName", key);
@@ -429,48 +413,69 @@ function createNewHost(key, value) {
 				// Effectively it sets the initial status of the blank function
 				// on element creation
 		}
-		// add device blank toggle
-                /* add a blank button */
-                function createBlankButton() {
-                                var $btn = $('<button/>', {
-                                                                type: 'button',
-                                                                text: 'Blank Screen',
-                                                                class: 'renameButton clickableButton',
-                                                                id: 'btn_blank'
-                                }).click(function(){
-                                        if ($(this).text() == "Blank Screen") {
-                                                console.log("Host instructed to blank screen:" + key);
-                                                $.ajax({
-                                                                type: "POST",
-                                                                url: "/set_blank_host.php",
-                                                                data: {
-                                                                      key: key,
-                                                                      value: 1
-                                                                      },
-                                                                success: function(response){
-                                                                console.log(response);
-                                                                                }
-                                                });
-                                $(this).text('Restore Screen')
-                                } else {
-                                                console.log("Host instructed to restore display:" + key);
-                                                $.ajax({
-                                                                type: "POST",
-                                                                url: "/set_blank_host.php",
-                                                                data: {
-                                                                                key: key,
-                                                                                value: 0
-                                                                                },
-                                                                success: function(response){
-                                                                console.log(response);
-                                                                                }
-                                                });
-                                $(this).text('Blank Screen')
-                                }
-                                });
-                return $btn;
-                }
+				/* add a blank button */
+				function createBlankButton(key) {
+				console.log('setting all hosts OFF blank mode');
+				// have to do this because JS seems to be a real mess with AJAX async calls and I couldn't get anything useful out of state detection..
+				// wrong tools for the wrong job? 
+					console.log("Host instructed to restore display:" + key);
+										$.ajax({
+												type: "POST",
+												url: "/set_blank_host.php",
+												data: {
+														key: key,
+														value: 0
+														},
+												success: function(response){
+												console.log(response);
+												}
+										});
 
+				console.log('hostname is: ' + key);
+
+				var buttonText = "Blank Screen";
+								var $btn = $('<button/>', {
+					type: 'button',
+										text: buttonText,
+										class: 'renameButton clickableButton',
+										id: 'btn_blank'
+								});
+			$btn.click(function(){
+				if ($(this).text() == "Blank Screen") {
+								console.log("Host instructed to blank screen:" + key);
+										$.ajax({
+											type: "POST",
+												url: "/set_blank_host.php",
+												data: {
+													key: key,
+														value: 1
+														},
+												success: function(response){
+												console.log(response);
+												}
+										});
+						$(this).text('Restore Screen')
+					} else {
+										console.log("Host instructed to restore display:" + key);
+										$.ajax({
+											type: "POST",
+												url: "/set_blank_host.php",
+												data: {
+													key: key,
+														value: 0
+														},
+												success: function(response){
+												console.log(response);
+						}
+										});
+						$(this).text('Blank Screen')
+									}
+				});
+			console.log("Requested text string is:" + buttonText);
+			$btn.text(`${buttonText}`);
+					return $btn;
+		}
+		
 		// add button elements
 			$(divEntry).append(createLabelDiv(value));
 			$(divEntry).append(createRenameButton());
@@ -478,7 +483,7 @@ function createNewHost(key, value) {
 			$(divEntry).append(createRestartButton());
 			$(divEntry).append(createRebootButton());
 			$(divEntry).append(createIdentifyButton());
-			$(divEntry).append(createBlankButton);
+			$(divEntry).append(createBlankButton(key));
 }
 
 function sendPHPID(event) {
