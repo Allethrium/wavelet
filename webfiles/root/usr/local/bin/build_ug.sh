@@ -104,19 +104,16 @@ event_decoder(){
 	nmcli dev wifi rescan
 	sleep 1
 	nmcli dev wifi rescan
-	sleep 1
-	nmcli dev wifi rescan
-	sleep 1
 	nmcli dev wifi connect Wavelet-1
-	sleep 1
 	# need to do this twice - WiFi network *should* have already been provisioned by decoderhostname.sh
 	nmcli dev wifi connect Wavelet-1
 	echo -e "Setting up systemd services to be a decoder, moving to run_ug"
-	event_decoder_restart
 	event_decoder_reset
 	event_reveal
 	event_reboot
 	event_reset
+	event_blankhost
+	event_generateHash
 	systemctl --user enable run_ug.service --now
 	etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/wavelet_build_completed" -- "${KEYVALUE}"
 	sleep 1
@@ -229,6 +226,16 @@ server_bootstrap(){
 	sed -i '/exec systemctl restart dnsmasq.service/s/^# *//' config $HOME/.config/sway/config
 	#
 	sed -i '/exec \/usr\/local\/bin\/local_rpm.sh/s/^# *//' config $HOME/.config/sway/config
+
+	# Next, we build the reflector prune function.  This is necessary for removing streams for old decoders and maintaining the long term health of the system
+		# Get decoderIP list
+		# Ping each decoder on list
+		# If dead, ping more intensively for 30s
+		# If still dead, remove from reflector subscription
+
+	# Finally, add a service to prune dead FUSE mountpoints.  Every time the UltraGrid AppImage is restarted, it leaves stale mountpoints.  This timed task will help keep everything clean.
+		# Get "alive mountpoints"
+		# Prune anything !=alive
 }
 
 service_exists() {
@@ -250,7 +257,8 @@ event_reboot(){
 	[Service]
 	Environment=ETCDCTL_API=3
 	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch \"SYSTEM_REBOOT\" -w simple -- sh -c \"/usr/local/bin/wavelet_reboot.sh\"
-	Restart=always
+	Restart=on-failure
+	RestartSec=2
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-reboot.service
 	# and the same for the host reboot
@@ -314,6 +322,21 @@ event_reveal(){
 	systemctl --user enable wavelet_monitor_decoder_reveal.service --now
 }
 
+event_blankhost(){
+	# Tells specific host to display a black testcard on the screen, use this for privacy modes as necessary.
+	echo -e "[Unit]
+	Description=Wavelet Task Blank Service
+	After=network-online.target etcd-member.service
+	Wants=network-online.target
+	[Service]
+	Type=simple
+	ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch $(hostname)/DECODER_BLANK -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_blank.sh\"
+	[Install]
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_monitor_decoder_blank.service
+	systemctl --user daemon-reload
+	systemctl --user enable wavelet_monitor_decoder_blank.service --now
+}
+
 event_encoder_reboot(){
 	# Encoders have their own reboot flag should watch the system reboot flag for a hard reset
 	echo -e "Generating Encoder Reboot SystemdD unit in /.config/systemd/user.."
@@ -341,7 +364,7 @@ event_decoder_reset(){
 	Wants=network-online.target
 	[Service]
 	Environment=ETCDCTL_API=3
-	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch decoderip/$(hostname)/DECODER_RESET -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_reset.sh\"
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch $(hostname)/DECODER_RESET -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_reset.sh\"
 	Restart=always
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-decoder-reset.service
@@ -349,6 +372,41 @@ event_decoder_reset(){
 	systemctl --user daemon-reload
 	systemctl --user enable wavelet-decoder-reset.service --now
 }
+
+get_os_partition_uuid() {
+		os_rootfs="/boot" # Replace with your actual OS root filesystem path
+		uuid=$(lsblk -f)
+}
+
+event_generateHash(){
+		# Can be modified from webUI, populates with hostname by default
+		# We will generate a hash from the root UUID and hostname, which we will use to track the label state
+		# This works much the same way as the label function on the detected input devices.
+		# Might need to do something more intelligent here..rn it's just sha256ing hostname+all partitions..
+		PARTUUID=$(get_os_partition_uuid)
+		echo -e "device hostname is: $(hostname)"
+		hostHash=$(echo "$PARTUUID, $(hostname)" | sha256sum)
+		echo -e "generated device hash: $hostHash \n"
+
+		# Check for pre-existing keys here
+		labelexists=$(ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} get hostHash/$(hostname)/label --print-value-only)
+		if [[ -z "${labelexists}" || ${#labelexists} -le 1 ]] then
+				echo -e "\nLabel value is null, or less than one char, continuing\n"
+				echo -e "\n Label value was set to ${labelexists} \n"
+				# Populate what will initially be used as the label variable from the webUI
+				ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put decoderlabel/$(hostname) -- $(hostname)
+				# And the reverse lookup for the device
+				ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostHash/$(hostname)/Hash -- $(hostHash)
+				ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put $(hostname)/Hash/$(hostHash)
+				ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostHash/$(hostname)/label -- $(hostname)
+				ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostHash/$(hostname)/ipaddr -- ${KEYVALUE}
+		else
+				echo -e "\nLabel value exists as ${labelexists}\nXcoder already populated, doing nothing and moving to run_ug.."
+				:
+		fi
+}
+
+
 
 event_device_redetect(){
 	# Watches for a device redetection flag, then runs detectv4l.sh
@@ -369,6 +427,7 @@ event_device_redetect(){
 }
 
 # Execution order
+
 set -x
 exec >/home/wavelet/build_ug.log 2>&1
 detect_self

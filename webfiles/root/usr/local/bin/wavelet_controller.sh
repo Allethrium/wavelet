@@ -27,9 +27,9 @@ uv_audioport="5006"
 uv_reflector="192.168.1.32"
 uv_obs="192.168.1.31"
 uv_livestream="192.168.1.30"
-uv_encoder="libavcodec:encoder=libsvt_hevc:preset=10:qp=20:pred_struct=0:gop=6:bitrate=25"
-uv_gop="16"
-uv_bitrate="10M"
+uv_encoder="libavcodec:encoder=libsvt_hevc:preset=10:pred_struct=0:crf=20:gop=12:bitrate=25"
+uv_gop="12"
+uv_bitrate="25M"
 uv_islivestreaming="0"
 
 
@@ -89,12 +89,12 @@ main() {
 			echo "Livestreaming is off, setting LiveStreaming flag to disabled"
 			KEYNAME=uv_islivestreaming
 			KEYVALUE="0"
-	   		write_etcd_global
+			write_etcd_global
 		else
 			echo "Livestreaming is on, setting LiveStreaming flag to enabled"
 			KEYNAME=uv_islivestreaming
-	    	KEYVALUE="1"
-    		write_etcd_global
+			KEYVALUE="1"
+			write_etcd_global
 		fi
 	waveletcontroller
 }
@@ -112,8 +112,8 @@ case $event in
 	# Display a static image of a court seal (find a better image!)
 	# 3-8 are all dynamic inputs populated from v4l2 (or in the future, hopefully Decklink)
 	# 9
-	(9)		echo -e "Recording currently Not implemented"				;is_recording=false																;;
-	(T)		echo "Test Card activated"									;current_event="wavelet-testcard"		;wavelet-testcard						;;
+	(9)		echo -e "Recording currently Not implemented"				;is_recording=false													;;
+	(T)		echo "Test Card activated"									;current_event="wavelet-testcard"		;wavelet-testcard				;;
 	# System control options
 	(DR)	echo -e "Decoders instructed to reload\n"					;current_event="wavelet-decoder-reboot"	;wavelet-decoder-reset					;;
 	(ER)	echo -e "Encoders instructed to reload\n"					;current_event="wavelet-encoder-reboot"	;wavelet-encoder-reboot					;;
@@ -126,14 +126,18 @@ case $event in
 #		($false) echo "Recording to archive file" && recording=true && wavelet_record_start;; 
 	# does not kill any streams, instead copies stream and appends to a labeled MKV file (not implemented unless we get a real server w/ STORAGE)
 	# HW and SW modes selected for compatibility reasons - some decoders don't like HW encoded video.  SW encoding will need a *FAST* CPU unless you like latency, dropped frames and glitches.
-	(A)		event_x264sw	&& echo "x264 Software video codec selected, updating encoder variables"													;;
-	(B)		event_x264hw 	&& echo "x264 VA-API video codec selected, updating encoder variables"														;;
-	(C)		event_x265sw 	&& echo "HEVC Software video codec selected, updating encoder variables"													;;
-	(D)		event_x265hw	&& echo "HEVC VA-API video codec selected, updating encoder variables"														;;
-	(E)		event_vp9sw	&& echo "VP-9 Software video codec selected, updating encoder variables"														;;
-	(F)		event_vp9hw 	&& echo "VP-9 Hardware video codec selected, updating encoder variables"													;;
-	(G)		event_rav1esw	&& echo "|*****||EXPERIMENTAL AV1 RAV1E codec selected, updating encoder vaiables||****|"									;;
-	(H)		event_av1hw	&& echo "|*****||EXPERIMENTAL AV1 VA-API codec selected, updating encoder vaiables||****|"										;;
+	(A)		event_x264sw				&& echo "x264 Software video codec selected, updating encoder variables"										;;
+	(B)		event_x264hw 				&& echo "x264 VA-API video codec selected, updating encoder variables"											;;
+	(C)		event_libx265sw 			&& echo "HEVC Software libx265 video codec selected, updating encoder variables"								;;
+	(C1)	event_libx265sw 			&& echo "HEVC Software libx265 video codec selected, updating encoder variables"								;;
+	(D)		event_libsvt_hevc_sw		&& echo "HEVC Software svt_hevc video codec selected, updating encoder variables"								;;
+	(D2)	event_libsvt_hevc_sw_zerolatency	&& echo "HEVC Software svt_hevc video codec selected, updating encoder variables"						;;	
+	(D1)	event_x265hw				&& echo "HEVC QSV video codec selected, updating encoder variables"												;;
+	(E)		event_vp9sw					&& echo "VP-9 Software video codec selected, updating encoder variables"										;;
+	(F)		event_vp9hw 				&& echo "VP-9 Hardware video codec selected, updating encoder variables"										;;
+	(G)		event_rav1esw				&& echo "|*****||EXPERIMENTAL AV1 RAV1E codec selected, updating encoder variables||****|"						;;
+	(H)		event_av1hw					&& echo "|*****||EXPERIMENTAL AV1 VA-API codec selected, updating encoder variables||****|"						;;
+	(H1)	event_libaom_av1			&& echo "|*****||EXPERIMENTAL AV1 LibAOM codec selected, updating encoder variables||****|"						;;	
 	#
 	# Multiple input modes go here (I wonder if there's a better, matrix-based approach to this?)
 	#
@@ -150,31 +154,31 @@ ETCDURI=http://192.168.1.32:2379/v2/keys
 ETCDENDPOINT=192.168.1.32:2379
 ETCDCTL_API=3
 read_etcd(){
-        printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME} --print-value-only)
-        echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
+		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME} --print-value-only)
+		echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
 }
 
 read_etcd_global(){
-        printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
-        echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for Global value"
+		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
+		echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for Global value"
 }
 
 write_etcd(){
-        etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
-        echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
+		etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
+		echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
 }
 
 write_etcd_global(){
-        etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
-        echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
+		etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
+		echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
 }
 
 write_etcd_clientip(){
-        etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${KEYVALUE}"
-        echo -e "$(hostname) set to ${KEYVALUE} for Global value"
+		etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${KEYVALUE}"
+		echo -e "$(hostname) set to ${KEYVALUE} for Global value"
 }
 read_etcd_clients_ip() {
-        return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
+		return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
 }
 
 
@@ -230,53 +234,53 @@ wavelet-seal() {
 	ffmpeg -y -s 900x900 -video_size cif -i ny-stateseal.jpg -c:v libx265 seal.mp4
 	write_etcd
 	# Kill existing streaming on the SERVER
-        systemctl --user stop UltraGrid.AppImage.service
-        # Set encoder restart flag to 1 - this will kill other videosources
-        KEYNAME=encoder_restart
-        KEYVALUE="1"
-        write_etcd_global
+		systemctl --user stop UltraGrid.AppImage.service
+		# Set encoder restart flag to 1 - this will kill other videosources
+		KEYNAME=encoder_restart
+		KEYVALUE="1"
+		write_etcd_global
 	# Now we setup a systemd unit for the encoder on the SERVER which will handle the generation of the seal stream.  Simple systemd unit.
-        KEYNAME=uv_videoport
-        read_etcd_global
-        video_port=${printvalue}
-        # Destination IP is the IP address of the UG Reflector
-        destinationipv4="192.168.1.32"
-        ugargs="--tool uv $filtervar -f V:rs:200:240 -l unlimited ${inputvar} -c ${encodervar} -P ${video_port} -m 9000 ${destinationipv4}"
-        KEYNAME=UG_ARGS
-        KEYVALUE=${ugargs}
-        write_etcd
-        echo -e "Verifying stored command line"
-        read_etcd
-        echo "
-        [Unit]
-        Description=UltraGrid AppImage executable
-        After=network-online.target
-        Wants=network-online.target
-        [Service]
-        ExecStart=/usr/local/bin/UltraGrid.AppImage ${ugargs}
+		KEYNAME=uv_videoport
+		read_etcd_global
+		video_port=${printvalue}
+		# Destination IP is the IP address of the UG Reflector
+		destinationipv4="192.168.1.32"
+		ugargs="--tool uv $filtervar -f V:rs:200:240 -l unlimited ${inputvar} -c ${encodervar} -P ${video_port} -m 9000 ${destinationipv4}"
+		KEYNAME=UG_ARGS
+		KEYVALUE=${ugargs}
+		write_etcd
+		echo -e "Verifying stored command line"
+		read_etcd
+		echo "
+		[Unit]
+		Description=UltraGrid AppImage executable
+		After=network-online.target
+		Wants=network-online.target
+		[Service]
+		ExecStart=/usr/local/bin/UltraGrid.AppImage ${ugargs}
 		KillMode=mixed
 		TimeoutStopSec=0.25
-        [Install]
-        WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
-        systemctl --user daemon-reload
-        systemctl --user restart UltraGrid.AppImage.service
-        echo -e "Encoder systemd units instructed to start..\n"
+		[Install]
+		WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
+		systemctl --user daemon-reload
+		systemctl --user restart UltraGrid.AppImage.service
+		echo -e "Encoder systemd units instructed to start..\n"
 }
 
 wavelet-testcard() {
 # T
-        current_event="wavelet-testcard"
-        KEYNAME=uv_input
-        KEYVALUE="BLANK"
-        write_etcd_global
-        KEYNAME=uv_input_cmd
-        KEYVALUE="-t testcard:pattern=smpte_bars"
-        /usr/local/bin/wavelet_textgen.sh
-        write_etcd
-        # Set encoder restart flag to 1
-        KEYNAME=encoder_restart
-        KEYVALUE="1"
-        write_etcd_global
+		current_event="wavelet-testcard"
+		KEYNAME=uv_input
+		KEYVALUE="BLANK"
+		write_etcd_global
+		KEYNAME=uv_input_cmd
+		KEYVALUE="-t testcard:pattern=smpte_bars"
+		/usr/local/bin/wavelet_textgen.sh
+		write_etcd
+		# Set encoder restart flag to 1
+		KEYNAME=encoder_restart
+		KEYVALUE="1"
+		write_etcd_global
 }
 
 wavelet-dynamic() {
@@ -293,7 +297,7 @@ wavelet-dynamic() {
 	# Kill existing streaming on the SERVER
 	systemctl --user stop UltraGrid.AppImage.service 
 	# Set encoder restart flag to 1
-	KEYNAME=encoder_restart
+	KEYNAME="encoder_restart"
 	KEYVALUE="1"
 	write_etcd_global
 	KEYNAME=input_update
@@ -313,15 +317,15 @@ wavelet_foursplit() {
 	controllerInputHash=${printvalue}
 	echo -e "\n \n Controller notified that the Four-way split input hash has been selected from the WebUI.  Encoder will do its best to generate a software mix of up to four available input devices. \n \n "
 	# Kill existing streaming on the SERVER
-        systemctl --user stop UltraGrid.AppImage.service
-        # Set encoder restart flag to 1
-        KEYNAME=encoder_restart
-        KEYVALUE="1"
-        write_etcd_global
-        KEYNAME=input_update
-        KEYVALUE="0"
-        echo -e "\n Task completed, resetting input_update key to 0.. \n"
-        write_etcd_global
+		systemctl --user stop UltraGrid.AppImage.service
+		# Set encoder restart flag to 1
+		KEYNAME=encoder_restart
+		KEYVALUE="1"
+		write_etcd_global
+		KEYNAME=input_update
+		KEYVALUE="0"
+		echo -e "\n Task completed, resetting input_update key to 0.. \n"
+		write_etcd_global
 }
 # These events contain additional codec-specific settings that have been found to work acceptably well on the system.
 # Since they are tuned by hand, you probably won't want to modify them unless you know exactly what you're doing.
@@ -331,32 +335,63 @@ wavelet_foursplit() {
 
 event_x264hw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=h264_qsv:gop=6:bitrate=30M"
+	KEYVALUE="libavcodec:encoder=h264_qsv:gop=6:bitrate=20M"
 	write_etcd_global
-	echo -e "x264 Hardware acceleration activated, Bitrate 25M, decoder task restart bit set. \n"
+	echo -e "x264 Hardware acceleration activated, Bitrate 20M, decoder task restart bit set. \n"
 	wavelet-decoder-reset
 }
 
 event_x264sw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx264:gop=6:bitrate=30M"
+	KEYVALUE="libavcodec:encoder=libx264:gop=6:bitrate=20M"
 	write_etcd_global
-	echo -e "x264 Software acceleration activated, Bitrate 30M \n"
+	echo -e "x264 Software acceleration activated, Bitrate 20M \n"
 	wavelet-decoder-reset
 }
 
-event_x265sw() {
+event_libx265sw() {
+	# disable intra-refresh, enabled threads=o and tweaking MTU seems to help!
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=10:qp=20:pred_struct=0:gop=6:bitrate=25"
+	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:tune=zerolatency:threads=0:crf=20:disable_intra_refresh:gop=30"
 	write_etcd_global
-	echo -e "x265 SVT Software acceleration activated, Bitrate 25M, decoder task restart bit set. \n"
+	echo -e "libx265 Software mode activated, CRF=20, Bitrate 25M, decoder task restart bit set. \n"
 	wavelet-decoder-reset
+}
+
+event_libx265sw_low() {
+	# disable intra-refresh, enabled threads=o and tweaking MTU seems to help!
+	KEYNAME=uv_encoder
+	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=26:threads=0:disable_intra_refresh:gop=30"
+	write_etcd_global
+	echo -e "x265 SVT Software mode activated, CRF=26, decoder task restart bit set. \n"
+	wavelet-decoder-reset
+}
+
+event_libsvt_hevc_sw() {
+	# NB zerolatency disables frame parallelism, can't use multicore!
+	# Feedback from deployment:
+	# The decoders HATE libx265 (massive dropped frames), we need to use libsvt_hevc instead.
+	# consider this the default COMPAT mode until we have a handle on things
+	KEYNAME=uv_encoder
+	#KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:tune=zerolatency:qp=26:gop=6:bitrate=25"
+	KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=10:pred_struct=0:crf=28:gop=6:bitrate=10M"
+	write_etcd_global
+}
+
+event_libsvt_hevc_sw_zerolatency() {
+	# NB zerolatency disables frame parallelism, can't use multicore!
+	# Feedback from deployment:
+	# The decoders HATE libx265 (massive dropped frames), we need to use libsvt_hevc instead.
+	KEYNAME=uv_encoder
+	#KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:tune=zerolatency:qp=26:gop=6:bitrate=25"
+	KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=10:tune=zerolatency:pred_struct=0:crf=28:gop=6:bitrate=10M"
+	write_etcd_global
 }	
 
 event_x265hw() {
 # working on tweaking these values to something as reliable as possible.
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=hevc_qsv:bitrate=25M:gop=6:subsampling=444"
+	KEYVALUE="libavcodec:encoder=hevc_qsv:low_power=1:gop=30:crf=28"
 #	KEYVALUE="libavcodec:encoder=hevc_qsv:gop=12:bitrate=15M:bpp=10:subsampling=444:q=0:scenario=remotegaming:profile=main10"
 	write_etcd_global
 	echo -e "x265 Hardware acceleration activated, Bitrate 25M, decoder task restart bit set. \n"
@@ -381,7 +416,7 @@ event_vp9hw() {
 
 event_rav1esw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=librav1e"
+	KEYVALUE="libavcodec:encoder=librav1e:qp=50:tile-columns=2:tile-rows=2:speed=8"
 	write_etcd_global
 	echo -e "AV1 Software acceleration activated \n"
 	wavelet-decoder-reset
@@ -395,16 +430,24 @@ event_av1hw() {
 	wavelet-decoder-reset
 }
 
+event_libaom_av1() {
+	KEYNAME=uv_encoder
+	KEYVALUE="libavcodec:encoder=libaom-av1:usage=realtime:enable-dual-filter=1:cpu-used=7:threads=0"
+	write_etcd_global
+	echo -e "LibAOM-AV1 Software compression activated \n"
+	wavelet-decoder-reset
+}
+
 wavelet-foursplit() {
 # W
 	current_event="wavelet-foursplit"
 	KEYNAME=uv_input
 	KEYVALUE=FOURSPLIT
 	write_etcd_global
-        # Set encoder restart flag to 1
-        KEYNAME=encoder_restart
-        KEYVALUE="1"
-        write_etcd_global
+		# Set encoder restart flag to 1
+		KEYNAME=encoder_restart
+		KEYVALUE="1"
+		write_etcd_global
 }
 wavelet-twosplit() {
 # W
@@ -412,10 +455,10 @@ wavelet-twosplit() {
 	KEYNAME=uv_input
 	KEYVALUE=TWOSPLIT
 	write_etcd_global
-        # Set encoder restart flag to 1
-        KEYNAME=encoder_restart
-        KEYVALUE="1"
-        write_etcd_global
+		# Set encoder restart flag to 1
+		KEYNAME=encoder_restart
+		KEYVALUE="1"
+		write_etcd_global
 }
 wavelet-pip1() {
 # Doesn't currently work, so disable.
@@ -423,10 +466,10 @@ wavelet-pip1() {
 	KEYNAME=uv_input
 	KEYVALUE=PIP1
 	write_etcd_global
-        # Set encoder restart flag to 1
-        KEYNAME=encoder_restart
-        KEYVALUE="1"
-        write_etcd_global
+		# Set encoder restart flag to 1
+		KEYNAME=encoder_restart
+		KEYVALUE="1"
+		write_etcd_global
 }
 wavelet-pip2() {
 # Doesn't currently work, so disable.
@@ -434,18 +477,19 @@ wavelet-pip2() {
 	KEYNAME=uv_input
 	KEYVALUE=PIP2
 	write_etcd_global
-        # Set encoder restart flag to 1
-        KEYNAME=encoder_restart
-        KEYVALUE="1"
-        write_etcd_global
+		# Set encoder restart flag to 1
+		KEYNAME=encoder_restart
+		KEYVALUE="1"
+		write_etcd_global
 }
-
 
 wavelet-decoder-reset() {
 # Finds all decoders and sets client reSET flag.  This restarts UltraGrid without a full system reboot.
+# Have to clean /DECODER_RESET from result or we get recursion, remember etcd isn't hierarchical!
 	return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --keys-only)
-	for host in ${return_etcd_clients_ip}; do
-		etcdctl --endpoints=${ETCDENDPOINT} put "${host}/DECODER_RESET" -- "1"
+	RESULT="${return_etcd_clients_ip///DECODER_RESET/}"
+	for host in ${RESULT}; do
+		etcdctl --endpoints=${ETCDENDPOINT} put "${RESULT}/DECODER_RESET" -- "1"
 		echo -e "DECODER_RESET flag enabled for ${host}..\n"
 	done
 	echo -e "Decoder tasks instructed to reset on all attached decoders.\n"
@@ -472,18 +516,18 @@ wavelet-clear-inputs() {
 # source devices which no longer exist, but still populate on the UI.
 # bad solution
 	etcdctl --endpoints=http://192.168.1.32:2379 del "interface" --prefix
-  	etcdctl --endpoints=http://192.168.1.32:2379 del "/interface" --prefix
-  	etcdctl --endpoints=http://192.168.1.32:2379 del "/hash" --prefix
-  	etcdctl --endpoints=http://192.168.1.32:2379 del "/short" --prefix
-  	etcdctl --endpoints=http://192.168.1.32:2379 del "/long" --prefix
-  	echo -e "All interface devices and their configuration data, as well as labels have been deleted\n
-  	Plugging in a new device will cause the detection module to run again.\n"
+	etcdctl --endpoints=http://192.168.1.32:2379 del "/interface" --prefix
+	etcdctl --endpoints=http://192.168.1.32:2379 del "/hash" --prefix
+	etcdctl --endpoints=http://192.168.1.32:2379 del "/short" --prefix
+	etcdctl --endpoints=http://192.168.1.32:2379 del "/long" --prefix
+	echo -e "All interface devices and their configuration data, as well as labels have been deleted\n
+	Plugging in a new device will cause the detection module to run again.\n"
 }
 
 wavelet-detect-inputs() {
 # Tells detectv4l to run on everything
-  	echo -e "\nAll devices now redetecting available input video sources..\n"
-  	etcdctl --endpoints=http://192.168.1.32:2379 set "DEVICE_REDETECT" -- "1"
+	echo -e "\nAll devices now redetecting available input video sources..\n"
+	etcdctl --endpoints=http://192.168.1.32:2379 set "DEVICE_REDETECT" -- "1"
 
 }
 

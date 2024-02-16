@@ -8,17 +8,17 @@ UG_HOSTNAME=$(hostname)
 	case $UG_HOSTNAME in
 	enc*) 					echo -e "I am an Encoder \n"; event_encoder
 	;;
-	decX.wavelet.local)			echo -e "I am a Decoder, but my hostname is generic.  An error has occurred at some point, and needs troubleshooting.\n Terminating process. \n"; exit 0
+	decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.  An error has occurred at some point, and needs troubleshooting.\n Terminating process. \n"; exit 0
 	;;
 	dec*)					echo -e "I am a Decoder \n"; event_decoder
 	;;
-	livestream*)				echo -e "I am a Livestream ouput gateway \n"; event_livestream
+	livestream*)			echo -e "I am a Livestream ouput gateway \n"; event_livestream
 	;;
 	gateway*)				echo -e "I am an input Gateway for another video streaming system \n"; event_gateway
 	;;
 	svr*)					echo -e "I am a Server."; event_server
 	;;
-	*) 					echo -e "This device Hostname is not set approprately, exiting \n"; exit 0
+	*) 						echo -e "This device Hostname is not set approprately, exiting \n"; exit 0
 	;;
 	esac
 }
@@ -52,8 +52,9 @@ write_etcd_global(){
 }
 
 write_etcd_clientip(){
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${KEYVALUE}"
-		echo -e "$(hostname) set to ${KEYVALUE} for Global value"
+		# Variable changed to IPVALUE because the module was picking up incorrect variables and applying them to /decoderip !
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${IPVALUE}"
+		echo -e "decoderip/$(hostname) set to ${IPVALUE} for Global value"
 }
 read_etcd_clients_ip() {
 		ETCDCTL_API=3 return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
@@ -66,7 +67,8 @@ event_encoder_server(){
 		echo -e "wavelet_controller service is running and watching for input events, continuing..."
 		event_encoder
 	else
-		echo -e "\n bringing up Wavelet controller service, and sleeping for five seconds to allow config to settle..."
+		echo -e "\n bringing up Wavelet controller service,
+		 and sleeping for five seconds to allow config to settle..."
 		systemctl --user start wavelet_init.service
 		sleep 5
 		echo -e "\n Running encoder..."
@@ -83,11 +85,14 @@ event_server(){
 	echo -e "Ensuring dnsmasq service is up.."
 	systemctl restart dnsmasq.service
 	if [[ "$printvalue" -eq 1 ]]; then
-		echo -e "An input device is present on this host, assuming we want an encoder running on the server.. \n"
+		echo -e "An input device is present on this host,
+		 assuming we want an encoder running on the server.. \n"
 		event_encoder_server
 	else 
-		echo -e "No input devices are present on this server, assuming the encoder is running on a separate device.. \n"
-		echo -e "\nNote this routine calls wavelet_init.service which sets default video settings and clears previous settings! \n"
+		echo -e "No input devices are present on this server,
+		 assuming the encoder is running on a separate device.. \n"
+		echo -e "\nNote this routine calls wavelet_init.service which
+		 sets default video settings and clears previous settings! \n"
 		systemctl --user start wavelet_init.service
 	fi
 }
@@ -101,15 +106,38 @@ event_encoder(){
 
 
 event_decoder(){
-# Tries three possible GPU outputs before failing.
-# If it crashes, you have hw/driver issues someplace or an improperly configured display env.
+# Sleep for 5 seconds so we have a chance for the decoder to connect to the network
+sleep 2
 # Registers self as a decoder in etcd for the reflector to query & include in its client args
-KEYVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
+IPVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
+# IP value MUST be populated or the decoder writes gibberish into the server
+if [[ "${IPVALUE}" == "" ]] then
+		# sleep for five seconds, then call yourself again
+		echo -e "\nIP Address is null, sleeping and calling function again\n"
+		sleep 5
+		event_decoder
+	else
+		echo -e "\nIP Address is not null, testing for validity..\n"
+		valid_ipv4() {
+			local ip=$1 regex='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
+			if [[ $ip =~ $regex ]]; then
+				echo -e "\nIP Address is valid, continuing..\n"
+				return 0
+			else
+				echo "\nIP Address is not valid, sleeping and calling function again\n"
+				event_decoder
+			fi
+		}
+		valid_ipv4 "${IPVALUE}"
+fi
+sleep 1
 write_etcd_clientip
 
-# Can be modified from webUI, populates with hostname by default
-ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put decoderlabel/$(hostname) "$(hostname)"
+ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/$(hostname)/ipaddr" -- "${IPVALUE}"
 
+# Ensure all reset, reveal and reboot flags are set to 0 so they are
+# 1) populated
+# 2) not active so the new device goes into a reboot/reset/reveal loop
 KEYVALUE="0"
 KEYNAME=$(hostname)/DECODER_RESET
 write_etcd_global
@@ -117,44 +145,44 @@ KEYNAME=$(hostname)/DECODER_REVEAL
 write_etcd_global
 KEYNAME=$(hostname)/DECODER_REBOOT
 write_etcd_global
+KEYNAME=$(hostname)/DECODER_BLANK
+write_etcd_global
+sleep 2
+# The below will be used to generate error messages on screen, once I've written those components
+# For now useful to track hostlabel generation properly and keep the UI synced.
+KEYNAME="$(hostname)/decoderlabel"
+read_etcd_global
+echo -e "My device label is ${printvalue}\n"
+deviceLabel=${printvalue}
+KEYNAME="/hostHash/$(hostname)/label"
+read_etcd_global
+deviceHostHashlabel=${printvalue}
+echo -e "The reverse lookup label is ${printvalue}\n"
+if [[ "${deviceLabel}" == "${deviceHostHashlabel}" ]] then
+		echo -e "\nDevice label and reverse lookup label match, continuing\n"
+		echo "${deviceLabel}" > /home/wavelet/hostLabel.txt
+	else
+		echo -e "\nDevice label and reverse lookup label DO NOT MATCH,
+		 reverting UI label in keystore and locally..\n"
+		KEYNAME="$(hostname)/decoderlabel"
+		KEYVALUE="${deviceHostHashLabel}"
+		write_etcd_global
+		echo "${deviceHostHashLabel}" > /home/wavelet/hostLabel.txt
+fi
 
-
+# Enable watcher services now all task activation keys are set to 0
 systemctl --user enable wavelet_monitor_decoder_reset.service --now
 systemctl --user enable wavelet_monitor_decoder_reveal.service --now
 systemctl --user enable wavelet_monitor_decoder_reboot.service --now
-
+sleep 1
 
 # Note - ExecStartPre=-swaymsg workspace 2 is a failable command 
-# It will always send the UG output to a second display.  If not connected the primary display will be used
-# This is an impoverished version of a multihead display management system.
-KEYNAME=UG_ARGS
-ug_args="--tool uv -d vulkan_sdl2:fs --param use-hw-accel"
-KEYVALUE="${ug_args}"
-write_etcd
-
-echo "
-[Unit]
-Description=UltraGrid AppImage executable
-After=network-online.target
-Wants=network-online.target
-[Service]
-ExecStartPre=-swaymsg workspace 2
-ExecStart=/usr/local/bin/UltraGrid.AppImage ${ug_args}
-Restart=always
-[Install]
-WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
-systemctl --user daemon-reload
-
-systemctl --user start UltraGrid.AppImage.service
-echo -e "Decoder systemd units instructed to start..\n"
-sleep 3
-
-
-return=$(systemctl --user is-active --quiet UltraGrid.AppImage.service)
-if [[ ${return} -eq !0 ]]; then
-	echo "SystemD unit failed with Vulkan_sdl2 driver for hwaccel, trying with GL driver.."
+# It will always send the UG output to a second display.  
+# If not connected the primary display will be used.
+# Tries three possible GPU outputs in order of efficiency, before failing.
+# If it crashes, you have hw/driver issues someplace or an improperly configured display env.
 	KEYNAME=UG_ARGS
-	ug_args="--tool uv -d gl:fs --param use-hw-accel"
+	ug_args="--tool uv -d vulkan_sdl2:fs:keep-aspect:nocursor:nodecorate"
 	KEYVALUE="${ug_args}"
 	write_etcd
 	rm -rf /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
@@ -172,11 +200,13 @@ if [[ ${return} -eq !0 ]]; then
 	systemctl --user daemon-reload
 	systemctl --user start UltraGrid.AppImage.service
 	echo -e "Decoder systemd units instructed to start..\n"
+	sleep 3
 	return=$(systemctl --user is-active --quiet UltraGrid.AppImage.service)
 	if [[ ${return} -eq !0 ]]; then
-		echo "Decoder failed to start, there may be something wrong with the system. \n Trying SDL as a fallback and then failing for good.."
+		echo "Decoder failed to start, there may be something wrong with the system.
+		\nTrying GL as a fallback, and then failing for good.."
 		KEYNAME=UG_ARGS
-		ug_args="--tool uv -d sdl:fs --param use-hw-accel"
+		ug_args="--tool uv -d gl:fs"
 		KEYVALUE="${ug_args}"
 		write_etcd
 		rm -rf /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
@@ -194,12 +224,24 @@ if [[ ${return} -eq !0 ]]; then
 	else
 		:
 	fi
-else
-	:
-fi
+
 # Perhaps add an etcd watch or some kind of server "isalive" function here
-# The decoders should reboot on their own if the server is down
-# assumption would be server was getting replaced, and they'd need to reregister on boot?
+# Decoder should display:
+# - No incoming video
+#	if POC REF = 0 bytes received for > 1m; then
+#	wavelet_errorgen.sh build imagemagick / "Host isn't receiving video data from server, check the reflector process on the server."
+# - Consistent POC errors, codec issue
+#		if POC errors or FEC errors > 1m; then
+#		test ping
+#		if ping fine
+		#	wavelet_errorgen.sh build imagemagick / "Host is experiencing high levels of corrupted frames.  Check network integrity, MTU Value and encoder settings."
+# 		if ping bad
+		# - consistent packet loss, network issue
+		# wavelet_errorgen.sh build imagemagick / "Host is experiencing	network connectivity issues, please check network settings.
+#		if ping DEAD
+		# wavelet_errorgen.sh build imagemagick / "Host has no network connectivity
+# - other possible failure modes
+#	???
 }
 
 
@@ -239,6 +281,7 @@ event_livestream(){
 #				-re -f lavdi -i anullsrc -c:v libx264 -preset veryfast -b:v 1024k -maxrate 1024k -bufsize 4096k \
 #				-vf 'format=yuv420p' -g 60 \
 #				flv rtmp://a.rtmp.youtube.com/live2/${MYAPIKEY}
+ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put ""
 }
 
 event_gateway_in(){

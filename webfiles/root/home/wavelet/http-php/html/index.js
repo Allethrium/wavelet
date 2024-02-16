@@ -7,6 +7,9 @@ dynamicInputs.innerHTML = '';
 
 function firstAjax(){
 // get dynamic devices from etcd, and call createNewButton function to generate entries for them.
+// value = generated hash value of the device, this is how we track it, and how wavelet can find it
+// keyfull = the pathname of the device in /interface/friendlyname
+// key = the key of the device (also friendlyname)
 		$.ajax({
 				type: "POST",
 				url: "get_inputs.php",
@@ -39,12 +42,29 @@ function secondAjax(){
 						console.log("JSON Hosts data received:");
 						console.log(returned_data);
 						returned_data.forEach(item => {
-										var key = item['key'];
+										var key	 = item['key'];
 										var value = item['value'];
 										createNewHost(key, value);
 										})
 				}
 		});
+}
+
+function fetchHostLabelAndUpdateUI(getLabelHostName){
+// This function gets hostname | label from etcd and is repsonsible for telling the server which text labels to produce for each host.
+		$.ajax({
+								type: "POST",
+								url: "get_host_label.php",
+								dataType: "json",
+								success: function(returned_data) {
+												counter = 500;
+												console.log("JSON Hosts data received:");
+												console.log(returned_data);
+												returned_data.forEach(item, index => {
+																				var key  = item['key'];
+										})
+								}
+				});
 
 }
 
@@ -144,21 +164,48 @@ function getBannerStatus(bannerValue) {
 		const bannerValue = JSON.parse(returned_data);
 			if (bannerValue == "1" ) {
 				console.log ("Banner value is 1, enabling toggle automatically.");
-				$("#bannertoggleinput")[0].checked=true; // set HTML checkbox to checked
+				$("#banner_toggle_checkbox")[0].checked=true; // set HTML checkbox to checked
 				} else {
 				console.log ("Banner value is NOT 1, disabling checkbox toggle.");
-				$("#bannertoggleinput")[0].checked=false; // set HTML checkbox to unchecked
+				$("#banner_toggle_checkbox")[0].checked=false; // set HTML checkbox to unchecked
 				}
 		}
 	})
 }
 
+function getHostBlankStatus(hostValue) {
+	// this function gets the banner status from etcd and sets the banner toggle button on/off upon page load
+	console.log('Attempting to retrieve host blank status for: ' + hostValue);
+	let retValue = null;
+
+	$.ajax({
+		type: "POST",
+		url: "get_blank_host_status.php",
+		dataType: "json",
+		data: {
+			key: hostValue
+		},
+		success: function(returned_data) {
+		var retValue = JSON.parse(returned_data);
+			if (retValue == 1 ) {
+				console.log ("Blank value is:" + retValue)
+				} else {
+			console.log ("Blank value is:" + retValue);
+				}
+		},
+		error: function() {
+		reject(new Error('Error fetching blank status'));  // reject promise if an error occurs
+		}
+	});
+	return retValue;
+}
+
+
 function createNewButton(key, value, keyFull) {
 	var divEntry		=	document.createElement("Div");
 	var dynamicButton 	= 	document.createElement("Button");
-	var renameButton	=	document.createElement("Button");
-	const text		=	document.createTextNode(key);
-	const id		=	document.createTextNode(counter + 1);
+	const text			=	document.createTextNode(key);
+	const id			=	document.createTextNode(counter + 1);
 	dynamicButton.id	=	counter;
 	/* create a div container, where the button, relabel button and any other associated elements reside */
 	dynamicInputs.appendChild(divEntry);
@@ -166,71 +213,119 @@ function createNewButton(key, value, keyFull) {
 	divEntry.setAttribute("data-fulltext", keyFull);
 	divEntry.setAttribute("divDevID", dynamicButton.id);
 	divEntry.classList.add("dynamicInputButtonDiv");
-	console.log("dynamic video source div created for device hash: " + value);
-	/* add rename button */
-	function createRenameButton() {
-		var $btn = $('<button/>', {
-				type: 'button',
-				text: 'Rename',
-				class: 'renameButton clickableButton',
-				id: 'btn_rename'
-		}).click(relabelInputElement);
-	return $btn;
-	}
-	$(divEntry).append(createRenameButton());
-//	divEntry.appendChild(renameButton);
-		/* create the button */
-		dynamicButton.appendChild(text);
-		dynamicButton.setAttribute("value", value);
-		dynamicButton.setAttribute("type", "button");
-		dynamicButton.setAttribute("data-fulltext", keyFull);
-		dynamicButton.classList.add("clickableButton", "dynamicInputButton");
-		dynamicButton.addEventListener("click", sendPHPID, setButtonActiveStyle(this, true));
-		divEntry.appendChild(dynamicButton);
+	console.log("dynamic video source div created for device hash: " + value + "and label" + key);
+	// Create the device button
+		function createInputButton(text, value) {
+			var $btn = $('<button/>', {
+							type: 'button',
+							text: key,
+							value: value,
+							class: 'dynamicInputButton clickableButton',
+							id: dynamicButton.id
+			}).click(sendPHPID);
+		$btn.data("fulltext", keyFull);
+		return $btn;
+		}
+	//	Create a rename button
+		function createRenameButton() {
+			var $btn = $('<button/>', {
+							type: 'button',
+							text: 'Rename',
+							class: 'renameButton clickableButton',
+							id: 'btn_rename'
+			}).click(relabelInputElement);
+		$btn.data("fulltext", keyFull);
+		return $btn;
+		}
+	//	Create a remove button
+		function createDeleteButton() {
+			var $btn = $('<button/>', {
+							type: 'button',
+							text: 'Remove',
+							class: 'renameButton clickableButton',
+							id: 'btn_delete'
+			}).click(function(){
+		$(this).parent().remove();
+			console.log("Deleting input entry and associated key:" + key + "and value: " + value);
+				$.ajax({
+						type: "POST",
+						url: "/remove_input.php",
+						data: {
+								key: key,
+								value: value
+								},
+						success: function(response){
+						console.log(response);
+						//location.reload(true);
+						}
+				});
+			})
+		return $btn;
+		}
+		$(divEntry).append(createDeleteButton());
+		$(divEntry).append(createRenameButton());
+		$(divEntry).append(createInputButton(text, value));
 	/* set counter +1 for button ID */
+	const selectedDivHash			=		$(this).parent().attr('divDeviceHash');
 	counter++;
 }
 
 function createNewHost(key, value) {
-		var divEntry            =       document.createElement("Div");
-		var dynamicButton       =       document.createElement("Button");
-		var renameButton        =       document.createElement("Button");
-		var deleteButton        =       document.createElement("Button");
-		var restartButton       =       document.createElement("Button");
-		var rebootButton        =       document.createElement("Button");
-		var identifyButton      =       document.createElement("Button");
-		const text              =       document.createTextNode(value);
-		const id                =       document.createTextNode(counter + 1);
-		dynamicButton.id        =       counter;
+		var divEntry			=		document.createElement("Div");
+		var dynamicButton		=		document.createElement("Button");
+		var renameButton		=		document.createElement("Button");
+		var deleteButton		=		document.createElement("Button");
+		var restartButton		=		document.createElement("Button");
+		var rebootButton		=		document.createElement("Button");
+		var identifyButton		=		document.createElement("Button");
+		var checkbox			=		document.createElement("checkbox");
+		var labelEntry			=		document.createElement("Div");
+		var labelDiv			=		document.createElement("Div");
+		var getLabelHostName		=		0;
+		const divHostName		=		document.createTextNode(key);
+		const id			=		document.createTextNode(counter + 1);
 		/* create a div container, where the button, relabel button and any other associated elements reside */
 		dynamicHosts.appendChild(divEntry);
 		divEntry.setAttribute("divDeviceHostName", key);
 		divEntry.setAttribute("deviceLabel", value);
-		divEntry.setAttribute("divDevID", dynamicButton.id);
-		divEntry.classList.add("dynamicInputButtonDiv");
-		console.log("dynamic Host divider created for device hostname: " + value);
+		divEntry.setAttribute("divDevID", value);
+		divEntry.classList.add("host_divider");
+		console.log("dynamic Host divider created for device hostname: " + key +" with label/value:" + value);
 		/* add rename button */
 		function createRenameButton() {
 				var $btn = $('<button/>', {
 								type: 'button',
 								text: 'Rename',
 								class: 'renameButton clickableButton',
-								id: 'btn_rename'
+								id: 'btn_rename',
 				}).click(relabelHostElement);
 		return $btn;
 		}
-		/* add delete button */
+				/* add delete button */
+		//      Create a remove button
 		function createDeleteButton() {
 				var $btn = $('<button/>', {
 								type: 'button',
 								text: 'Remove',
 								class: 'renameButton clickableButton',
-								id: 'btn_delete'
+								id: 'btn_HostDelete'
 				}).click(function(){
-						$(this).parent().remove();
-						console.log("Deleting host entry and all UI elements:" + value);
+					console.log("Deleting host entry and associated keys: " + key + "and hash value: " + value);
+					$.ajax({
+						type: "POST",
+						url: "/remove_host.php",
+						data: {
+							key: key,
+							value: value
+							},
+						success: function(response){
+						console.log(response);
+						//location.reload(true);
+						//$(this).parent().remove();
+						}
+					});
 				})
-		return $btn;
+			return $btn;
 		}
 		/* add decoder Identify button */
 		function createIdentifyButton() {
@@ -252,7 +347,6 @@ function createNewHost(key, value) {
 								console.log(response);
 										}
 						});
-
 				})
 				return $btn;
 		}
@@ -288,7 +382,7 @@ function createNewHost(key, value) {
 								class: 'renameButton clickableButton',
 								id: 'btn_reboot'
 				}).click(function(){
-						console.log("Host instructed to reboot:" + key + "," + value);
+						console.log("Host instructed to reboot:" + key);
 						$.ajax({
 								type: "POST",
 								url: "/reboot_host.php",
@@ -304,21 +398,92 @@ function createNewHost(key, value) {
 				})
 				return $btn;
 		}
+		/* a subdiv with a text label */
+		function createLabelDiv(value){
+				var labelEntry                  =               document.createElement("Div");
+				var labelText                   =               document.createTextNode(value);
+				labelEntry.classList.add("dynamicInputButtonLabelDiv");
+				labelEntry.innerHTML = ("Device: " + value);
+				labelEntry.id = value;
+				labelEntry.style.display = "inline-block";
+				labelEntry.style.marginRight = "20px";
+				divEntry.appendChild(labelEntry);
+				// This event listener monitors for DOM Nodes inserted
+				// UNDER $dynamicHosts, and checks for .dynamicCheckBox
+				// Effectively it sets the initial status of the blank function
+				// on element creation
+		}
+				/* add a blank button */
+				function createBlankButton(key) {
+				console.log('setting all hosts OFF blank mode');
+				// have to do this because JS seems to be a real mess with AJAX async calls and I couldn't get anything useful out of state detection..
+				// wrong tools for the wrong job? 
+					console.log("Host instructed to restore display:" + key);
+										$.ajax({
+												type: "POST",
+												url: "/set_blank_host.php",
+												data: {
+														key: key,
+														value: 0
+														},
+												success: function(response){
+												console.log(response);
+												}
+										});
+
+				console.log('hostname is: ' + key);
+
+				var buttonText = "Blank Screen";
+								var $btn = $('<button/>', {
+					type: 'button',
+										text: buttonText,
+										class: 'renameButton clickableButton',
+										id: 'btn_blank'
+								});
+			$btn.click(function(){
+				if ($(this).text() == "Blank Screen") {
+								console.log("Host instructed to blank screen:" + key);
+										$.ajax({
+											type: "POST",
+												url: "/set_blank_host.php",
+												data: {
+													key: key,
+														value: 1
+														},
+												success: function(response){
+												console.log(response);
+												}
+										});
+						$(this).text('Restore Screen')
+					} else {
+										console.log("Host instructed to restore display:" + key);
+										$.ajax({
+											type: "POST",
+												url: "/set_blank_host.php",
+												data: {
+													key: key,
+														value: 0
+														},
+												success: function(response){
+												console.log(response);
+						}
+										});
+						$(this).text('Blank Screen')
+									}
+				});
+			console.log("Requested text string is:" + buttonText);
+			$btn.text(`${buttonText}`);
+					return $btn;
+		}
 		
-		$(divEntry).append(createRenameButton());
-		$(divEntry).append(createDeleteButton());	
-		$(divEntry).append(createRestartButton());
-		$(divEntry).append(createRebootButton());
-		$(divEntry).append(createIdentifyButton());
-		/* create the button */
-		dynamicButton.appendChild(text);
-		dynamicButton.setAttribute("value", key);
-		dynamicButton.setAttribute("type", "button");
-		dynamicButton.classList.add("clickableButton", "dynamicInputButton");
-		dynamicButton.addEventListener("click", sendPHPID, setButtonActiveStyle(this, true));
-		divEntry.appendChild(dynamicButton);
-		/* set counter +1 for button ID */
-		counter++;
+		// add button elements
+			$(divEntry).append(createLabelDiv(value));
+			$(divEntry).append(createRenameButton());
+			$(divEntry).append(createDeleteButton());
+			$(divEntry).append(createRestartButton());
+			$(divEntry).append(createRebootButton());
+			$(divEntry).append(createIdentifyButton());
+			$(divEntry).append(createBlankButton(key));
 }
 
 function sendPHPID(event) {
@@ -338,13 +503,13 @@ function sendPHPID(event) {
 }
 
 function relabelInputElement() {
-	const selectedDivHash		=	$(this).parent().attr('divDeviceHash');
-						console.log("the found hash is: " + selectedDivHash);
-	const relabelTarget		=	$(this).parent().attr('divDevID');
-						console.log("the found button ID is: " + relabelTarget);
-	const oldGenText		=	$(this).parent().attr('data-fulltext');
-	const newTextInput		=	prompt("Enter new text label for this device:");
-		console.log("Device full label is:" + oldGenText);
+	const selectedDivHash			=		$(this).parent().attr('divDeviceHash');
+											console.log("the found hash is: " + selectedDivHash);
+	const relabelTarget				=		$(this).parent().attr('divDevID');
+											console.log("the found button ID is: " + relabelTarget);
+	const oldGenText				=		$(this).parent().attr('data-fulltext');
+	const newTextInput				=		prompt("Enter new text label for this device:");
+	console.log("Device full label is:" + oldGenText);
 	console.log("New input label is:" +newTextInput);
 	if (newTextInput !== null && newTextInput !== "") {
 		document.getElementById(relabelTarget).innerText = newTextInput;
@@ -353,53 +518,53 @@ function relabelInputElement() {
 		console.log("The originally generated device field from Wavelet was: " + oldGenText);
 		console.log("The button must be activated for any changes to reflect on the video banner!");
 		$.ajax({
-				type: "POST",
-				url: "/set_input_label.php",
-				data: {
-						value: selectedDivHash,
-						label: newTextInput,
-						oldvl: oldGenText
-					  },
-				success: function(response){
-					console.log(response);
-				}
-				});
+			type: "POST",
+			url: "/set_input_label.php",
+			data: {
+					value: selectedDivHash,
+					label: newTextInput,
+					oldvl: oldGenText
+				  },
+			success: function(response){
+				console.log(response);
+				location.reload(true);
+			}
+		});
 	} else {
 		return;
 	}
 }
 
-
-function relabelHostElement() {
-		const selectedDivHost		=		$(this).parent().attr('divDeviceHostName');
+function relabelHostElement(label) {
+		var selectedDivHost			=		$(this).parent().attr('divDeviceHostName');
 											console.log("the found hostname is: " + selectedDivHost);
-		const relabelTarget			=       $(this).parent().attr('divDevID');
-											console.log("the found button ID is: " + relabelTarget);
+		var targetElement			=		$(this).parent().attr('deviceLabel');
+											console.log("the associated host label is: " +targetElement);
 		const oldGenText			=       $(this).parent().attr('deviceLabel');
-		const newTextInput			=	prompt("Enter new text label for this device:");
+		const newTextInput			=		prompt("Enter new text label for this device:");
 		console.log("Device old label is:" + oldGenText);
 		console.log("New device label is:" +newTextInput);
 		if (newTextInput !== null && newTextInput !== "") {
-				document.getElementById(relabelTarget).innerText = newTextInput;
-				document.getElementById(relabelTarget).oldGenText = oldGenText;
-				console.log("Button text successfully applied as:" + newTextInput);
-				console.log("The originally generated device field from Wavelet was: " + oldGenText);
-				$.ajax({
-						type: "POST",
-						url: "/set_host_label.php",
-						data: {
-								key: selectedDivHost,
-								value: newTextInput,
-							  },
-						success: function(response){
-								console.log(response);
-						}
+		document.getElementById(targetElement).innerText = newTextInput;
+		document.getElementById(targetElement).oldGenText = oldGenText;
+		console.log("Button text successfully applied as:" + newTextInput);
+		console.log("The originally generated device field from Wavelet was: " + oldGenText);
+		$.ajax({
+				type: "POST",
+				url: "/set_host_label.php",
+				data: {
+						key: selectedDivHost,
+						value: newTextInput,
+					  },
+				success: function(response){
+						console.log(response);
+						location.reload(true);
+				}
 				});
-		} else {
-				return;
-		}
+	} else {
+			return;
+	}
 }
-
 
 function setButtonActiveStyle(button) {
 	$(this).removeClass('active');

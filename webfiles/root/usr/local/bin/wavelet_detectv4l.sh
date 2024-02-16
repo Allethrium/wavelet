@@ -187,11 +187,13 @@ detect() {
 # is called in a foreach loop from detect_ug devices, therefore it is already instanced for each device
 	echo -e "Device string is ${device_string_long} \n"
 	case ${device_string_long} in
-	*IPEVO*)						echo -e "IPEVO Document Camera device detected.. \n"		&& event_ipevo
+	*IPEVO*)						echo -e "IPEVO Document Camera device detected.. \n"			&& event_ipevo
 	;;
-	*"Logitech Screen Share"*)				echo -e "Logitech HDMI-USB Capture device detected.. \n"	&& event_logitech_hdmi
+	*"Logitech Screen Share"*)		echo -e "Logitech HDMI-USB Capture device detected.. \n"		&& event_logitech_hdmi
 	;;
-	*)							echo -e "Unknown device detected, attempting to process..\n"	&& event_unknowndevice
+	*Magewell*)						echo -e "Logitech HDMI-USB Capture device detected.. \n"		&& event_magewell
+	;;
+	*)								echo -e "Unknown device detected, attempting to process..\n"	&& event_unknowndevice
 	;;
 	esac
 }
@@ -216,8 +218,17 @@ event_logitech_hdmi() {
 	echo -e "\n Detection completed for Logitech HDMI Capture device.. \n \n \n \n"
 	device_cleanup
 }
+event_magewell() {
+# tries to set 60FPS and RGB mode - if breaks, put magewell via USB on windows w/ config app and enable RGB24 mode!!
+	echo -e "Setting up Magewell USB capture card..\n"
+	KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/60:convert=RGB:device=${v4l_device_path}"
+		KEYNAME="${device_string_long}"
+	write_etcd_inputs
+	echo -e "\n Detection completed for device.. \n \n \n \n"
+	device_cleanup
+}
 event_unknowndevice() {
-# 30fps is a compatibility setting, this is called for Magewell capture cards which can do 60fps, but as its a catch all for other devices we will leave at 30.
+# 30fps is a compatibility setting, catch all for other devices we will leave at 30.  Try YUYV with RGB conversion..
 	echo -e "The connected device has not been previously assigned an input ID for the UI component.  Storing hash.\n"
 	KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"
 		KEYNAME="${device_string_long}"

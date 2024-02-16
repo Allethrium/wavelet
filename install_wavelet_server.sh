@@ -75,8 +75,8 @@ customization(){
 	# Sick of typing this is for now..
 	#read -p "Please input a password for the wavelet-root user: "  wvltroot_pw
 	#read -p "Please input a password for the Wavelet user: " wavelet_pw
-	wvltroot_pw="TestLab032023@"
-	wavelet_pw="WvltU$R60C"
+	wvltroot_pw='TestLab032023@'
+	wavelet_pw='WvltU$R60C'
 	rootpw=$(mkpasswd --method=yescrypt ${wvltroot_pw})
 	waveletpw=$(mkpasswd --method=yescrypt ${wavelet_pw})
 	echo -e "Password hashes generated..\n"
