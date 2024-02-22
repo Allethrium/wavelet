@@ -9,7 +9,7 @@ jobs:
         uses: actions/checkout@v4
       - name: create tarball
         run: |
-          git ls-files -z 'webfiles/**' | tar -czf wavelet-files.tar.xz --null -T 
+          git ls-files -z 'webfiles/**' | xargs -0 tar -czf wavelet-files.tar.xz --null -T 
       - name: Note Status
         run: echo "🍏 This job's status is ${{ job.status }}."
       - name: Upload tarball
