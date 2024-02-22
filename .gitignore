@@ -60,3 +60,4 @@ server_custom.yml
 Kernel-change.ContainerFile
 installer.log
 webfiles/root/usr/local/bin/connectwifi.sh
+webfiles/root/usr/local/bin/connectwifi.sh
