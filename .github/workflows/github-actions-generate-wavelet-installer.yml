@@ -8,13 +8,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: create tarball
-      - run: |
+        run: |
           git ls-files -z 'webfiles/**' | tar -czf wavelet-files.tar.xz --null -T 
       - name: Note Status
-      - run: echo "🍏 This job's status is ${{ job.status }}."
+        run: echo "🍏 This job's status is ${{ job.status }}."
       - name: Upload tarball
-      - uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4
         with : 
           name: wavelet-files
           path: ./wavelet-files.tar.xz
-
