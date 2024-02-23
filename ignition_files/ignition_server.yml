@@ -73,7 +73,7 @@ storage:
       mode: 0644
       overwrite: true
       contents:
-        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/wavelet-files.zip
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/wavelet-files.tar.xz
     # Enable proxy for dnf.conf for all the good it may do us..
     - path: /etc/dnf/dnf.conf
       mode: 0664

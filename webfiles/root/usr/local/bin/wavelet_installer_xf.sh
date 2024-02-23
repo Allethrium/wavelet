@@ -93,9 +93,7 @@ echo -e "RPM package updates completed, finishing installer task..\n"
 }
 
 extract_base(){
-	unzip /home/wavelet/wavelet-files.zip
 	tar xf /home/wavelet/wavelet-files.tar.xz -C /home/wavelet --no-same-owner
-	rm wavelet-files.zip
 	cd /home/wavelet
 	mv ./usrlocalbin.tar.xz /usr/local/bin/
 }
