@@ -511,7 +511,7 @@ systemd:
           [Unit]
           Description=Daily Reboot
           [Timer]
-          OnCalendar=*-*-* 6:03:00
+          OnCalendar=*-*-* 6:05:00
           [Install]
           WantedBy=timers.target
     # Reboot service timer

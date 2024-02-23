@@ -32,7 +32,7 @@ storage:
       mode: 0755
       overwrite: true
       contents:
-        source: https://www.andymelville.net/wavelet/configure_ethernet.sh
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/usr/local/bin/configure_ethernet.sh
     # Set hostname
     - path: /etc/hostname
       mode: 0644
@@ -44,36 +44,36 @@ storage:
       mode: 0644
       overwrite: true
       contents:
-        source: https://www.andymelville.net/wavelet/skel_bashrc.txt
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/skel_bashrc.txt
     - path: /etc/skel/.bash_profile
       mode: 0644
       overwrite: true
       contents:
-        source: https://www.andymelville.net/wavelet/skel_profile.txt
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/skel_profile.txt
     # Wavelet user (b/c default doesn't use skel b/c we aren't using useradd -m)
     - path: /home/wavelet/.bashrc
       mode: 0644
       overwrite: true
       contents:
-        source: https://www.andymelville.net/wavelet/skel_bashrc.txt
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/skel_bashrc.txt
     - path: /home/wavelet/.bash_profile
       mode: 0644
       overwrite: true
       contents:
-        source: https://www.andymelville.net/wavelet/skel_profile.txt
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/skel_profile.txt
     # Registries.conf to define local container registry
     # may change with prod. certs
     - path: /etc/containers/registries.conf.d/10-wavelet.conf
       mode: 0644
       overwrite: true
       contents:
-        source: https://www.andymelville.net/wavelet/10-wavelet.conf
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/containers/registries.conf.d/10-wavelet.conf
     # Web files for the control component
-    - path: /home/wavelet/wavelet-files.tar.xz
+    - path: /home/wavelet/wavelet-files.zip
       mode: 0644
       overwrite: true
       contents:
-        source: https://www.andymelville.net/wavelet/wavelet-files.tar.xz
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/wavelet-files.zip
     # Enable proxy for dnf.conf for all the good it may do us..
     - path: /etc/dnf/dnf.conf
       mode: 0664
@@ -157,13 +157,13 @@ storage:
       mode: 0644
       overwrite: true
       contents:
-        source: https://www.andymelville.net/wavelet/dnsmasq.conf
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/dnsmasq.conf
     # Automation to spin up and install dnsmasq as a SYSTEM service
     - path: /usr/local/bin/build_dnsmasq.sh
       mode: 0755
       overwrite: true
       contents:
-        source: https://www.andymelville.net/wavelet/build_dnsmasq.sh
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/usr/local/bin/build_dnsmasq.sh
     # Define system performance settings
     - path: /etc/sysctl.d/90-sysrq.conf
       mode: 0644
@@ -215,7 +215,7 @@ storage:
       mode: 0755
       overwrite: true
       contents:
-        source: https://www.andymelville.net/wavelet/wavelet_installer_xf.sh
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/usr/local/bin/wavelet_installer_xf.sh
     # Define Udev rules for USB inputs, download appropriate scriptfiles
     - path: /etc/udev/rules.d/80-wavelet-encoder.rules
       mode: 0644
@@ -230,18 +230,18 @@ storage:
       mode: 0755
       overwrite: true
       contents:
-        source: https://www.andymelville.net/wavelet/config
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/home/wavelet/.config/sway/config
     # For SWAY - Styles.css is for the controller surface elsewhere..
     - path: /home/wavelet/.config/waybar/style.css
       mode: 0755
       overwrite: true
       contents:
-        source: https://www.andymelville.net/wavelet/style.css
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/home/wavelet/.config/waybar/style.css
     - path: /home/wavelet/.config/waybar/time.sh
       mode: 0755
       overwrite: true
       contents:
-        source: https://www.andymelville.net/wavelet/time.sh
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/home/wavelet/.config/waybar/time.sh
 # Systemd user units
     # systemD user unit for wavelet initialization
     # Called with other initializations when Sway is executed from;
@@ -545,13 +545,15 @@ storage:
 # user accounts, passwords and pubkeys
 passwd:
   users:
+      # Root account
     - name: wavelet-root
       uid: 9337
       groups:
         - wheel
         - sudo
-      password_hash: $6$nP0Rno68wE$kLZixz9bqOzUspYONNXvH21razOeqkkxo.325Q1pfWtuHWoSAHaoUVrbJ0oqYYjO7f4/Qs5U5HOpm2n6WFASO0
+      password_hash: waveletrootpassword
       home_dir: /home/wavelet-root
+      # User account
     - name: wavelet
       uid: 1337
       # N.B ignition can't yet create groups properly as of 1.5
@@ -563,10 +565,9 @@ passwd:
         # - render
         # - rdma
         # - kvm
-      password_hash: $6$0OV84d.JPTnYjv02$i8JnR90kRViFcTwjPKTB3g7p99DpIux8PJBI2n2ToNvcI7Epb1T2vLLRuansi8WQbxaQT7Ibl/RKWtAD5Otsz0
+      password_hash: waveletuserpassword
       ssh_authorized_keys:
-        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHZUyuVxgJINkkdZ9qHf7MlwPYvIRIuSJTUgk7XSQ23f
-        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKwLQapZHSqsJ2/brzkAinnPdS/aZyROCJqRJdlpI4tY
+        - PUBKEYGOESHERE
       home_dir: /home/wavelet
 # Configure SYSTEM systemd units
 systemd:

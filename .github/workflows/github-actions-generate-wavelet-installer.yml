@@ -1,0 +1,19 @@
+name: GitHub Generate wavelet-files.tar.xz
+run-name: ${{ github.actor }} updated wavelet installer archive file
+on: [push]
+jobs:
+  Explore-GitHub-Actions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: create tarball
+        run: |
+          git ls-files -z 'webfiles/**' | xargs -0 tar -czf wavelet-files.tar.xz --null -T ./webfiles
+      - name: Note Status
+        run: echo "🍏 This job's status is ${{ job.status }}."
+      - name: Upload tarball
+        uses: actions/upload-artifact@v4
+        with : 
+          name: wavelet-files
+          path: ./wavelet-files.tar.xz

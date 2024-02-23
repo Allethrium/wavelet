@@ -20,6 +20,21 @@ client_networks(){
 		echo -e "Please input the system's gateway IP address, and subnet mask.."
 		read -p "Gateway IPv4 Address: " GW
 		read -p "Subnet Mask CIDR I.E 24 for class C network: " SN
+		# Validate user input
+		if ! [[ $GW =~ ^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$ ]]; then
+					echo -e "Invalid Gateway IPv4 Address format. Please use the format A.B.C.D."
+					return
+		fi
+
+		if ! [[ $SN =~ ^[0-9]+$ ]]; then
+			echo -e "Invalid Subnet Mask CIDR format. Please use only digits."
+			return
+		fi
+		if ! [[ $SN -ge 16 && $SN -le 32 ]]; then
+			echo -e "Subnet Mask CIDR value must be between 16 and 32."
+			return
+		fi
+
 		grIP="${GW}/${SN}"
 			if [[ SN > 28 ]]; then
 					echo -e "Subnet mask is too small for a Wavelet system, we need at least 32 host IP's to be available!"
@@ -31,13 +46,13 @@ client_networks(){
 					hostname_domain
 			fi
 			#echo -e "IPv6 not supported at the current time."
-# SED for 192.168.1.1 and set ${GW}
-sed -i 's/192.168.1.1/${GW}/g' ${INPUTFILES}
-# SED for subnet mask and set appropriately
-sed -i 's/255.255.255.0/${SN}/g' ${INPUTFILES}
-# SED for nameserver and remove args
-sed -i 's/- nameserver/d' ${INPUTFILES}
-# SED for FQDN and replace
+	# SED for 192.168.1.1 and set ${GW}
+	sed -i 's/192.168.1.1/${GW}/g' ${INPUTFILES}
+	# SED for subnet mask and set appropriately
+	sed -i 's/255.255.255.0/${SN}/g' ${INPUTFILES}
+	# SED for nameserver and remove args
+	sed -i 's/- nameserver/d' ${INPUTFILES}
+	# SED for FQDN and replace
 }
 
 hostname_domain(){
@@ -71,31 +86,53 @@ customization
 customization(){
 	echo -e "Generating ignition files with appropriate settings.."
 	INPUTFILES="server_custom.yml encoder_custom.yml decoder_custom.yml"
-	# Yes, I know this is terribly insecure, however if attackers are watching what you're doing on the bootstrap server you may have bigger problems..
-	# Sick of typing this is for now..
-	#read -p "Please input a password for the wavelet-root user: "  wvltroot_pw
-	#read -p "Please input a password for the Wavelet user: " wavelet_pw
-	wvltroot_pw='TestLab032023@'
-	wavelet_pw='WvltU$R60C'
-	rootpw=$(mkpasswd --method=yescrypt ${wvltroot_pw})
-	waveletpw=$(mkpasswd --method=yescrypt ${wavelet_pw})
+	touch rootpw.secure
+	touch waveletpw.secure
+	chmod 0600 *.secure
+	unset tmp_rootpw
+	unset tmp_waveletpw
+	echo -e 'Please input a password for the wavelet-root user: '
+	read -s  tmp_rootpw
+	echo -e 'Please input a password for the wavelet user: '
+	read -s  tmp_waveletpw
+	mkpasswd --method=yescrypt "${tmp_rootpw}" > rootpw.secure
+	mkpasswd --method=yescrypt "${tmp_waveletpw}" > waveletpw.secure
+	unset tmp_rootpw tmp_waveletpw
 	echo -e "Password hashes generated..\n"
 	
-	repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<<"$rootpw")
-	sed -i "s/waveletrootpassword/${repl}/g" ${INPUTFILES}
-        echo -e "${rootpw} injected .. \n" 
+	repl=$(cat rootpw.secure)
+	sed -i "s|waveletrootpassword|${repl}|g" ${INPUTFILES}
+		echo -e "Root password hash injected .. \n" 
 	echo -e "root pw injected..\n"
 	
-	repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<<"$waveletpw")
-	sed -i "s/waveletuserpassword/${repl}/g" ${INPUTFILES}
+	repl=$(cat waveletpw.secure)
+	sed -i "s|waveletuserpassword|${repl}|g" ${INPUTFILES}
 	
-	echo -e "user pw injected..\n"
+	echo -e "user password hash injected..\n"
 	
 	echo -e "Generating SSH Public Key and injecting to Ignition file.."
 	ssh-keygen -t ed25519 -C "wavelet@wavelet.local" -f wavelet
-	pubkeys=$(cat wavelet.pub)
-	sed -i "s/PUBKEYGOESHERE/${pubkeys}/g" ${INPUTFILES}
+	pubkey=$(cat wavelet.pub)
+	sed -i "s|PUBKEYGOESHERE|${pubkey}|g" ${INPUTFILES}
 	echo -e "Ignition customization completed, and .ign files have been generated."
+
+	# WiFi settings
+	cp ./webfiles/root/usr/local/bin/connectwifi.sh.original ./webfiles/root/usr/local/bin/connectwifi.sh
+	INPUTFILES="./webfiles/root/usr/local/bin/connectwifi.sh"
+	echo -e "Moving on to WiFi settings..\n"
+	echo -e "If this hasn't yet been configured, please do so now, as the installer will wait for your input..\n"
+	read -p "Please input the SSID of your configured wireless network: " wifi_ssid
+	read -p "Please input the first three elements of the WiFi BSSID / MAC address, colon delimited like so AA:BB:CC ... " wifi_bssid
+	read -p "Please input the configured password for your WiFi SSID: " wifi_password
+
+		repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_ssid}")
+		sed -i "s/SEDwaveletssid/${repl}/g" ${INPUTFILES}
+
+		repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_bssid}")
+		sed -i "s/SEDwaveletbssid/${repl}/g" ${INPUTFILES}
+
+		repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_password}")
+		sed -i "s/SEDwaveletwifipassword/${repl}/g" ${INPUTFILES}
 }
 
 wifi_setup(){
@@ -103,7 +140,7 @@ wifi_setup(){
 	echo -e "please input your WiFi network and credentials \n
 	Performance highly dependent on AP model, we tested on Ruckus AP's with good results.\n
 	Note the AP needs to be configured seperately by hand, this script won't do that for you!\n"
-	read -p "Configured WiFi SSID: " SSID
+	read -p "Configured WiFi SSID, we recommend you match this as closely as possible to the configured FQDN configured previously: " SSID
 	read -p "Configured WiFi WPA2/WPA3 Password: " WIFIPW
 	# WIFICRYPT=$(echo ${WIFIPW} | openssl enc -aes-256-cbc -md sha512 -a -pbkdf2 -iter 100000 -salt -pass pass:'SuperSecretPassword!111one')
 	# Currently this can't be considered secure because the WiFi Password is in plain text all over the place..
@@ -111,12 +148,19 @@ wifi_setup(){
 	sed -i 's/a-secure-password/$WIFICRYPT/g' ${INPUTFILES}
 }
 
+
+####
+#
 # Main
+#
+####
+
 echo -e "Will this system run on an isolated network?"
 read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || client_networks
 echo -e "System configured for isolated, authoritative mode."
 		# we still need to generate credentials here
 		customization
-
-echo -e "Calling coreos_installer.sh to generate ISO images.  You will then need to burn them to USB/SD cards."
-./coreos_installer.sh
+		echo -e "Creating tar archive"
+			./generate_installer.sh
+		echo -e "Calling coreos_installer.sh to generate ISO images.  You will then need to burn them to USB/SD cards."
+			./coreos_installer.sh

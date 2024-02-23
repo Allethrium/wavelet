@@ -53,3 +53,11 @@ webfiles/root/usr/local/bin/etcd-member.service_old.sh
 webfiles/root/home/wavelet/http-php/html/drawflow-element.js
 server_custom.yml
 server_custom.yml
+waveletpw.secure
+webfiles/root/usr/local/bin/connectwifi.sh
+wavelet-files.tar.xz
+server_custom.yml
+Kernel-change.ContainerFile
+installer.log
+webfiles/root/usr/local/bin/connectwifi.sh
+webfiles/root/usr/local/bin/connectwifi.sh

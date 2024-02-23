@@ -93,7 +93,9 @@ echo -e "RPM package updates completed, finishing installer task..\n"
 }
 
 extract_base(){
+	unzip /home/wavelet/wavelet-files.zip
 	tar xf /home/wavelet/wavelet-files.tar.xz -C /home/wavelet --no-same-owner
+	rm wavelet-files.zip
 	cd /home/wavelet
 	mv ./usrlocalbin.tar.xz /usr/local/bin/
 }
@@ -123,6 +125,7 @@ extract_usrlocalbin(){
 install_decklink(){
 	# adapted from https://github.com/coreos/layering-examples/tree/main/loading-kernel-module
 	# Download Decklink software, extract and install base RPM's (required for Decklink support)
+	# Won't work because.. i lack brain cells, apparently.
 	cd /home/wavelet/
 
 	podman build --build-arg KERNEL_VERSION=$(uname -r) -t quay.io/fedora/fedora-coreos:stable:kmm-kmod -f Containerfile
