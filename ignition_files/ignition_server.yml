@@ -69,11 +69,11 @@ storage:
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/containers/registries.conf.d/10-wavelet.conf
     # Web files for the control component
-    - path: /home/wavelet/wavelet-files.zip
+    - path: /home/wavelet/wavelet-files.tar.xz
       mode: 0644
       overwrite: true
       contents:
-        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/wavelet-files.tar.xz
+        source: https://github.com/Allethrium/wavelet/raw/master/wavelet-files.tar.xz
     # Enable proxy for dnf.conf for all the good it may do us..
     - path: /etc/dnf/dnf.conf
       mode: 0664
