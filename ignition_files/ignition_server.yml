@@ -44,23 +44,23 @@ storage:
       mode: 0644
       overwrite: true
       contents:
-        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/skel_bashrc.txt
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/skel/.bashrc
     - path: /etc/skel/.bash_profile
       mode: 0644
       overwrite: true
       contents:
-        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/skel_profile.txt
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/skel/.bash_profile
     # Wavelet user (b/c default doesn't use skel b/c we aren't using useradd -m)
     - path: /home/wavelet/.bashrc
       mode: 0644
       overwrite: true
       contents:
-        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/skel_bashrc.txt
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/skel/.bashrc
     - path: /home/wavelet/.bash_profile
       mode: 0644
       overwrite: true
       contents:
-        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/skel_profile.txt
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/skel/.bash_profile
     # Registries.conf to define local container registry
     # may change with prod. certs
     - path: /etc/containers/registries.conf.d/10-wavelet.conf
