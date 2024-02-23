@@ -97,16 +97,16 @@ customization(){
 	read -s  tmp_waveletpw
 	mkpasswd --method=yescrypt "${tmp_rootpw}" > rootpw.secure
 	mkpasswd --method=yescrypt "${tmp_waveletpw}" > waveletpw.secure
-	rm tmp_rootpw tmp_waveletpw
+	unset tmp_rootpw tmp_waveletpw
 	echo -e "Password hashes generated..\n"
 	
 	repl=$(cat rootpw.secure)
-	sed -i "s/waveletrootpassword/${repl}/g" ${INPUTFILES}
+	sed -i "s|waveletrootpassword|${repl}|g" ${INPUTFILES}
 		echo -e "Root password hash injected .. \n" 
 	echo -e "root pw injected..\n"
 	
 	repl=$(cat waveletpw.secure)
-	sed -i "s/waveletuserpassword/${repl}/g" ${INPUTFILES}
+	sed -i "s|waveletuserpassword|${repl}|g" ${INPUTFILES}
 	
 	echo -e "user password hash injected..\n"
 	
