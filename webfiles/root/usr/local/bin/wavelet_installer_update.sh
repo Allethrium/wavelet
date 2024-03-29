@@ -20,18 +20,24 @@ UG_HOSTNAME=$(hostname)
 }
 
 event_encoder(){
+	# retreives tar.xz from server
+	wget https://192.168.1.32:8080/ignition/wavelet-files.tar.xz
 	extract_base
 	extract_home && extract_usrlocalbin
 	exit 0
 }
 
 event_decoder(){
+	# retreives tar.xz from server
+	wget https://192.168.1.32:8080/ignition/wavelet-files.tar.xz
 	extract_base
 	extract_home && extract_usrlocalbin
 	exit 0
 }
 
 event_server(){
+	# retreives tar.xz from github for the newest versions
+	wget https://github.com/Allethrium/wavelet/raw/master/wavelet-files.tar.xz
 	mkdir -p /home/wavelet/.config/containers/systemd/
 	chown -R wavelet:wavelet /home/wavelet
 	extract_base
@@ -68,7 +74,18 @@ extract_usrlocalbin(){
 
 
 # Perhaps add a checksum to make sure nothing's been tampered with here..
-wget https://192.168.1.32:8080/ignition/wavelet-files.tar.xz
+#github now generates checksum on push
+
+# curl $checksum URL
+checksum=$(echo sha256sumfile)
+filesum=$(shasum wavelet-files.tar.xz)
+if [[ "${checksum}" == "${filesum}" ]]; then
+	echo "Checksums match, the file is correct.."
+else
+	echo -e "\n\n ****Checksums do not match!  the file may be corrupted or tampered with!****\n\n"
+	exit 0
+fi
+
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 systemctl disable zincati.service --now
 set -x
