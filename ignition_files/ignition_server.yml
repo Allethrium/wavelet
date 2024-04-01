@@ -26,7 +26,7 @@ storage:
       mode: 0755
       overwrite: true
       contents:
-        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9/UltraGrid-1.9-x86_64.AppImage
+        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.1/UltraGrid-1.9.1-x86_64.AppImage
     # Detect NetworkManager name and set as static script
     - path: /usr/local/bin/configure_ethernet.sh
       mode: 0755
