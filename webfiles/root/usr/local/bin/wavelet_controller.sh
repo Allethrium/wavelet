@@ -486,13 +486,16 @@ wavelet-pip2() {
 wavelet-decoder-reset() {
 # Finds all decoders and sets client reSET flag.  This restarts UltraGrid without a full system reboot.
 # Have to clean /DECODER_RESET from result or we get recursion, remember etcd isn't hierarchical!
-	return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --keys-only)
-	RESULT="${return_etcd_clients_ip///DECODER_RESET/}"
-	for host in ${RESULT}; do
-		etcdctl --endpoints=${ETCDENDPOINT} put "${RESULT}/DECODER_RESET" -- "1"
-		echo -e "DECODER_RESET flag enabled for ${host}..\n"
-	done
-	echo -e "Decoder tasks instructed to reset on all attached decoders.\n"
+        return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --keys-only)
+        RESULT="${return_etcd_clients_ip///DECODER_RESET/}"
+        for host in ${RESULT}; do
+                trimmed_host=$(echo ${host} | sed 's|decoderip/||g')
+                echo -e "working on : ${trimmed_host}"
+                etcdctl --endpoints=${ETCDENDPOINT} put "${trimmed_host}/DECODER_RESET" -- "1"
+
+                echo -e "DECODER_RESET flag enabled for ${trimmed_host}..\n"
+        done
+        echo -e "Decoder tasks instructed to reset on all attached decoders.\n"
 }
 
 wavelet-encoder-reboot() {
