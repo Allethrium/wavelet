@@ -129,7 +129,7 @@ case $event in
 	(A)		event_x264sw				&& echo "x264 Software video codec selected, updating encoder variables"										;;
 	(B)		event_x264hw 				&& echo "x264 VA-API video codec selected, updating encoder variables"											;;
 	(C)		event_libx265sw 			&& echo "HEVC Software libx265 video codec selected, updating encoder variables"								;;
-	(C1)	event_libx265sw 			&& echo "HEVC Software libx265 video codec selected, updating encoder variables"								;;
+	(C1)	event_libx265sw_low 		&& echo "HEVC Software libx265 video codec selected, updating encoder variables"								;;
 	(D)		event_libsvt_hevc_sw		&& echo "HEVC Software svt_hevc video codec selected, updating encoder variables"								;;
 	(D2)	event_libsvt_hevc_sw_zerolatency	&& echo "HEVC Software svt_hevc video codec selected, updating encoder variables"						;;	
 	(D1)	event_x265hw				&& echo "HEVC QSV video codec selected, updating encoder variables"												;;
@@ -350,20 +350,20 @@ event_x264sw() {
 }
 
 event_libx265sw() {
-	# disable intra-refresh, enabled threads=o and tweaking MTU seems to help!
+	# enabled threads=0 and tweaking MTU seems to help!  disable_intra_refresh causes a lot of problems
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:tune=zerolatency:threads=0:crf=20:disable_intra_refresh:gop=30"
+	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:tune=zerolatency:threads=0:crf=26:gop=15"
 	write_etcd_global
 	echo -e "libx265 Software mode activated, CRF=20, Bitrate 25M, decoder task restart bit set. \n"
 	wavelet-decoder-reset
 }
 
 event_libx265sw_low() {
-	# disable intra-refresh, enabled threads=o and tweaking MTU seems to help!
+	# enabled threads=0 and tweaking MTU seems to help! disable_intra_refresh causes a lot of problems
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=26:threads=0:disable_intra_refresh:gop=30"
+	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=30:threads=0:gop=15"
 	write_etcd_global
-	echo -e "x265 SVT Software mode activated, CRF=26, decoder task restart bit set. \n"
+	echo -e "x265 SVT Software mode activated, CRF=30, decoder task restart bit set. \n"
 	wavelet-decoder-reset
 }
 
@@ -391,10 +391,10 @@ event_libsvt_hevc_sw_zerolatency() {
 event_x265hw() {
 # working on tweaking these values to something as reliable as possible.
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=hevc_qsv:low_power=1:gop=30:crf=28"
+	KEYVALUE="libavcodec:encoder=hevc_qsv:low_power=1:gop=15:crf=26"
 #	KEYVALUE="libavcodec:encoder=hevc_qsv:gop=12:bitrate=15M:bpp=10:subsampling=444:q=0:scenario=remotegaming:profile=main10"
 	write_etcd_global
-	echo -e "x265 Hardware acceleration activated, Bitrate 25M, decoder task restart bit set. \n"
+	echo -e "x265 Hardware acceleration activated, Constant Rate Factor=26 , decoder task restart bit set. \n"
 	wavelet-decoder-reset
 }
 
