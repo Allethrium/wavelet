@@ -128,24 +128,24 @@ case $event in
 	# HW and SW modes selected for compatibility reasons - some decoders don't like HW encoded video.  SW encoding will need a *FAST* CPU unless you like latency, dropped frames and glitches.
 	(A)		event_x264sw				&& echo "x264 Software video codec selected, updating encoder variables"										;;
 	(B)		event_x264hw 				&& echo "x264 VA-API video codec selected, updating encoder variables"											;;
-	(C)		event_libx265sw 			&& echo "HEVC Software libx265 video codec selected, updating encoder variables"								;;
-	(C1)	event_libx265sw 			&& echo "HEVC Software libx265 video codec selected, updating encoder variables"								;;
-	(D)		event_libsvt_hevc_sw		&& echo "HEVC Software svt_hevc video codec selected, updating encoder variables"								;;
-	(D2)	event_libsvt_hevc_sw_zerolatency	&& echo "HEVC Software svt_hevc video codec selected, updating encoder variables"						;;	
-	(D1)	event_x265hw				&& echo "HEVC QSV video codec selected, updating encoder variables"												;;
-	(E)		event_vp9sw					&& echo "VP-9 Software video codec selected, updating encoder variables"										;;
+	(C)		event_libx265sw 			&& echo "HEVC Software libx265 video codec HI selected, updating encoder variables"								;;
+	(C1)		event_libx265sw_low 			&& echo "HEVC Software libx265 video codec LOW selected, updating encoder variables"								;;
+	(D)		event_libsvt_hevc_sw			&& echo "HEVC Software svt_hevc video codec selected, updating encoder variables"								;;
+	(D2)		event_libsvt_hevc_sw_zerolatency	&& echo "HEVC Software svt_hevc ZeroLatency video codec selected, updating encoder variables"						;;	
+	(D1)		event_x265hw				&& echo "HEVC QSV video codec selected, updating encoder variables"												;;
+	(E)		event_vp9sw				&& echo "VP-9 Software video codec selected, updating encoder variables"										;;
 	(F)		event_vp9hw 				&& echo "VP-9 Hardware video codec selected, updating encoder variables"										;;
 	(G)		event_rav1esw				&& echo "|*****||EXPERIMENTAL AV1 RAV1E codec selected, updating encoder variables||****|"						;;
-	(H)		event_av1hw					&& echo "|*****||EXPERIMENTAL AV1 VA-API codec selected, updating encoder variables||****|"						;;
-	(H1)	event_libaom_av1			&& echo "|*****||EXPERIMENTAL AV1 LibAOM codec selected, updating encoder variables||****|"						;;	
+	(H)		event_av1hw				&& echo "|*****||EXPERIMENTAL AV1 VA-API codec selected, updating encoder variables||****|"						;;
+	(H1)		event_libaom_av1			&& echo "|*****||EXPERIMENTAL AV1 LibAOM codec selected, updating encoder variables||****|"						;;	
 	#
 	# Multiple input modes go here (I wonder if there's a better, matrix-based approach to this?)
 	#
-	(W) echo "Four-way panel split activated \n"						;current_event="event_foursplit";wavelet-foursplit								;;
-	(X) echo "Two-way panel split activated \n"							;current_event="event_twosplit"	;wavelet-twosplit								;;
+	(W) echo "Four-way panel split activated \n"						;current_event="event_foursplit"	;wavelet-foursplit								;;
+	(X) echo "Two-way panel split activated \n"						;current_event="event_twosplit"	;wavelet-twosplit								;;
 	(Y) echo "Picture-in-Picture 1 activated \n"						;current_event="event_pip1"		;wavelet-pip1									;;
 	(Z) echo "Picture-in-Picture 2 activated \n"						;current_event="event_pip2"		;wavelet-pip2									;;
-	(*) echo "Unknown predefined input, passing hash to encoders.. \n"	;current_event="dynamic"		;wavelet-dynamic								;;
+	(*) echo "Unknown predefined input, passing hash to encoders.. \n"			;current_event="dynamic"		;wavelet-dynamic								;;
 esac
 }
 
@@ -227,7 +227,7 @@ wavelet-seal() {
 	KEYVALUE="SEAL"
 	write_etcd_global
 	# Always set this to SW x265, everything else breaks due to pixel format issues w/ FFMPEG/lavc
-	encodervar="libavcodec:encoder=libx265:gop=6:bitrate=15M:subsampling=444:bpp=10"
+	encodervar="libavcodec:encoder=libx265:gop=30:crf=28:subsampling=444:bpp=10"
 	inputvar="-t file:/home/wavelet/seal.mp4:loop"
 	/usr/local/bin/wavelet_textgen.sh
 	cd /home/wavelet/
@@ -350,18 +350,18 @@ event_x264sw() {
 }
 
 event_libx265sw() {
-	# disable intra-refresh, enabled threads=o and tweaking MTU seems to help!
+	# disable intra-refresh stops the clients picking anything useful up, enabled threads=0 and tweaking MTU seems to help!
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:tune=zerolatency:threads=0:crf=20:disable_intra_refresh:gop=30"
+	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:threads=0:crf=26:gop=30"
 	write_etcd_global
-	echo -e "libx265 Software mode activated, CRF=20, Bitrate 25M, decoder task restart bit set. \n"
+	echo -e "libx265 Software mode activated, CRF=26, decoder task restart bit set. \n"
 	wavelet-decoder-reset
 }
 
 event_libx265sw_low() {
-	# disable intra-refresh, enabled threads=o and tweaking MTU seems to help!
+	# Threads=0 and tweaking MTU seems to help!
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=26:threads=0:disable_intra_refresh:gop=30"
+	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=30:threads=0:gop=30"
 	write_etcd_global
 	echo -e "x265 SVT Software mode activated, CRF=26, decoder task restart bit set. \n"
 	wavelet-decoder-reset
