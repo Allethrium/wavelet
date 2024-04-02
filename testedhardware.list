@@ -2,14 +2,17 @@ Tested Hardware:
 
 PC's:
 
-	12th Gen Intel Core-I5 or better CPU
+	-	12th Gen Intel Core-I5 or better CPU
 	Required for VA-API / QuickSync video core
+	-	Newer CPU require OneAPI.
 
 	For low-power, good results on Alder-Lake based SBC boards such as upcoming ZimaBlade, ZX05 etc.
 	HW acceleration necesary due to tight CPU constraints.  Probably make stellar low-cost decoders!
 
-	WiFi 6 networking via PCIe is highly recommended, 5ghz wifi capability is effectively a requirement. USB works, however does introduce some overhead.
-	B/G Band WiFi works, but very poorly.
+	WiFi 6 networking via PCIe is highly recommended, 5ghz wifi capability is effectively a requirement. 
+	USB works, however does introduce some overhead.
+	
+	B/G Band WiFi can be used, would NOT recommend.
 
 	Older CPU's will work, but may struggle particularly with more advanced HEVC/VP9/AV1 codecs
 
@@ -26,11 +29,13 @@ tested SBC's:
 
 	Khadas:
 		VIM1			-	Too Slow, HDMI output issues.
-		VIM3S			-	Functional, but blacks are crushed on video output.  HW Video acceleration and therefore custom kernel is a requirement.
-		Edge2			-	WiFi 5ghz is broken, requires proprietary kernel for proper video acceleration, non-starter until these issues are fixed.
+		VIM3S			-	Functional, but blacks are crushed on video output.  
+						HW Video acceleration and therefore custom kernel is a requirement.
+		Edge2			-	Requires proprietary kernel from Khadas (Fenix) for proper video acceleration, hw encoding has issues
+						can perform low-grade software encode but struggles with HEVC and higher..
 	
 	Orange Pi:
-		OrangePi 4LTS	-	Software acceleration only, struggles on nearly every codec
+		OrangePi 4LTS		-	Software acceleration only, struggles on nearly every codec
 
 	Odroid:
 		Odroid M1		-	Manufacturer is missing wifi kernel modules, struggles on most codecs due to older design
@@ -38,7 +43,19 @@ tested SBC's:
 	Raspberry Pi:
 		?
 
-	Here, I think we are waiting for that one SBC unicorn with proper mainline kernel support.  Suggestions are more than welcome.
+	Mini-PC ZX05:
+		Ali-Express Intel N95 derived SBC.  Works perfectly, full HW decode.  Can be run as server as long as you stick with HW encoding.
+
+	Asus:
+		Asus Mini-PC PN42.  Works perfectly. Can be run as server as long as you stick with HW encoding.
+
+	ZimaBlade:
+		In testing
+
+
+	The Intel SBC are clear winners for target hardware down to cost, x86 compatibility and Intel's efforts on LibVA and OneAPI.  
+	I'd like to circle back once we have some options with open-source Hardware encoding, however mainline ARM support seems very slow.
+	For now, stick with x86.
 
 
 
@@ -50,8 +67,8 @@ Wired:
 
 
 Wireless:
-	Ruckus R350 Access Point 	-	Currently the recommended standard
-	Ubiquiti AC-Pro				-	Functional but lacking WiFi6 support
+	Ruckus R350 Access Point 		-	Currently the recommended standard
+	Ubiquiti AC-Pro			-	Functional but lacking WiFi6 support
 	Ubiquiti UAP				-	B/G band WiFi too slow, worked on one or two decoders but performance was spotty
 	Extreme Networks			-	AP needs a standalone mode, many enterprise AP's are not suitable for this reason
 
@@ -59,14 +76,20 @@ Network Cards:
 	Hawking WiFi 6 USB 			-	Functional but USB adds unacceptable overhead
 	Intel Built-In ??			-	No issues
 	Mellanox CX2				-	To be tested (RoCE/RDMA support to further lower latency?)
+	Intel X710				-	Good performance
 
 HDMI Capture Devices:
-	MageWell HDMI Capture Pro 	-	Fully supported.  Can be spotty on HDMI input due to HDCP issues
-	LG USB Capture Cards		-	Fully supported.  Large delay when spinning up V4L2 capture, however.  Less fussy about inputs than the Magewell
-	Decklink					-	On shopping list, would also like to add SDI support
+	MageWell HDMI Capture Pro 	-	Fully supported.  Can be spotty on HDMI input due to HDCP issues.
+						Recommend configuring via Windows configuration app prior to deployment for pixel formats
+						
+	LG USB Capture Cards		-	Fully supported.  
+						Large delay when spinning up V4L2 capture.  
+						Less fussy about video input than the Magewell
+
+	BlackMagic Decklink		-	Requires DKMS module, which is thorny to build on CoreOS due to hurdles with rpm-ostree.
+						Nearly all PCIE cards will require kernel modules, but should have better performance by 20ms/frame+
 
 USB Input Devices:
-	IPEVO Ziggy Document Camera - 	Fully supported @ 1080/30fps.   On some machines refuses to capture at above 15fps, however.
-	ELMO document camera		-	not yet tested
+	IPEVO Ziggy Document Camera 	- 	Fully supported @ 1080/30fps.   On some machines refuses to capture at above 15fps, however.
+	ELMO document camera			-	not yet tested
 	TESIRA ex-UBT				-	not yet tested (linux support on website isn't alluded to)
-	?							- 	This is likely where we'll see the most devices eventually.
