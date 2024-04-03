@@ -42,6 +42,7 @@ event_server(){
 	cd /home/wavelet
 	rpm_ostree_install
 	git clone https://github.com/ALLETHRIUM/wavelet
+	generate_tarfiles
 	extract_base
 	extract_home && extract_usrlocalbin
 	# not functional yet, needs a lot of work
@@ -96,6 +97,16 @@ touch /var/rpm-ostree-overlay.complete
 touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
 touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
 echo -e "RPM package updates completed, finishing installer task..\n"
+}
+
+generate_tarfiles(){
+		echo -e "Generating tar.xz files for upload to distribution server..\n"
+		tar -cJf usrlocalbin.tar.xz --owner=root:0 -C home/wavelet/wavelet/webfiles/root/usr/local/bin/ .
+		tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C home/wavelet/wavelet/webfiles/root/home/wavelet/ .
+		echo -e "Packaging files together..\n"
+		tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz}
+		echo -e "Done."
+		rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz}
 }
 
 extract_base(){
