@@ -53,3 +53,4 @@ Kernel-change.ContainerFile
 installer.log
 webfiles/root/usr/local/bin/connectwifi.sh
 rootpw.secure
+rootpw.secure

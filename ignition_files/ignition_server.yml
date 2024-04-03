@@ -9,6 +9,7 @@ kernel_arguments:
     - nosmt
     - threadirqs
     - mitigations=off
+    - cpufreq.default_governor=performance
     - ip=192.168.1.32::192.168.1.1:255.255.255.0:svr.wavelet.local::on
     - nameserver=192.168.1.1
     - nameserver=9.9.9.9
@@ -175,9 +176,22 @@ storage:
       overwrite: true
       contents:
         inline: |
-          net.core.wmem_max = 8388608
-          net.core.rmem_max = 72990720   # for uncompressed 8K
+          # As per UG Team
+          # Increase the read-buffer space allocatable
+          net.ipv4.tcp_mem = 1000000 2000000 83886080
+          net.ipv4.tcp_rmem = 8192 4194394 83886080
+          net.ipv4.udp_mem = 8388608 12582912 83886080
+          net.core.rmem_default = 83886080
+          net.core.rmem_max = 83886080
+          net.core.netdev_max_backlog = 2000
           net.ipv4.ip_unprivileged_port_start=53
+          # Increase the write-buffer-space allocatable
+          net.ipv4.tcp_wmem = 8192 4194394 83886080
+          net.ipv4.udp_wmem = 8388608 12582912 83886080
+          net.core.wmem_default = 83886080
+          net.core.wmem_max = 83886080
+          # intel gpu
+          dev.i915.perf_stream_paranoid=0
     - path: /etc/modprobe.d/i915.conf
       mode: 0644
       overwrite: true

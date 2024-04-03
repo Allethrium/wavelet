@@ -368,9 +368,7 @@ event_libx265sw_low() {
 }
 
 event_libsvt_hevc_sw() {
-	# NB zerolatency disables frame parallelism, can't use multicore!
 	# Feedback from deployment:
-	# The decoders HATE libx265 (massive dropped frames), we need to use libsvt_hevc instead.
 	# consider this the default COMPAT mode until we have a handle on things
 	KEYNAME=uv_encoder
 	#KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:tune=zerolatency:qp=26:gop=6:bitrate=25"
@@ -380,21 +378,19 @@ event_libsvt_hevc_sw() {
 
 event_libsvt_hevc_sw_zerolatency() {
 	# NB zerolatency disables frame parallelism, can't use multicore!
-	# Feedback from deployment:
-	# The decoders HATE libx265 (massive dropped frames), we need to use libsvt_hevc instead.
 	KEYNAME=uv_encoder
 	#KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:tune=zerolatency:qp=26:gop=6:bitrate=25"
 	KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=10:tune=zerolatency:pred_struct=0:crf=28:gop=6:bitrate=10M"
 	write_etcd_global
 }	
 
-event_x265hw() {
+event_x265hevc() {
 # working on tweaking these values to something as reliable as possible.
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=hevc_qsv:low_power=1:gop=15:crf=26"
+	KEYVALUE="libavcodec:encoder=hevc_qsv:compressionframedelay=0:rc=qvbr:low_power=1:gop=15:cqp=20"
 #	KEYVALUE="libavcodec:encoder=hevc_qsv:gop=12:bitrate=15M:bpp=10:subsampling=444:q=0:scenario=remotegaming:profile=main10"
 	write_etcd_global
-	echo -e "x265 Hardware acceleration activated, Constant Rate Factor=26 , decoder task restart bit set. \n"
+	echo -e "x265 QSV Hardware acceleration activated, decoder task restart bit set. \n"
 	wavelet-decoder-reset
 }
 

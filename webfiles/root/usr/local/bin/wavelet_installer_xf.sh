@@ -66,6 +66,8 @@ https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E 
 echo -e "RPM Fusion repo installed, waiting for 2 seconds..\n"
 sleep 2
 
+# This is everything-and-the-kitchen sink approach to media acceleration.  We should probably add some detection logic here re; hardware platforms
+# and install only the appropriate packages to clean this up at some point..
 /usr/bin/rpm-ostree install \
 -y -A --idempotent \
 intel-media-driver \
@@ -73,6 +75,7 @@ intel-gpu-tools intel-compute-runtime oneVPL-intel-gpu intel-media-driver intel-
 intel-level-zero oneapi-level-zero oneVPL intel-mediasdk libva libva-utils libva-v4l2-request libva-vdpau-driver intel-ocloc \
 ocl-icd opencl-headers mpv libsrtp mesa-dri-drivers intel-opencl \
 libvdpau-va-gl mesa-vdpau-drivers libvdpau libvdpau-devel \
+libvpl libvpl-devel libva-intel-driver \
 ffmpeg ffmpeg-libs libheif-freeworld \
 neofetch htop \
 mesa-libOpenCL python3-pip srt srt-libs ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
