@@ -28,6 +28,23 @@ storage:
       overwrite: true
       contents:
         source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.1/UltraGrid-1.9.1-x86_64.AppImage
+    # WiFi WiFi Name
+    - path: /var/home/wavelet/wifi_ssid
+      overwrite: true
+      contents:
+        inline: SEDwaveletssid
+    # WiFi WiFi Name
+    - path: /var/home/wavelet/wifi_bssid
+      mode: 0600
+      overwrite: true
+      contents:
+        inline: SEDwaveletbssid
+    # WiFi WPA Passphrase
+    - path: /var/home/wavelet/wifi_pw
+      mode: 0600
+      overwrite: true
+      contents:
+        inline: SEDwaveletwifipassword
     # Detect NetworkManager name and set as static script
     - path: /usr/local/bin/configure_ethernet.sh
       mode: 0755
@@ -69,12 +86,12 @@ storage:
       overwrite: true
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/containers/registries.conf.d/10-wavelet.conf
-    # Web files for the control component
-    - path: /home/wavelet/wavelet-files.tar.xz
+    # Installer script to handle ostree overlay and git clone
+    - path: /usr/local/bin/wavelet-installer_xf.sh
       mode: 0644
       overwrite: true
       contents:
-        source: https://github.com/Allethrium/wavelet/raw/master/wavelet-files.tar.xz
+        source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/usr/local/bin/wavelet_installer_xf.sh
     # Enable proxy for dnf.conf for all the good it may do us..
     - path: /etc/dnf/dnf.conf
       mode: 0664
