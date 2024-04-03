@@ -18,6 +18,23 @@ kernel_arguments:
     # - preempt=full
 storage:
   files:
+    # WiFi WiFi Name
+    - path: /var/home/wavelet/wifi_ssid
+      overwrite: true
+      contents:
+        inline: SEDwaveletssid
+    # WiFi WiFi Name
+    - path: /var/home/wavelet/wifi_bssid
+      mode: 0600
+      overwrite: true
+      contents:
+        inline: SEDwaveletbssid
+    # WiFi WPA Passphrase
+    - path: /var/home/wavelet/wifi_pw
+      mode: 0600
+      overwrite: true
+      contents:
+        inline: SEDwaveletwifipassword
     # UltraGrid AppImage
     - path: /usr/local/bin/UltraGrid.AppImage
       mode: 0755

@@ -117,10 +117,10 @@ customization(){
 	echo -e "Ignition customization completed, and .ign files have been generated."
 
 	# WiFi settings
-	cp ./webfiles/root/usr/local/bin/connectwifi.sh.original ./webfiles/root/usr/local/bin/connectwifi.sh
-	INPUTFILES="./webfiles/root/usr/local/bin/connectwifi.sh"
+	# changed to mod ignition files w/ inline data for the scripts to call, this way I don't publish wifi secrets to github.
+	INPUTFILES="server_custom.yml encoder_custom.yml decoder_custom.yml"
 	echo -e "Moving on to WiFi settings..\n"
-	echo -e "If this hasn't yet been configured, please do so now, as the installer will wait for your input..\n"
+	echo -e "If your Wifi AP hasn't yet been configured, please do so now, as the installer will wait for your input..\n"
 	read -p "Please input the SSID of your configured wireless network: " wifi_ssid
 	read -p "Please input the first three elements of the WiFi BSSID / MAC address, colon delimited like so AA:BB:CC ... " wifi_bssid
 	read -p "Please input the configured password for your WiFi SSID: " wifi_password
@@ -135,19 +135,6 @@ customization(){
 		sed -i "s/SEDwaveletwifipassword/${repl}/g" ${INPUTFILES}
 }
 
-wifi_setup(){
-	INPUTFILES=./webfiles/root/usr/local/bin/decoderhostname.sh
-	echo -e "please input your WiFi network and credentials \n
-	Performance highly dependent on AP model, we tested on Ruckus AP's with good results.\n
-	Note the AP needs to be configured seperately by hand, this script won't do that for you!\n"
-	read -p "Configured WiFi SSID, we recommend you match this as closely as possible to the configured FQDN configured previously: " SSID
-	read -p "Configured WiFi WPA2/WPA3 Password: " WIFIPW
-	# WIFICRYPT=$(echo ${WIFIPW} | openssl enc -aes-256-cbc -md sha512 -a -pbkdf2 -iter 100000 -salt -pass pass:'SuperSecretPassword!111one')
-	# Currently this can't be considered secure because the WiFi Password is in plain text all over the place..
-	sed -i 's/Wavelet-wifi5g/$SSID/g' ${INPUTFILES}
-	sed -i 's/a-secure-password/$WIFICRYPT/g' ${INPUTFILES}
-}
-
 
 ####
 #
@@ -160,7 +147,5 @@ read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] 
 echo -e "System configured for isolated, authoritative mode."
 		# we still need to generate credentials here
 		customization
-		echo -e "Creating tar archive"
-			./generate_installer.sh
 		echo -e "Calling coreos_installer.sh to generate ISO images.  You will then need to burn them to USB/SD cards."
 			./coreos_installer.sh

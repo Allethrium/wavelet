@@ -36,11 +36,14 @@ event_decoder(){
 }
 
 event_server(){
+	# create directories, install base packages and git clone wavelet
 	mkdir -p /home/wavelet/.config/containers/systemd/
 	chown -R wavelet:wavelet /home/wavelet
+	cd /home/wavelet
+	rpm_ostree_install
+	git clone https://github.com/ALLETHRIUM/wavelet
 	extract_base
 	extract_home && extract_usrlocalbin
-	rpm_ostree_install
 	# not functional yet, needs a lot of work
 	# install_decklink
 	/usr/local/bin/local_rpm.sh
@@ -52,9 +55,9 @@ rpm_ostree_install(){
 wget fontawesome-fonts wl-clipboard nnn mako sway bemenu rofi-wayland lxsession sway-systemd waybar \
 foot vim powerline powerline-fonts vim-powerline NetworkManager-wifi iw wireless-regdb wpa_supplicant \
 cockpit-bridge cockpit-networkmanager cockpit-system cockpit-ostree cockpit-podman buildah rdma git \
-iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd dnf yum-utils createrepo \
+iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd dnf yum-utils createrepo sha \
 libsrtp libdrm python3-pip srt srt-libs libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
-ImageMagick  intel-opencl mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
+ImageMagick intel-opencl mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
 mesa-libxatracker alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools dkms kernel-headers
 echo -e "Base RPM Packages installed, waiting for 2 seconds..\n"
 sleep 5
@@ -66,8 +69,8 @@ https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E 
 echo -e "RPM Fusion repo installed, waiting for 2 seconds..\n"
 sleep 2
 
-# This is everything-and-the-kitchen sink approach to media acceleration.  We should probably add some detection logic here re; hardware platforms
-# and install only the appropriate packages to clean this up at some point..
+# This is everything-and-the-kitchen sink approach to media acceleration.
+# libvpl libvpl-devel required for older intel CPU, has clash with oneVPL library however, so need detection logic.
 /usr/bin/rpm-ostree install \
 -y -A --idempotent \
 intel-media-driver \
@@ -75,7 +78,7 @@ intel-gpu-tools intel-compute-runtime oneVPL-intel-gpu intel-media-driver intel-
 intel-level-zero oneapi-level-zero oneVPL intel-mediasdk libva libva-utils libva-v4l2-request libva-vdpau-driver intel-ocloc \
 ocl-icd opencl-headers mpv libsrtp mesa-dri-drivers intel-opencl \
 libvdpau-va-gl mesa-vdpau-drivers libvdpau libvdpau-devel \
-libvpl libvpl-devel libva-intel-driver \
+libva-intel-driver \
 ffmpeg ffmpeg-libs libheif-freeworld \
 neofetch htop \
 mesa-libOpenCL python3-pip srt srt-libs ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
