@@ -25,9 +25,10 @@ fi
 IMAGEFILE=$(ls -t *.iso | head -n1)
 echo "Generating Ignition files with Butane.."
 butane --pretty --strict ./server_custom.yml --output server.ign
-#butane --pretty --strict ./encoder_custom.yml --output encoder.ign
+butane --pretty --strict ./encoder_custom.yml --output encoder.ign
 butane --pretty --strict ./decoder_custom.yml --output decoder.ign
 echo "Customizing ISO files with Ignition"
 coreos-installer iso customize --dest-device ${DESTINATION_DEVICE} --dest-ignition decoder.ign -o $HOME/Downloads/wavelet_decoder.iso ${IMAGEFILE}
+coreos-installer iso customize --dest-device ${DESTINATION_DEVICE} --dest-ignition encoder.ign -o $HOME/Downloads/wavelet_encoder.iso ${IMAGEFILE}
 coreos-installer iso customize --dest-device ${DESTINATION_DEVICE} --dest-ignition server.ign -o $HOME/Downloads/wavelet_server.iso ${IMAGEFILE}
 echo -e "Images generated, server will subsequently bootstrap everything. \n ensure it's setup before attempting to install another device, or their installation will fail. \n"
