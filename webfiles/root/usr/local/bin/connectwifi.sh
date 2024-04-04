@@ -3,7 +3,7 @@
 
 # These are now defined by inline files in ignition so they can be "securely" customized ahead of time
 networkssid=$(echo /var/home/wavelet/wifi_ssid)
-wifipassword=$(echo /var/home/wavelet/wifi_ssid)
+wifipassword=$(echo /var/home/wavelet/wifi_bssid)
 wifi_ap_mac=$(echo /var/home/wavelet/wifi_pw)
 
 connectwifi(){
