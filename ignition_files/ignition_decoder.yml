@@ -41,7 +41,8 @@ storage:
       overwrite: true
       contents:
         source: http://192.168.1.32:8080/UltraGrid.AppImage
-    # Sets hostname (assume decoder until changed manually)
+    # Sets hostname (set randomly after bootstrap process completes.
+    # Any decoder can be promoted to another device by manually changing hostname
     - path: /etc/hostname
       mode: 0644
       overwrite: true

@@ -1,5 +1,4 @@
-# Depreciated - don't use this anymore, it uses the decoder ignition script and autodetects itself based off hostname now.
-
+# Updated to keep in line with current standard settings.
 variant: fcos
 version: 1.5.0
 kernel_arguments: 
@@ -27,48 +26,107 @@ storage:
       mode: 0600
       overwrite: true
       contents:
-        inline: SEDwaveletwifipassword      
-# Sets hostname (PRECONFIGURED by initial setup script in actual deployment, or you can edit it here and generate an ignition file with butane..)
+        inline: SEDwaveletwifipassword
+    # UltraGrid AppImage
+    - path: /usr/local/bin/UltraGrid.AppImage
+      mode: 0755
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/UltraGrid.AppImage
+    # Sets hostname (set during build phase after bootstrap)
     - path: /etc/hostname
       mode: 0644
       overwrite: true
-      contents: 
-        inline: enc0.mis.357m.60c.wavelet.local
-# run_ug.sh script that launches UltraGrid and handles tasks such as client registration and setting keys in etcd
-    - path: /home/wavelet/run_ug.sh
-      mode: 0755
-      overwrite: true
-      contents: 
-        source: https://www.andymelville.net/wavelet/run_ug.sh
-# Skel .bashrc, profile customizations and Q.O.L improvements can go here
+      contents:
+        inline: encX.wavelet.local
+    # Skel .bashrc, profile customizations and Q.O.L improvements can go here
     - path: /etc/skel/.bashrc
       mode: 0644
       overwrite: true
-      contents: 
-        source: https://andymelville.net/wavelet/skel_bashrc.txt
+      contents:
+        source: http://192.168.1.32:8080/ignition/skel_bashrc.txt
     - path: /etc/skel/.bash_profile
       mode: 0644
       overwrite: true
-      contents: 
-        source: https://andymelville.net/wavelet/skel_profile.txt
-# Wavelet user (b/c default doesn't use skel b/c we aren't using useradd -m)
+      contents:
+        source: http://192.168.1.32:8080/ignition/skel_profile.txt
+    # Wavelet user (b/c default doesn't use skel b/c we aren't using useradd -m)
     - path: /home/wavelet/.bashrc
       mode: 0644
       overwrite: true
-      contents: 
-        source: https://andymelville.net/wavelet/skel_bashrc.txt
+      contents:
+        source: http://192.168.1.32:8080/ignition/skel_bashrc.txt
     - path: /home/wavelet/.bash_profile
       mode: 0644
       overwrite: true
-      contents: 
-        source: https://andymelville.net/wavelet/skel_profile.txt
-# Registries.conf to define local container registry - this is always the same data, may change with prod. certs
-    - path: /etc/containers/registries.conf
+      contents:
+        source: http://192.168.1.32:8080/ignition/skel_profile.txt
+    # PolKit entries for systemd services the wavelet user is allowed to manage
+    - path: /etc/polkit-1/rules.d/1337-wavelet.rules
       mode: 0644
       overwrite: true
-      contents: 
-        source: https://andymelville.net/wavelet/registries.conf
-# Define system performance settings
+      contents:
+        inline: |
+          polkit.addRule(function(action, subject) {
+          if (action.id == "org.freedesktop.systemd1.manage-units") {
+              polkit.log("action=" + action)
+              polkit.log("subject=" + subject)
+              polkit.log("unit="+action.lookup("unit"))
+              polkit.log("verb="+action.lookup("verb"))
+              if (action.lookup("unit") == "systemd-resolved.service" ||
+                  action.lookup("unit") == "dnsmasq.service" ||
+                  action.lookup("unit") == "decoderhostname.service" ||
+                  action.lookup("unit") == "etcd-member.service")
+                  {
+                  var verb = action.lookup("verb");
+                  if (verb == "start" || verb == "stop" || verb == "restart" || verb == "enable" || verb == "disable") {
+                      polkit.log("returning YES")
+                      return polkit.Result.YES;
+                  }
+              }
+          }
+          polkit.log("returning NO") });
+# PolKit entries for systemd services the wavelet user is allowed to manage
+    - path: /etc/polkit-1/rules.d/1338-wavelet-wifi.rules
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          [Allow wi-fi scans for all users]
+          Identity=unix-user:*
+          Action=org.freedesktop.NetworkManager.wifi.scan
+          ResultAny=yes
+          ResultInactive=yes
+          ResultActive=yes
+# Allow wavelet user access to hostnamectl
+    - path: /etc/polkit-1/rules.d/49-wavelet-hostnamectl.rules
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          polkit.addRule(function(action, subject) {
+          if (action.id == "org.freedesktop.hostname1.set-hostname") {
+            if (subject.user == "wavelet") {
+              return polkit.Result.YES;
+                  }
+                }
+          polkit.log("returning NO") });
+              });
+    # generate dnf repository
+    # looks at the server for cached packages before trying to download anything
+    # saves about 800mb+ BW per install!
+    - path: /etc/yum.repos.d/wavelet.repo
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          [wavelet-repo]
+          name=Wavelet local server repository
+          baseurl=http://192.168.1.32:8080/repo_mirror/fedora/releases/$releasever/$basearch
+          enabled=1
+          gpgcheck=0
+          priority=10
+    # Define system performance settings
     - path: /etc/sysctl.d/90-sysrq.conf
       mode: 0644
       contents:
@@ -95,24 +153,8 @@ storage:
           net.core.wmem_max = 83886080
           # intel gpu
           dev.i915.perf_stream_paranoid=0
-# Define Udev rules for USB inputs, download appropriate scriptfiles
-    - path: /etc/udev/rules.d/80-wavelet-encoder.rules
-      mode: 0644
-      overwrite: true
-      contents:
-        inline: |
-          ACTION=="add", ENV{ID_BUS}=="usb", SUBSYSTEM=="usb", RUN+="/home/wavelet/udev_call.sh"
-    - path: /home/wavelet/udev_call.sh
-      mode: 0755
-      overwrite: true
-      contents: 
-        source: https://andymelville.net/wavelet/udev_call.sh
-    - path: /home/wavelet/detectv4l.sh
-      mode: 0755
-      overwrite: true
-      contents: 
-        source: https://andymelville.net/wavelet/detectv4l.sh
-# Enable password auth so you can get into the server via Cockpit
+          net.ipv4.ip_unprivileged_port_start=53
+    # Prevent SSHD from generating older key types
     - path: /etc/ssh/sshd_config.d/20-enable-passwords.conf
       mode: 0644
       contents:
@@ -121,30 +163,42 @@ storage:
           # Enable it.
           # This file must sort before 40-disable-passwords.conf.
           PasswordAuthentication yes
-# run_ug.sh script that launches UltraGrid and handles tasks such as client registration and setting keys in etcd
-    - path: /home/wavelet/run_ug.sh
+    # Prevent SSHD from accepting anything other than modern ed25519 keytypes.
+    - path: /etc/ssh/sshd_config.d/30-ed25519-only.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          PubkeyAcceptedKeyTypes ssh-ed25519-cert-v01@openssh.com,ssh-ed25519 
+    # We don't want rolling updates enabled via Zincati, as this is an offline appliance
+    - path: /etc/zincati/config.d/90-disable-auto-updates.toml
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          # Disable Zincati service auto-updates
+          [updates]
+          enabled = false
+    # Define Udev rules for USB inputs, download appropriate scriptfiles
+    - path: /etc/udev/rules.d/80-wavelet-encoder.rules
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          ACTION=="add", ENV{ID_BUS}=="usb", SUBSYSTEM=="usb", RUN+="/usr/local/bin/udev_call.sh"
+          ACTION=="remove", ENV{ID_BUS}=="usb", SUBSYSTEM=="usb", RUN+="/usr/local/bin/udev_call.sh removed"
+    # Remainder files to be served from a previously configured Wavelet server.
+    - path: /home/wavelet/wavelet-files.tar.xz
       mode: 0755
       overwrite: true
-      contents: 
-        source: https://www.andymelville.net/wavelet/run_ug.sh
-# wavelet_reflector.sh to run the reflector
-    - path: /home/wavelet/wavelet_reflector.sh
+      contents:
+        source: http://192.168.1.32:8080/ignition/wavelet-files.tar.xz
+    # Setup script for RPMFusion depends
+    - path: /usr/local/bin/wavelet_installer_xf.sh
       mode: 0755
       overwrite: true
-      contents: 
-        source: https://www.andymelville.net/wavelet/wavelet_reflector.sh
-# monitor_encoderflag.sh to monitor for encoder restarts
-    - path: /home/wavelet/wavelet_client_poll.sh
-      mode: 0755
-      overwrite: true
-      contents: 
-        source: https://www.andymelville.net/wavelet/wavelet_client_poll.sh
-# monitor_encoderflag.sh to monitor for encoder restarts
-    - path: /home/wavelet/monitor_encoderflag.sh
-      mode: 0755
-      overwrite: true
-      contents: 
-        source: https://www.andymelville.net/wavelet/monitor_encoderflag.sh
+      contents:
+        source: http://192.168.1.32:8080/ignition/wavelet_installer_xf.sh
 # TODO Define PipeWire/Wireplumber settings for BT Audio capture to livestream
 # Linger services for User services configure in the USER section below
     - path: /var/lib/systemd/linger/wavelet

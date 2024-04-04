@@ -145,7 +145,6 @@ customization(){
 echo -e "Will this system run on an isolated network?"
 read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || client_networks
 echo -e "System configured for isolated, authoritative mode."
-		# we still need to generate credentials here
-		customization
-		echo -e "Calling coreos_installer.sh to generate ISO images.  You will then need to burn them to USB/SD cards."
-			./coreos_installer.sh
+customization
+echo -e "Calling coreos_installer.sh to generate ISO images.  You will then need to burn them to USB/SD cards."
+./coreos_installer.sh
