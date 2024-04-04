@@ -43,10 +43,12 @@ event_server(){
 	rpm_ostree_install
 	git clone https://github.com/ALLETHRIUM/wavelet
 	generate_tarfiles
+	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
 	extract_base
 	extract_home && extract_usrlocalbin
 	# not functional yet, needs a lot of work
 	# install_decklink
+	# sets up local rpm repository - there's an issue with importing Intel repo GPG keys which might need user intervention.
 	/usr/local/bin/local_rpm.sh
 }
 
@@ -61,7 +63,7 @@ libsrtp libdrm python3-pip srt srt-libs libv4l v4l-utils libva-v4l2-request pipe
 ImageMagick intel-opencl mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
 mesa-libxatracker alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools dkms kernel-headers
 echo -e "Base RPM Packages installed, waiting for 2 seconds..\n"
-sleep 5
+sleep 2
 
 /usr/bin/rpm-ostree install \
 -y -A \
@@ -101,8 +103,8 @@ echo -e "RPM package updates completed, finishing installer task..\n"
 
 generate_tarfiles(){
 		echo -e "Generating tar.xz files for upload to distribution server..\n"
-		tar -cJf usrlocalbin.tar.xz --owner=root:0 -C home/wavelet/wavelet/webfiles/root/usr/local/bin/ .
-		tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C home/wavelet/wavelet/webfiles/root/home/wavelet/ .
+		tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /home/wavelet/wavelet/webfiles/root/usr/local/bin/ .
+		tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /home/wavelet/wavelet/webfiles/root/home/wavelet/ .
 		echo -e "Packaging files together..\n"
 		tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz}
 		echo -e "Done."
