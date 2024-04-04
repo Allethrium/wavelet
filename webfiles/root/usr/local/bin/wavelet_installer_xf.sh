@@ -36,20 +36,28 @@ event_decoder(){
 }
 
 event_server(){
-	# create directories, install base packages and git clone wavelet
+	# create directories, install git, clone wavelet and setup modules
 	mkdir -p /home/wavelet/.config/containers/systemd/
 	chown -R wavelet:wavelet /home/wavelet
 	cd /home/wavelet
-	rpm_ostree_install
+	rpm_ostree_install_git
 	git clone https://github.com/ALLETHRIUM/wavelet
 	generate_tarfiles
 	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
 	extract_base
 	extract_home && extract_usrlocalbin
+	# Install dependencies and base packages.  Could definitely be pared down.
+	rpm_ostree_install
 	# not functional yet, needs a lot of work
 	# install_decklink
 	# sets up local rpm repository - there's an issue with importing Intel repo GPG keys which might need user intervention.
 	/usr/local/bin/local_rpm.sh
+}
+
+
+rpm_ostree_install_git(){
+# Needed because otherwise sway launches the userspace setup before everything is ready
+/usr/bin/rpm-ostree install -y -A git 
 }
 
 rpm_ostree_install(){
@@ -57,7 +65,7 @@ rpm_ostree_install(){
 -y -A \
 wget fontawesome-fonts wl-clipboard nnn mako sway bemenu rofi-wayland lxsession sway-systemd waybar \
 foot vim powerline powerline-fonts vim-powerline NetworkManager-wifi iw wireless-regdb wpa_supplicant \
-cockpit-bridge cockpit-networkmanager cockpit-system cockpit-ostree cockpit-podman buildah rdma git \
+cockpit-bridge cockpit-networkmanager cockpit-system cockpit-ostree cockpit-podman buildah rdma \
 iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd dnf yum-utils createrepo sha \
 libsrtp libdrm python3-pip srt srt-libs libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
 ImageMagick intel-opencl mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
