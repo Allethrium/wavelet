@@ -39,7 +39,7 @@ event_x265sw() {
         # Feedback from deployment:
         # The decoders HATE libx265 (massive dropped frames), we need to use libsvt_hevc instead.
         KEYNAME=uv_encoder
-        KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=30:threads=0:gop=15"
+        KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:threads=0:crf=28:gop=30"
         #KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=10:pred_struct=0:crf=26:gop=6:bitrate=10M"
         write_etcd_global
         KEYNAME=uv_gop

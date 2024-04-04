@@ -131,8 +131,9 @@ case $event in
 	(C)		event_libx265sw 			&& echo "HEVC Software libx265 video codec selected, updating encoder variables"								;;
 	(C1)	event_libx265sw_low 		&& echo "HEVC Software libx265 video codec selected, updating encoder variables"								;;
 	(D)		event_libsvt_hevc_sw		&& echo "HEVC Software svt_hevc video codec selected, updating encoder variables"								;;
-	(D2)	event_libsvt_hevc_sw_zerolatency	&& echo "HEVC Software svt_hevc video codec selected, updating encoder variables"						;;	
-	(D1)	event_x265hw				&& echo "HEVC QSV video codec selected, updating encoder variables"												;;
+	(D1)	event_libsvt_hevc_sw_zerolatency	&& echo "HEVC Software svt_hevc video codec selected, updating encoder variables"						;;	
+	(D2)	event_x265hw_qsv			&& echo "HEVC QSV video codec selected, updating encoder variables"												;;
+	(D3)	event_x265hw_vaapi			&& echo "HEVC QSV video codec selected, updating encoder variables"												;;
 	(E)		event_vp9sw					&& echo "VP-9 Software video codec selected, updating encoder variables"										;;
 	(F)		event_vp9hw 				&& echo "VP-9 Hardware video codec selected, updating encoder variables"										;;
 	(G)		event_rav1esw				&& echo "|*****||EXPERIMENTAL AV1 RAV1E codec selected, updating encoder variables||****|"						;;
@@ -227,11 +228,11 @@ wavelet-seal() {
 	KEYVALUE="SEAL"
 	write_etcd_global
 	# Always set this to SW x265, everything else breaks due to pixel format issues w/ FFMPEG/lavc
-	encodervar="libavcodec:encoder=libx265:gop=6:bitrate=15M:subsampling=444:bpp=10"
+	encodervar="libavcodec:encoder=libx265:gop=15:bitrate=8M:safe"
 	inputvar="-t file:/home/wavelet/seal.mp4:loop"
 	/usr/local/bin/wavelet_textgen.sh
 	cd /home/wavelet/
-	ffmpeg -y -s 900x900 -video_size cif -i ny-stateseal.jpg -c:v libx265 seal.mp4
+	ffmpeg -r 1/30 -i ny-stateseal.jpg -c:v libx265 -vf fps=30 -pix_fmt yuv420p seal.mp4
 	write_etcd
 	# Kill existing streaming on the SERVER
 		systemctl --user stop UltraGrid.AppImage.service
@@ -327,11 +328,12 @@ wavelet_foursplit() {
 		echo -e "\n Task completed, resetting input_update key to 0.. \n"
 		write_etcd_global
 }
+
+
 # These events contain additional codec-specific settings that have been found to work acceptably well on the system.
 # Since they are tuned by hand, you probably won't want to modify them unless you know exactly what you're doing.
 # Proper operation depends on bandwidth, latency, network quality, encoder speed.  It's highly hardware dependent.
 # These operate in conjunction with the standard defined variables set above.  
-
 
 event_x264hw() {
 	KEYNAME=uv_encoder
@@ -352,29 +354,30 @@ event_x264sw() {
 event_libx265sw() {
 	# enabled threads=0 and tweaking MTU seems to help!  disable_intra_refresh causes a lot of problems
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:tune=zerolatency:threads=0:crf=26:gop=15"
+	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:threads=0:crf=28:gop=15"
 	write_etcd_global
-	echo -e "libx265 Software mode activated, CRF=20, Bitrate 25M, decoder task restart bit set. \n"
+	echo -e "libx265 Software mode activated, CRF=28, Bitrate 25M, decoder task restart bit set. \n"
 	wavelet-decoder-reset
 }
 
 event_libx265sw_low() {
 	# enabled threads=0 and tweaking MTU seems to help! disable_intra_refresh causes a lot of problems
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=30:threads=0:gop=15"
+	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=32:threads=0:gop=15:safe"
 	write_etcd_global
-	echo -e "x265 SVT Software mode activated, CRF=30, decoder task restart bit set. \n"
+	echo -e "x265 SVT Software mode activated, CRF=32, decoder task restart bit set. \n"
 	wavelet-decoder-reset
 }
+
 
 event_libsvt_hevc_sw() {
 	# Feedback from deployment:
 	# consider this the default COMPAT mode until we have a handle on things
 	KEYNAME=uv_encoder
-	#KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:tune=zerolatency:qp=26:gop=6:bitrate=25"
-	KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=10:pred_struct=0:crf=28:gop=6:bitrate=10M"
+	KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=10:pred_struct=0:gop=10:thread_count=0:safe:qp=36"
 	write_etcd_global
 }
+
 
 event_libsvt_hevc_sw_zerolatency() {
 	# NB zerolatency disables frame parallelism, can't use multicore!
@@ -384,11 +387,19 @@ event_libsvt_hevc_sw_zerolatency() {
 	write_etcd_global
 }	
 
-event_x265hevc() {
+event_x265hw_qsv() {
 # working on tweaking these values to something as reliable as possible.
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=hevc_qsv:compressionframedelay=0:rc=qvbr:low_power=1:gop=15:cqp=20"
-#	KEYVALUE="libavcodec:encoder=hevc_qsv:gop=12:bitrate=15M:bpp=10:subsampling=444:q=0:scenario=remotegaming:profile=main10"
+	KEYVALUE="libavcodec:encoder=hevc_qsv:compressionframedelay=0:rc=qvbr:low_power=1:gop=15"
+	write_etcd_global
+	echo -e "x265 QSV Hardware acceleration activated, decoder task restart bit set. \n"
+	wavelet-decoder-reset
+}
+
+event_x265hw_vaapi() {
+	# Intel VA-API hw acceleration, probably depreciated soon in favor of QSV
+	KEYNAME=uv_encoder
+	KEYVALUE="libavcodec:encoder=hevc_vaapi:low_power=1:idr_interval=15"
 	write_etcd_global
 	echo -e "x265 QSV Hardware acceleration activated, decoder task restart bit set. \n"
 	wavelet-decoder-reset
@@ -396,17 +407,17 @@ event_x265hevc() {
 
 event_vp9sw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libvpx-vp9:gop=12:bitrate=30M"
+	KEYVALUE="libavcodec:encoder=libvpx-vp9:gop=15:bitrate=10M"
 	write_etcd_global
-	echo -e "VP9 Software acceleration activated, Bitrate 30M \n"
+	echo -e "VP9 Software acceleration activated, Bitrate 10M \n"
 	wavelet-decoder-reset
 }
 
 event_vp9hw() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=vp9_qsv:gop=12:bitrate=30M:q=0:subsampling=444:bpp=10"
+	KEYVALUE="libavcodec:encoder=vp9_qsv:gop=15:bitrate=10M:q=0"
 	write_etcd_global
-	echo -e "VP9 Hardware acceleration activated, Bitrate 30M \n"
+	echo -e "VP9 Hardware acceleration activated, Bitrate 10M \n"
 	wavelet-decoder-reset
 }
 
@@ -482,16 +493,16 @@ wavelet-pip2() {
 wavelet-decoder-reset() {
 # Finds all decoders and sets client reSET flag.  This restarts UltraGrid without a full system reboot.
 # Have to clean /DECODER_RESET from result or we get recursion, remember etcd isn't hierarchical!
-        return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --keys-only)
-        RESULT="${return_etcd_clients_ip///DECODER_RESET/}"
-        for host in ${RESULT}; do
-                trimmed_host=$(echo ${host} | sed 's|decoderip/||g')
-                echo -e "working on : ${trimmed_host}"
-                etcdctl --endpoints=${ETCDENDPOINT} put "${trimmed_host}/DECODER_RESET" -- "1"
+		return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --keys-only)
+		RESULT="${return_etcd_clients_ip///DECODER_RESET/}"
+		for host in ${RESULT}; do
+				trimmed_host=$(echo ${host} | sed 's|decoderip/||g')
+				echo -e "working on : ${trimmed_host}"
+				etcdctl --endpoints=${ETCDENDPOINT} put "${trimmed_host}/DECODER_RESET" -- "1"
 
-                echo -e "DECODER_RESET flag enabled for ${trimmed_host}..\n"
-        done
-        echo -e "Decoder tasks instructed to reset on all attached decoders.\n"
+				echo -e "DECODER_RESET flag enabled for ${trimmed_host}..\n"
+		done
+		echo -e "Decoder tasks instructed to reset on all attached decoders.\n"
 }
 
 wavelet-encoder-reboot() {
