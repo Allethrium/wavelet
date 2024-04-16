@@ -35,12 +35,10 @@ read_etcd_clients_ip() {
 
 
 event_x265sw() {
-        # NB zerolatency disables frame parallelism, can't use multicore!
-        # Feedback from deployment:
-        # The decoders HATE libx265 (massive dropped frames), we need to use libsvt_hevc instead.
+        # Further testing shows that simply setting everything to the fastest, laziest preset generates a bad stream. 
+        # We choose preset 6 so we get some work happening, SVT then behaves itself again.
         KEYNAME=uv_encoder
-        KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:crf=30:threads=0:gop=15"
-        #KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=10:pred_struct=0:crf=26:gop=6:bitrate=10M"
+        KEYVALUE="ibavcodec:encoder=libsvt_hevc:preset=6:gop=60:thread_count=0:safe:qp=38"
         write_etcd_global
         KEYNAME=uv_gop
         KEYVALUE=6
@@ -48,7 +46,7 @@ event_x265sw() {
         KEYNAME=uv_bitrate
         KEYVALUE="25M"
         write_etcd_global
-        echo -e "libx265 Software acceleration activated (compatibility mode), GOP 15 frames,  CRF 30 \n"
+        echo -e "LibSVT_HEVC activated with 60 GOP, preset 6 and qp=38 \n"
 }
 
 

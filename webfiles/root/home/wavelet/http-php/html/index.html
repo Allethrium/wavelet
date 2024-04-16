@@ -40,7 +40,7 @@ Video Sources<br>
 <br>
 Toggle Livestreaming <label class="switch" id="lstoggle">
 <input type ="checkbox" id="lstoggleinput">
-<span class="slider round"></span>
+<span class="slider round"></span>7
 </label>	
 <br><br>
 <details><summary>Livestream target, API Key setup<span class="icon"></span></summary>
@@ -75,13 +75,20 @@ Toggle Livestreaming <label class="switch" id="lstoggle">
 <button class="codecButton inputStaticButtons" value="B">H.264 QSV (recommended)
 <button class="codecButton inputStaticButtons" value="C">HEVC SW High BW (libx265)
 <button class="codecButton inputStaticButtons" value="C1">HEVC SW Low BW (libx265)
-<button class="codecButton inputStaticButtons" value="D">HEVC SW (libsvt_HEVC)	
-<button class="codecButton inputStaticButtons" value="D1">HEVC QSV
+<button class="codecButton inputStaticButtons" value="D">HEVC SW (libsvt_hevc)	
+<button class="codecButton inputStaticButtons" value="D1">HEVC SW (libsvt_hevc zerolatency)
+<button class="codecButton inputStaticButtons" value="D2">HEVC QSV
+<button class="codecButton inputStaticButtons" value="D3">HEVC VA-API
 <button class="codecButton inputStaticButtons" value="E">VP9 SW
+<button class="codecButton inputStaticButtons" value="E1">VP8 SW
 <button class="codecButton inputStaticButtons" value="F">VP9 HW
 <button class="codecButton inputStaticButtons" value="G">RAV1E AV1 SW
 <button class="codecButton inputStaticButtons" value="H">AV1 QSV
 <button class="codecButton inputStaticButtons" value="H1">LIBAOM_AV1 SW
+<button class="codecButton inputStaticButtons" value="H2">LIBSVT_AV1 SW
+<button class="codecButton inputStaticButtons" value="M1">MJPEG SW
+<button class="codecButton inputStaticButtons" value="M2">MJPEG QSV 
+
 </p>
 </details>
 </div>
