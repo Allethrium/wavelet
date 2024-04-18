@@ -27,9 +27,9 @@ uv_audioport="5006"
 uv_reflector="192.168.1.32"
 uv_obs="192.168.1.31"
 uv_livestream="192.168.1.30"
-uv_encoder="libavcodec:encoder=libsvt_hevc:preset=10:pred_struct=0:crf=20:gop=12:bitrate=25"
-uv_gop="12"
-uv_bitrate="25M"
+uv_encoder="libavcodec:encoder=libsvt_hevc:preset=7:pred_struct=0:crf=25:gop=60:bitrate=10"
+uv_gop="60"
+uv_bitrate="10M"
 uv_islivestreaming="0"
 
 
@@ -233,11 +233,11 @@ wavelet-seal() {
 	KEYVALUE="SEAL"
 	write_etcd_global
 	# Always set this to SW x265, everything else breaks due to pixel format issues w/ FFMPEG/lavc
-	encodervar="libavcodec:encoder=libx265:gop=10:preset=fast:bitrate=5M:safe:x265-params=lossless=1"
+	encodervar="libavcodec:encoder=libsvt_hevc:preset=6:gop=60:thread_count=0:safe:crf=24"
 	inputvar="-t file:/home/wavelet/seal.mp4:loop"
 	/usr/local/bin/wavelet_textgen.sh
 	cd /home/wavelet/
-	ffmpeg -r 1/30 -i ny-stateseal.jpg -c:v libx265 -vf fps=30 -pix_fmt yuv420p seal.mp4
+	ffmpeg -r 1/60 -i ny-stateseal.jpg -c:v libx265 -vf fps=60 -pix_fmt yuv420p seal.mp4
 	write_etcd
 	# Kill existing streaming on the SERVER
 		systemctl --user stop UltraGrid.AppImage.service
@@ -385,7 +385,7 @@ event_libsvt_hevc_sw() {
 	# Feedback from deployment:
 	# consider this the default COMPAT mode until we have a handle on things
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=6:gop=60:thread_count=0:safe:qp=38"
+	KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=6:gop=60:thread_count=0:safe:crf=24"
 	write_etcd_global
 }
 
