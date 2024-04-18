@@ -38,7 +38,7 @@ event_x265sw() {
         # Further testing shows that simply setting everything to the fastest, laziest preset generates a bad stream. 
         # We choose preset 6 so we get some work happening, SVT then behaves itself again.
         KEYNAME=uv_encoder
-        KEYVALUE="ibavcodec:encoder=libsvt_hevc:preset=6:gop=60:thread_count=0:safe:qp=38"
+        KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=6:gop=60:thread_count=0:safe:crf=24"
         write_etcd_global
         KEYNAME=uv_gop
         KEYVALUE=6

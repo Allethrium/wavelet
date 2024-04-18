@@ -255,7 +255,7 @@ passwd:
       password_hash: waveletuserpassword
       home_dir: /home/wavelet
       ssh_authorized_keys:
-          - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBmo+nVPHtnqrKp7YubD5fT9TnLlbQp22SBxKaGco/sZ wavelet@wavelet.local
+        - PUBKEYGOESHERE
 systemd:
   units:
     - name: install-overlayed-rpms.service
