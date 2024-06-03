@@ -86,6 +86,12 @@ storage:
       overwrite: true
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/containers/registries.conf.d/10-wavelet.conf
+    # Disable PASST/Pasta
+    - path: /etc/containers/containers.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/containers/containers.conf
     # Installer script to handle ostree overlay and git clone
     - path: /usr/local/bin/wavelet-installer_xf.sh
       mode: 0644
@@ -123,25 +129,9 @@ storage:
          name=Intel® oneAPI repository
          baseurl=https://yum.repos.intel.com/oneapi
          enabled=1
-         gpgcheck=0
-         repo_gpgcheck=0
-         gpgkey=https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
-    # TEST Snapcast Jwillikers COPR repository
-    - path: /etc/yum.repos.d/jwillikers-snapcast.repo
-      mode: 0664
-      overwrite: true
-      contents:
-        inline: |
-         [copr:copr.fedorainfracloud.org:jwillikers:snapcast]
-         name=Copr repo for snapcast owned by jwillikers
-         baseurl=https://download.copr.fedorainfracloud.org/results/jwillikers/snapcast/fedora-$releasever-$basearch/
-         type=rpm-md
-         skip_if_unavailable=True
          gpgcheck=1
-         gpgkey=https://download.copr.fedorainfracloud.org/results/jwillikers/snapcast/pubkey.gpg
-         repo_gpgcheck=0
-         enabled=1
-         enabled_metadata=1
+         repo_gpgcheck=1
+         gpgkey=https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
     # PolKit entries for systemd services the wavelet user is allowed to manage
     - path: /etc/polkit-1/rules.d/1337-wavelet.rules
       mode: 0644

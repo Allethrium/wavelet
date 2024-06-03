@@ -61,3 +61,4 @@ ignition_files/.ignition_encoder.yml.~660b393b
 .coreos_installer.sh.~692bff20
 fedora-coreos-40.20240504.3.0-live.x86_64.iso
 webfiles/root/usr/local/bin/build_httpd_quadlet.sh
+fedora-coreos-40.20240504.3.0-live.x86_64.iso.sig
