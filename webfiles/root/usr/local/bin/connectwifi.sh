@@ -2,11 +2,12 @@
 # Attempts to find and join a Wavelet network if it's available
 
 # These are now defined by inline files in ignition so they can be "securely" customized ahead of time
-networkssid=$(echo /var/home/wavelet/wifi_ssid)
-wifipassword=$(echo /var/home/wavelet/wifi_pw)
-wifi_ap_mac=$(echo /var/home/wavelet/wifi_bssid)
+networkssid=$(cat /var/home/wavelet/wifi_ssid)
+wifipassword=$(cat /var/home/wavelet/wifi_pw)
+wifi_ap_mac=$(cat /var/home/wavelet/wifi_bssid)
 
 connectwifi(){
+# 5/28/2024 - fix echo to cat so connectwifi spits out proper values and connects appropriately.
 	nmcli dev wifi rescan
 	sleep 5
 	nmcli dev wifi rescan

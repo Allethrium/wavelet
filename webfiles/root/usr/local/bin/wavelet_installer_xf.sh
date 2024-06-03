@@ -65,7 +65,7 @@ rpm_ostree_install(){
 -y -A \
 wget fontawesome-fonts wl-clipboard nnn mako sway bemenu rofi-wayland lxsession sway-systemd waybar \
 foot vim powerline powerline-fonts vim-powerline NetworkManager-wifi iw wireless-regdb wpa_supplicant \
-cockpit-bridge cockpit-networkmanager cockpit-system cockpit-ostree cockpit-podman buildah rdma \
+cockpit-bridge cockpit-networkmanager cockpit-system cockpit-ostree cockpit-podman buildah rdma avahi \
 iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd dnf yum-utils createrepo sha \
 libsrtp libdrm python3-pip srt srt-libs libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
 ImageMagick intel-opencl mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
@@ -93,7 +93,8 @@ libva-intel-driver \
 ffmpeg ffmpeg-libs libheif-freeworld \
 neofetch htop \
 mesa-libOpenCL python3-pip srt srt-libs ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
-ImageMagick mplayer
+ImageMagick mplayer \
+libndi libndi-devel ndi-sdk obs-ndi
 echo -e "RPMFusion Media Packages installed, waiting for 2 seconds..\n"
 sleep 2
 

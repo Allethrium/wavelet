@@ -183,16 +183,19 @@ server_bootstrap(){
 	echo -e "Pulling etcd and generating systemd services.."
 #	/usr/local/bin/etcd-member-service.sh
 	cd /home/wavelet/.config/systemd/user/
-	/bin/podman pull quay.io/coreos/etcd:v3.5.9
-	/bin/podman create --name etcd-member --net=host \
-   quay.io/coreos/etcd:v3.5.9 /usr/local/bin/etcd              \
-   --data-dir /etcd-data --name wavelet_svr                  \
-   --initial-advertise-peer-urls http://192.168.1.32:2380 \
-   --listen-peer-urls http://192.168.1.32:2380           \
-   --advertise-client-urls http://192.168.1.32:2379       \
-   --listen-client-urls http://192.168.1.32:2379,http://127.0.0.1:2379        \
-	   --initial-cluster wavelet_svr=http://192.168.1.32:2380 \
-	   --initial-cluster-state new
+	#/bin/podman pull quay.io/coreos/etcd:v3.5.9
+	/bin/podman pull quay.io/coreos/etcd
+	# Need to add specific net arguments here as Podman5/Pasta Update appears to break things
+	/bin/podman create --name etcd-member --net=pasta:--ipv4-only,--no-ndp,-no-dhcpv6,--no-dhcp,-T,2379,-T,2380 \
+	--publish 2379-2380:2379-2380 \
+	quay.io/coreos/etcd:v3.5.9 /usr/local/bin/etcd \
+	--data-dir /etcd-data --name wavelet_svr \
+	--initial-advertise-peer-urls http://192.168.1.32:2380 \
+	--listen-peer-urls http://192.168.1.32:2380 \
+	--advertise-client-urls http://192.168.1.32:2379 \
+	--listen-client-urls http://192.168.1.32:2379,http://127.0.0.1:2379 \
+	--initial-cluster wavelet_svr=http://192.168.1.32:2380 \
+	--initial-cluster-state new
 	/bin/podman generate systemd --files --name etcd-member --restart-policy=always -t 2
 	systemctl --user daemon-reload
 	echo -e "Attempting to start etcd container.."

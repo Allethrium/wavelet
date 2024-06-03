@@ -27,7 +27,7 @@ storage:
       mode: 0755
       overwrite: true
       contents:
-        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.1/UltraGrid-1.9.1-x86_64.AppImage
+        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.3/UltraGrid-1.9.3-x86_64.AppImage
     # WiFi WiFi Name
     - path: /var/home/wavelet/wifi_ssid
       overwrite: true
@@ -123,9 +123,25 @@ storage:
          name=Intel® oneAPI repository
          baseurl=https://yum.repos.intel.com/oneapi
          enabled=1
-         gpgcheck=1
-         repo_gpgcheck=1
+         gpgcheck=0
+         repo_gpgcheck=0
          gpgkey=https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+    # TEST Snapcast Jwillikers COPR repository
+    - path: /etc/yum.repos.d/jwillikers-snapcast.repo
+      mode: 0664
+      overwrite: true
+      contents:
+        inline: |
+         [copr:copr.fedorainfracloud.org:jwillikers:snapcast]
+         name=Copr repo for snapcast owned by jwillikers
+         baseurl=https://download.copr.fedorainfracloud.org/results/jwillikers/snapcast/fedora-$releasever-$basearch/
+         type=rpm-md
+         skip_if_unavailable=True
+         gpgcheck=1
+         gpgkey=https://download.copr.fedorainfracloud.org/results/jwillikers/snapcast/pubkey.gpg
+         repo_gpgcheck=0
+         enabled=1
+         enabled_metadata=1
     # PolKit entries for systemd services the wavelet user is allowed to manage
     - path: /etc/polkit-1/rules.d/1337-wavelet.rules
       mode: 0644
