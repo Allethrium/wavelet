@@ -94,14 +94,9 @@ ffmpeg ffmpeg-libs libheif-freeworld \
 neofetch htop \
 mesa-libOpenCL python3-pip srt srt-libs ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
 ImageMagick mplayer \
-libndi libndi-devel ndi-sdk obs-ndi
-echo -e "RPMFusion Media Packages installed, waiting for 2 seconds..\n"
-sleep 2
-
-/usr/bin/rpm-ostree install \
--y -A --idempotent \
+libndi libndi-devel ndi-sdk obs-ndi \
 firefox
-echo -e "Firefox installed for local console capability, waiting for two seconds..\n"
+echo -e "RPMFusion Media Packages installed, waiting for 2 seconds..\n"
 sleep 2
 
 touch /var/rpm-ostree-overlay.complete
