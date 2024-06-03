@@ -86,12 +86,6 @@ storage:
       overwrite: true
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/containers/registries.conf.d/10-wavelet.conf
-    # Force Podman 5.0 to use slirp4netns backend, pasta networking backend breaks inter-container communication
-    - path: /usr/share/containers/containers.conf
-      mode: 0644
-      overwrite: true
-      contents:
-        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/usr/share/containers/containers.conf
     # Installer script to handle ostree overlay and git clone
     - path: /usr/local/bin/wavelet-installer_xf.sh
       mode: 0644
