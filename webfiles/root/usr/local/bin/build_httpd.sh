@@ -29,7 +29,7 @@ cp /usr/local/bin/wavelet_installer_xf.sh /home/wavelet/http/ignition/
 cp /home/wavelet/.bashrc /home/wavelet/http/ignition/skel_bashrc.txt
 cp /home/wavelet/.bash_profile /home/wavelet/http/ignition/skel_profile.txt
 chown -R wavelet:wavelet /home/wavelet/http
-chmod x /home/wavelet/http
+chmod -x /home/wavelet/http
 pwd
 exit 0
 

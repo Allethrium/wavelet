@@ -86,7 +86,7 @@ sleep 2
 # This is everything-and-the-kitchen sink approach to media acceleration.
 # libvpl libvpl-devel required for older intel CPU, has clash with oneVPL library however, so need detection logic.
 /usr/bin/rpm-ostree install \
--y -A --idempotent \
+-y -A --idempotent --allow-replacement \
 intel-media-driver \
 intel-gpu-tools intel-compute-runtime oneVPL-intel-gpu intel-media-driver intel-gmmlib \
 intel-level-zero oneapi-level-zero libvpl intel-mediasdk libva libva-utils libva-v4l2-request libva-vdpau-driver intel-ocloc \
