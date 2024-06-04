@@ -365,7 +365,7 @@ event_x264hw() {
 event_libx265sw() {
 	# HIGH bw software HEVC encoding in UI
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx265:preset=superfast:gop=15:bitrate=15M:threads=0:safe"
+	KEYVALUE="libavcodec:encoder=libx265:preset=superfast:bitrate=15M:threads=0:safe:x265-params=keyint=15:min-keyint=5"
 	# lossless mode exists, but would generate 250mb+ stream
 	write_etcd_global
 	echo -e "libx265 Software mode activated, Bitrate 15M, decoder task restart bit set. \n"
