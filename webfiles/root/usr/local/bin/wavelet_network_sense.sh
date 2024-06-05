@@ -36,7 +36,7 @@ parse_input_opts(){
 	;;
 	del))			echo -e "Dnsmasq has noted that a lease has been deleted, setting device as inactive"		;	event_inactive_networkDevice
 	;;
-	*)			echo -e "Input doesn't seem to be valid, doing nothing"						;	exit 0
+	*)				echo -e "Input doesn't seem to be valid, doing nothing"						;	exit 0
 }
 
 event_detect_networkDevice(){
@@ -44,15 +44,15 @@ event_detect_networkDevice(){
 	echo -e "Detect network device function called with the following data:\nOperation: ${dnsmasq_operation_type},\nMAC: ${dnsmasq_mac},\n IP Address: ${dnsmasq_ipAddr},\n Hostname: ${dnsmasq_hostName}\n"
 	
 	case ${dnsmasq_mac} in
-	whateverMagewellis)		echo -e "Magewell device matched, proceeding to attempt configuration"	;	event_vendorDevice1
+	whateverMagewellis)				echo -e "Magewell device matched, proceeding to attempt configuration"		;	event_vendorDevice1
 	;;
-	whateverPTZis)			echo -e "PTZ matched, proceeding to attempt configuration"		;	event_vendorDevice2
+	whateverPTZis)					echo -e "PTZ matched, proceeding to attempt configuration"					;	event_vendorDevice2
 	;;
-	whateverNDIis)			echo -e "NDI matched, proceeding to attempt configuration"		;	event_vendorDevice3
+	whateverNDIis)					echo -e "NDI matched, proceeding to attempt configuration"					;	event_vendorDevice3
 	;;
-	whateverAnothersupportDevIs)	echo -e "Device matched, proceeding to attempt configuration"		;	event_vendorDevice4
+	whateverAnothersupportDevIs)	echo -e "Device matched, proceeding to attempt configuration"				;	event_vendorDevice4
 	;;
-	*)				echo -e "Device not supported at current time, doing nothing."		;	exit 0
+	*)								echo -e "Device not supported at current time, doing nothing."				;	exit 0
 }
 
 event_inactive_networkDevice(){
