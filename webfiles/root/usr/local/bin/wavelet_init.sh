@@ -46,7 +46,7 @@ event_libsvt_hevc() {
         KEYNAME=uv_bitrate
         KEYVALUE="25M"
         write_etcd_global
-        echo -e "LibSVT_HEVC activated with 60 GOP, preset 6 and qp=38 \n"
+        echo -e "LibSVT_HEVC activated\n"
 }
 
 
