@@ -34,11 +34,11 @@ read_etcd_clients_ip() {
 }
 
 
-event_x265sw() {
+event_libsvt_hevc() {
         # Further testing shows that simply setting everything to the fastest, laziest preset generates a bad stream. 
         # We choose preset 6 so we get some work happening, SVT then behaves itself again.
         KEYNAME=uv_encoder
-        KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=6:gop=60:thread_count=0:safe:crf=24"
+        KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=8:thread_count=0:safe:crf=31"
         write_etcd_global
         KEYNAME=uv_gop
         KEYVALUE=6
@@ -78,7 +78,7 @@ systemctl --user enable wavelet_reflector.service --now
 systemctl --user enable watch_encoderflag.service --now
 echo -e "Values populated, monitor services launched.  Starting reflector\n\n"
 systemctl --user enable UltraGrid.Reflector.service --now
-event_x265sw
+event_libsvt_hevc
 systemctl --user enable wavelet_controller.service --now
 wait 2
 KEYNAME=input_update
