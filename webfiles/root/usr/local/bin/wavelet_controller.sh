@@ -365,17 +365,20 @@ event_x264hw() {
 event_libx265sw() {
 	# HIGH bw software HEVC encoding in UI
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx265:preset=superfast:bitrate=15M:threads=0:safe:x265-params=keyint=15:min-keyint=5"
+	# We've changed these values around as setting GOP can mess with rate control, and we've forced keyframe insertion every 15 frames instead.
+	KEYVALUE="libavcodec:encoder=libx265:preset=superfast:bitrate=20M:threads=0:safe:x265-params=keyint=15\:min-keyint=5"
 	# lossless mode exists, but would generate 250mb+ stream
 	write_etcd_global
-	echo -e "libx265 Software mode activated, Bitrate 15M, decoder task restart bit set. \n"
+	echo -e "libx265 Software mode activated, Bitrate 20M, decoder task restart bit set. \n"
 	wavelet-decoder-reset
 }
 
 event_libx265sw_low() {
 	# LOW bw software HEVC encoding in UI
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libx265:preset=superfast:gop=15:bitrate=8M:threads=0:safe"
+	#KEYVALUE="libavcodec:encoder=libx265:preset=superfast:gop=15:bitrate=8M:threads=0:safe"
+	# We've changed these values around as setting GOP can mess with rate control, and we've forced keyframe insertion every 15 frames instead.
+	KEYVALUE="libavcodec:encoder=libx265:preset=superfast:bitrate=8M:threads=0:safex265-params=keyint=15\:min-keyint=5"
 	write_etcd_global
 	echo -e "libx265 software mode activated, 8mbit stream, decoder task restart bit set. \n"
 	wavelet-decoder-reset
@@ -385,7 +388,7 @@ event_libsvt_hevc_sw() {
 	# Feedback from deployment:
 	# consider this the default COMPAT mode until we have a handle on things
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=6:gop=60:thread_count=0:safe:crf=24"
+	KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=7:thread_count=0:safe:crf=31"
 	write_etcd_global
 }
 
