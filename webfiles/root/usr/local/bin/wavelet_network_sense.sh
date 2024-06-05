@@ -65,7 +65,7 @@ event_inactive_networkDevice(){
 
 event_vendorDevice1(){
 	# Interrogates Magewell device, attempts preconfigured username and password, then tries to set appropriate settings for streaming into UltraGrid.
-	echo -e "Attempting to connect to device\n"
+	echo -e "Attempting to connect to device from Magewell\n"
 	echo -e "Successful!\nProceeding to parse REST data to stream into Wavelet..\n"
 		# stuff to set the stream target to RTP/RTSP 192.168.1.32 on appropriate port
 	echo -e "Generating device hash and creating WebUI interface components..\n"
@@ -76,7 +76,7 @@ event_vendorDevice1(){
 
 event_vendorDevice2(){
 	# Interrogates PTZ Cam device, attempts preconfigured username and password, then tries to set appropriate settings for streaming into UltraGrid.
-	echo -e "Attempting to connect to device\n"
+	echo -e "Attempting to connect to device from PTZ Optics\n"
 	echo -e "Successful!\nProceeding to parse REST data to stream into Wavelet..\n"
 		# stuff to set the stream target to RTP/RTSP 192.168.1.32 on appropriate port
 	echo -e "Generating device hash and creating WebUI interface components..\n"

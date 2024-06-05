@@ -82,22 +82,38 @@ generate_device_info() {
 	echo -e "generated device hash: $deviceHash \n"
 	device_string_short=$(echo "${device_string_long}" | sed 's/.*usb-//')
 	# Let's look for the device hash in the /interface prefix to make sure it doesn't already exist!
-	# First delete empty /hash/ values that might be there incorrectly (WHY???)
-	etcdctl --endpoints=http://192.168.1.32:2379 del "/hash/"
+		# umm - isn't this deleting everything in /hash/ each time a device is generated??
+		# First delete empty /hash/ values that might be there incorrectly (WHY???)
+		#etcdctl --endpoints=http://192.168.1.32:2379 del "/hash/"
 	output_return=$(etcdctl --endpoints=http://192.168.1.32:2379 get "/hash/${deviceHash}")
 	if [[ $output_return == "" ]] then
-		echo -e "\n ${deviceHash} not located within etcd, assuming we have a new device and continuing with process to set parameters.. \n"
-		set_device
+		echo -e "\n${deviceHash} not located within etcd, assuming we have a new device and continuing with process to set parameters..\n"
+		isDevice_input_or_output
 	else
-		echo -e "\n ${deviceHash} located in etcd: \n \n ${output_return} \n \n, terminating process. \n If you wish for the device to be properly redetected from scratch, please move it to a different USB port. \n"
+		echo -e "\n${deviceHash} located in etcd:\n\n${output_return}\n\n, terminating process.\nIf you wish for the device to be properly redetected from scratch, please move it to a different USB port.\n"
 		# we run device_cleanup regardless!!
 		device_cleanup
-
 	fi
 }
 
+isDevice_input_or_output () {
+	# Are we outputting audio/video signals someplace or is this an input?  we determine this here
+	case ${device_string_long} in 
+	*BiAmp*)				echo -e "BiAmp HDMI-USB Capture device detected.. \n"						&&	event_biAmp
+	;;
+	*audio*)				echo -e "Audio out device detected.. \n"									&&	event_audioOutput
+	;;
+	*)						ecgi -e "Not a biAmp, we are probably connecting video capture dev."		&&	set_device_input
+	;;
+	esac
+}
 
-set_device() {
+event_audioOutput() {
+	# Attempt to set the new audio output to default sink in Pipewire
+		# work out how to do this..
+}
+
+set_device_input() {
 	# called from generate_device_info from the nested if loop checking for pre-existing deviceHash in etcd /hash/
 	# populated device_string_short with hash value, this is used by the interface webUI component - device_string_short is effectively the webui Label and banner text.
 	# Because we cannot query etcd by keyvalue, we must create a reverse lookup prefix for everything we want to be able to clean up!!
@@ -187,15 +203,13 @@ detect() {
 # is called in a foreach loop from detect_ug devices, therefore it is already instanced for each device
 	echo -e "Device string is ${device_string_long} \n"
 	case ${device_string_long} in
-	*IPEVO*)				echo -e "IPEVO Document Camera device detected.. \n"			&& event_ipevo
+	*IPEVO*)						echo -e "IPEVO Document Camera device detected.. \n"				&& event_ipevo
 	;;
-	*"Logitech Screen Share"*)		echo -e "Logitech HDMI-USB Capture device detected.. \n"		&& event_logitech_hdmi
+	*"Logitech Screen Share"*)		echo -e "Logitech HDMI-USB Capture device detected.. \n"			&& event_logitech_hdmi
 	;;
-	*Magewell*)				echo -e "Magewell HDMI-USB Capture device detected.. \n"		&& event_magewell
+	*Magewell*)						echo -e "Magewell HDMI-USB Capture device detected.. \n"			&& event_magewell
 	;;
-	*BiAmp*)				echo -e "BiAmp HDMI-USB Capture device detected.. \n"			&& event_biAmp
-	;;
-	*)					echo -e "Unknown device detected, attempting to process..\n"		&& event_unknowndevice
+	*)								echo -e "Unknown device detected, attempting to process..\n"		&& event_unknowndevice
 	;;
 	esac
 }
