@@ -63,48 +63,59 @@ rpm_ostree_install_git(){
 }
 
 rpm_ostree_install(){
-/usr/bin/rpm-ostree install \
--y -A \
-wget fontawesome-fonts wl-clipboard nnn mako sway bemenu rofi-wayland lxsession sway-systemd waybar \
-foot vim powerline powerline-fonts vim-powerline NetworkManager-wifi iw wireless-regdb wpa_supplicant \
-cockpit-bridge cockpit-networkmanager cockpit-system cockpit-ostree cockpit-podman buildah rdma avahi \
-iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd dnf yum-utils createrepo sha \
-libsrtp libdrm python3-pip srt srt-libs libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
-ImageMagick intel-opencl mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
-mesa-libxatracker alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools dkms kernel-headers
-echo -e "Base RPM Packages installed, waiting for 2 seconds..\n"
-sleep 2
+	/usr/bin/rpm-ostree upgrade -A
+	rpm_ostree_install_step1(){
+	/usr/bin/rpm-ostree install \
+	-y -A \
+	wget fontawesome-fonts wl-clipboard nnn mako sway bemenu rofi-wayland lxsession sway-systemd waybar \
+	foot vim powerline powerline-fonts vim-powerline NetworkManager-wifi iw wireless-regdb wpa_supplicant \
+	cockpit-bridge cockpit-networkmanager cockpit-system cockpit-ostree cockpit-podman buildah rdma avahi \
+	iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd dnf yum-utils createrepo sha \
+	libsrtp libdrm python3-pip srt srt-libs libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
+	ImageMagick intel-opencl mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
+	mesa-libxatracker alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools dkms kernel-headers
+	echo -e "\nBase RPM Packages installed, waiting for 1 second..\n"
+	sleep 1
+	}
 
-/usr/bin/rpm-ostree install \
--y -A \
-https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
-https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
-/usr/bin/rpm-ostree refresh-md
-echo -e "RPM Fusion repo installed, waiting for 2 seconds..\n"
-sleep 2
+	rpm_ostree_install_step2(){
+	/usr/bin/rpm-ostree install \
+	-y -A \
+	https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
+	https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+	echo -e "\nRPM Fusion repo installed, waiting for 1 second..\n"
+	sleep 1
+	}
 
-# This is everything-and-the-kitchen sink approach to media acceleration.
-# libvpl libvpl-devel required for older intel CPU, has clash with oneVPL library however, so need detection logic.
-/usr/bin/rpm-ostree install \
--y -A --idempotent --allow-replacement \
-intel-media-driver \
-intel-gpu-tools intel-compute-runtime oneVPL-intel-gpu intel-media-driver intel-gmmlib \
-intel-level-zero oneapi-level-zero libvpl intel-mediasdk libva libva-utils libva-v4l2-request libva-vdpau-driver intel-ocloc \
-ocl-icd opencl-headers mpv libsrtp mesa-dri-drivers intel-opencl \
-libvdpau-va-gl mesa-vdpau-drivers libvdpau libvdpau-devel libva-intel-driver \
-ffmpeg ffmpeg-libs libheif-freeworld \
-neofetch htop \
-mesa-libOpenCL python3-pip srt srt-libs ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
-ImageMagick mplayer \
-libndi libndi-devel ndi-sdk obs-ndi \
-firefox
-echo -e "RPMFusion Media Packages installed, waiting for 2 seconds..\n"
-sleep 2
+	rpm_ostree_install_step3(){
+	# This is everything-and-the-kitchen sink approach to media acceleration.
+	# libvpl libvpl-devel required for older intel CPU, has clash with oneVPL library however, so need detection logic.
+	# Refresh Metadata
+	/usr/bin/rpm-ostree refresh-md
+	/usr/bin/rpm-ostree install \
+	-y -A --idempotent \
+	intel-media-driver \
+	intel-gpu-tools intel-compute-runtime oneVPL-intel-gpu intel-media-driver intel-gmmlib \
+	intel-level-zero oneapi-level-zero libvpl intel-mediasdk libva libva-utils libva-v4l2-request libva-vdpau-driver intel-ocloc \
+	ocl-icd opencl-headers mpv libsrtp mesa-dri-drivers intel-opencl \
+	libvdpau-va-gl mesa-vdpau-drivers libvdpau libvdpau-devel libva-intel-driver \
+	ffmpeg ffmpeg-libs libheif-freeworld \
+	neofetch htop \
+	mesa-libOpenCL python3-pip srt srt-libs ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
+	ImageMagick mplayer \
+	libndi libndi-devel ndi-sdk obs-ndi
+	echo -e "\nRPMFusion Media Packages installed, waiting for 1 second..\n"
+	sleep 1
+	}
 
-touch /var/rpm-ostree-overlay.complete
-touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
-touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-echo -e "RPM package updates completed, finishing installer task..\n"
+	rpm_ostree_install_step1
+	touch /var/rpm-ostree-overlay.complete
+	rpm_ostree_install_step2
+	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
+	rpm_ostree_install_step3
+	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+	/usr/bin/rpm-ostree install -y -A --idempotent firefox
+	echo -e "RPM package updates completed, finishing installer task..\n"
 }
 
 generate_tarfiles(){
@@ -153,7 +164,7 @@ install_decklink(){
 
 	podman build --build-arg KERNEL_VERSION=$(uname -r) -t quay.io/fedora/fedora-coreos:stable:kmm-kmod -f Containerfile
 
-	FROM fedora:39 as builder
+	FROM fedora:40 as builder
 	ARG KERNEL_VERSION
 
 	RUN dnf install -y \
@@ -164,16 +175,16 @@ install_decklink(){
 
 	# Get the kernel-headers
 	RUN KERNEL_XYZ=$(echo ${KERNEL_VERSION} | cut -d"-" -f1) && \
-    KERNEL_DISTRO=$(echo ${KERNEL_VERSION} | cut -d"-" -f2 | cut -d"." -f-2) && \
-    KERNEL_ARCH=$(echo ${KERNEL_VERSION} | cut -d"-" -f2 | cut -d"." -f3) && \
-    dnf install -y \
-    https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-${KERNEL_VERSION}.rpm \
-    https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-core-${KERNEL_VERSION}.rpm \
-    https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-modules-${KERNEL_VERSION}.rpm \
-    https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-modules-core-${KERNEL_VERSION}.rpm \
-    https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/x86_64/kernel-devel-${KERNEL_VERSION}.rpm
+  	KERNEL_DISTRO=$(echo ${KERNEL_VERSION} | cut -d"-" -f2 | cut -d"." -f-2) && \
+	KERNEL_ARCH=$(echo ${KERNEL_VERSION} | cut -d"-" -f2 | cut -d"." -f3) && \
+	dnf install -y \
+	https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-${KERNEL_VERSION}.rpm \
+	https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-core-${KERNEL_VERSION}.rpm \
+	https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-modules-${KERNEL_VERSION}.rpm \
+	https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-modules-core-${KERNEL_VERSION}.rpm \
+	https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/x86_64/kernel-devel-${KERNEL_VERSION}.rpm
 
-    # Here is where we'd want to copy the blackmagic DKMS modules into our container
+	# Here is where we'd want to copy the blackmagic DKMS modules into our container
 	RUN git clone https://github.com/kubernetes-sigs/kernel-module-management
 	RUN wget https://www.andymelville.net/wavelet/desktopvideo-12.7.1a1.x86_64.rpm
 	# Extract RPM
@@ -196,6 +207,7 @@ install_decklink(){
 	RUN rpm-ostree install strace && rm -rf /var/cache && \
   	ostree container commit
 }
+
 
 # Perhaps add a checksum to make sure nothing's been tampered with here..
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
