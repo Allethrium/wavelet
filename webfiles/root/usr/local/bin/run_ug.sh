@@ -83,7 +83,7 @@ event_server(){
 	KEYNAME=INPUT_DEVICE_PRESENT
 	read_etcd
 	echo -e "Ensuring dnsmasq service is up.."
-	systemctl restart dnsmasq.service
+	systemctl enable dnsmasq.service --now
 	if [[ "$printvalue" -eq 1 ]]; then
 		echo -e "An input device is present on this host,
 		 assuming we want an encoder running on the server.. \n"
