@@ -40,8 +40,6 @@ event_server(){
 	mkdir -p /home/wavelet/.config/containers/systemd/
 	chown -R wavelet:wavelet /home/wavelet
 	cd /home/wavelet
-	/usr/bin/rpm-ostree refresh-md
-	/usr/bin/rpm-ostree upgrade
 	rpm_ostree_install_git
 	git clone https://github.com/ALLETHRIUM/wavelet
 	generate_tarfiles
@@ -63,7 +61,6 @@ rpm_ostree_install_git(){
 }
 
 rpm_ostree_install(){
-	/usr/bin/rpm-ostree upgrade -A
 	rpm_ostree_install_step1(){
 	/usr/bin/rpm-ostree install \
 	-y -A \
