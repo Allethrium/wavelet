@@ -363,42 +363,42 @@ event_x264hw() {
 }
 
 event_libx265sw() {
-	# HIGH bw software HEVC encoding in UI
-	KEYNAME=uv_encoder
-	# We've changed these values around as setting GOP can mess with rate control, and we've forced keyframe insertion every 15 frames instead.
-	KEYVALUE="libavcodec:encoder=libx265:preset=superfast:bitrate=20M:threads=0:safe:x265-params=keyint=15\:min-keyint=5"
-	# lossless mode exists, but would generate 250mb+ stream
-	write_etcd_global
-	echo -e "libx265 Software mode activated, Bitrate 20M, decoder task restart bit set. \n"
-	wavelet-decoder-reset
+        # HIGH bw software HEVC encoding in UI
+        KEYNAME=uv_encoder
+        # Being less clever with libx265 now yields better results, specially with SMT enabled.
+        KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:threads=0:bitrate=8M"
+        # lossless mode exists, but would generate 250mb+ stream
+        write_etcd_global
+        echo -e "libx265 Software mode activated, decoder task restart bit set. \n"
+        wavelet-decoder-reset
 }
 
 event_libx265sw_low() {
-	# LOW bw software HEVC encoding in UI
-	KEYNAME=uv_encoder
-	#KEYVALUE="libavcodec:encoder=libx265:preset=superfast:gop=15:bitrate=8M:threads=0:safe"
-	# We've changed these values around as setting GOP can mess with rate control, and we've forced keyframe insertion every 15 frames instead.
-	KEYVALUE="libavcodec:encoder=libx265:preset=superfast:bitrate=8M:threads=0:safex265-params=keyint=15\:min-keyint=5"
-	write_etcd_global
-	echo -e "libx265 software mode activated, 8mbit stream, decoder task restart bit set. \n"
-	wavelet-decoder-reset
+        # LOW bw software HEVC encoding in UI
+        KEYNAME=uv_encoder
+        #KEYVALUE="libavcodec:encoder=libx265:preset=superfast:gop=15:bitrate=8M:threads=0:safe"
+        # Same args as high BW apply here.
+        KEYVALUE="libavcodec:encoder=libx265:preset=superfast:crf=36:threads=0:safe:x265-params=keyint=15\:min-keyint=2"
+        write_etcd_global
+        echo -e "libx265 software mode activated, crf 36, decoder task restart bit set. \n"
+        wavelet-decoder-reset
 }
 
 event_libsvt_hevc_sw() {
-	# Feedback from deployment:
-	# consider this the default COMPAT mode until we have a handle on things
-	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=7:thread_count=0:safe:crf=31"
-	write_etcd_global
+        # Feedback from deployment:
+        # consider this the default COMPAT mode until we have a handle on things
+        KEYNAME=uv_encoder
+        KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=7:thread_count=0:safe:crf=30"
+        write_etcd_global
 }
 
 event_libsvt_hevc_sw_zerolatency() {
-	# NB zerolatency disables frame parallelism, can't use multicore!
-	KEYNAME=uv_encoder
-	#KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:tune=zerolatency:qp=26:gop=6:bitrate=25"
-	KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=6:tune=zerolatency:pred_struct=0:qp=36:gop=60"
-	write_etcd_global
-}	
+        # NB zerolatency disables frame parallelism, can't use multicore!
+        KEYNAME=uv_encoder
+        #KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:tune=zerolatency:qp=26:gop=6:bitrate=25"
+        KEYVALUE="libavcodec:encoder=libsvt_hevc:preset=6:tune=zerolatency:pred_struct=0:qp=36:gop=60"
+        write_etcd_global
+}
 
 event_x265hw_qsv() {
 # working on tweaking these values to something as reliable as possible.

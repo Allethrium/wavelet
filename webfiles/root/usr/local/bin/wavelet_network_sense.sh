@@ -115,6 +115,11 @@ event_vendorDevice4(){
 #
 ####
 
+set -x
+exec >/home/wavelet/network_sense.log 2>&1
+# check to see if I'm a server or an encoder
+
+echo -e "\n \n \n ********Begin network detection and registration process...******** \n \n \n"
 detect_self
 
 
