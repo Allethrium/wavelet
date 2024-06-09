@@ -6,7 +6,7 @@ variant: fcos
 version: 1.5.0
 kernel_arguments:
   should_exist:
-    - nosmt
+    #- nosmt
     - threadirqs
     - mitigations=off
     - cpufreq.default_governor=performance
