@@ -36,7 +36,7 @@ parse_input_opts(){
 	;;
 	del))			echo -e "Dnsmasq has noted that a lease has been deleted, setting device as inactive"		;	event_inactive_networkDevice
 	;;
-	*)			echo -e "Input doesn't seem to be valid, doing nothing"						;	exit 0
+	*)				echo -e "Input doesn't seem to be valid, doing nothing"						;	exit 0
 }
 
 event_detect_networkDevice(){
@@ -44,15 +44,15 @@ event_detect_networkDevice(){
 	echo -e "Detect network device function called with the following data:\nOperation: ${dnsmasq_operation_type},\nMAC: ${dnsmasq_mac},\n IP Address: ${dnsmasq_ipAddr},\n Hostname: ${dnsmasq_hostName}\n"
 	
 	case ${dnsmasq_mac} in
-	whateverMagewellis)		echo -e "Magewell device matched, proceeding to attempt configuration"	;	event_vendorDevice1
+	whateverMagewellis)				echo -e "Magewell device matched, proceeding to attempt configuration"		;	event_vendorDevice1
 	;;
-	whateverPTZis)			echo -e "PTZ matched, proceeding to attempt configuration"		;	event_vendorDevice2
+	whateverPTZis)					echo -e "PTZ matched, proceeding to attempt configuration"					;	event_vendorDevice2
 	;;
-	whateverNDIis)			echo -e "NDI matched, proceeding to attempt configuration"		;	event_vendorDevice3
+	whateverNDIis)					echo -e "NDI matched, proceeding to attempt configuration"					;	event_vendorDevice3
 	;;
-	whateverAnothersupportDevIs)	echo -e "Device matched, proceeding to attempt configuration"		;	event_vendorDevice4
+	whateverAnothersupportDevIs)	echo -e "Device matched, proceeding to attempt configuration"				;	event_vendorDevice4
 	;;
-	*)				echo -e "Device not supported at current time, doing nothing."		;	exit 0
+	*)								echo -e "Device not supported at current time, doing nothing."				;	exit 0
 }
 
 event_inactive_networkDevice(){
@@ -65,7 +65,7 @@ event_inactive_networkDevice(){
 
 event_vendorDevice1(){
 	# Interrogates Magewell device, attempts preconfigured username and password, then tries to set appropriate settings for streaming into UltraGrid.
-	echo -e "Attempting to connect to device\n"
+	echo -e "Attempting to connect to device from Magewell\n"
 	echo -e "Successful!\nProceeding to parse REST data to stream into Wavelet..\n"
 		# stuff to set the stream target to RTP/RTSP 192.168.1.32 on appropriate port
 	echo -e "Generating device hash and creating WebUI interface components..\n"
@@ -76,7 +76,7 @@ event_vendorDevice1(){
 
 event_vendorDevice2(){
 	# Interrogates PTZ Cam device, attempts preconfigured username and password, then tries to set appropriate settings for streaming into UltraGrid.
-	echo -e "Attempting to connect to device\n"
+	echo -e "Attempting to connect to device from PTZ Optics\n"
 	echo -e "Successful!\nProceeding to parse REST data to stream into Wavelet..\n"
 		# stuff to set the stream target to RTP/RTSP 192.168.1.32 on appropriate port
 	echo -e "Generating device hash and creating WebUI interface components..\n"
@@ -115,6 +115,11 @@ event_vendorDevice4(){
 #
 ####
 
+set -x
+exec >/home/wavelet/network_sense.log 2>&1
+# check to see if I'm a server or an encoder
+
+echo -e "\n \n \n ********Begin network detection and registration process...******** \n \n \n"
 detect_self
 
 

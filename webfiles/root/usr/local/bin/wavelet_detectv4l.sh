@@ -82,24 +82,41 @@ generate_device_info() {
 	echo -e "generated device hash: $deviceHash \n"
 	device_string_short=$(echo "${device_string_long}" | sed 's/.*usb-//')
 	# Let's look for the device hash in the /interface prefix to make sure it doesn't already exist!
-	# First delete empty /hash/ values that might be there incorrectly (WHY???)
-	etcdctl --endpoints=http://192.168.1.32:2379 del "/hash/"
+		# umm - isn't this deleting everything in /hash/ each time a device is generated??
+		# First delete empty /hash/ values that might be there incorrectly (WHY???)
+		#etcdctl --endpoints=http://192.168.1.32:2379 del "/hash/"
 	output_return=$(etcdctl --endpoints=http://192.168.1.32:2379 get "/hash/${deviceHash}")
 	if [[ $output_return == "" ]] then
-		echo -e "\n ${deviceHash} not located within etcd, assuming we have a new device and continuing with process to set parameters.. \n"
-		set_device
+		echo -e "\n${deviceHash} not located within etcd, assuming we have a new device and continuing with process to set parameters..\n"
+		isDevice_input_or_output
 	else
-		echo -e "\n ${deviceHash} located in etcd: \n \n ${output_return} \n \n, terminating process. \n If you wish for the device to be properly redetected from scratch, please move it to a different USB port. \n"
+		echo -e "\n${deviceHash} located in etcd:\n\n${output_return}\n\n, terminating process.\nIf you wish for the device to be properly redetected from scratch, please move it to a different USB port.\n"
 		# we run device_cleanup regardless!!
 		device_cleanup
-
 	fi
 }
 
+isDevice_input_or_output () {
+	# Are we outputting audio/video signals someplace or is this an input?  we determine this here
+	case ${device_string_long} in 
+	*BiAmp*)				echo -e "BiAmp HDMI-USB Capture device detected.. \n"						&&	event_biAmp
+	;;
+	*audio*)				echo -e "Audio out device detected.. \n"									&&	event_audioOutput
+	;;
+	*)						ecgi -e "Not a biAmp, we are probably connecting video capture dev."		&&	set_device_input
+	;;
+	esac
+}
 
-set_device() {
+event_audioOutput() {
+	# Attempt to set the new audio output to default sink in Pipewire
+		# work out how to do this..
+}
+
+set_device_input() {
 	# called from generate_device_info from the nested if loop checking for pre-existing deviceHash in etcd /hash/
-	# populated device_string_short with hash value, this is used by the interface webUI component - device_string_short is effectively the webui Label and banner text.
+	# populated device_string_short with hash value, this is used by the interface webUI component
+	# device_string_short is effectively the webui Label / banner text.
 	# Because we cannot query etcd by keyvalue, we must create a reverse lookup prefix for everything we want to be able to clean up!!
 	KEYNAME="/interface/$(hostname)/${device_string_short}"
 	KEYVALUE="${deviceHash}"
@@ -129,7 +146,6 @@ set_device() {
 	KEYNAME=INPUT_DEVICE_PRESENT
 	KEYVALUE=1
 	write_etcd
-	# Let us eventually do something clever here to try and set useful video caps.
 	detect
 }
 
@@ -183,36 +199,26 @@ declare -a interfaceLongArray=$(etcdctl --endpoints=${ETCDENDPOINT} get /long_in
 
 
 detect() {
-# we still need this fairly simple approach, as the Logitech screen share USB devices have no serial number, making multiple inputs hard to handle.
+# we still need this fairly simple approach, as the Logitech screen share USB devices have no serial number, making multiple inputs is hard to handle.
 # is called in a foreach loop from detect_ug devices, therefore it is already instanced for each device
+# Because we have already run a case in for device type, this detection routine will be handling video output devices ONLY.
+# If we need to support audio output devices, we need to do it via a different path branching from isDevice_input_or_output
 	echo -e "Device string is ${device_string_long} \n"
 	case ${device_string_long} in
-	*IPEVO*)				echo -e "IPEVO Document Camera device detected.. \n"			&& event_ipevo
+	*IPEVO*)						echo -e "IPEVO Document Camera device detected.. \n"				&& event_ipevo
 	;;
-	*"Logitech Screen Share"*)		echo -e "Logitech HDMI-USB Capture device detected.. \n"		&& event_logitech_hdmi
+	*"Logitech Screen Share"*)		echo -e "Logitech HDMI-USB Capture device detected.. \n"			&& event_logitech_hdmi
 	;;
-	*Magewell*)				echo -e "Magewell HDMI-USB Capture device detected.. \n"		&& event_magewell
+	*Magewell*)						echo -e "Magewell HDMI-USB Capture device detected.. \n"			&& event_magewell
 	;;
-	*BiAmp*)				echo -e "BiAmp HDMI-USB Capture device detected.. \n"			&& event_biAmp
+	*EPSON*)						echo -e "Magewell HDMI-USB Capture device detected.. \n"			&& event_epson
 	;;
-	*)					echo -e "Unknown device detected, attempting to process..\n"		&& event_unknowndevice
+	*)								echo -e "Unknown device detected, attempting to process..\n"		&& event_unknowndevice
 	;;
 	esac
 }
 
-event_biamp() {
-# This should set the biAmp up as a Pipewire audio output sink by default, so Wavelet will stream any audio data the system receives into the biAmp
-	echo -e "biAmp detection running..\n"
-	KEYVALUE="testValue"
-	KEYNAME=${device_string_long}
-	write_etcd_inputs
-	# Set AUDIO_OUT flag so the UI does not generate an input button, but an audio OUT button instead?
-	KEYVALUE="1"
-	KEYNAME=${device_string_long}/AUDIO_OUT
-	write_etcd_inputs
-	echo -e "\n Detection completed for IPEVO device.. \n \n \n \n"
-	device_cleanup
-}
+# VIDEO output device blocks
 
 event_ipevo() {
 # each of these blocks contains specific configuration options that must be preset for each device in order for them to work.  
@@ -234,9 +240,16 @@ event_logitech_hdmi() {
 	device_cleanup
 }
 event_magewell() {
-# tries to set 60FPS and RGB mode - if breaks, put magewell via USB on windows w/ config app and enable RGB24 mode!!
 	echo -e "Setting up Magewell USB capture card..\n"
-	KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/60:convert=RGB:device=${v4l_device_path}"
+	KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"
+		KEYNAME="${device_string_long}"
+	write_etcd_inputs
+	echo -e "\n Detection completed for device.. \n \n \n \n"
+	device_cleanup
+}
+event_epson() {
+	echo -e "Setting up Magewell USB capture card..\n"
+	KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/24:convert=RGB:device=${v4l_device_path}"
 		KEYNAME="${device_string_long}"
 	write_etcd_inputs
 	echo -e "\n Detection completed for device.. \n \n \n \n"
@@ -252,6 +265,22 @@ event_unknowndevice() {
 	device_cleanup
 }
 
+
+#AUDIO output device block
+
+event_biamp() {
+# This should set the biAmp up as a Pipewire audio output sink by default, so Wavelet will stream any audio data the system receives into the biAmp
+	echo -e "biAmp detection running..\n"
+	KEYVALUE="testValue"
+	KEYNAME=${device_string_long}
+	write_etcd_inputs
+	# Set AUDIO_OUT flag so the UI does not generate an input button, but an audio OUT button instead?
+	KEYVALUE="1"
+	KEYNAME=${device_string_long}/AUDIO_OUT
+	write_etcd_inputs
+	echo -e "\n Detection completed for IPEVO device.. \n \n \n \n"
+	device_cleanup
+}
 
 
 detect_self(){
