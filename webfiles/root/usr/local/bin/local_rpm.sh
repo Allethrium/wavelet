@@ -24,7 +24,7 @@ mkdir -p /home/wavelet/http/repo_mirror/fedora/releases/${releasever}/x86_64/
 dnf reinstall -y --nogpgcheck --downloadonly --downloaddir=/home/wavelet/http/repo_mirror/fedora/releases/${releasever}/x86_64/ `rpm -qa`
 createrepo /home/wavelet/http/repo_mirror/fedora/releases/${releasever}/x86_64/
 chown -R wavelet:wavelet /home/wavelet/
-find /home/wavelet/http -type d -exec chmod 755 {} +
+find /home/wavelet/http -type d -exec chmod 750 {} +
 
 touch /home/wavelet/local_rpm_setup.complete
 chown wavelet:wavelet /home/wavelet/local_rpm_setup.complete
