@@ -96,21 +96,20 @@ generate_device_info() {
 	fi
 }
 
-isDevice_input_or_output () {
+isDevice_input_or_output() {
 	# Are we outputting audio/video signals someplace or is this an input?  we determine this here
 	case ${device_string_long} in 
-	*BiAmp*)				echo -e "BiAmp HDMI-USB Capture device detected.. \n"						&&	event_biAmp
+	*BiAmp*)				echo -e "BiAmp HDMI-USB Capture device detected..\n"						&&	event_biAmp
 	;;
-	*audio*)				echo -e "Audio out device detected.. \n"									&&	event_audioOutput
+	*audio*)				echo -e "Audio out device detected..\n"										&&	event_audioOutput
 	;;
-	*)						ecgi -e "Not a biAmp, we are probably connecting video capture dev."		&&	set_device_input
+	*)						echo -e "Not a biAmp, we are probably connecting video capture dev.\n"		&&	set_device_input
 	;;
 	esac
 }
 
 event_audioOutput() {
-	# Attempt to set the new audio output to default sink in Pipewire
-		# work out how to do this..
+	# currently empty pending whether we can do this in pipewire statically with lua scripts or we need to do something here..
 }
 
 set_device_input() {
