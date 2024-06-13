@@ -67,17 +67,18 @@ wavelet_reflector() {
 	echo ${return_etcd_clients_ip} > /home/wavelet/reflector_clients_ip.txt
 	if [[ ! -z "${return_etcd_clients_ip}" ]]; then
 		reflectorclients_file=/home/wavelet/reflector_clients_ip.txt
-	#       KEYNAME=uv_filter_cmd
-	#       read_etcd
-	#       uv_filterString=return_etcd
-		echo -e "Systemd will execute hd-rum-transcode with commandline: \n\n hd-rum-transcode 8M 5004 ${return_etcd_clients_ip} \n after a one-second delay"
+		# KEYNAME=uv_filter_cmd
+		# read_etcd
+		# uv_filterString=return_etcd
+		echo -e "Systemd will execute hd-rum-transcode with commandline: \n\nhd-rum-transcode 2M 5004 ${return_etcd_clients_ip}\nafter a half-second delay"
 		KEYNAME=REFLECTOR_ARGS
-		ugargs="--tool hd-rum-transcode 8M 5004 ${processed_clients_ip}"
+		# Reduce HD-RUM buffer to 2M
+		ugargs="--tool hd-rum-transcode 2M 5004 ${processed_clients_ip}"
 		KEYVALUE="${ugargs}"
 		echo -e "Generating initial reflector clients list.."
 		echo "${return_etcd_clients_ip}" > /home/wavelet/reflector_clients_ip.txt
 		write_etcd_global
-		sleep 1
+		sleep 0.5
 		echo "
 		[Unit]
 		Description=UltraGrid AppImage Reflector
@@ -94,9 +95,9 @@ wavelet_reflector() {
 		KEYNAME=reload_reflector
 		KEYVALUE=0
 		write_etcd_global
-	#       Audio reflector, IP settings identical to video reflector so we don't need to do all that again
+		# Audio reflector, IP settings identical to video reflector so we don't need to do all that again
 		KEYNAME=AUDIO_REFLECTOR_ARGS
-		ugargs="--tool hd-rum-transcode 8M 5006 ${processed_clients_ip}"
+		ugargs="--tool hd-rum-transcode 2M 5006 ${processed_clients_ip}"
 		KEYVALUE="${ugargs}"
 		write_etcd_global
 		echo "
@@ -122,6 +123,6 @@ wavelet_reflector() {
 	fi
 }
 
-set -x
-exec >/home/wavelet/wavelet_reflector.log 2>&1
+#set -x
+exec >/home/wavelet/reflector.log 2>&1
 wavelet_reflector
