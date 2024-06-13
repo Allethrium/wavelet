@@ -101,15 +101,11 @@ isDevice_input_or_output() {
 	case ${device_string_long} in 
 	*BiAmp*)				echo -e "BiAmp HDMI-USB Capture device detected..\n"						&&	event_biAmp
 	;;
-	*audio*)				echo -e "Audio out device detected..\n"										&&	event_audioOutput
+	*audio*)				echo -e "Audio out device detected..\n"										&&	echo -e "an audio output selection event would be called here\n"
 	;;
 	*)						echo -e "Not a biAmp, we are probably connecting video capture dev.\n"		&&	set_device_input
 	;;
 	esac
-}
-
-event_audioOutput() {
-	# currently empty pending whether we can do this in pipewire statically with lua scripts or we need to do something here..
 }
 
 set_device_input() {
