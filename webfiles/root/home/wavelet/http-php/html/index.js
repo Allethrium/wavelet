@@ -46,7 +46,31 @@ function secondAjax(){
 										var value = item['value'];
 										createNewHost(key, value);
 										})
-				}
+				},
+		complete: function(){
+			thirdAjax();
+		}
+		});
+}
+
+function thirdjax(){
+// get dynamic network inputs from etcd, and call and generate entries and buttons for them.
+// why aren't we moving to Angular/REACT already? oh that's right.. i haven't had time to learn it yet..
+	$.ajax({
+				type: "POST",
+				url: "get_network_inputs.php",
+				dataType: "json",
+				success: function(returned_data) {
+						counter = 3000;
+						console.log("JSON Network Inputs data received:");
+						console.log(returned_data);
+						returned_data.forEach(item => {
+										var key = item['key'];
+										var value = item['value'];
+										var keyFull = item['keyFull'];
+										createNewNetworkButton(key, value, keyFull);
+										})
+				},
 		});
 }
 
@@ -132,6 +156,7 @@ function handlePageLoad() {
 				}
 	});
 
+# Run first AJAX call
 firstAjax();
 }
 
@@ -200,6 +225,10 @@ function getHostBlankStatus(hostValue) {
 	return retValue;
 }
 
+const callingFunction = (callback) => {
+    const callerId = 'calling_function';
+    callback(this);
+};
 
 function createNewButton(key, value, keyFull) {
 	var divEntry		=	document.createElement("Div");
@@ -208,7 +237,12 @@ function createNewButton(key, value, keyFull) {
 	const id			=	document.createTextNode(counter + 1);
 	dynamicButton.id	=	counter;
 	/* create a div container, where the button, relabel button and any other associated elements reside */
-	dynamicInputs.appendChild(divEntry);
+	if (typeof firstAjax === 'object') {
+		dynamicInputs.appendChild(divEntry);
+	} else if (typeof thirdAjax === 'object') {
+		dynamicNetworkInputs.appendChild(divEntry);
+	}
+	//dynamicInputs.appendChild(divEntry);
 	divEntry.setAttribute("divDeviceHash", value);
 	divEntry.setAttribute("data-fulltext", keyFull);
 	divEntry.setAttribute("divDevID", dynamicButton.id);
