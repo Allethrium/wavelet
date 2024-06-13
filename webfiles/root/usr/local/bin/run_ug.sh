@@ -4,6 +4,8 @@
 
 detect_self(){
 UG_HOSTNAME=$(hostname)
+# Create a hostname.local file in tmp so that nonprivileged users such as dnsmasq can tell who we are
+echo $(hostname) >> /var/tmp/hostname.local
 	echo -e "Hostname is $UG_HOSTNAME \n"
 	case $UG_HOSTNAME in
 	enc*) 					echo -e "I am an Encoder \n"; event_encoder
