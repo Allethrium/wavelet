@@ -71,7 +71,7 @@ rpm_ostree_install(){
 	libsrtp libdrm python3-pip srt srt-libs libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
 	ImageMagick intel-opencl mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
 	mesa-libxatracker alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools dkms kernel-headers usbutils \
-	tuned realtime-setup realtime-tests rtkit
+	tuned realtime-setup realtime-tests rtkit jo
 	echo -e "\nBase RPM Packages installed, waiting for 1 second..\n"
 	sleep 1
 	}
