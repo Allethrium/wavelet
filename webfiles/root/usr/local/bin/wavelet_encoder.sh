@@ -135,10 +135,10 @@ event_encoder(){
 	# Currently -f V:rs:200:240 on the end specifies reed-solomon forward error correction 
 	# For higher btirate streams, we can use "-f LDGM:40%" - must be >2mb frame size!
 	# Audio runs as a multiplied stream, if enabled at all.
-	# traffic shaping can be disabled by adding '-l unlimited" before inputvar
-	# For now, we must use a very small MTU, this is because a packet loss can result-
-	# in the loss of the entire GOP, leading to the display artefacting we've been seeing.
-	# CESNET/UG team aware, working on a fix.
+	# This command would use the switcher;
+	# --tool uv $filtervar -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${inputvar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}
+	# can be used remote with this kind of tool (netcat) : echo 'capture.data 0' | busybox nc localhost <control_port>
+	# not using right now as different inputs have different formats.. may be problematic.
 	UGMTU="9000"
 	echo -e "Assembled command is: \n --tool uv $filtervar -f V:rs:200:250 ${inputvar} -c ${encodervar} -P ${uv_videoport} -m ${UGMTU} ${destinationipv4} \n"
 	ugargs="--tool uv $filtervar -f V:rs:200:250 ${inputvar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}"
