@@ -43,7 +43,7 @@ event_init_codec() {
 
 event_init_av1() {
 	KEYNAME=uv_encoder
-	KEYVALUE="libavcodec:encoder=libaom-av1:usage=realtime:cpu-used=8"
+	KEYVALUE="libavcodec:encoder=libaom-av1:usage=realtime:cpu-used=8:safe"
 	write_etcd_global
 	echo -e "Default LibX265 activated, bitrate 8M\n"     
 }
