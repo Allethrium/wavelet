@@ -2,6 +2,7 @@
 #
 # The controller is responsible for orchestrating the rest of the system
 
+
 # Define standard default variables for encoders
 uv_videoport="5004"
 uv_audioport="5006"
@@ -100,31 +101,31 @@ case $event in
 #		($false) echo "Recording to archive file" && recording=true && wavelet_record_start;; 
 	# does not kill any streams, instead copies stream and appends to a labeled MKV file (not implemented unless we get a real server w/ STORAGE)
 	# HW and SW modes selected for compatibility reasons - some decoders don't like HW encoded video.  SW encoding will need a *FAST* CPU unless you like latency, dropped frames and glitches.
-	(A)		event_x264sw						&& echo "x264 Software video codec selected, updating encoder variables"						;;
-	(B)		event_x264hw 						&& echo "x264 VA-API video codec selected, updating encoder variables"							;;
-	(C)		event_libx265sw 					&& echo "HEVC Software libx265 video codec selected, updating encoder variables"				;;
-	(C1)	event_libx265sw_low 				&& echo "HEVC Software libx265 video codec selected, updating encoder variables"				;;
-	(D)		event_libsvt_hevc_sw				&& echo "HEVC Software svt_hevc video codec selected, updating encoder variables"				;;
+	(A)		event_x264sw						&& echo "x264 Software video codec selected, updating encoder variables"		;;
+	(B)		event_x264hw 						&& echo "x264 VA-API video codec selected, updating encoder variables"			;;
+	(C)		event_libx265sw 					&& echo "HEVC Software libx265 video codec selected, updating encoder variables"	;;
+	(C1)	event_libx265sw_low 				&& echo "HEVC Software libx265 video codec selected, updating encoder variables"			;;
+	(D)		event_libsvt_hevc_sw				&& echo "HEVC Software svt_hevc video codec selected, updating encoder variables"		;;
 	(D1)	event_libsvt_hevc_sw_zerolatency	&& echo "HEVC Software svt_hevc video codec selected, updating encoder variables"				;;
-	(D2)	event_x265hw_qsv					&& echo "HEVC QSV video codec selected, updating encoder variables"								;;
-	(D3)	event_x265hw_vaapi					&& echo "HEVC QSV video codec selected, updating encoder variables"								;;
-	(E)		event_vp9sw							&& echo "VP-9 Software video codec selected, updating encoder variables"						;;
-	(E1)	event_vp8sw							&& echo "VP-8 Software video codec selected, updating encoder variables"						;;
-	(F)		event_vp9hw 						&& echo "VP-9 Hardware video codec selected, updating encoder variables"						;;
+	(D2)	event_x265hw_qsv					&& echo "HEVC QSV video codec selected, updating encoder variables"				;;
+	(D3)	event_x265hw_vaapi					&& echo "HEVC QSV video codec selected, updating encoder variables"				;;
+	(E)		event_vp9sw							&& echo "VP-9 Software video codec selected, updating encoder variables"	;;
+	(E1)	event_vp8sw							&& echo "VP-8 Software video codec selected, updating encoder variables"		;;
+	(F)		event_vp9hw 						&& echo "VP-9 Hardware video codec selected, updating encoder variables"		;;
 	(G)		event_rav1esw						&& echo "|*****||EXPERIMENTAL AV1 RAV1E codec selected, updating encoder variables||****|"		;;
 	(H)		event_av1hw							&& echo "|*****||EXPERIMENTAL AV1 VA-API codec selected, updating encoder variables||****|"		;;
-	(H1)	event_libaom_av1					&& echo "|*****||EXPERIMENTAL AV1 LibAOM codec selected, updating encoder variables||****|"		;;
-	(H2)	event_libsvt_av1					&& echo "|*****||EXPERIMENTAL AV1 libSVT codec selected, updating encoder variables||****|"		;;
-	(M1)	event_mjpeg_sw						&& echo "MJPEG SW activated - safest but high BW"												;;
-	(M2)	event_mjpeg_qsv						&& echo "MJPEG QSV activated - safest but high BW"												;;
-	(N1)	event_cineform						&& echo "Cineform SW activated - broken"														;;
+	(H1)	event_libaom_av1					&& echo "|*****||EXPERIMENTAL AV1 LibAOM codec selected, updating encoder variables||****|"	;;
+	(H2)	event_libsvt_av1					&& echo "|*****||EXPERIMENTAL AV1 libSVT codec selected, updating encoder variables||****|"	;;
+	(M1)	event_mjpeg_sw						&& echo "MJPEG SW activated - safest but high BW"						;;
+	(M2)	event_mjpeg_qsv						&& echo "MJPEG QSV activated - safest but high BW"						;;
+	(N1)	event_cineform						&& echo "Cineform SW activated - broken"							;;
 	#
 	# Multiple input modes go here (I wonder if there's a better, matrix-based approach to this?)
 	#
-	(W) echo "Four-way panel split activated \n"						;current_event="event_foursplit";wavelet-foursplit				;;
-	(X) echo "Two-way panel split activated \n"							;current_event="event_twosplit"	;wavelet-twosplit				;;
-	(Y) echo "Picture-in-Picture 1 activated \n"						;current_event="event_pip1"		;wavelet-pip1					;;
-	(Z) echo "Picture-in-Picture 2 activated \n"						;current_event="event_pip2"		;wavelet-pip2					;;
+	(W) echo "Four-way panel split activated \n"						;current_event="event_foursplit";wavelet-foursplit			;;
+	(X) echo "Two-way panel split activated \n"							;current_event="event_twosplit"	;wavelet-twosplit		;;
+	(Y) echo "Picture-in-Picture 1 activated \n"						;current_event="event_pip1"		;wavelet-pip1			;;
+	(Z) echo "Picture-in-Picture 2 activated \n"						;current_event="event_pip2"		;wavelet-pip2			;;
 	(*) echo "Unknown predefined input, passing hash to encoders.. \n"	;current_event="dynamic"		;wavelet-dynamic				;;
 esac
 }
@@ -190,78 +191,32 @@ wavelet-blank() {
 	KEYNAME=uv_input
 	KEYVALUE="BLANK"
 	write_etcd_global
-	KEYNAME=uv_input_cmd
-	KEYVALUE="-t testcard:pattern=blank"
-	/usr/local/bin/wavelet_textgen.sh
-	write_etcd
-	# Set encoder restart flag to 1
-	KEYNAME=encoder_restart
-	KEYVALUE="1"
-	write_etcd_global
+	echo 'capture.data 0' | busybox nc -v 127.0.0.1 6160
 }
 
 wavelet-seal() {
 # 2
 # Serves a static image in .jpg format in a loop to the encoder.
 	current_event="wavelet-seal"
+	rm -rf seal.mp4
+	ffmpeg -r 1 -i ny-stateseal.jpg -c:v mjpeg -vf fps=30 -color_range 2 -pix_fmt yuv440p seal.mp4
 	KEYNAME=uv_input
 	KEYVALUE="SEAL"
 	write_etcd_global
-	# Always set this to SW x265, everything else breaks due to pixel format conversion issues w/ FFMPEG/lavc
-	encodervar="libavcodec:encoder=libx265:safe"
-	inputvar="-t file:/home/wavelet/seal.mp4:loop"
-	/usr/local/bin/wavelet_textgen.sh
 	cd /home/wavelet/
-	ffmpeg -r 1/10 -i ny-stateseal.jpg -c:v libx265 -vf fps=10 -pix_fmt yuv420p seal.mp4
-	write_etcd
-	# Kill existing streaming on the SERVER
-		systemctl --user stop UltraGrid.AppImage.service
-		# Set encoder restart flag to 1 - this will kill other videosources
-		KEYNAME=encoder_restart
-		KEYVALUE="1"
-		write_etcd_global
-	# Now we setup a systemd unit for the encoder on the SERVER which will handle the generation of the seal stream.  Simple systemd unit.
-		KEYNAME=uv_videoport
-		read_etcd_global
-		video_port=${printvalue}
-		# Destination IP is the IP address of the UG Reflector
-		destinationipv4="192.168.1.32"
-		ugargs="--tool uv $filtervar -f V:rs:200:240 -l unlimited ${inputvar} -c ${encodervar} -P ${video_port} -m 9000 ${destinationipv4}"
-		KEYNAME=UG_ARGS
-		KEYVALUE=${ugargs}
-		write_etcd
-		echo -e "Verifying stored command line"
-		read_etcd
-		echo "
-		[Unit]
-		Description=UltraGrid AppImage executable
-		After=network-online.target
-		Wants=network-online.target
-		[Service]
-		ExecStart=/usr/local/bin/UltraGrid.AppImage ${ugargs}
-		KillMode=mixed
-		TimeoutStopSec=0.25
-		[Install]
-		WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
-		systemctl --user daemon-reload
-		systemctl --user restart UltraGrid.AppImage.service
-		echo -e "Encoder systemd units instructed to start..\n"
+	# We now use the switcher for simple things
+	echo 'capture.data 2' | busybox nc -v 127.0.0.1 6160
 }
 
 wavelet-testcard() {
 # T
-		current_event="wavelet-testcard"
-		KEYNAME=uv_input
-		KEYVALUE="BLANK"
-		write_etcd_global
-		KEYNAME=uv_input_cmd
-		KEYVALUE="-t testcard:pattern=smpte_bars"
-		/usr/local/bin/wavelet_textgen.sh
-		write_etcd
-		# Set encoder restart flag to 1
-		KEYNAME=encoder_restart
-		KEYVALUE="1"
-		write_etcd_global
+# Test Card
+	current_event="wavelet-testcard"
+	KEYNAME=uv_input
+	KEYVALUE="BLANK"
+	write_etcd_global
+	KEYVALUE="1"
+	echo 'capture.data 1' | busybox nc -v 127.0.0.1 6160
 }
 
 wavelet-dynamic() {
@@ -281,10 +236,14 @@ wavelet-dynamic() {
 	KEYNAME="encoder_restart"
 	KEYVALUE="1"
 	write_etcd_global
+	# Ensure input is set to 3 so we get the right selection out of the switcher.
+	# Because there are so many possibilities for video input sources, we're going to avoid using the switcher and stay with the old kill/restart method here.
 	KEYNAME=input_update
 	KEYVALUE="0"
 	echo -e "\n Task completed, resetting input_update key to 0.. \n"
 	write_etcd_global
+	sleep 2
+	echo 'capture.data 3' | busybox nc -v 127.0.0.1 6160
 }
 
 wavelet_foursplit() {
@@ -298,15 +257,15 @@ wavelet_foursplit() {
 	controllerInputHash=${printvalue}
 	echo -e "\n \n Controller notified that the Four-way split input hash has been selected from the WebUI.  Encoder will do its best to generate a software mix of up to four available input devices. \n \n "
 	# Kill existing streaming on the SERVER
-		systemctl --user stop UltraGrid.AppImage.service
-		# Set encoder restart flag to 1
-		KEYNAME=encoder_restart
-		KEYVALUE="1"
-		write_etcd_global
-		KEYNAME=input_update
-		KEYVALUE="0"
-		echo -e "\n Task completed, resetting input_update key to 0.. \n"
-		write_etcd_global
+	systemctl --user stop UltraGrid.AppImage.service
+	# Set encoder restart flag to 1
+	KEYNAME=encoder_restart
+	KEYVALUE="1"
+	write_etcd_global
+	KEYNAME=input_update
+	KEYVALUE="0"
+	echo -e "\n Task completed, resetting input_update key to 0.. \n"
+	write_etcd_global
 }
 # These events contain additional codec-specific settings that have been found to work acceptably well on the system.
 # Since they are tuned by hand, you probably won't want to modify them unless you know exactly what you're doing.
@@ -330,8 +289,6 @@ event_cineform() {
 	wavelet-decoder-reset
 }
 event_mjpeg_sw() {
-	# BROKEN - Clients never receive any frames, they drop everything
-	# Test card works like a dream though?  Must be some conversion stuff from input devs..
 	KEYNAME=uv_encoder
 	KEYVALUE="libavcodec:encoder=mjpeg:huffman=1:q=10:safe"
 	write_etcd_global
@@ -339,7 +296,6 @@ event_mjpeg_sw() {
 	wavelet-decoder-reset
 }
 event_mjpeg_qsv() {
-	# BROKEN - Clients never receive any frames, they drop everything
 	KEYNAME=uv_encoder
 	KEYVALUE="libavcodec:encoder=mjpeg_qsv:safe"
 	write_etcd_global
@@ -426,7 +382,7 @@ event_vp9sw() {
 	wavelet-decoder-reset
 }
 event_libsvt_vp9() {
-       KEYNAME=uv_encoder
+	   KEYNAME=uv_encoder
 	KEYVALUE="libavcodec:encoder=libsvt-vp9:safe"
 	write_etcd_global
 	echo -e "VP9 Software acceleration activated\n"
@@ -456,7 +412,7 @@ event_av1hw() {
 event_libaom_av1() {
 	KEYNAME=uv_encoder
 	#KEYVALUE="libavcodec:encoder=libaom-av1:usage=realtime:cpu-used=5:threads=9:safe:keyint-min-dist=60:sb_size=64:cq-level=30:passes=2:lag-in-frames=15:end-usage=q:drop_threshold=2"
-	KEYVALUE="libavcodec:encoder=libaom-av1:usage=realtime:cpu-used=8"
+	KEYVALUE="libavcodec:encoder=libaom-av1:usage=realtime:cpu-used=8:safe"
 	write_etcd_global
 	echo -e "LibAOM-AV1 Software compression activated \n"
 	wavelet-decoder-reset
