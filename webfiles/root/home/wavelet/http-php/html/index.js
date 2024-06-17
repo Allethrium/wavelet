@@ -19,10 +19,11 @@ function firstAjax(){
 						console.log("JSON Inputs data received:");
 						console.log(returned_data);
 						returned_data.forEach(item => {
+										const functionIndex = 1;
 										var key = item['key'];
 										var value = item['value'];
 										var keyFull = item['keyFull'];
-										createNewButton(key, value, keyFull);
+										createNewButton(key, value, keyFull, functionIndex);
 										})
 				},
 		complete: function(){
@@ -42,6 +43,7 @@ function secondAjax(){
 						console.log("JSON Hosts data received:");
 						console.log(returned_data);
 						returned_data.forEach(item => {
+										const functionIndex = 2;
 										var key	 = item['key'];
 										var value = item['value'];
 										createNewHost(key, value);
@@ -53,7 +55,7 @@ function secondAjax(){
 		});
 }
 
-function thirdjax(){
+function thirdAjax(){
 // get dynamic network inputs from etcd, and call and generate entries and buttons for them.
 // why aren't we moving to Angular/REACT already? oh that's right.. i haven't had time to learn it yet..
 	$.ajax({
@@ -65,10 +67,11 @@ function thirdjax(){
 						console.log("JSON Network Inputs data received:");
 						console.log(returned_data);
 						returned_data.forEach(item => {
+										const functionIndex = 3;
 										var key = item['key'];
 										var value = item['value'];
 										var keyFull = item['keyFull'];
-										createNewNetworkButton(key, value, keyFull);
+										createNewButton(key, value, keyFull, functionIndex);
 										})
 				},
 		});
@@ -155,9 +158,8 @@ function handlePageLoad() {
 						});
 				}
 	});
-
-# Run first AJAX call
-firstAjax();
+	// Execute initial AJAX Call
+	firstAjax();
 }
 
 function getLivestreamStatus(livestreamValue) {
@@ -226,21 +228,25 @@ function getHostBlankStatus(hostValue) {
 }
 
 const callingFunction = (callback) => {
-    const callerId = 'calling_function';
-    callback(this);
+	const callerId = 'calling_function';
+	callback(this);
 };
 
-function createNewButton(key, value, keyFull) {
+function createNewButton(key, value, keyFull, functionIndex) {
 	var divEntry		=	document.createElement("Div");
 	var dynamicButton 	= 	document.createElement("Button");
-	const text			=	document.createTextNode(key);
-	const id			=	document.createTextNode(counter + 1);
+	const text		=	document.createTextNode(key);
+	const id		=	document.createTextNode(counter + 1);
 	dynamicButton.id	=	counter;
 	/* create a div container, where the button, relabel button and any other associated elements reside */
-	if (typeof firstAjax === 'object') {
+	if (functionIndex === 1) {
+		console.log("called from firstAjax so this is a local video source");
 		dynamicInputs.appendChild(divEntry);
-	} else if (typeof thirdAjax === 'object') {
+	} else if (functionIndex === 3) {
+		console.log("called from thirdAjax so this is a network video source");
 		dynamicNetworkInputs.appendChild(divEntry);
+	} else {
+		console.error("createNewButton not called from a valid function");
 	}
 	//dynamicInputs.appendChild(divEntry);
 	divEntry.setAttribute("divDeviceHash", value);
