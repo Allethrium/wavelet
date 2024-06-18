@@ -120,7 +120,6 @@ event_decoder(){
 
 }
 
-
 event_encoder(){
 	echo -e "reloading systemctl user daemon, moving to run_ug"
 	systemctl --user daemon-reload
@@ -161,7 +160,7 @@ server_bootstrap(){
 	# Disabled, because we will call with the installer script
 	until [ -f /home/wavelet/local_rpm_setup.complete ]
 	do
-		sleep 5
+		sleep 2
 	done
 	if test -f "/var/server_bootstrap_completed"; then
 		echo -e "\n server bootstrap has already been completed, exiting..\n"
@@ -171,17 +170,36 @@ server_bootstrap(){
 		# check for bootstrap_completed, verify services running
 		echo -e "Generating HTTPD server and copying/compressing wavelet files to server directory.."
 		/usr/local/bin/build_httpd.sh	
-		sleep 5
+		sleep 2
 	}
 
 	bootstrap_nginx_php(){
 		# http PHP server for control interface	
 		/usr/local/bin/build_nginx_php.sh
-		sleep 5
+		sleep 2
+	}
+
+	bootstrap_dnsmasq_watcher_service(){
+		echo -e "[Unit]
+Description=Inotifywait dnsmasq service
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/wavelet-inotifywait-service.sh
+RestartSec=10s
+User=wavelet
+Group=wavelet
+Type=simple
+StandardOutput=inherit
+StandardError=inherit
+
+[Install]
+WantedBy=default.target" > wavelet_dnsmasq_netsense_inotify.service
+		systemctl --user enable wavelet_dnsmasq_netsense_inotify.service --now
+		echo -e "\ninotify service enabled for wavelet network sense via dnsmasq..\n"
 	}
 
 	echo -e "Pulling etcd and generating systemd services.."
-#	/usr/local/bin/etcd-member-service.sh
 	cd /home/wavelet/.config/systemd/user/
 	/bin/podman pull quay.io/coreos/etcd:v3.5.9
 	/bin/podman create --name etcd-member --net=host \
@@ -197,9 +215,10 @@ server_bootstrap(){
 	systemctl --user daemon-reload
 	echo -e "Attempting to start etcd container.."
 	systemctl --user enable container-etcd-member.service --now
-	sleep 3
+	sleep 2
 	bootstrap_http
 	bootstrap_nginx_php
+	bootstrap_dnsmasq_watcher_service
 	KEYNAME=SERVER_BOOTSTRAP_COMPLETED
 	KEYVALUE=1
 	touch /var/server_bootstrap_completed
@@ -405,8 +424,6 @@ event_generateHash(){
 				:
 		fi
 }
-
-
 
 event_device_redetect(){
 	# Watches for a device redetection flag, then runs detectv4l.sh
