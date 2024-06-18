@@ -41,30 +41,22 @@ read_etcd_clients_ip_sed() {
 
 wavelet_reflector() {
 # queries etcd for list of registered decoders
-# cleans data, runs hd-rum-transcode with appropriate settings for audio and video streams
-# reset sets reload_reflector flag to 0
-# HD-RUM-TRANSCODE supports capture filters directly, so we'd like to use that instead of bothering the encoder..
-# systemd is a user service that is configured in the build_ug.sh script
 	read_etcd_clients_ip
-
-	# we need some validation here to make sure bad addresses don't sneak their way in
-	# forEach IP in list do
-	#echo -e "\nIP Address is not null, testing for validity..\n"
-	#valid_ipv4() {
-		#local ip=$1 regex='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
-			#if [[ $ip =~ $regex ]]; then
-				#echo -e "\nIP Address is valid, continuing..\n"
-				#return 0
-			#else
-				#echo "\nIP Address is not valid, discarding\n"
-				#event_decoder
-			#fi
-		#}
-		#valid_ipv4 "${IPVALUE}"
-		#fi
-
 	read_etcd_clients_ip_sed
 	echo ${return_etcd_clients_ip} > /home/wavelet/reflector_clients_ip.txt
+	# We can use a control port to add or remove clients from hd-rum as a subscription list.  This will be better than killing/restarting the process.
+	# Our problem here is hd-rum-multi can't tell us what the "root create-port" is currently sending to, so we must do our own bookkeeping.
+	# 0) echo 'stats on' | busybox nc -v 127.0.0.1 6161
+	# 1) read out reflector_clients_ip to an array
+	# 2) compare array values and determine what the discrepancy between the new and old data are
+	# 3) if hostadded
+	#	3a) foreach %i in addedhosts
+	#	3a) echo 'root add-port ${i%}' | busybox nc -v 127.0.0.1 6161
+	# 3b) else
+	#	3b) foreach %i in removedhosts
+	#	3b) echo 'root delete-port ${i%}' | busybox nc -v 127.0.0.1 6161
+	# 3c) update the "old/current" etcd list of IP's so any further changes will compare against that
+	# 4) echo 'root add-port ${i%}' | busybox nc -v 127.0.0.1 6161
 	if [[ ! -z "${return_etcd_clients_ip}" ]]; then
 		reflectorclients_file=/home/wavelet/reflector_clients_ip.txt
 		# KEYNAME=uv_filter_cmd
@@ -73,7 +65,9 @@ wavelet_reflector() {
 		echo -e "Systemd will execute hd-rum-transcode with commandline: \n\nhd-rum-transcode 2M 5004 ${return_etcd_clients_ip}\nafter a half-second delay"
 		KEYNAME=REFLECTOR_ARGS
 		# Reduce HD-RUM buffer to 2M
-		ugargs="--tool hd-rum-transcode 2M 5004 ${processed_clients_ip}"
+		# v. 1.9.4 will introduce hd-rum-av which can handle both audio and video in the same reflector, so we can drop the second systemd unit.
+		# args="--tool hd-rum-av --control-port 6161 2M 5004 ${processed_clients_ip}"
+		ugargs="--tool hd-rum-multi --control-port 6161 2M 5004 ${processed_clients_ip}"
 		KEYVALUE="${ugargs}"
 		echo -e "Generating initial reflector clients list.."
 		echo "${return_etcd_clients_ip}" > /home/wavelet/reflector_clients_ip.txt
@@ -85,7 +79,11 @@ wavelet_reflector() {
 		After=network-online.target
 		Wants=network-online.target
 		[Service]
+		# Hashed out comments would pin the reflector to a dedicated CPU core (core 1) - if we had appropriate perms
+		#ExecStartPre=/bin/bash -c '/usr/bin/echo "1" > /sys/fs/cgroup/cpuset/wavelet/cpuset.cpus'
+		#ExecStartPre=/bin/bash -c '/usr/bin/echo "0" > /sys/fs/cgroup/cpuset/wavelet/cpuset.mems'
 		ExecStart=/usr/local/bin/UltraGrid.AppImage ${ugargs}
+		#ExecStartPost=/bin/bash -c '/usr/bin/echo $MAINPID >> /sys/fs/cgroup/wavelet/tasks'
 		Restart=always
 		[Install]
 		WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.Reflector.service
@@ -97,7 +95,7 @@ wavelet_reflector() {
 		write_etcd_global
 		# Audio reflector, IP settings identical to video reflector so we don't need to do all that again
 		KEYNAME=AUDIO_REFLECTOR_ARGS
-		ugargs="--tool hd-rum-transcode 2M 5006 ${processed_clients_ip}"
+		ugargs="--tool hd-rum-transcode --control-port 6162 2M 5006 ${processed_clients_ip}"
 		KEYVALUE="${ugargs}"
 		write_etcd_global
 		echo "
