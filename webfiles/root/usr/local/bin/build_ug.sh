@@ -180,23 +180,27 @@ server_bootstrap(){
 	}
 
 	bootstrap_dnsmasq_watcher_service(){
-		echo -e "[Unit]
-Description=Inotifywait dnsmasq service
-After=network.target
+		echo -e "		[Unit]
+		Description=Dnsmasq inotify service
+		After=network.target
 
-[Service]
-ExecStart=/usr/local/bin/wavelet-inotifywait-service.sh
-RestartSec=10s
-User=wavelet
-Group=wavelet
-Type=simple
-StandardOutput=inherit
-StandardError=inherit
+		[Service]
+		ExecStart=/usr/local/bin/wavelet_dnsmasq_inotify_service.sh
+		RestartSec=10s
+		Type=simple
+		StandardOutput=inherit
+		StandardError=inherit
 
-[Install]
-WantedBy=default.target" > wavelet_dnsmasq_netsense_inotify.service
+		[Install]
+		WantedBy=default.target" > wavelet_dnsmasq_inotify.service
+		systemctl --user daemon-reload
 		systemctl --user enable wavelet_dnsmasq_netsense_inotify.service --now
 		echo -e "\ninotify service enabled for wavelet network sense via dnsmasq..\n"
+		mkdir -p /var/tmp/dnsmasq/leases
+		# set write-write-read for user-group-other on this folder.  NO EXECUTE.
+		chmod -R 0664 /var/tmp/dnsmasq/leases
+		# ensure group membership is inherited by files created in this dir
+		chmod -g+s /var/tmp/dnsmasq/leases
 	}
 
 	echo -e "Pulling etcd and generating systemd services.."
