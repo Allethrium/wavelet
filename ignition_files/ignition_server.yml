@@ -656,6 +656,18 @@ systemd:
         ExecStart=systemctl enable cockpit.service --now
         [Install]
         WantedBy=multi-user.target
+    # Generate wavelet Cgroup
+    - name: wavelet.cgroup.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Generate cgroup for wavelet user
+        ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+        [Service]
+        Type=oneshot
+        ExecStart=/bin/bash -c `/usr/local/bin/generate_cgroup.sh
+        [Install]
+        WantedBy=multi-user.target
     # Container registry to host and serve containers to local clients
     - name: registry.service
       enabled: true
