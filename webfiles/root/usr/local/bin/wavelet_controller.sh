@@ -205,7 +205,7 @@ wavelet-seal() {
 	write_etcd_global
 	cd /home/wavelet/
 	# We now use the switcher for simple things
-	echo 'capture.data 2' | busybox nc -v 127.0.0.1 6160
+	echo 'capture.data 1' | busybox nc -v 127.0.0.1 6160
 }
 
 wavelet-testcard() {
@@ -216,7 +216,7 @@ wavelet-testcard() {
 	KEYVALUE="BLANK"
 	write_etcd_global
 	KEYVALUE="1"
-	echo 'capture.data 1' | busybox nc -v 127.0.0.1 6160
+	echo 'capture.data 2' | busybox nc -v 127.0.0.1 6160
 }
 
 wavelet-dynamic() {

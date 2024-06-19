@@ -79,7 +79,7 @@ echo -e "Values populated, monitor services launched.  Starting reflector\n\n"
 systemctl --user enable UltraGrid.Reflector.service --now
 event_init_av1
 systemctl --user enable wavelet_controller.service --now
-wait 2
+sleep 2
 KEYNAME=input_update
 KEYVALUE=1
 write_etcd_global
