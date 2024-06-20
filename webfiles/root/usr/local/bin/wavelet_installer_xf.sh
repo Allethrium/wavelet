@@ -48,7 +48,9 @@ event_server(){
 	extract_home && extract_usrlocalbin
 	# Install dependencies and base packages.  Could definitely be pared down.
 	rpm_ostree_install
-	# not functional yet, needs a lot of work
+	# generate a hostname file so that dnsmasq's dhcp-script call works properly
+	echo -e "${hostname}" > /var/lib/dnsmasq/hostname.local
+	# Build and install decklink kmod/akmod to support pcie cards - **not functional yet, needs a lot of work**
 	# install_decklink
 	# sets up local rpm repository - there's an issue with importing Intel repo GPG keys which might need user intervention.
 	/usr/local/bin/local_rpm.sh
@@ -155,6 +157,7 @@ extract_usrlocalbin(){
 }
 
 install_decklink(){
+	# I can't seem to work this out.  It also seems like Fedora are experimenting more with bootc containers now?
 	# adapted from https://github.com/coreos/layering-examples/tree/main/loading-kernel-module
 	# Download Decklink software, extract and install base RPM's (required for Decklink support)
 	# Won't work because.. i lack brain cells, apparently.
