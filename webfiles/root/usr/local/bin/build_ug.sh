@@ -196,11 +196,6 @@ server_bootstrap(){
 		systemctl --user daemon-reload
 		systemctl --user enable wavelet_dnsmasq_netsense_inotify.service --now
 		echo -e "\ninotify service enabled for wavelet network sense via dnsmasq..\n"
-		mkdir -p /var/tmp/dnsmasq/leases
-		# set write-write-read for user-group-other on this folder.  NO EXECUTE.
-		chmod -R 0664 /var/tmp/dnsmasq/leases
-		# ensure group membership is inherited by files created in this dir
-		chmod -g+s /var/tmp/dnsmasq/leases
 	}
 
 	echo -e "Pulling etcd and generating systemd services.."
