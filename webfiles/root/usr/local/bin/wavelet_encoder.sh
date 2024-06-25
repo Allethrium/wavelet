@@ -77,8 +77,6 @@ event_encoder(){
 	}
 
 	read_uv_hash_select() {
-	# 11/15/2023
-	# Totally new approach
 	# Now, we pull uv_hash_select, which is a value passed from the webUI back into this etcd key
 	# compare the hash against available keys in /hash/$keyname, keyvalue will be the device string
 	# then search for device string in $hostname/inputs and if found, we run with that and set another key to notify that it is active
@@ -88,15 +86,15 @@ event_encoder(){
 		read_etcd_global
 		encoderDeviceHash="${printvalue}"
 		case ${encoderDeviceHash} in
-		(1)	echo "Blank screen activated, as set from controller."; exit 0
+		(1)	echo "Blank screen activated, as set from controller."				;	exit 0
 		;;
-		(2)	echo "Seal image activated, as set from controller"; exit 0
+		(2)	echo "Seal image activated, as set from controller"				;	exit 0
 		;;
-		(T)	echo "Testcard generation activated, as set from controller"; exit 0
+		(T)	echo "Testcard generation activated, as set from controller"			;	exit 0
 		;;
-		(W) echo "Four Panel split activated, attempting multidisplay swmix";	encoder_event_setfourway 
+		(W)	echo "Four Panel split activated, attempting multidisplay swmix"		;	encoder_event_setfourway 
 		;;
-		*) single dynamic input device, run code below:
+		*)	echo -e "single dynamic input device, run code below:\m"			;
 		KEYNAME="/hash/${encoderDeviceHash}"
 		read_etcd_global
 		encoderDeviceStringFull="${printvalue}"
