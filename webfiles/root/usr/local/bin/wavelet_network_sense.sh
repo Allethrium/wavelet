@@ -44,12 +44,9 @@ parse_input_opts(){
 }
 
 event_detect_networkDevice(){
-	# We write out a lease file to /var/tmp/dnsmasq
-	# This script is spawned as a dnsmasq user, and therefore cannot run binaries such as curl, etcdctl etc.
-	# Create /leases dir and ensure other users and groups can read the files therein
-	# TO DO : SELinux context must be appropriately set to allow dnsmasq to write to this directory and use touch!
-	# Inotifywait will monitor this directory and the actual device setup will be launched as the wavelet user.
-	touch /var/tmp/dnsmasq/leases/{dnsmasq_ipAddr}_${dnsmasq_mac}
+	# We write out a lease file to /var/tmp/
+	# Inotifywait will monitor this directory and process the most recent .lease file.  The actual device setup will be launched as the wavelet user.
+	touch /var/tmp/${dnsmasq_ipAddr}_${dnsmasq_mac}.lease
 }
 
 ###

@@ -48,9 +48,65 @@ event_init_av1() {
 	echo -e "Default LibX265 activated, bitrate 8M\n"     
 }
 
+event_init_seal(){
+	# Because of the way the controller operates with video switchers, we initially actually need to start Wavelet with a single input option
+	# 2
+	# Serves a static image in .jpg format in a loop to the encoder.
+	current_event="wavelet-seal"
+	rm -rf seal.mp4
+	ffmpeg -r 1 -i ny-stateseal.jpg -c:v mjpeg -vf fps=30 -color_range 2 -pix_fmt yuv440p seal.mp4
+	KEYNAME=uv_input
+	KEYVALUE="SEAL"
+	write_etcd_global
+	cd /home/wavelet/
+	# call uv_hash_select to process the provided device hash and select the input from these data
+	read_uv_hash_select
+	# Reads Filter settings, should be banner.pam most of the time
+	KEYNAME=uv_filter_cmd
+	read_etcd_global
+	filtervar=${printvalue}
+	# Reads Encoder codec settings, should be populated from the Controller
+	KEYNAME=uv_encoder
+	read_etcd_global
+	encodervar=${printvalue}
+	# Videoport is always 5004 unless we are doing some strange future project requiring bidirectionality or conference modes
+	KEYNAME=uv_videoport
+	read_etcd_global
+	video_port=${printvalue}
+	# Audio Port is always 5006, unless UltraGrid has gotten far better at handling audio we likely won't use this.
+	KEYNAME=uv_audioport
+	read_etcd_global
+	audio_port=${printvalue}
+	# Destination IP is the IP address of the UG Reflector
+	destinationipv4="192.168.1.32"
+	UGMTU="9000"
+    ugargs="--tool uv $filtervar --control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}"
+	KEYNAME=UG_ARGS
+	KEYVALUE=${ugargs}
+	write_etcd
+	echo -e "Verifying stored command line:\n"
+	read_etcd
+	echo "
+	[Unit]
+	Description=UltraGrid AppImage executable
+	After=network-online.target
+	Wants=network-online.target
+	[Service]
+	ExecStart=/usr/local/bin/UltraGrid.AppImage ${ugargs}
+	KillMode=mixed
+	TimeoutStopSec=0.25
+	[Install]
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
+	systemctl --user daemon-reload
+	systemctl --user restart UltraGrid.AppImage.service
+	# Sleep for a couple of seconds to allow the encoder to come up, then Select switcher input #1 which should always be the Seal image.
+	sleep 2
+	echo 'capture.data 1' | busybox nc -v 127.0.0.1 6160
+}
 
 # Populate standard values into etcd
 set -x
+exec >/home/wavelet/initialize.log 2>&1
 echo -e "Populating standard values into etcd, the last step will trigger the Controller and Reflector functions, bringing the system up.\n"
 KEYNAME="uv_videoport"
 KEYVALUE="5004"
@@ -78,9 +134,5 @@ systemctl --user enable watch_encoderflag.service --now
 echo -e "Values populated, monitor services launched.  Starting reflector\n\n"
 systemctl --user enable UltraGrid.Reflector.service --now
 event_init_av1
-systemctl --user enable wavelet_controller.service --now
-sleep 2
-KEYNAME=input_update
-KEYVALUE=1
-write_etcd_global
 systemctl --user restart wavelet_reflector.service --now
+systemctl --user enable wavelet_controller.service --now

@@ -80,20 +80,20 @@ waveletcontroller() {
 # 11/2023 - note that hardcoded inputs are no longer used here, the case $event in line just tests static buttons from the webUI.  The rest is handled between detectv4l and wavelet_encoder, for the most part.
 case $event in
 	# 1
-	(1) 	echo -e "Option One, Blank activated\n"				;current_event="wavelet-blank"		;wavelet-blank					;;
+	(1) 	echo -e "Option One, Blank activated\n"						;current_event="wavelet-blank"			;wavelet-blank								;;
 	# Display a black screen on all devices
 	# 2
-	(2) 	echo -e "Option Two, Seal activated\n"				;current_event="wavelet-seal"		;wavelet-seal					;;
+	(2) 	echo -e "Option Two, Seal activated\n"						;current_event="wavelet-seal"			;wavelet-seal								;;
 	# Display a static image of a court seal (find a better image!)
 	# 3-8 are all dynamic inputs populated from v4l2 (or in the future, hopefully Decklink)
 	# 9
-	(9)	echo -e "Recording currently Not implemented"			;is_recording=false									;;
-	(T)	echo "Test Card activated"					;current_event="wavelet-testcard"	;wavelet-testcard				;;
+	(9)		echo -e "Recording currently Not implemented"				;is_recording=false																	;;
+	(T)		echo "Test Card activated"									;current_event="wavelet-testcard"		;wavelet-testcard							;;
 	# System control options
-	# (DR)	echo -e "Decoders instructed to reload\n"			;current_event="wavelet-decoder-reboot"	;wavelet-decoder-reset				;;
-	(ER)	echo -e "Encoders instructed to reload\n"			;current_event="wavelet-encoder-reboot"	;wavelet-encoder-reboot				;;
-	(SR)	echo -e "Whole system reboot\n"					;current_event="wavelet-system-reboot"	;wavelet-system-reboot				;;
-	(CL)	echo -e "Clearing All Input Sources from keystore..\n"		;current_event="wavelet-clear-inputs"	;wavelet-clear-inputs				;;
+	# (DR)	echo -e "Decoders instructed to reload\n"					;current_event="wavelet-decoder-reboot"	;wavelet-decoder-reset						;;
+	(ER)	echo -e "Encoders instructed to reload\n"					;current_event="wavelet-encoder-reboot"	;wavelet-encoder-reboot						;;
+	(SR)	echo -e "Whole system reboot\n"								;current_event="wavelet-system-reboot"	;wavelet-system-reboot						;;
+	(CL)	echo -e "Clearing All Input Sources from keystore..\n"		;current_event="wavelet-clear-inputs"	;wavelet-clear-inputs						;;
 	(RD)	echo -e "Running re-detection of source devices..\n"		;current_event="wavelet-detect-inputs"	;/usr/local/bin/wavelet_detectv4l.sh		;;
 #	if [ $recording = true ]; then
 #		echo "Recording to archive file" && recording=true && wavelet_record_start
