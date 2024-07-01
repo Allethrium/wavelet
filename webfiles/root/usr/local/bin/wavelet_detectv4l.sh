@@ -220,7 +220,7 @@ event_ipevo() {
 # We will have to add to this over time to support more devices appropriately.
 # Specifically this camera supports MJPG so we will use that instead of YUYV for the capture pixel format
 	echo -e "IPEVO Camera detection running..\n"
-	KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"
+	KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:device=${v4l_device_path}"
 	KEYNAME=${device_string_long}
 	write_etcd_inputs
 	echo -e "\n Detection completed for IPEVO device.. \n \n \n \n"
