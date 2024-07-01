@@ -62,7 +62,6 @@ parse_macaddr() {
 }
 
 
-
 #
 # Device processing blocks - these are basically the 'driver' as far as this module is concerned.
 #
@@ -99,8 +98,7 @@ event_ptz_ndiHX(){
         # Then write out config values for each device so we have them in etcd;
         #
         # or
-        #
-        # foreach i in ${output_array[@]}
+                # foreach i in ${output_array[@]}
         # split by space in the middle (cut, awk, whatever), etcdctl write key-before-space, value-after-space
         #
         # or..
