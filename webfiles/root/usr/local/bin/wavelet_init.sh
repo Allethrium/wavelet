@@ -45,7 +45,7 @@ event_init_av1() {
 	KEYNAME=uv_encoder
 	KEYVALUE="libavcodec:encoder=libaom-av1:usage=realtime:cpu-used=8:safe"
 	write_etcd_global
-	echo -e "Default LibX265 activated, bitrate 8M\n"     
+	echo -e "Default libaom_av1 activated, bitrate managed via codec\n"     
 }
 
 event_init_seal(){
@@ -136,3 +136,4 @@ systemctl --user enable UltraGrid.Reflector.service --now
 event_init_av1
 systemctl --user restart wavelet_reflector.service --now
 systemctl --user enable wavelet_controller.service --now
+event_init_seal
