@@ -179,6 +179,11 @@ server_bootstrap(){
 		sleep 2
 	}
 
+	bootstrap_nodejs(){
+		/usr/local/bin/build_nodejs.sh
+		sleep 2
+	}
+
 	bootstrap_dnsmasq_watcher_service(){
 		echo -e "		[Unit]
 		Description=Dnsmasq inotify service
@@ -217,6 +222,7 @@ server_bootstrap(){
 	sleep 2
 	bootstrap_http
 	bootstrap_nginx_php
+	bootstrap_nodejs
 	bootstrap_dnsmasq_watcher_service
 	KEYNAME=SERVER_BOOTSTRAP_COMPLETED
 	KEYVALUE=1
