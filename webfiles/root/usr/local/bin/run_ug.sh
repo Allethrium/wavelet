@@ -184,7 +184,7 @@ sleep 1
 # Tries three possible GPU outputs in order of efficiency, before failing.
 # If it crashes, you have hw/driver issues someplace or an improperly configured display env.
 	KEYNAME=UG_ARGS
-	ug_args="--tool uv -d vulkan_sdl2:fs:keep-aspect:nocursor:nodecorate"
+	ug_args="--tool uv -d vulkan_sdl2:fs:keep-aspect:nocursor:nodecorate -r pipewire"
 	KEYVALUE="${ug_args}"
 	write_etcd
 	rm -rf /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
@@ -208,7 +208,7 @@ sleep 1
 		echo "Decoder failed to start, there may be something wrong with the system.
 		\nTrying GL as a fallback, and then failing for good.."
 		KEYNAME=UG_ARGS
-		ug_args="--tool uv -d gl:fs"
+		ug_args="--tool uv -d gl:fs -r pipewire"
 		KEYVALUE="${ug_args}"
 		write_etcd
 		rm -rf /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
