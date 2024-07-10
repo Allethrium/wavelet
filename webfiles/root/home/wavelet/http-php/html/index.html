@@ -2,17 +2,52 @@
 <link rel="stylesheet" href="styles.css">
 <meta charset="utf-8">
 <html lang="en">
+
+
 <head><title>Wavelet System User Interface</title></head>
 <div id="body_div" class="body_divider">
 <div id="page title" class="title">Wavelet System User Interface</div>
 <body onload="handlePageLoad();" class="defaultBody">
 <div id="common_options" class="input_divider">
+
+
 <div id="static_inputs_section" class="input_divider">
-Static Inputs<div id="static_inputs_section_inner" class="input_divider_inner">
+Static Video Inputs<div id="static_inputs_section_inner" class="input_divider_inner">
 <button id="1" class="inputButton inputStaticButtons" value="1" type="button">Blank Screen</button>
 <button id="2" class="inputButton inputStaticButtons" value="2" type="button">NY State Seal</button>
 <button id="T" class="inputButton inputStaticButtons" value="T" type="button">Test Card</button>
 </div></div>
+
+
+<div id="audio_section" class="input_divider">
+Audio Controls (wip)
+<br>Toggle Audio <label class="switch" id="audio_toggle"><input type ="checkbox" id="audio_toggle_checkbox"><span class="slider round"></span></label>
+<br>
+<div id="audio_input_inner" class="audio_input_divider_inner">
+&emsp;<details><summary>Audio Input Selection<span class="icon"></span></summary>
+<p>
+<div>
+Do not change this unless you specifically want a different audio input from the video device.<br>
+Wavelet will currently override this if a new video input device is selected!
+</div>
+</p>
+</details>
+</div>
+<br>
+<div id="audio_output_inner" class="audio_output_divider_inner">
+&emsp;<details><summary>Audio Output Selection<span class="icon"></span></summary>
+<p>
+If bluetooth is configured, it will become the default audio output device.
+<div><label for="btMAC">Bluetooth MAC Address:</label>
+<input type="text" id="btMAC" name="btMAC">&ensp;
+<button onclick="applyBlueToothMAC()" id="btApplyButton" class="btApplyButton" type="button">Apply</button><br></div>
+</p>
+</details>
+</div>
+</div></div>
+</div>
+
+
 <div id="dynamic_inputs" class="input_divider">
 Video Sources<br>
 <button id="RD" class="inputButton inputStaticButtons" value="RD" type="button">Refresh Video Sources</button><br>
@@ -20,6 +55,7 @@ Video Sources<br>
 <div id="dynamicNetworkInputs" div class="dynamicInputsTarget" div title="dynamically populated inputs for vendor network devices, such as supported IP cameras."></div>
 <br>Toggle Banner <label class="switch" id="banner_toggle"><input type ="checkbox" id="banner_toggle_checkbox"><span class="slider round"></span></label>
 </div>
+
 
 <div id="multiple_inputs_section" class="input_divider">
 <div id="multiple_inputs_inner" class="input_divider_inner">
@@ -32,6 +68,7 @@ Video Sources<br>
 <div id="Host control" class="host_divider">Detected Wavelet Hosts<br>
 <div id="dynamicHosts" div class="dynamicHostsTarget"></div>
 </div>
+
 
 <div id="Advanced Settings" class="settings_divider">
 <details><summary>Advanced Settings<span class="icon"></span></summary>
@@ -53,18 +90,6 @@ Toggle Livestreaming <label class="switch" id="lstoggle">
 <br>
 <button onclick="applyLivestreamSettings()" id="lsApplyButton" class="lsApplyButton" type="button">Apply</button><br>
 </p>
-</details>
-</div>
-</div>
-<div id="systemcontrols" class="input_divider">
-<details><summary>System Controls<span class="icon"></span></summary>
-<p>
-<button id="DR" class="inputButton inputStaticButtons" value="DR" type="button">Decoder Task Restart (all)</button>
-<button id="ER" class="inputButton inputStaticButtons" value="ER" type="button">Encoder Hard Reset (all)</button>
-<button id="SR" class="inputButton inputStaticButtons" value="SR" type="button">Hard Reset (all)</button>
-<button id="SR" class="inputButton inputStaticButtons" value="CL" type="button">Clear Video Sources</button>
-</p>
-</div>
 </details>
 </div>
 </div>
@@ -97,6 +122,22 @@ Toggle Livestreaming <label class="switch" id="lstoggle">
 </p>
 </details>
 </div>
+
+
+<div id="systemcontrols" class="input_divider">
+<details><summary>System Controls<span class="icon"></span></summary>
+<p>
+<button id="DR" class="inputButton inputStaticButtons" value="DR" type="button">Decoder Task Restart (all)</button>
+<button id="ER" class="inputButton inputStaticButtons" value="ER" type="button">Encoder Hard Reset (all)</button>
+<button id="SR" class="inputButton inputStaticButtons" value="SR" type="button">Hard Reset (all)</button>
+<button id="SR" class="inputButton inputStaticButtons" value="CL" type="button">Clear Video Sources</button>
+</p>
+</div>
+</details>
+</div>
+</div>
+
+
 <br><br>
 <script src="index.js"></script>
 </body>
