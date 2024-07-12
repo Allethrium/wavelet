@@ -94,20 +94,48 @@ event_encoder(){
 		;;
 		(W)	echo "Four Panel split activated, attempting multidisplay swmix"		;	encoder_event_setfourway 
 		;;
-		*)	echo -e "single dynamic input device, run code below:\m"			;
-		KEYNAME="/hash/${encoderDeviceHash}"
-		read_etcd_global
-		encoderDeviceStringFull="${printvalue}"
-		echo -e "\n Device string ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash} \n"
-		printvalue=""
-		KEYNAME="${encoderDeviceStringFull}"
-		read_etcd_global
-		inputvar=${printvalue}
-		echo -e "\n Device input key $inputvar located for this device string, proceeding to set encoder parameters \n"
-		/usr/local/bin/wavelet_textgen.sh
+		*)	echo -e "single dynamic input device, run code below:\m"			;	encoder_event_singleDevice
 		esac
 	}
 
+	encoder_event_singleDevice(){
+		KEYNAME="/hash/${encoderDeviceHash}"
+		read_etcd_global
+		if [ -n "${printvalue}" ]; then
+    			echo -e "found in /hash/ - we have a local device\n"
+    			encoderDeviceStringFull="${printvalue}"
+			echo -e "\nDevice string ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash}\n"
+			printvalue=""
+			KEYNAME="${encoderDeviceStringFull}"
+			read_etcd_global
+			inputvar=${printvalue}
+			echo -e "\n Device input key $inputvar located for this device string, proceeding to set encoder parameters \n"
+                else
+                        echo -e "null string found in /hash/ - this is a network device\n"
+                        KEYNAME="/network_shorthash/${encoderDeviceHash}"
+                        read_etcd_global
+                        if [ -n "${printvalue}" ]; then
+                                echo -e "found in /network_shorthash/, proceeding..\n"
+                                encoderDeviceStringFull="${printvalue}"
+                                echo -e "\nDevice String ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash}\n"
+                                printvalue=""
+                                # Locate device hash in network_ip folder
+                                KEYNAME="/network_ip/${encoderDeviceHash}"
+                                read_etcd_global
+                                # Locate input command from the IP value retreived above
+                                KEYNAME="/network_uv_stream_command/${printvalue}"
+                                read_etcd_global
+                                inputvar="-t ${printvalue}"
+                                # clear printvalue
+                                printvalue=""
+                        else
+                                echo -e "not found in network_shorthash, we have an invalid selection, ending process..\n"
+                                exit 0
+                        fi
+                fi
+                # Run common options here
+                /usr/local/bin/wavelet_textgen.sh
+	}
 	# Encoder SubLoop
 	# call uv_hash_select to process the provided device hash and select the input from these data
 	read_uv_hash_select
