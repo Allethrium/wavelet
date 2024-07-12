@@ -397,6 +397,42 @@ event_decoder_reset(){
 	systemctl --user enable wavelet-decoder-reset.service --now
 }
 
+event_audio_toggle(){
+	# Toggles audio functionality on and off
+	echo -e "Generating Reboot SystemdD unit in /.config/systemd/user.."
+	echo -e "[Unit]
+	Description=etcd Decoder retart watcher 
+	After=network-online.target
+	Wants=network-online.target
+	[Service]
+	Environment=ETCDCTL_API=3
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /interface/audio/enabled -w simple -- sh -c \"/usr/local/bin/wavelet_audio_toggle.sh\"
+	Restart=always
+	[Install]
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-audio-toggle.service
+
+	systemctl --user daemon-reload
+	systemctl --user enable wavelet-audio-toggle.service --now
+}
+
+event_audio_bluetooth_connect(){
+	# Monitors the bluetooth MAC value and updates the system if there's a change
+	echo -e "Generating Reboot SystemdD unit in /.config/systemd/user.."
+	echo -e "[Unit]
+	Description=etcd Decoder retart watcher 
+	After=network-online.target
+	Wants=network-online.target
+	[Service]
+	Environment=ETCDCTL_API=3
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /interface/bluetooth_mac -w simple -- sh -c \"/usr/local/bin/wavelet_bluetooth_connect.sh\"
+	Restart=always
+	[Install]
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-bluetooth-audio.service
+
+	systemctl --user daemon-reload
+	systemctl --user enable wavelet-bluetooth-audio.service --now
+}
+
 get_os_partition_uuid() {
 		os_rootfs="/boot" # Replace with your actual OS root filesystem path
 		uuid=$(lsblk -f)
