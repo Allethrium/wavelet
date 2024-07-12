@@ -14,7 +14,7 @@ dnsmasq_hostName=$4
 detect_self(){
 	# hostname.local populated by run_ug.sh on system boot
 	# necessary because this script is spawned with restricted privileges
-	UG_HOSTNAME=$(cat /var/lib/dnsmasq/hostname.local)
+	UG_HOSTNAME=!!hostnamegoeshere!!
 	echo -e "Hostname is ${UG_HOSTNAME} \n"
 	case ${UG_HOSTNAME} in
 	svr*)			echo -e "I am a Server."; event_server
