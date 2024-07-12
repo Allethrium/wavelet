@@ -78,7 +78,7 @@ function thirdAjax(){
 }
 
 function fetchHostLabelAndUpdateUI(getLabelHostName){
-// This function gets hostname | label from etcd and is repsonsible for telling the server which text labels to produce for each host.
+// This function gets hostname | label from etcd and is responsible for telling the server which text labels to produce for each host.
 		$.ajax({
 								type: "POST",
 								url: "get_host_label.php",
@@ -98,6 +98,8 @@ function fetchHostLabelAndUpdateUI(getLabelHostName){
 function handlePageLoad() {
 	var livestreamValue	=	getLivestreamStatus(livestreamValue);
 	var bannerValue		=	getBannerStatus(bannerValue);
+	var audioValue		=	getAudioStatus(audioValue);
+	var btMACValue		=	getBluetoothMAC(bluetoothMACValue);
 	/* getLivestreamURLdata(); */
 	// Adding classes and attributes to the prepopulated 'static' buttons on the webUI
 	const staticInputElements = document.querySelectorAll(".inputStaticButtons");
@@ -107,27 +109,27 @@ function handlePageLoad() {
 	$("#lstoggleinput").change
 		(function() {
 			if ($(this).is(':checked')) {
-						$.ajax({
-							type: "POST",
-							url: "/enable_livestream.php",
-							data: {
-								lsonoff: "1"
-								},
-							success: function(response){
-							console.log(response);
-							}
-						});
+				$.ajax({
+					type: "POST",
+					url: "/enable_livestream.php",
+					data: {
+						lsonoff: "1"
+						},
+					success: function(response){
+					console.log(response);
+					}
+				});
 				} else {
-												$.ajax({
-														type: "POST",
-														url: "/enable_livestream.php",
-														data: {
-																lsonoff: "0"
-																},
-														success: function(response){
-														console.log(response);
-														}
-												});
+					$.ajax({
+						type: "POST",
+						url: "/enable_livestream.php",
+						data: {
+								lsonoff: "0"
+								},
+								success: function(response){
+								console.log(response);
+								}
+							});
 
 				}
 	});
@@ -151,6 +153,33 @@ function handlePageLoad() {
 						url: "/enable_banner.php",
 						data: {
 							banneronoff: "0"
+								},
+						success: function(response){
+							console.log(response);
+							}
+						});
+				}
+	});
+	// Apply event listener to audio toggle
+	$("#audio_toggle").change
+		(function() {
+			if ($(this).is(':checked')) {
+						$.ajax({
+							type: "POST",
+							url: "/enable_audio.php",
+							data: {
+								audioonoff: "1"
+								},
+							success: function(response){
+							console.log(response);
+							}
+						});
+				} else {
+						$.ajax({
+						type: "POST",
+						url: "/enable_audio.php",
+						data: {
+							audioonoff: "0"
 								},
 						success: function(response){
 							console.log(response);
@@ -200,6 +229,44 @@ function getBannerStatus(bannerValue) {
 	})
 }
 
+function getAudioStatus(audioValue) {
+	// this function gets the audio status from etcd and sets the audio toggle button on/off upon page load
+	$.ajax({
+		type: "POST",
+		url: "get_audio_status.php",
+		dataType: "json",
+		success: function(returned_data) {
+		const audioValue = JSON.parse(returned_data);
+			if (audioValue == "1" ) {
+				console.log ("Banner value is 1, enabling toggle automatically.");
+				$("#audio_toggle")[0].checked=true; // set HTML checkbox to checked
+				} else {
+				console.log ("Banner value is NOT 1, disabling checkbox toggle.");
+				$("#audio_toggle")[0].checked=false; // set HTML checkbox to unchecked
+				}
+		}
+	})
+}
+
+function getBluetoothMAC(bluetoothMACValue) {
+	// this function gets the audio status from etcd and sets the audio toggle button on/off upon page load
+	$.ajax({
+		type: "POST",
+		url: "get_bluetooth_mac.php",
+		dataType: "json",
+		success: function(returned_data) {
+		const audioValue = JSON.parse(returned_data);
+			if (audioValue == "" ) {
+				console.log ("There is no value populated here, so we set the audio_toggle_checkbox to 0");
+				$("#audio_toggle_checkbox")[0].checked=false; // set HTML checkbox to checked
+				} else {
+				console.log ("Banner value is NOT 0, pulling the value and populating it into the text box");
+				$("#btMAC").val(bluetoothMACValue); // set the value of the btMAC text box to the populated MAC address
+				}
+		}
+	})
+}
+
 function getHostBlankStatus(hostValue) {
 	// this function gets the banner status from etcd and sets the banner toggle button on/off upon page load
 	console.log('Attempting to retrieve host blank status for: ' + hostValue);
@@ -235,15 +302,16 @@ const callingFunction = (callback) => {
 function createNewButton(key, value, keyFull, functionIndex) {
 	var divEntry		=	document.createElement("Div");
 	var dynamicButton 	= 	document.createElement("Button");
-	const text		=	document.createTextNode(key);
-	const id		=	document.createTextNode(counter + 1);
+	const text			=	document.createTextNode(key);
+	const id			=	document.createTextNode(counter + 1);
+	const title			=	document.createTextNode(key);
 	dynamicButton.id	=	counter;
 	/* create a div container, where the button, relabel button and any other associated elements reside */
 	if (functionIndex === 1) {
-		console.log("called from firstAjax so this is a local video source");
+		console.log("called from firstAjax, so this is a local video source");
 		dynamicInputs.appendChild(divEntry);
 	} else if (functionIndex === 3) {
-		console.log("called from thirdAjax so this is a network video source");
+		console.log("called from thirdAjax, so this is a network video source");
 		dynamicNetworkInputs.appendChild(divEntry);
 	} else {
 		console.error("createNewButton not called from a valid function");
@@ -253,7 +321,7 @@ function createNewButton(key, value, keyFull, functionIndex) {
 	divEntry.setAttribute("data-fulltext", keyFull);
 	divEntry.setAttribute("divDevID", dynamicButton.id);
 	divEntry.classList.add("dynamicInputButtonDiv");
-	console.log("dynamic video source div created for device hash: " + value + "and label" + key);
+	console.log("dynamic video source div created for device hash: " + value + "and label: " + key);
 	// Create the device button
 		function createInputButton(text, value) {
 			var $btn = $('<button/>', {
@@ -621,6 +689,21 @@ function applyLivestreamSettings() {
 				data: {
 						lsurl: vlsurl,
 						apikey: vapikey
+						},
+				success: function(response){
+						console.log(response);
+						}
+		});
+}
+
+function applyAudioBlueToothSettings() {
+		postValue = (this.value);
+		var btMACValue = $("#btMAC").val();
+		$.ajax({
+				type: "POST",
+				url: "/apply_bluetooth_mac.php",
+				data: {
+						btMAC: btMACValue
 						},
 				success: function(response){
 						console.log(response);
