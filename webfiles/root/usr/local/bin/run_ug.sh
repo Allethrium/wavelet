@@ -5,7 +5,11 @@
 detect_self(){
 UG_HOSTNAME=$(hostname)
 # Create a hostname.local file in tmp so that nonprivileged users such as dnsmasq can tell who we are
-echo $(hostname) >> /var/tmp/hostname.local
+hostname=$(hostname)
+echo ${hostname} > /var/hostname.local
+chmod 664 /var/hostname.local
+chown root:root /var/hostname.local
+sed -i "s|!!hostnamegoeshere!!|${hostname}|g" /usr/local/bin/wavelet_network_sense.sh
 	echo -e "Hostname is $UG_HOSTNAME \n"
 	case $UG_HOSTNAME in
 	enc*) 					echo -e "I am an Encoder \n"; event_encoder
@@ -82,6 +86,8 @@ event_encoder_server(){
 event_server(){
 # Note that if we want to wind up orchestrating the existing MageWell NDI encoders, this is going to have to be expanded.
 # Suggest some scanner service that enumerates and stores them in ETCD, then sets another "present" flag
+	# Generate a catch-all audio sink for simultaneous output to transient devices
+	/usr/local/bin/pipewire_create_output_sink.sh
 	KEYNAME=INPUT_DEVICE_PRESENT
 	read_etcd
 	echo -e "Ensuring dnsmasq service is up.."
