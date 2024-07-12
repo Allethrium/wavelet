@@ -58,9 +58,28 @@ function delete_hash($value) {
 	}
 }
 
+function delete_networkHash($value) {
+	$prefixstring = "/network_shorthash/$value";
+	$keyPrefix=base64_encode($prefixstring);
+		$ch = curl_init();
+		curl_setopt($ch, CURLOPT_URL, 'http://192.168.1.32:2379/v3/kv/deleterange');
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+		curl_setopt($ch, CURLOPT_POST, 1);
+		curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\":\"$keyPrefix\"}");
+	$headers = array();
+		$headers[] = 'Content-Type: application/x-www-form-urlencoded';
+		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+		$result = curl_exec($ch);
+		if (curl_errno($ch)) {
+			echo 'Error:' . curl_error($ch);
+	}
+}
+
 delete_input_labels($key);
 delete_hash($value);
 delete_short_hash($value);
+// add function to remove network hash value
+delete_networkHash($value);
 
-echo "Requested Label and tracking data have been removed from Wavelet - subsequent redections will clear old data and repopulate as a fresh device, if it entered some kind of failure mode.";
+echo "Requested Label and tracking data have been removed from Wavelet - subsequent redetections will clear old data and repopulate as a fresh device, if it entered some kind of failure mode.";
 ?>
