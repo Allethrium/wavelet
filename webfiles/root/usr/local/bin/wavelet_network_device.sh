@@ -38,27 +38,28 @@ read_etcd_clients_ip() {
 }
 
 parse_macaddr() {
-        echo -e "argument 1: ${1}\n"
-        echo -e "argument 2: ${2}\n"
-        echo -e "Detect network device function called with the following data:\nMAC: ${2},\nIP Address: ${1}\n"
-        case ${2^^} in
-                # Convert input to all uppercase with ^^i
-                D0:C8:57:8*)                    echo -e "Nanjing (Magewell) device matched, proceeding to attempt configuration"                                ;       event_magewell_ndi
-                ;;
-                70:B3:D5:75:D*)                 echo -e "Nanjing (Magewell) device matched, proceeding to attempt configuration"                                ;       event_magewell_ndi
-                ;;
-                D4:E0:8E*)                      echo -e "ValueHD Corporation (PTZ Optics) matched, proceeding to attempt configuration"                         ;       event_ptz_ndiHX
-                ;;
-                whateverNDIis)                  echo -e "NDI matched, proceeding to attempt configuration"                                                      ;       event_vendorDevice3
-                ;;
-                # This one might need different config as the camera is of a different design
-                DC:ED:84*)                      echo -e "PTZ Optics NDI Cam (HAverford Systems Inc.) matched, proceeding to attempt configuration"              ;       event_ptz_ngiHX
-                ;;
-                whateverAnothersupportDevIs)    echo -e "Device matched, proceeding to attempt configuration"                                                   ;       event_vendorDevice3
-                ;;
-                *)                              echo -e "Device not supported at current time, doing nothing."                                                  ;       exit 0
-                ;;
-                esac
+	echo -e "argument 1: ${1}\n"
+	echo -e "argument 2: ${2}\n"
+	echo -e "Detect network device function called with the following data:\nMAC: ${2},\nIP Address: ${1}\n"
+	# We put ^^ after the var to convert to uppercase!
+	case ${2^^} in
+		# Convert input to all uppercase with ^^i
+		D0:C8:57:8*)                    echo -e "Nanjing (Magewell) device matched, proceeding to attempt configuration"                                ;       event_magewell_ndi
+		;;
+		70:B3:D5:75:D*)                 echo -e "Nanjing (Magewell) device matched, proceeding to attempt configuration"                                ;       event_magewell_ndi
+		;;
+		D4:E0:8E*)                      echo -e "ValueHD Corporation (PTZ Optics) matched, proceeding to attempt configuration"                         ;       event_ptz_ndiHX
+		;;
+		whateverNDIis)                  echo -e "NDI matched, proceeding to attempt configuration"                                                      ;       event_vendorDevice3
+		;;
+		# This one might need different config as the camera is of a different design
+		DC:ED:84*)                      echo -e "PTZ Optics NDI Cam (HAverford Systems Inc.) matched, proceeding to attempt configuration"              ;       event_ptz_ngiHX
+		;;
+		whateverAnothersupportDevIs)    echo -e "Device matched, proceeding to attempt configuration"                                                   ;       event_vendorDevice3
+		;;
+		*)                              echo -e "Device not supported at current time, doing nothing."                                                  ;       exit 0
+		;;
+		esac
 }
 
 
@@ -72,62 +73,31 @@ event_event_magewell_ndi(){
 }
 
 event_ptz_ndiHX(){
-        # Interrogates PTZ Cam device, attempts preconfigured username and password, then tries to set appropriate settings for streaming into UltraGrid.
-        echo -e "Waiting for five seconds, then attempting to connect to device..\n"
-        sleep 5
-        # stuff to set the stream target to RTP/RTSP 192.168.1.32 on appropriate port
-        # Generate JSON config object from the device webserver
-        input=$(curl -X GET -H "Content-type: application/json" -H "Accept: application/json" http://${ipAddr}/cgi-bin/param.cgi?get_device_conf | tr -d '"' | jq -Rs 'split("\n")[:-1][]')
-        cleaned=$(echo "$input" | tr -d ' ' |sed -e 's/=/:/' -e 's/\"//g')
-        declare -A output_array
-        index=0
-        while read -r line; do
-                keyname=$(printf "%s" "$line" | cut -d':' -f1)
-                value=$(printf "%s" "$line" | cut -d':' -f2)
-                output_array[${keyname}]=${value}
-                ((index++))
-                done <<< "$cleaned"
-                device_json=$(
-                printf '{\n'
-                for key in "${!output_array[@]}"; do
-                printf '"%s": "%s",\n' "$key" "${output_array[$key]}"
-        done
-        printf "}\n")
-        # do something here with array data to reliably parse info out for difference devices
-        # (search array islike= serial, then =serial, hostname islike host, then hostname=)
-        # Then write out config values for each device so we have them in etcd;
-        #
-        # or
-                # foreach i in ${output_array[@]}
-        # split by space in the middle (cut, awk, whatever), etcdctl write key-before-space, value-after-space
-        #
-        # or..
-        #
-        # KEYNAME ="/network_config/${devicehash}/deviceSerialNum"
-        # KEYVALUE="${deviceSerialFromArray}"
-        # write_etcd_global
-        # KEYNAME ="/network_config/${devicehash}/deviceVersionInfo"
-        # KEYVALUE="${deviceVersionInfoFromArray}"
-        # write_etcd_global
-        # KEYNAME ="/network_config/${devicehash}/deviceModel"
-        # KEYVALUE="${deviceModelFromArray}"
-        # write_etcd_global
-        # KEYNAME ="/network_config/${devicehash}/deviceName"
-        # KEYVALUE="${deviceNameFromArray}"
-        # write_etcd_global
-        # KEYNAME ="/network_config/${devicehash}/deviceType"
-        # KEYVALUE="${deviceTypeFromArray}"
-        # write_etcd_global
-        #
-        # If PTZ or other config data can be stored, it would also be good to put those keys in here, if appropriate
-        # These fields will probably have to be arbitrary.. 
-        #
-        # KEYNAME ="/network_config/${devicehash}/deviceSetting1"
-        # KEYVALUE="${deviceSetting1}"
-        # write_etcd_global
-        #
+	# Interrogates PTZ Cam device, attempts preconfigured username and password, then tries to set appropriate settings for streaming into UltraGrid.
+	echo -e "Waiting for five seconds, then attempting to connect to device..\n"
+	sleep 5
+	# stuff to set the stream target to RTP/RTSP 192.168.1.32 on appropriate port
+	# Generate JSON config object from the device webserver
+	input=$(curl -X GET -H "Content-type: application/json" -H "Accept: application/json" http://${ipAddr}/cgi-bin/param.cgi?get_device_conf | tr -d '"' | jq -Rs 'split("\n")[:-1][]')
+	cleaned=$(echo "$input" | tr -d ' ' |sed -e 's/=/:/' -e 's/\"//g')
+	declare -A output_array
+	index=0
+	while read -r line; do
+		keyname=$(printf "%s" "$line" | cut -d':' -f1)
+		value=$(printf "%s" "$line" | cut -d':' -f2)
+		output_array[${keyname}]=${value}
+		((index++))
+		done <<< "$cleaned"
+		device_json=$(
+		printf '{\n'
+		for key in "${!output_array[@]}"; do
+		printf '"%s": "%s",\n' "$key" "${output_array[$key]}"
+	done
+	printf "}\n")
+	value="devname"
+	deviceHostName=$(echo ${output_array[devname]})
+
         # Now we populate the appropriate keys for webUI labeling and tracking:
-        #
         echo -e "\nPopulating ETCD with discovery data..\n"
         KEYNAME="/network_interface/short/${deviceHostName}"
         KEYVALUE="${deviceHash}"
@@ -138,11 +108,20 @@ event_ptz_ndiHX(){
         KEYNAME="/network_long/${leasefile}"
         KEYVALUE="${devhash}"
         write_etcd_global
-        KEYNAME="/network_longhash/${devHash}"
+        KEYNAME="/network_longhash/${deviceHash}"
         KEYVALUE="${leasefile}"
+        write_etcd_global
+        KEYNAME="/network_ip/${deviceHash}"
+        KEYVALUE="${ipAddr}"
+        write_etcd_global
+        KEYNAME="/network_uv_stream_command/${ipAddr}"
+        KEYVALUE="rtsp://${ipAddr}/1:rtp_rx_porjournalt=554"
+        write_etcd_global
         echo -e "Device successfully configured, finishing up..\n"
         exit 0
 }
+
+
 
 
 event_vendorDevice3(){
