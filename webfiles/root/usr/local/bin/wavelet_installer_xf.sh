@@ -103,7 +103,7 @@ rpm_ostree_install(){
 	neofetch htop \
 	mesa-libOpenCL python3-pip srt srt-libs ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
 	ImageMagick mplayer \
-	libndi libndi-devel ndi-sdk obs-ndi
+	libndi libndi-devel ndi-sdk obs-ndi pipewire-utils
 	echo -e "\nRPMFusion Media Packages installed, waiting for 1 second..\n"
 	sleep 1
 	}
