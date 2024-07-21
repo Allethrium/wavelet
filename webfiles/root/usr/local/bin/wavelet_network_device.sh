@@ -96,29 +96,7 @@ event_ptz_ndiHX(){
 	printf "}\n")
 	value="devname"
 	deviceHostName=$(echo ${output_array[devname]})
-
-        # Now we populate the appropriate keys for webUI labeling and tracking:
-        echo -e "\nPopulating ETCD with discovery data..\n"
-        KEYNAME="/network_interface/short/${deviceHostName}"
-        KEYVALUE="${deviceHash}"
-        write_etcd_global
-        KEYNAME="/network_shorthash/${deviceHash}"
-        KEYVALUE="${deviceHostName}"
-        write_etcd_global
-        KEYNAME="/network_long/${leasefile}"
-        KEYVALUE="${devhash}"
-        write_etcd_global
-        KEYNAME="/network_longhash/${deviceHash}"
-        KEYVALUE="${leasefile}"
-        write_etcd_global
-        KEYNAME="/network_ip/${deviceHash}"
-        KEYVALUE="${ipAddr}"
-        write_etcd_global
-        KEYNAME="/network_uv_stream_command/${ipAddr}"
-        KEYVALUE="rtsp://${ipAddr}/1:rtp_rx_porjournalt=554"
-        write_etcd_global
-        echo -e "Device successfully configured, finishing up..\n"
-        exit 0
+	populate_to_etcd
 }
 
 
@@ -171,6 +149,33 @@ read_leasefile(){
 	echo -e "\nDetected MAC Address: ${macAddr^^}\n"
 	parse_macaddr "${ipAddr}" "${macAddr}"
 }
+
+populate_to_etcd(){
+	# Now we populate the appropriate keys for webUI labeling and tracking:
+	echo -e "\nPopulating ETCD with discovery data..\n"
+	KEYNAME="/network_interface/short/${deviceHostName}"
+    KEYVALUE="${deviceHash}"
+    write_etcd_global
+    KEYNAME="/network_shorthash/${deviceHash}"
+    KEYVALUE="${deviceHostName}"
+    write_etcd_global
+    KEYNAME="/network_long/${leasefile}"
+    KEYVALUE="${devhash}"
+    write_etcd_global
+    KEYNAME="/network_longhash/${deviceHash}"
+    KEYVALUE="${leasefile}"
+	write_etcd_global
+    KEYNAME="/network_ip/${deviceHash}"
+    KEYVALUE="${ipAddr}"
+    write_etcd_global
+    KEYNAME="/network_uv_stream_command/${ipAddr}"
+    KEYVALUE="rtsp://${ipAddr}/1:rtp_rx_porjournalt=554"
+    write_etcd_global
+    echo -e "Device successfully configured, finishing up..\n"
+    exit 0
+}
+
+
 
 #####
 #
