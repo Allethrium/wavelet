@@ -46,8 +46,9 @@ main(){
 	write_etcd_global
 
 	# etcdctl - get bluetooth MAC for ExUBT (set in Audio control portion on webUI)
-	KEYNAME="/interface/bluetooth_mac"
-	bluetoothMAC=$(read_etcd_global)
+	KEYNAME="/audio_interface/bluetooth_mac"
+	read_etcd_global
+	bluetoothMAC=${printvalue}
 	# if bluetoothMAC=""; then
 	# echo -e "Bluetooth MAC ID is not populated! Exiting and resetting connect bit"
 	# KEYNAME="/interface/bluetooth_connect_active"
@@ -65,7 +66,7 @@ main(){
 	echo -e "connect ${bluetoothMAC}\n" | bluetoothctl
 
 	# etcdctl set bluetooth connection successful for webUI tracking
-	KEYNAME="/interface/bluetooth_connect_active"
+	KEYNAME="/audio_interface/bluetooth_connect_active"
 	KEYVALUE="1"
 	write_etcd_global
 	echo -e "Bluetooth connection set for ${bluetoothMAC}"
