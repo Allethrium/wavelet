@@ -67,7 +67,8 @@ wavelet_reflector() {
 		# Reduce HD-RUM buffer to 2M
 		# v. 1.9.4 will introduce hd-rum-av which can handle both audio and video in the same reflector, so we can drop the second systemd unit.
 		# args="--tool hd-rum-av --control-port 6161 2M 5004 ${processed_clients_ip}"
-		ugargs="--tool hd-rum-multi --control-port 6161 2M 5004 ${processed_clients_ip}"
+		# as of pre 1.9.5 release, --control-port appears to break hd-rum-transcode, so we will drop it for now.
+		ugargs="--tool hd-rum-multi 2M 5004 ${processed_clients_ip}"
 		KEYVALUE="${ugargs}"
 		echo -e "Generating initial reflector clients list.."
 		echo "${return_etcd_clients_ip}" > /home/wavelet/reflector_clients_ip.txt
@@ -95,7 +96,7 @@ wavelet_reflector() {
 		write_etcd_global
 		# Audio reflector, IP settings identical to video reflector so we don't need to do all that again
 		KEYNAME=AUDIO_REFLECTOR_ARGS
-		ugargs="--tool hd-rum-transcode --control-port 6162 2M 5006 ${processed_clients_ip}"
+		ugargs="--tool hd-rum-transcode 2M 5006 ${processed_clients_ip}"
 		KEYVALUE="${ugargs}"
 		write_etcd_global
 		echo "
