@@ -424,7 +424,7 @@ event_audio_bluetooth_connect(){
 	Wants=network-online.target
 	[Service]
 	Environment=ETCDCTL_API=3
-	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /interface/bluetooth_mac -w simple -- sh -c \"/usr/local/bin/wavelet_bluetooth_connect.sh\"
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /audio_interface_bluetooth_mac -w simple -- sh -c \"/usr/local/bin/wavelet_set_bluetooth_connect.sh\"
 	Restart=always
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-bluetooth-audio.service
