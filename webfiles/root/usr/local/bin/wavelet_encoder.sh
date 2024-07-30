@@ -10,68 +10,68 @@
 #Etcd Interaction
 ETCDENDPOINT=192.168.1.32:2379
 read_etcd(){
-        printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME} --print-value-only)
-        echo -e "Key Name $KEYNAME read from etcd for value $printvalue for host $(hostname)"
+		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME} --print-value-only)
+		echo -e "Key Name $KEYNAME read from etcd for value $printvalue for host $(hostname)"
 }
 
 read_etcd_prefix(){
-        printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix $(hostname)/${KEYNAME} --print-value-only)
-        echo -e "Key Name $KEYNAME read from etcd for value $printvalue for host $(hostname)"
+		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix $(hostname)/${KEYNAME} --print-value-only)
+		echo -e "Key Name $KEYNAME read from etcd for value $printvalue for host $(hostname)"
 }
 
 read_etcd_global(){
-        printvalue="$(etcdctl --endpoints=${ETCDENDPOINT} get "${KEYNAME}" --print-value-only)"
-        echo -e "Key Name $KEYNAME read from etcd for value $printvalue for Global value"
+		printvalue="$(etcdctl --endpoints=${ETCDENDPOINT} get "${KEYNAME}" --print-value-only)"
+		echo -e "Key Name $KEYNAME read from etcd for value $printvalue for Global value"
 }
 
 write_etcd(){
-        etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
-        echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
+		etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
+		echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
 }
 
 write_etcd_global(){
-        etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
-        echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
+		etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
+		echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
 }
 
 write_etcd_clientip(){
-        etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${KEYVALUE}"
-        echo -e "$(hostname) set to ${KEYVALUE} for Global value"
+		etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${KEYVALUE}"
+		echo -e "$(hostname) set to ${KEYVALUE} for Global value"
 }
 read_etcd_clients_ip() {
-        return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
+		return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
 }
 
 event_encoder(){
 	# Before we do anything, check that we have an input device present.
-        KEYNAME=INPUT_DEVICE_PRESENT
-        read_etcd
-                if [[ "$printvalue" -eq 1 ]]; then
-                        echo -e "An input device is present on this host, continuing.. \n"
-                        :
-                else
-                        echo -e "No input devices are present on this system, Encoder cannot run! \n"
-                        exit 0
-                fi
+		KEYNAME=INPUT_DEVICE_PRESENT
+		read_etcd
+				if [[ "$printvalue" -eq 1 ]]; then
+						echo -e "An input device is present on this host, continuing.. \n"
+						:
+				else
+						echo -e "No input devices are present on this system, Encoder cannot run! \n"
+						exit 0
+				fi
 	# Register yourself with etcd as an encoder and your IP address
 	KEYNAME=encoder_ip_address
 	KEYVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
 	write_etcd_global
-        
+		
 	systemctl --user daemon-reload
 	systemctl --user enable watch_encoderflag.service --now
 	echo -e "now monitoring for encoder reset flag changes.. \n"
 	
 	encoder_event_setfourway(){
-        # This block will attempt various four-way panel configurations depending on available devices
-        # lists entries out of etcd, concats them to a single swmig command and stores as uv_input_cmd.
+		# This block will attempt various four-way panel configurations depending on available devices
+		# lists entries out of etcd, concats them to a single swmig command and stores as uv_input_cmd.
 	# This won't work on multiencoder setups, all devices used here must be local to the active encoder.
-        generatedLine=""
-        swmixVar=$(etcdctl --endpoints=${ETCDENDPOINT} get "$(hostname)/inputs/" --prefix --print-value-only | xargs -d'\n' $(echo "${generatedLine}"))
-        KEYNAME=uv_input_cmd
-        KEYVALUE="-t swmix:1920:1080:30 ${swmixVar}"
+		generatedLine=""
+		swmixVar=$(etcdctl --endpoints=${ETCDENDPOINT} get "$(hostname)/inputs/" --prefix --print-value-only | xargs -d'\n' $(echo "${generatedLine}"))
+		KEYNAME=uv_input_cmd
+		KEYVALUE="-t swmix:1920:1080:30 ${swmixVar}"
 	write_etcd_global
-        echo -e "Generated command line is:\n${KEYVALUE}\n"
+		echo -e "Generated command line is:\n${KEYVALUE}\n"
 	inputvar=${KEYVALUE}
 	/usr/local/bin/wavelet_textgen.sh
 	}
@@ -102,47 +102,59 @@ event_encoder(){
 		KEYNAME="/hash/${encoderDeviceHash}"
 		read_etcd_global
 		if [ -n "${printvalue}" ]; then
-    			echo -e "found in /hash/ - we have a local device\n"
-    			encoderDeviceStringFull="${printvalue}"
+				echo -e "found in /hash/ - we have a local device\n"
+				encoderDeviceStringFull="${printvalue}"
 			echo -e "\nDevice string ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash}\n"
 			printvalue=""
 			KEYNAME="${encoderDeviceStringFull}"
 			read_etcd_global
 			inputvar=${printvalue}
 			echo -e "\n Device input key $inputvar located for this device string, proceeding to set encoder parameters \n"
-                else
-                        echo -e "null string found in /hash/ - this is a network device\n"
-                        KEYNAME="/network_shorthash/${encoderDeviceHash}"
-                        read_etcd_global
-                        if [ -n "${printvalue}" ]; then
-                                echo -e "found in /network_shorthash/, proceeding..\n"
-                                encoderDeviceStringFull="${printvalue}"
-                                echo -e "\nDevice String ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash}\n"
-                                printvalue=""
-                                # Locate device hash in network_ip folder
-                                KEYNAME="/network_ip/${encoderDeviceHash}"
-                                read_etcd_global
-                                # Locate input command from the IP value retreived above
-                                KEYNAME="/network_uv_stream_command/${printvalue}"
-                                read_etcd_global
-                                inputvar="-t ${printvalue}"
-                                # clear printvalue
-                                printvalue=""
-                        else
-                                echo -e "not found in network_shorthash, we have an invalid selection, ending process..\n"
-                                exit 0
-                        fi
-                fi
-                # Run common options here
-                /usr/local/bin/wavelet_textgen.sh
+			# For Audio we will select pipewire here
+			audiovar="-s pipewire"
+				else
+						echo -e "null string found in /hash/ - this is a network device\n"
+						KEYNAME="/network_shorthash/${encoderDeviceHash}"
+						read_etcd_global
+						if [ -n "${printvalue}" ]; then
+								echo -e "found in /network_shorthash/, proceeding..\n"
+								encoderDeviceStringFull="${printvalue}"
+								echo -e "\nDevice String ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash}\n"
+								printvalue=""
+								# Locate device hash in network_ip folder
+								KEYNAME="/network_ip/${encoderDeviceHash}"
+								read_etcd_global
+								# Locate input command from the IP value retreived above
+								KEYNAME="/network_uv_stream_command/${printvalue}"
+								read_etcd_global
+								inputvar="-t ${printvalue}"
+								# For a network device we will try to use the embedded audio stream
+								audiovar="-s embedded"
+								# clear printvalue
+								printvalue=""
+						else
+								echo -e "not found in network_shorthash, we have an invalid selection, ending process..\n"
+								exit 0
+						fi
+				fi
+				# Run common options here
+				/usr/local/bin/wavelet_textgen.sh
 	}
 	# Encoder SubLoop
 	# call uv_hash_select to process the provided device hash and select the input from these data
 	read_uv_hash_select
 	# Reads Filter settings, should be banner.pam most of the time
-	KEYNAME=uv_filter_cmd
-	read_etcd_global
-	filtervar=${printvalue}
+	# If banner isn't enabled filtervar will be null, as the logo.c file can result in crashes with RTSP streams and some other pixel formats.
+	KEYNAME="/banner/enabled"
+	if [[ "${printvalue}" == "0" ]]; then
+		echo -e "\nBanner is enabled, so filtervar will be set appropriately.  Note currently the logo.c file in UltraGrid can generate errors on particular kinds of streams!..\n"
+		KEYNAME=uv_filter_cmd
+		read_etcd_global
+		filtervar=${printvalue}
+	else 
+		echo -e "\nBanner is not enabled, so filtervar will be set to NULL..\n"
+		filtervar=""
+	fi
 	# Reads Encoder codec settings, should be populated from the Controller
 	KEYNAME=uv_encoder
 	read_etcd_global
@@ -166,8 +178,8 @@ event_encoder(){
 	# can be used remote with this kind of tool (netcat) : echo 'capture.data 0' | busybox nc localhost <control_port>
 	# not using right now as different inputs have different formats.. may be problematic.
 	UGMTU="9000"
-        echo -e "Assembled command is: \n --tool uv $filtervar -f V:rs:200:250 --control-port 6160 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${inputvar} -s pipewire -c ${encodervar} -P ${uv_videoport} -m ${UGMTU} ${destinationipv4} \n"
-        ugargs="--tool uv $filtervar --control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${inputvar} -s pipewire -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}"
+		echo -e "Assembled command is: \n --tool uv $filtervar -f V:rs:200:250 --control-port 6160 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${inputvar} ${audiovar} -c ${encodervar} -P ${uv_videoport} -m ${UGMTU} ${destinationipv4} \n"
+		ugargs="--tool uv $filtervar --control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${inputvar} ${audiovar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}"
 	KEYNAME=UG_ARGS
 	KEYVALUE=${ugargs}
 	write_etcd
