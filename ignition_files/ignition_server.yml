@@ -46,6 +46,11 @@ storage:
       overwrite: true
       contents:
         inline: SEDwaveletwifipassword
+    # Devloper Mode
+    - path: /var/tmp/DEV_OFF
+      overwrite: true
+      contents:
+        inline: DeveloperModeEnableSwitch
     # Detect NetworkManager name and set as static script
     - path: /usr/local/bin/configure_ethernet.sh
       mode: 0755
