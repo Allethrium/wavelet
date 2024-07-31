@@ -2,8 +2,14 @@
 
 # Wavelet network sense script
 
-# This script is called by an inotifywait service monitoring /var/lib/dnsmasq/leases/
+# This script is called by an inotifywait service monitoring /var/tmp
 # reads out the most recently modified lease file, then processes the IpAddr/MAC combination
+
+# We need to change how this works.  Currently if a lease is created in /var/tmp that file is unmodifiable by wavelet since it's not root
+# This means that we need to modify the monitor service to call this script in some other manner, because the even-driven approach won't work
+# 1) on boot since we have multiple lease files
+# 2) if we need to add a previously existing and leased device
+# So this only currently works for NEW devices, and we can't even delete the old lease files.  
 
 #Etcd Interaction
 ETCDURI=http://192.168.1.32:2379/v2/keys
@@ -38,113 +44,112 @@ read_etcd_clients_ip() {
 }
 
 parse_macaddr() {
-        echo -e "argument 1: ${1}\n"
-        echo -e "argument 2: ${2}\n"
-        echo -e "Detect network device function called with the following data:\nMAC: ${2},\nIP Address: ${1}\n"
-        case ${2^^} in
-                # Convert input to all uppercase with ^^i
-                D0:C8:57:8*)                    echo -e "Nanjing (Magewell) device matched, proceeding to attempt configuration"                                ;       event_magewell_ndi
-                ;;
-                70:B3:D5:75:D*)                 echo -e "Nanjing (Magewell) device matched, proceeding to attempt configuration"                                ;       event_magewell_ndi
-                ;;
-                D4:E0:8E*)                      echo -e "ValueHD Corporation (PTZ Optics) matched, proceeding to attempt configuration"                         ;       event_ptz_ndiHX
-                ;;
-                whateverNDIis)                  echo -e "NDI matched, proceeding to attempt configuration"                                                      ;       event_vendorDevice3
-                ;;
-                # This one might need different config as the camera is of a different design
-                DC:ED:84*)                      echo -e "PTZ Optics NDI Cam (HAverford Systems Inc.) matched, proceeding to attempt configuration"              ;       event_ptz_ngiHX
-                ;;
-                whateverAnothersupportDevIs)    echo -e "Device matched, proceeding to attempt configuration"                                                   ;       event_vendorDevice3
-                ;;
-                *)                              echo -e "Device not supported at current time, doing nothing."                                                  ;       exit 0
-                ;;
-                esac
+	echo -e "argument 1: ${1}\n"
+	echo -e "argument 2: ${2}\n"
+	echo -e "Detect network device function called with the following data:\nMAC: ${2},\nIP Address: ${1}\n"
+	# We put ^^ after the var to convert to uppercase!
+	case ${2^^} in
+		# Convert input to all uppercase with ^^i
+		D0:C8:57:8*)                    echo -e "Nanjing (Magewell) device matched, proceeding to attempt configuration"                                ;       event_magewell_ndi
+		;;
+		70:B3:D5:75:D*)                 echo -e "Nanjing (Magewell) device matched, proceeding to attempt configuration"                                ;       event_magewell_ndi
+		;;
+		D4:E0:8E*)                      echo -e "ValueHD Corporation (PTZ Optics) matched, proceeding to attempt configuration"                         ;       event_ptz_ndiHX
+		;;
+		whateverNDIis)                  echo -e "NDI matched, proceeding to attempt configuration"                                                      ;       event_vendorDevice3
+		;;
+		# This one might need different config as the camera is of a different design
+		DC:ED:84*)                      echo -e "PTZ Optics NDI Cam (Haverford Systems Inc.) matched, proceeding to attempt configuration"              ;       event_ptz_ngiHX
+		;;
+		whateverAnothersupportDevIs)    echo -e "Device matched, proceeding to attempt configuration"                                                   ;       event_vendorDevice3
+		;;
+		*)                              echo -e "Device not supported at current time, doing nothing."                                                  ;       exit 0
+		;;
+		esac
 }
 
 
-
 #
-# Device processing blocks - these are basically the 'driver' as far as this module is concerned.
+# Device processing blocks - these are the 'driver' as far as this module is concerned.
 #
 
-event_event_magewell_ndi(){
+event_magewell_ndi(){
 	# Interrogates Magewell device, attempts preconfigured username and password, then tries to set appropriate settings for streaming into UltraGrid.
-	echo -e "\nthis currently does nothing at all\n"
+	echo -e "Waiting for two seconds, then attempting to connect to device..\n"
+	sleep 2
+	echo -e "\nCalling curl with GET request for Default Username and Password..\n"
+	defaultPassword="Admin"
+	md5sumAdminPassword=$(echo -n "${defaultPassword}" | md5sum | cut -d' ' -f1)
+	curl --cookie-jar /var/tmp/sid.txt "http://${ipAddr}/mwapi?method=login&id=Admin&pass=${md5sumAdminPassword}"
+	if [ $? -ne 0 ]; then
+	echo "\nConnection to MageWell device failed!  Reset the device to FACTORY DEFAULTS and try again!\n"
+	exit 1
+	fi
+	# Perhaps we should autogen an admin password and store it in etcd here for security purposes?
+	
+	# This network device username and password should be generated by the wavelet installer script
+	# at the same time as the wavelet_root and wavelet user passwords, mod ignition and installer scripts
+	# Mental watts are low, so I couldn't think of another elegant way to set it up beyond generating rando and storing it in etcd..
+	waveletUserPass=$(echo /home/wavelet/networkdevice_userpass)
+	echo -e "\nAttempting to add Wavelet user..\n"
+	md5sumWaveletPassword=$(echo -n "${waveletUserPass}" | md5sum | cut -d' ' -f1)
+	curl --cookie /var/tmp/sid.txt "http://${ipAddr}/mwapi?method=add-user&id=Wavelet&pass=${md5sumWaveletPassword}"
+	# Now we login with the Wavelet User to save the cookie
+	curl --cookie-jar /var/tmp/wavelet_sid.txt "http://${ipAddr}/mwapi?method=login&id=Admin&pass=${md5sumAdminPassword}"
+	# LibNDI should be installed on wavelet by default (DEPENDENCY)
+	ndiSource=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | cut -d '(' -f1 | awk '{print $1}')
+	ndiIPAddr=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | awk '{print $5}')
+	# We need to set the magewell card to raw framerate 30fps, AV1 compression had pauses at 60FPS!
+	declare -a magewellCommands=('mwapi?method=set-video-config&out-fr-convertion=frame-rate-half',	'mwapi?method=set-video-config&out-raw-resolution=false&out-cx=1920&out-cy=1080', 'mwapi?method=set-video-config&in-auto-quant-range=false&in-quant-range=full', 'mwapi?method=set-video-config&in-auto-color-fmt=false&in-color-fmt=rgb', 'mwapi?method=set-video-config&bit-rate-ratio=150', 'mwapi?method=out-quant-range=full', 'http://ip/mwapi?method=set-ndi-config&enable=true')
+	for i in "${magewellCommands[@]}"
+	do
+		curl --cookie /var/tmp/wavelet_sid.txt http://"${ipAddr}"/"$i"
+	done
+	echo -e "\nMageWell ProConvert device should now be fully configured..\n"
+	# Generate UG Stream command from the appropriate NDI Source
+	deviceHostName="Magewell Proconvert HDMI $(curl --cookie /var/tmp/wavelet_sid.txt 'http://192.168.1.27/mwapi?method=get-summary-info' | jq '.ndi.name' | tr -d '"')"
+	UGdeviceStreamCommand="ndi:url=${ndiIPAddr}"
+	populate_to_etcd
 }
 
 event_ptz_ndiHX(){
-        # Interrogates PTZ Cam device, attempts preconfigured username and password, then tries to set appropriate settings for streaming into UltraGrid.
-        echo -e "Waiting for five seconds, then attempting to connect to device..\n"
-        sleep 5
-        # stuff to set the stream target to RTP/RTSP 192.168.1.32 on appropriate port
-        # Generate JSON config object from the device webserver
-        input=$(curl -X GET -H "Content-type: application/json" -H "Accept: application/json" http://${ipAddr}/cgi-bin/param.cgi?get_device_conf | tr -d '"' | jq -Rs 'split("\n")[:-1][]')
-        cleaned=$(echo "$input" | tr -d ' ' |sed -e 's/=/:/' -e 's/\"//g')
-        declare -A output_array
-        index=0
-        while read -r line; do
-                keyname=$(printf "%s" "$line" | cut -d':' -f1)
-                value=$(printf "%s" "$line" | cut -d':' -f2)
-                output_array[${keyname}]=${value}
-                ((index++))
-                done <<< "$cleaned"
-                device_json=$(
-                printf '{\n'
-                for key in "${!output_array[@]}"; do
-                printf '"%s": "%s",\n' "$key" "${output_array[$key]}"
-        done
-        printf "}\n")
-        # do something here with array data to reliably parse info out for difference devices
-        # (search array islike= serial, then =serial, hostname islike host, then hostname=)
-        # Then write out config values for each device so we have them in etcd;
-        #
-        # or
-        #
-        # foreach i in ${output_array[@]}
-        # split by space in the middle (cut, awk, whatever), etcdctl write key-before-space, value-after-space
-        #
-        # or..
-        #
-        # KEYNAME ="/network_config/${devicehash}/deviceSerialNum"
-        # KEYVALUE="${deviceSerialFromArray}"
-        # write_etcd_global
-        # KEYNAME ="/network_config/${devicehash}/deviceVersionInfo"
-        # KEYVALUE="${deviceVersionInfoFromArray}"
-        # write_etcd_global
-        # KEYNAME ="/network_config/${devicehash}/deviceModel"
-        # KEYVALUE="${deviceModelFromArray}"
-        # write_etcd_global
-        # KEYNAME ="/network_config/${devicehash}/deviceName"
-        # KEYVALUE="${deviceNameFromArray}"
-        # write_etcd_global
-        # KEYNAME ="/network_config/${devicehash}/deviceType"
-        # KEYVALUE="${deviceTypeFromArray}"
-        # write_etcd_global
-        #
-        # If PTZ or other config data can be stored, it would also be good to put those keys in here, if appropriate
-        # These fields will probably have to be arbitrary.. 
-        #
-        # KEYNAME ="/network_config/${devicehash}/deviceSetting1"
-        # KEYVALUE="${deviceSetting1}"
-        # write_etcd_global
-        #
-        # Now we populate the appropriate keys for webUI labeling and tracking:
-        #
-        echo -e "\nPopulating ETCD with discovery data..\n"
-        KEYNAME="/network_interface/short/${deviceHostName}"
-        KEYVALUE="${deviceHash}"
-        write_etcd_global
-        KEYNAME="/network_shorthash/${deviceHash}"
-        KEYVALUE="${deviceHostName}"
-        write_etcd_global
-        KEYNAME="/network_long/${leasefile}"
-        KEYVALUE="${devhash}"
-        write_etcd_global
-        KEYNAME="/network_longhash/${devHash}"
-        KEYVALUE="${leasefile}"
-        echo -e "Device successfully configured, finishing up..\n"
-        exit 0
+		# Interrogates PTZ Cam device, attempts preconfigured username and password, then tries to set appropriate settings for streaming into UltraGrid.
+		echo -e "Waiting for five seconds, then attempting to connect to device..\n"
+		sleep 5
+		# stuff to set the stream target to RTP/RTSP 192.168.1.32 on appropriate port
+		# Generate JSON config object from the device webserver
+		input=$(curl -X GET -H "Content-type: application/json" -H "Accept: application/json" http://${ipAddr}/cgi-bin/param.cgi?get_device_conf | tr -d '"' | jq -Rs 'split("\n")[:-1][]')
+		cleaned=$(echo "$input" | tr -d ' ' |sed -e 's/=/:/' -e 's/\"//g')
+		declare -A output_array
+		index=0
+		while read -r line; do
+				keyname=$(printf "%s" "$line" | cut -d':' -f1)
+				value=$(printf "%s" "$line" | cut -d':' -f2)
+				output_array[${keyname}]=${value}
+				((index++))
+				done <<< "$cleaned"
+				device_json=$(
+				printf '{\n'
+				for key in "${!output_array[@]}"; do 
+				printf '"%s": "%s",\n' "$key" "${output_array[$key]}"
+		done
+		printf "}\n")
+		deviceHostName=$(echo ${output_array[devname]})
+		# Check to see if this device is NDI enabled
+		ndiSource=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | cut -d '(' -f1 | awk '{print $1}')
+		if [ -n ${ndiSource} ]; then
+			echo -e "\nNDI source for this IP address not found, configuring for RTSP..\n"
+			UGdeviceStreamCommand="rtsp://${ipAddr}:554/1:decompress"
+			populate_to_etcd
+			echo -e "Device successfully configured, finishing up..\n"
+			exit 0
+		else
+			echo -e "\nNDI is available for this device, defaulting to NDI..\n"
+			UGdeviceStreamCommand="ndi:url=${ndiIPAddr}"
+		fi
 }
+
+
 
 
 event_vendorDevice3(){
@@ -194,6 +199,41 @@ read_leasefile(){
 	echo -e "\nDetected MAC Address: ${macAddr^^}\n"
 	parse_macaddr "${ipAddr}" "${macAddr}"
 }
+
+populate_to_etcd(){
+	# Now we populate the appropriate keys for webUI labeling and tracking:
+	echo -e "\nPopulating ETCD with discovery data..\n"
+	KEYNAME="/network_interface/short/${deviceHostName}"
+	KEYVALUE="${deviceHash}"
+	write_etcd_global
+	KEYNAME="/network_shorthash/${deviceHash}"
+	KEYVALUE="${deviceHostName}"
+	write_etcd_global
+	KEYNAME="/network_long/${leasefile}"
+	KEYVALUE="${devicehash}"
+	write_etcd_global
+	KEYNAME="/network_longhash/${deviceHash}"
+	KEYVALUE="${leasefile}"
+	write_etcd_global
+	KEYNAME="/network_ip/${deviceHash}"
+	KEYVALUE="${ipAddr}"
+	write_etcd_global
+	KEYNAME="/network_uv_stream_command/${ipAddr}"
+	KEYVALUE="${UGdeviceStreamCommand}"
+	write_etcd_global
+	echo -e "Device successfully configured, finishing up..\n"
+	# since we now have a network device active on the system, we need to setup an IP ping watcher to autoremove it or note it as bad
+		# Read current IP subscription list
+		# find this device in the IP Subscription list
+		# if is not already there, append it
+		# restart ping watcher service, which will set a "PROBLEM" flag if the device has network issues.  We can use this later on for the webui
+		# etcd  /network_health/${ipAddr} --  GOOD or BAD
+		# Finally, set and configure a watcher service for this device so that it will reconfigure the device hostname if the label is changed on the webUI
+		# /usr/local/bin/wavelet_network_device_relabel.sh
+	exit 0
+}
+
+
 
 #####
 #

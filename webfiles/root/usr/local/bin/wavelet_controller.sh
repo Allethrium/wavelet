@@ -44,7 +44,6 @@ main
 
 
 main() {
-# 11/2023 - now reads uv_hash_select key for inputdata
 	KEYNAME=input_update
 	read_etcd_global
 	if [[ "${printvalue}" == 1 ]]; then

@@ -206,7 +206,9 @@ detect() {
 	;;
 	*Magewell*)						echo -e "Magewell HDMI-USB Capture device detected.. \n"			&& event_magewell
 	;;
-	*EPSON*)						echo -e "Magewell HDMI-USB Capture device detected.. \n"			&& event_epson
+	*EPSON*)						echo -e "EPSON Capture device detected.. \n"						&& event_epson
+	;;
+	*Dell_Webcam_WB3023*)			echo -e "Dell WB3023 Webcam	device detected.. \n"					&& event_dellWB3023
 	;;
 	*)								echo -e "Unknown device detected, attempting to process..\n"		&& event_unknowndevice
 	;;
@@ -220,16 +222,15 @@ event_ipevo() {
 # We will have to add to this over time to support more devices appropriately.
 # Specifically this camera supports MJPG so we will use that instead of YUYV for the capture pixel format
 	echo -e "IPEVO Camera detection running..\n"
-	KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"
+	KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:device=${v4l_device_path}"
 	KEYNAME=${device_string_long}
 	write_etcd_inputs
 	echo -e "\n Detection completed for IPEVO device.. \n \n \n \n"
 	device_cleanup
 }
 event_logitech_hdmi() {
-# here as a legacy setting, it's basically the same as the MageWell devices.
 	KEYNAME=${device_string_long}
-	KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"
+	KEYVALUE="-t v4l2:codec=MJPEG:size=1920x1080:tpf=1/30:device=${v4l_device_path}"
 	write_etcd_inputs
 	echo -e "\n Detection completed for Logitech HDMI Capture device.. \n \n \n \n"
 	device_cleanup
@@ -243,12 +244,20 @@ event_magewell() {
 	device_cleanup
 }
 event_epson() {
-	echo -e "Setting up Magewell USB capture card..\n"
-	KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/24:convert=RGB:device=${v4l_device_path}"
+	echo -e "Setting up EPSON Document camera device...\n"
+	KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/24:device=${v4l_device_path}"
 		KEYNAME="${device_string_long}"
 	write_etcd_inputs
 	echo -e "\n Detection completed for device.. \n \n \n \n"
 	device_cleanup
+}
+event_dellWB3023(){
+	echo -e "Setting up Dell WB3023 webcam..\n"
+	KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:device=${v4l_device_path}"
+		KEYNAME="${device_string_long}"
+	write_etcd_inputs
+	echo -e "\n Detection completed for device.. \n \n \n \n"
+	device_cleanup	
 }
 event_unknowndevice() {
 # 30fps is a compatibility setting, catch all for other devices we will leave at 30.  Try YUYV with RGB conversion..

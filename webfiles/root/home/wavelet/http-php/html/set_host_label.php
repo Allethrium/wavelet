@@ -5,10 +5,11 @@
 // oldText = the old device label, which we need to delete from ETCD.
 $key = $_POST["key"];
 $value = $_POST["value"];
+$type = $_POST["type"]
 
 function curl_etcd($keyTarget, $keyValue) {
 		echo "Attempting to set $keyTarget for $keyValue";
-		$b64KeyTarget = base64_encode("decoderlabel/$keyTarget");
+		$b64KeyTarget = base64_encode("hostlabel/$keyTarget");
 		$b64KeyValue = base64_encode($keyValue);
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, 'http://192.168.1.32:2379/v3/kv/put');
@@ -23,12 +24,12 @@ function curl_etcd($keyTarget, $keyValue) {
 				echo 'Error:' . curl_error($ch);
 		}
 		curl_close($ch);
-		echo "\n Succesfully set decoderlabel/{$keyTarget} for {$keyValue} \n";
+		echo "\n Succesfully set hostlabel/{$keyTarget} for {$keyValue} \n";
 }
 
 function curl_etcd_hostname($keyTarget, $keyValue) {
 		echo "Attempting to set $keyTarget for $keyValue";
-		$b64KeyTarget = base64_encode("$keyTarget/decoderlabel");
+		$b64KeyTarget = base64_encode("$keyTarget/hostlabel");
 		$b64KeyValue = base64_encode($keyValue);
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, 'http://192.168.1.32:2379/v3/kv/put');
@@ -43,7 +44,7 @@ function curl_etcd_hostname($keyTarget, $keyValue) {
 				echo 'Error:' . curl_error($ch);
 		}
 		curl_close($ch);
-		echo "\n Succesfully set {$keyTarget}/decoderlabel for {$keyValue} \n";
+		echo "\n Succesfully set {$keyTarget}/hostlabel for {$keyValue} \n";
 }
 
 function set_etcd_hostHash($keyTarget, $keyValue) {
@@ -69,6 +70,8 @@ function set_etcd_hostHash($keyTarget, $keyValue) {
 
 // curl etcd uv_hash_select for the value of the device hash we want to see streaming on the system
 // please note how we have to call the function twice to set the reverse lookup values as well as the fwd values!
+
+// add an IF argument here to set decoderlabel/encoderlabel etc.
 echo "posted data are: \n New Label: $value\n Key: $key \n";
 curl_etcd("$key", "$value");
 curl_etcd_hostname("$key", "$value");

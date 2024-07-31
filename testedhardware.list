@@ -43,6 +43,8 @@ tested SBC's:
 	Raspberry Pi:
 		?
 
+	Intel N95/N100 based SBC:
+	
 	Mini-PC ZX05:
 		Ali-Express Intel N95 derived SBC.  Works perfectly, full HW decode.  Can be run as server as long as you stick with HW encoding.
 
@@ -56,31 +58,46 @@ tested SBC's:
 	The Intel SBC are clear winners for target hardware down to cost, x86 compatibility and Intel's efforts on LibVA and OneAPI.  
 	I'd like to circle back once we have some options with open-source Hardware encoding, however mainline ARM support seems very slow.
 	For now, stick with x86.
+	
+	RISC V SBC's?  
 
 
 
 Networking Equipment:
 
+
 Wired:
+
 	Extreme Networks switch (8port)
 	TP-Link unmanaged switch
+	D-LINK Switch
+	Netgear unmanaged switch
 
 
 Wireless:
+
 	Ruckus R350 Access Point 		-	Currently the recommended standard
-	Ubiquiti AC-Pro			-	Functional but lacking WiFi6 support
+	Ubiquiti AC-Pro				-	Functional but lacking WiFi6 support
 	Ubiquiti UAP				-	B/G band WiFi too slow, worked on one or two decoders but performance was spotty
 	Extreme Networks			-	AP needs a standalone mode, many enterprise AP's are not suitable for this reason
 
+N.B	-	Stretch goal here is to have some kind of IaaS functionality to autoconfigure network devices appropriately.
+
+
 Network Cards:
+
+N.B	-	PCIe/10Gbe SFP+ cards are preferred	
+
 	Hawking WiFi 6 USB 			-	Functional but USB adds unacceptable overhead
 	Intel Built-In ??			-	No issues
 	Mellanox CX2				-	To be tested (RoCE/RDMA support to further lower latency?)
 	Intel X710				-	Good performance
 
+
 HDMI Capture Devices:
+
 	MageWell HDMI Capture Pro 	-	Fully supported.  Can be spotty on HDMI input due to HDCP issues.
-						Recommend configuring via Windows configuration app prior to deployment for pixel formats
+						Recommend configuring via Windows configuration app prior to deployment for better control of output pixel formats
 						
 	LG USB Capture Cards		-	Fully supported.  
 						Large delay when spinning up V4L2 capture.  
@@ -88,8 +105,29 @@ HDMI Capture Devices:
 
 	BlackMagic Decklink		-	Requires DKMS module, which is thorny to build on CoreOS due to hurdles with rpm-ostree.
 						Nearly all PCIE cards will require kernel modules, but should have better performance by 20ms/frame+
+						
+	AJA Cards			-	Should now be supported since I've lifted the library build code from UltraGrid
+
 
 USB Input Devices:
-	IPEVO Ziggy Document Camera 	- 	Fully supported @ 1080/30fps.   On some machines refuses to capture at above 15fps, however.
-	ELMO document camera			-	not yet tested
+
+	IPEVO Ziggy Document Camera 		- 	Fully supported @ 1080/30fps.   On some machines refuses to capture at above 15fps on an intermittent basis.
+	
+	ELMO document camera			-	The unit I have to test is only HDMI out so we would have to run it through another capture device
+	
+	EPSON document camera			-	supported, but FPS are low
+	
 	TESIRA ex-UBT				-	not yet tested (linux support on website isn't alluded to)
+	
+	Dell WB303 Webcam			-	added, untested
+	
+	
+Network input devices:
+
+	MageWell ProConvert HDMI (NDI)	-	Supported fully
+	PTZ Optics Hx			-	supported with NDI or with RTSP (no audio)
+	RTSP Generic			-	Should work with H.264 streams
+	
+	
+If you have a device you may wish to support, send me one and I'll work on it.  Will return the device once confident it's functional.
+

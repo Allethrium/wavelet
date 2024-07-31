@@ -41,7 +41,13 @@ event_server(){
 	chown -R wavelet:wavelet /home/wavelet
 	cd /home/wavelet
 	rpm_ostree_install_git
-	git clone https://github.com/ALLETHRIUM/wavelet
+	if [[ ! -f /var/tmp/DEV_ON ]]; then
+		echo -e "\n\n***WARNING***\n\nDeveloper Mode is ON\n\nCloning from development repository..\n"
+		git clone -b armelvil-working --single-branch https://github.com/ALLETHRIUM/wavelet	
+	else
+		echo -e "\nDeveloper Mode is off, cloning from main repository..\n"
+		git clone https://github.com/ALLETHRIUM/wavelet
+	fi
 	generate_tarfiles
 	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
 	extract_base
@@ -73,7 +79,8 @@ rpm_ostree_install(){
 	libsrtp libdrm python3-pip srt srt-libs libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
 	ImageMagick intel-opencl mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
 	mesa-libxatracker alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools dkms kernel-headers usbutils \
-	tuned realtime-setup realtime-tests rtkit jo netcat busybox inotify-tools
+	tuned realtime-setup realtime-tests rtkit jo netcat busybox inotify-tools \
+	gcc gcc-c++ openssl-devel bzip2-devel libffi-devel zlib-devel make cmake libuuid-devel
 	echo -e "\nBase RPM Packages installed, waiting for 1 second..\n"
 	sleep 1
 	}
@@ -103,7 +110,7 @@ rpm_ostree_install(){
 	neofetch htop \
 	mesa-libOpenCL python3-pip srt srt-libs ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
 	ImageMagick mplayer \
-	libndi libndi-devel ndi-sdk obs-ndi
+	libndi libndi-devel ndi-sdk obs-ndi pipewire-utils
 	echo -e "\nRPMFusion Media Packages installed, waiting for 1 second..\n"
 	sleep 1
 	}
@@ -209,6 +216,63 @@ install_decklink(){
   	ostree container commit
 }
 
+install_ug_depends(){
+	# This is lifted from the UltraGrid project with a couple of tweaks for CoreOS/my purposes
+	# It builds dependencies for;
+	#	Cineform
+	#	libAJA to support AJA capture cards
+	#	Live555 for rtmp
+	#	LibNDI for Magewell devices
+
+		cd /home/wavelet
+		# CineForm SDK
+        git clone --depth 1 https://github.com/gopro/cineform-sdk
+        cd cineform-sdk
+        git apply "$curdir/0001-CMakeList.txt-remove-output-lib-name-force-UNIX.patch"
+        mkdir build && cd build
+        cmake -DBUILD_TOOLS=OFF
+        cmake --build . --parallel "$(nproc)"
+        sudo cmake --install .
+        cd /home/wavelet
+        #Install libAJA Library
+        git clone --depth 1 https://github.com/aja-video/libajantv2.git
+        # export MACOSX_DEPLOYMENT_TARGET=10.13 # needed for arm64 mac
+        cmake -DAJANTV2_DISABLE_DEMOS=ON  -DAJANTV2_DISABLE_DRIVER=ON \
+        -DAJANTV2_DISABLE_TOOLS=ON  -DAJANTV2_DISABLE_TESTS=ON \
+        -DAJANTV2_DISABLE_PLUGINS=ON  -DAJANTV2_BUILD_SHARED=ON \
+        -DCMAKE_BUILD_TYPE=Release -Blibajantv2/build -Slibajantv2
+        cmake --build libajantv2/build --config Release -j "$(nproc)"
+        sudo cmake --install libajantv2/build
+        # Live555
+        git clone --depth 1 https://github.com/xanview/live555/
+        cd live555
+		./genMakefiles linux-with-shared-libraries
+        make -j "$(nproc)"
+        make -C live555 install
+        # LibNDI
+        # Lifted from https://github.com/DistroAV/DistroAV/blob/master/CI/libndi-get.sh
+        mkdir -p /home/wavelet/libNDI
+        cd /home/wavelet/libNDI   
+        LIBNDI_INSTALLER_NAME="Install_NDI_SDK_v6_Linux"
+        LIBNDI_INSTALLER="$LIBNDI_INSTALLER_NAME.tar.gz"
+        LIBNDI_INSTALLER_URL=https://downloads.ndi.tv/SDK/NDI_SDK_Linux/$LIBNDI_INSTALLER
+        download_libndi(){
+        curl -L $LIBNDI_INSTALLER_URL -f --retry 5 > "/home/wavelet/libNDI/$LIBNDI_INSTALLER"
+        # Check if download was successful
+		if [ $? -ne 0 ]; then
+    		echo "Download failed."
+		fi
+		echo "Download complete."
+		}
+		download_libndi
+		tar -xzvf "/home/wavelet/libNDI/$LIBNDI_INSTALLER"
+		yes | PAGER="cat" sh $LIBNDI_INSTALLER_NAME.sh
+		cp -P /home/wavelet/libNDI/NDI\ SDK\ for\ Linux/lib/x86_64-linux-gnu/* /usr/local/lib/
+		ldconfig
+		ln -s /usr/local/lib/libndi.so.6 /usr/local/lib/libndi.so.5
+		chown -R wavelet:wavelet /home/wavelet/libNDI
+		echo -e "\nLibNDI Installed..\n"
+}
 
 # Perhaps add a checksum to make sure nothing's been tampered with here..
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor

@@ -32,23 +32,53 @@ detect_ug_version(){
 }
 
 detect_self(){
-systemctl --user daemon-reload
-UG_HOSTNAME=$(hostname)
+	systemctl --user daemon-reload
+	UG_HOSTNAME=$(hostname)
+	# Check to see if hostname has changed since last reboot
+	if [[ ! -f /var/tmp/oldhostname.txt ]]; then
+		check_hostname
+	fi
 	echo -e "Hostname is $UG_HOSTNAME \n"
 	case $UG_HOSTNAME in
-	enc*) 					echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."; event_encoder
+	enc*) 					echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."			;	event_encoder
 	;;
-	decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.  Randomizing my hostname, and rebooting"; systemctl start decoderhostname.service 
+	decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.  Randomizing my hostname and rebooting"	;	systemctl start decoderhostname.service 
 	;;
-	dec*)					echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."; event_decoder
+	dec*)					echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."				;	event_decoder
 	;;
-	livestream*)			echo -e "I am a Livestreamer \n" && echo -e "Provisioning systemD units as a livestreamer.."; event_livestreamer
+	livestream*)			echo -e "I am a Livestreamer \n" && echo -e "Provisioning systemD units as a livestreamer.."	;	event_livestreamer
 	;;
-	gateway*)				echo -e "I am an input Gateway for another video streaming system \n"  && echo -e "Provisioning systemD units as a gateway.."; event_gateway
+	gateway*)				echo -e "I am an input Gateway for another video streaming system \n" 							;	event_gateway
 	;;
-	svr*)					echo -e "I am a Server. Proceeding..."  && event_server
+	svr*)					echo -e "I am a Server. Proceeding..."															;	event_server
 	;;
-	*) 						echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
+	*) 						echo -e "This device Hostname is not set approprately, exiting \n"								;	exit 0
+	;;
+	esac
+}
+
+check_hostname(){
+	# Get the old hostname from the file, then remove it because it's not necessary until the hostname is changed again.
+	oldHostName=$(echo /var/tmp/oldhostname.txt)
+	if [[ "${oldHostName}" == "$(hostname)" ]]; then
+		echo -e "\nOld hostname is the same as the current hostname!  Doing nothing.\n"
+		rm -rf /var/tmp/oldhostname.txt
+		exit 0
+	fi
+	case $oldHostName in
+	enc*) 					echo -e "\nI was an Encoder, and I am currently an Encoder, removing hostname file and exiting.\n"	; exit 0
+	;;
+	decX.wavelet.local)		echo -e "\nI was an unconfigured Decoder, removing hostname file and exiting.\n"					; exit 0
+	;;
+	dec*)					echo -e "I was a Decoder \n"																		; clean_oldDecoderHostnameSettings
+	;;
+	livestream*)			echo -e "I was a Livestreamer \n"																	; clean_oldLivestreamHostnameSettings
+	;;
+	gateway*)				echo -e "I was an input Gateway\n"  																; clean_oldGatewayHostnameSettings
+	;;
+	svr*)					echo -e "I was a Server. Proceeding..."																; clean_oldServerHostnameSettings
+	;;
+	*) 						echo -e "This device Hostname was not set appropriately, exiting \n" && exit 0
 	;;
 	esac
 }
@@ -64,6 +94,7 @@ event_gateway(){
 	systemctl --user daemon-reload
 	systemctl --user enable wavelet_ndi_gateway.service
 	etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/wavelet_build_completed" -- "${KEYVALUE}"
+	event_generateHash gateway
 	sleep 1
 }
 
@@ -92,13 +123,14 @@ event_livestreamer(){
 	systemctl --user start run_ug.service
 	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/wavelet_build_completed" -- "${KEYVALUE}"
 	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/livestream_capable" -- 1
+	event_generateHash livestream
 	sleep 1
 }
 
 
 event_decoder(){
 	echo -e "Decoder routine started.  Attempting to connect to preprovisioned WiFi.."
-	# Finding the correct BSSID is VERY fussy, hence we do so many redundant rescans.
+	# Finding the correct BSSID is VERY fussy and dependent on AP settings such as beacon interval, hence we do so many redundant rescans.
 	nmcli dev wifi rescan
 	sleep 1
 	nmcli dev wifi rescan
@@ -113,7 +145,7 @@ event_decoder(){
 	event_reboot
 	event_reset
 	event_blankhost
-	event_generateHash
+	event_generateHash dec
 	systemctl --user enable run_ug.service --now
 	etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/wavelet_build_completed" -- "${KEYVALUE}"
 	sleep 1
@@ -124,11 +156,14 @@ event_encoder(){
 	echo -e "reloading systemctl user daemon, moving to run_ug"
 	systemctl --user daemon-reload
 	systemctl --user enable run_ug.service --now
+	# Generate Systemd notifier services for encoders
 	event_encoder_reboot
 	event_reboot
 	event_reset
 	etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/wavelet_build_completed" -- "${KEYVALUE}"
+	event_generateHash enc
 	sleep 1
+	fi
 }
 
 event_server(){
@@ -152,6 +187,7 @@ event_server(){
 		echo -e "Etcd service is not present, cannot check for bootstrap key and assuming that bootstrap has not been run. Executing bootstrap process..\n"
 		server_bootstrap
 	fi
+	event_generateHash svr
 	event_reboot
 }
 
@@ -179,8 +215,13 @@ server_bootstrap(){
 		sleep 2
 	}
 
+	bootstrap_nodejs(){
+		/usr/local/bin/build_nodejs.sh
+		sleep 2
+	}
+
 	bootstrap_dnsmasq_watcher_service(){
-		echo -e "		[Unit]
+		echo -e "[Unit]
 		Description=Dnsmasq inotify service
 		After=network.target
 
@@ -217,6 +258,7 @@ server_bootstrap(){
 	sleep 2
 	bootstrap_http
 	bootstrap_nginx_php
+	bootstrap_nodejs
 	bootstrap_dnsmasq_watcher_service
 	KEYNAME=SERVER_BOOTSTRAP_COMPLETED
 	KEYVALUE=1
@@ -391,6 +433,42 @@ event_decoder_reset(){
 	systemctl --user enable wavelet-decoder-reset.service --now
 }
 
+event_audio_toggle(){
+	# Toggles audio functionality on and off
+	echo -e "Generating Reboot SystemdD unit in /.config/systemd/user.."
+	echo -e "[Unit]
+	Description=etcd Decoder retart watcher 
+	After=network-online.target
+	Wants=network-online.target
+	[Service]
+	Environment=ETCDCTL_API=3
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /interface/audio/enabled -w simple -- sh -c \"/usr/local/bin/wavelet_audio_toggle.sh\"
+	Restart=always
+	[Install]
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-audio-toggle.service
+
+	systemctl --user daemon-reload
+	systemctl --user enable wavelet-audio-toggle.service --now
+}
+
+event_audio_bluetooth_connect(){
+	# Monitors the bluetooth MAC value and updates the system if there's a change
+	echo -e "Generating Reboot SystemdD unit in /.config/systemd/user.."
+	echo -e "[Unit]
+	Description=etcd Decoder retart watcher 
+	After=network-online.target
+	Wants=network-online.target
+	[Service]
+	Environment=ETCDCTL_API=3
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /audio_interface_bluetooth_mac -w simple -- sh -c \"/usr/local/bin/wavelet_set_bluetooth_connect.sh\"
+	Restart=always
+	[Install]
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-bluetooth-audio.service
+
+	systemctl --user daemon-reload
+	systemctl --user enable wavelet-bluetooth-audio.service --now
+}
+
 get_os_partition_uuid() {
 		os_rootfs="/boot" # Replace with your actual OS root filesystem path
 		uuid=$(lsblk -f)
@@ -405,22 +483,34 @@ event_generateHash(){
 		echo -e "device hostname is: $(hostname)"
 		hostHash=$(echo "$PARTUUID, $(hostname)" | sha256sum)
 		echo -e "generated device hash: $hostHash \n"
-
 		# Check for pre-existing keys here
 		labelexists=$(ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} get hostHash/$(hostname)/label --print-value-only)
 		if [[ -z "${labelexists}" || ${#labelexists} -le 1 ]] then
-				echo -e "\nLabel value is null, or less than one char, continuing\n"
-				echo -e "\n Label value was set to ${labelexists} \n"
-				# Populate what will initially be used as the label variable from the webUI
-				ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put decoderlabel/$(hostname) -- $(hostname)
-				# And the reverse lookup for the device
-				ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostHash/$(hostname)/Hash -- $(hostHash)
-				ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put $(hostname)/Hash/$(hostHash)
-				ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostHash/$(hostname)/label -- $(hostname)
-				ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostHash/$(hostname)/ipaddr -- ${KEYVALUE}
+			echo -e "\nLabel value is null, or less than one char, continuing\n"
+			echo -e "\n Label value was set to ${labelexists} \n"
+			# Populate what will initially be used as the label variable from the webUI
+			case ${1} in
+				enc*)			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostLabel/$(hostname)/type -- enc
+				;;
+				dec*)			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostLabel/$(hostname)/type -- dec
+				;;
+				livestream*)	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostLabel/$(hostname)/type -- lvstr
+				;;
+				gateway*)		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostLabel/$(hostname)/type -- gtwy
+				;;
+				svr*)			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostLabel/$(hostname)/type -- svr
+				;;
+				*)				echo -e "hostname invalid, exiting."	;	exit 0
+				;;
+			esac
+		# And the reverse lookup for the device
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostHash/$(hostname)/Hash -- $(hostHash)
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put $(hostname)/Hash/$(hostHash)
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostHash/$(hostname)/label -- $(hostname)
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put hostHash/$(hostname)/ipaddr -- ${KEYVALUE}
 		else
-				echo -e "\nLabel value exists as ${labelexists}\nXcoder already populated, doing nothing and moving to run_ug.."
-				:
+			echo -e "\nLabel value exists as ${labelexists}\nXcoder already populated, doing nothing and moving to run_ug.."
+			:
 		fi
 }
 
@@ -433,13 +523,83 @@ event_device_redetect(){
 	Wants=network-online.target
 	[Service]
 	Environment=ETCDCTL_API=3
-	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch \"DEVICE_REDETECT\" -w simple -- sh -c \"/usr/local/bin/wavelet-device-redetect.sh\"
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch \"DEVICE_REDETECT\" -w simple -- sh -c \"/usr/local/bin/wavelet_device_redetect.sh\"
 	Restart=always
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-device-redetect.service
-
 	systemctl --user daemon-reload
 	systemctl --user enable wavelet-device-redetect.service --now
+}
+
+event_host_relabel_watcher(){
+	# Watches for a device relabel flag, then runs wavelet-device-relabel.sh
+	echo -e "Generating Reboot SystemdD unit in /.config/systemd/user.."
+	echo -e "[Unit]
+	Description=etcd Device redetection watcher
+	After=network-online.target
+	Wants=network-online.target
+	[Service]
+	Environment=ETCDCTL_API=3
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch $(hostname)/RELABEL -w simple -- sh -c \"/usr/local/bin/wavelet_device_relabel.sh\"
+	Restart=always
+	[Install]
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-device-relabel.service
+	systemctl --user daemon-reload
+	systemctl --user enable wavelet-device-relabel.service --now
+}
+
+clean_oldEncoderHostnameSettings(){
+	# Finds and cleans up any references in etcd to the old hostname
+	# First, disable all reset watchers so that the host isn't instructed to reboot the moment a flag changes!
+	systemctl --user disable wavelet-device-redetect.service --now
+	systemctl --user disable wavelet-encoder-reboot.service --now
+	systemctl --user disable wavelet_monitor_decoder_reboot.service --now
+	systemctl --user disable wavelet_monitor_decoder_reset.service --now
+	# Delete all reverse lookups, labels and hashes for this device
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del encoderlabel/$(oldHostName)
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del hostHash/$(oldHostName)
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del $(oldHostName)
+}
+
+clean_oldDecoderHostnameSettings(){
+	# Finds and cleans up any references in etcd to the old hostname
+	# First, disable all reset watchers so that the host isn't instructed to reboot the moment a flag changes!
+	systemctl --user disable wavelet-decoder-reset.service --now
+	systemctl --user disable wavelet_monitor_decoder_reveal.service --now
+	systemctl --user disable wavelet_monitor_decoder_reboot.service --now
+	systemctl --user disable wavelet_monitor_decoder_reset.service --now
+	systemctl --user disable wavelet_monitor_decoder_blank.service --now
+	# Delete all reverse lookups, labels and hashes for this device
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del hostLabel/$(oldHostName)
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del hostHash/$(oldHostName)
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del $(oldHostName)
+}
+
+clean_oldLivestreamHostnameSettings(){
+	# Finds and cleans up any references in etcd to the old hostname
+	# We'd be doing livestream specific stuff here, but since we haven't developed that feature this is just here as a placeholder
+	echo -e "\nRemoving and disabling services referring to his host's previous role as a livestreamer..\n"
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del livestreamlabel/$(oldHostName)
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del hostHash/$(oldHostName)
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del $(oldHostName)
+}
+
+clean_oldGatewayHostnameSettings(){
+	# Finds and cleans up any references in etcd to the old hostname
+	# We'd be doing gateway specific stuff here, but since we haven't developed that feature this is just here as a placeholder
+	# Delete all reverse lookups, labels and hashes for this device
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del gatewaylabel/$(oldHostName)
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del hostHash/$(oldHostName)
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del $(oldHostName)
+}
+
+clean_oldServerHostnameSettings(){
+	# Finds and cleans up any references in etcd to the old hostname
+	# The server has many more settings than any other device with the way the system currently works.
+	# This is also a silly function to have, but putting it here for completeness' sake.
+	# Delete all reverse lookups, labels and hashes for this device
+	echo -e "\nDeleting the server is quite a silly thing to do.\n"  
+	exit 0
 }
 
 # Execution order
