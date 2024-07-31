@@ -88,11 +88,11 @@ event_encoder(){
 		case ${encoderDeviceHash} in
 		(1)	echo "Blank screen activated, as set from controller."				;	exit 0
 		;;
-		(2)	echo "Seal image activated, as set from controller"				;	exit 0
+		(2)	echo "Seal image activated, as set from controller"					;	exit 0
 		;;
-		(T)	echo "Testcard generation activated, as set from controller"			;	exit 0
+		(T)	echo "Testcard generation activated, as set from controller"		;	exit 0
 		;;
-		(W)	echo "Four Panel split activated, attempting multidisplay swmix"		;	encoder_event_setfourway 
+		(W)	echo "Four Panel split activated, attempting multidisplay swmix"	;	encoder_event_setfourway 
 		;;
 		*)	echo -e "single dynamic input device, run code below:\m"			;	encoder_event_singleDevice
 		esac
@@ -102,8 +102,14 @@ event_encoder(){
 		KEYNAME="/hash/${encoderDeviceHash}"
 		read_etcd_global
 		if [ -n "${printvalue}" ]; then
-				echo -e "found in /hash/ - we have a local device\n"
-				encoderDeviceStringFull="${printvalue}"
+			echo -e "found in /hash/ - we have a local device\n"
+			case ${printvalue} in
+				$(hostname))    echo -e "\nThis device is attached to this encoder, proceeding\n"; 
+				;;
+				*)              echo -e "\nThis device is attached to a different encoder\n"    ;       exit 0
+				;;
+			esac
+			encoderDeviceStringFull="${printvalue}"
 			echo -e "\nDevice string ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash}\n"
 			printvalue=""
 			KEYNAME="${encoderDeviceStringFull}"
@@ -112,33 +118,42 @@ event_encoder(){
 			echo -e "\n Device input key $inputvar located for this device string, proceeding to set encoder parameters \n"
 			# For Audio we will select pipewire here
 			audiovar="-s pipewire"
+		else
+			echo -e "null string found in /hash/ - this is a network device\n"
+			KEYNAME="/network_shorthash/${encoderDeviceHash}"
+			read_etcd_global
+			if [ -n "${printvalue}" ]; then
+				echo -e "found in /network_shorthash/, proceeding..\n"
+				encoderDeviceStringFull="${printvalue}"
+				echo -e "\nDevice String ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash}\n"
+				printvalue=""
+				# Locate device hash in network_ip folder and return the device IP address
+				KEYNAME="/network_ip/${encoderDeviceHash}"
+				read_etcd_global
+				ipAddr=${printvalue}
+				# Locate input command from the IP value retreived above
+				KEYNAME="/network_uv_stream_command/${printvalue}"
+				read_etcd_global
+				# We have to check the NDI device for port changes because they do not seem stable..
+				if [[ "${printvalue}" == *"ndi"* ]]; then
+					echo -e "\nNDI Device in play, rescanning ports on IP Address ${ipAddr}..\n"
+					ndiIPAddr=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | awk '{print $5}')
+					inputvar="-t ndi:url=${ndiIPAddr}"
+					audiovar="-s embedded"
 				else
-						echo -e "null string found in /hash/ - this is a network device\n"
-						KEYNAME="/network_shorthash/${encoderDeviceHash}"
-						read_etcd_global
-						if [ -n "${printvalue}" ]; then
-								echo -e "found in /network_shorthash/, proceeding..\n"
-								encoderDeviceStringFull="${printvalue}"
-								echo -e "\nDevice String ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash}\n"
-								printvalue=""
-								# Locate device hash in network_ip folder
-								KEYNAME="/network_ip/${encoderDeviceHash}"
-								read_etcd_global
-								# Locate input command from the IP value retreived above
-								KEYNAME="/network_uv_stream_command/${printvalue}"
-								read_etcd_global
-								inputvar="-t ${printvalue}"
-								# For a network device we will try to use the embedded audio stream
-								audiovar="-s embedded"
-								# clear printvalue
-								printvalue=""
-						else
-								echo -e "not found in network_shorthash, we have an invalid selection, ending process..\n"
-								exit 0
-						fi
+					inputvar="-t ${printvalue}"
+					# Audio is not implemented in UltraGrid's RTSP yet, so we will just utilize pipewire here or have NO audio.
+					audiovar="-s pipewire"
 				fi
-				# Run common options here
-				/usr/local/bin/wavelet_textgen.sh
+				# clear printvalue
+				printvalue=""
+			else
+				echo -e "not found in network_shorthash, we have an invalid selection, ending process..\n"
+				exit 0
+			fi
+		fi
+	# Run common options here
+	/usr/local/bin/wavelet_textgen.sh
 	}
 	# Encoder SubLoop
 	# call uv_hash_select to process the provided device hash and select the input from these data
@@ -178,8 +193,8 @@ event_encoder(){
 	# can be used remote with this kind of tool (netcat) : echo 'capture.data 0' | busybox nc localhost <control_port>
 	# not using right now as different inputs have different formats.. may be problematic.
 	UGMTU="9000"
-		echo -e "Assembled command is: \n --tool uv $filtervar -f V:rs:200:250 --control-port 6160 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${inputvar} ${audiovar} -c ${encodervar} -P ${uv_videoport} -m ${UGMTU} ${destinationipv4} \n"
-		ugargs="--tool uv $filtervar --control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${inputvar} ${audiovar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}"
+	echo -e "Assembled command is: \n --tool uv $filtervar -f V:rs:200:250 --control-port 6160 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar}-c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4} \n"
+	ugargs="--tool uv $filtervar --control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}"
 	KEYNAME=UG_ARGS
 	KEYVALUE=${ugargs}
 	write_etcd
@@ -199,6 +214,8 @@ event_encoder(){
 	systemctl --user daemon-reload
 	systemctl --user restart UltraGrid.AppImage.service
 	echo -e "Encoder systemd units instructed to start..\n"
+	sleep 3
+	echo 'capture.data 3' | busybox nc -v 127.0.0.1 6160
 }
 
 # Main
