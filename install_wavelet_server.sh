@@ -3,6 +3,21 @@
 # This script bootstraps your initial wavelet server based upon input variables.
 # The server can run in authoritative mode for an isolated network, or subordinate mode if you are placing it on a network with an active DHCP server for instance.
 # It's generally designed to be run isolated and handle its own DHCP/DNS.
+
+for i in "$@"
+	do
+		case $i in
+			D)	echo -e "\nDev mode enabled, switching git tree to working branch\n."
+				developerMode="1"
+			;;
+			h)	echo -e "\nSimple command line switches:\n-D for developer mode, will clone git from ARMELVIL working branch for non-release features.\n"
+				exit 0
+			;;
+			*)	echo -e "\nBad input argument, ignoring"
+			;;
+		esac
+done
+
 echo -e "Is the target network configured with an active gateway, and are you prepared to deal with downloading approximately 4gb of initial files?"
 read -p "Continue? (Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit
 echo -e "Continuing, copying base ignition files for customization.."
@@ -115,6 +130,13 @@ customization(){
 	pubkey=$(cat wavelet.pub)
 	sed -i "s|PUBKEYGOESHERE|${pubkey}|g" ${INPUTFILES}
 	echo -e "Ignition customization completed, and .ign files have been generated."
+
+	if [[ ${developerMode} -eq "1" ]] then;
+		echo -e "\nInjecting dev branch into files..\n"
+		repl="https://raw.githubusercontent.com/Allethrium/wavelet/armelvil-working"
+		sed -i "s|https://github.com/Allethrium/wavelet/raw/master|${repl}|g" ${INPUTFILES}
+		sed -i "s|DEV_OFF|DEV_ON|g" ${INPUTFILES}
+	fi
 
 	# WiFi settings
 	# changed to mod ignition files w/ inline data for the scripts to call, this way I don't publish wifi secrets to github.
