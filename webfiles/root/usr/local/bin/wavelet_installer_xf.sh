@@ -41,7 +41,13 @@ event_server(){
 	chown -R wavelet:wavelet /home/wavelet
 	cd /home/wavelet
 	rpm_ostree_install_git
-	git clone https://github.com/ALLETHRIUM/wavelet
+	if [[ ! -f /var/tmp/DEV_ON ]]; then
+		echo -e "\n\n***WARNING***\n\nDeveloper Mode is ON\n\nCloning from development repository..\n"
+		git clone -b armelvil-working --single-branch https://github.com/ALLETHRIUM/wavelet	
+	else
+		echo -e "\nDeveloper Mode is off, cloning from main repository..\n"
+		git clone https://github.com/ALLETHRIUM/wavelet
+	fi
 	generate_tarfiles
 	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
 	extract_base
