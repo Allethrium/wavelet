@@ -4,7 +4,7 @@ $key = $_POST["key"];
 $value = $_POST["value"];
 
 function delete_host_labels($key) {
-	$prefixstring = "decoderlabel/$key";
+	$prefixstring = "/hostLabel/$key0";
 	$keyPrefix=base64_encode($prefixstring);
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, 'http://192.168.1.32:2379/v3/kv/deleterange');
@@ -22,8 +22,8 @@ function delete_host_labels($key) {
 	echo "$key removed from decoderlabel.";
 }
 
-function delete_hash_labels($key) {
-	$prefixstring = "hostHash/$key";
+function delete_hash_labels($value) {
+	$prefixstring = "/hostHash/$key";
 	$prefixstringplusOne = "$prefixstring" . "0";
 	$keyPrefix=base64_encode($prefixstring);
 	$keyPrefixPlusOneBit=base64_encode($prefixstringplusOne);
@@ -43,7 +43,7 @@ function delete_hash_labels($key) {
 }
 
 function delete_host_keys($key) {
-	$prefixstring = "$key";
+	$prefixstring = "/$key0";
 	$keyPrefix=base64_encode($prefixstring);
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, 'http://192.168.1.32:2379/v3/kv/deleterange');
@@ -61,7 +61,7 @@ function delete_host_keys($key) {
 	echo "$key removed from decoder state tracking.";
 }
 
-echo "Key received $key";
+echo "Key received: $key, Hash Value: $value";
 delete_host_labels($key);
 delete_hash_labels($value);
 delete_host_keys($key);
