@@ -12,7 +12,7 @@ read_etcd_global(){
 }
 
 read_etcd(){
-		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME} --print-value-only)
+		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME} --print-value-only)
 		echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
 }
 
@@ -42,12 +42,12 @@ UG_HOSTNAME=$(hostname)
 
 main() {
 # main thread, checks encoder restart flag in etcd
-	KEYNAME=encoder_restart
-	read_etcd_global
+	KEYNAME="encoder_restart"
+	read_etcd
 	if [[ "$printvalue" -eq 1 ]]; then
 		detect_self
 		if [[ "${self}" = "encoder" ]]; then		
-			systemctl --user restart restart run_ug.service
+			systemctl --user restart run_ug.service
 			echo -e "Encoder restart flag is enabled, restarting encoder.."
 		elif [[ "${self}" = "server" ]]; then
 			# we check whether an input device has been added via detectv4l.sh to this  server
