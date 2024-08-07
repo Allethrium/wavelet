@@ -10,12 +10,12 @@
 #Etcd Interaction
 ETCDENDPOINT=192.168.1.32:2379
 read_etcd(){
-		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME} --print-value-only)
+		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME} --print-value-only)
 		echo -e "Key Name $KEYNAME read from etcd for value $printvalue for host $(hostname)"
 }
 
 read_etcd_prefix(){
-		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix $(hostname)/${KEYNAME} --print-value-only)
+		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix /$(hostname)/${KEYNAME} --print-value-only)
 		echo -e "Key Name $KEYNAME read from etcd for value $printvalue for host $(hostname)"
 }
 
@@ -25,7 +25,7 @@ read_etcd_global(){
 }
 
 write_etcd(){
-		etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
+		etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
 		echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
 }
 
@@ -35,11 +35,11 @@ write_etcd_global(){
 }
 
 write_etcd_clientip(){
-		etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${KEYVALUE}"
+		etcdctl --endpoints=${ETCDENDPOINT} put /decoderip/$(hostname) "${KEYVALUE}"
 		echo -e "$(hostname) set to ${KEYVALUE} for Global value"
 }
 read_etcd_clients_ip() {
-		return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
+		return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix /decoderip/ --print-value-only)
 }
 
 event_encoder(){
@@ -57,7 +57,6 @@ event_encoder(){
 	KEYNAME=encoder_ip_address
 	KEYVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
 	write_etcd_global
-		
 	systemctl --user daemon-reload
 	systemctl --user enable watch_encoderflag.service --now
 	echo -e "now monitoring for encoder reset flag changes.. \n"
@@ -94,17 +93,18 @@ event_encoder(){
 		;;
 		(W)	echo "Four Panel split activated, attempting multidisplay swmix"	;	encoder_event_setfourway 
 		;;
-		*)	echo -e "single dynamic input device, run code below:\m"			;	encoder_event_singleDevice
+		*)	echo -e "single dynamic input device, run code below:\n"			;	encoder_event_singleDevice
 		esac
 	}
 
 	encoder_event_singleDevice(){
 		KEYNAME="/hash/${encoderDeviceHash}"
 		read_etcd_global
+		currentHostName=($hostname)
 		if [ -n "${printvalue}" ]; then
-			echo -e "found in /hash/ - we have a local device\n"
+			echo -e "found ${printvalue} in /hash/ - we have a local device\n"
 			case ${printvalue} in
-				$(hostname))    echo -e "\nThis device is attached to this encoder, proceeding\n"; 
+				${currentHostName}*)    echo -e "\nThis device is attached to this encoder, proceeding\n"; 
 				;;
 				*)              echo -e "\nThis device is attached to a different encoder\n"    ;       exit 0
 				;;
@@ -193,8 +193,8 @@ event_encoder(){
 	# can be used remote with this kind of tool (netcat) : echo 'capture.data 0' | busybox nc localhost <control_port>
 	# not using right now as different inputs have different formats.. may be problematic.
 	UGMTU="9000"
-	echo -e "Assembled command is: \n --tool uv $filtervar -f V:rs:200:250 --control-port 6160 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar}-c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4} \n"
-	ugargs="--tool uv $filtervar --control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}"
+	echo -e "Assembled command is:\n--tool uv $filtervar -f V:rs:200:250 --control-port 6160 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar}-c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4} \n"
+	ugargs="--tool uv $filtervar--control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4} --param control-accept-global"
 	KEYNAME=UG_ARGS
 	KEYVALUE=${ugargs}
 	write_etcd
