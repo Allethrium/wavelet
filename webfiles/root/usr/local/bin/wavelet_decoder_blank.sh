@@ -88,9 +88,9 @@ exit 0
 set -x
 exec >/home/wavelet/wavelet_blank_decoder.log 2>&1
 
-KEYNAME=$(hostname)/DECODER_BLANK
+KEYNAME=/$(hostname)/DECODER_BLANK
 read_etcd_global
-OLDKEYNAME=$(hostname)/DECODER_BLANK_PREV
+OLDKEYNAME=/$(hostname)/DECODER_BLANK_PREV
 read_etcd_oldkeyname
 	if [[ ${printvalue} == ${oldprintvalue} ]]; then
 		echo -e "\n Blank setting and previous blank setting match, the webpage has been refreshed, doing nothing..\n"
