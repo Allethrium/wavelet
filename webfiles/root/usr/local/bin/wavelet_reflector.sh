@@ -7,7 +7,7 @@
 ETCDURI=http://192.168.1.32:2379/v2/keys
 ETCDENDPOINT=192.168.1.32:2379
 read_etcd(){
-	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME})
+	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME})
 	echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
 }
 
@@ -17,7 +17,7 @@ read_etcd_global(){
 }
 
 write_etcd(){
-	etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
+	etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
 	echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
 }
 
@@ -27,16 +27,16 @@ write_etcd_global(){
 }
 
 write_etcd_clientip(){
-	etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${KEYVALUE}"
+	etcdctl --endpoints=${ETCDENDPOINT} put /decoderip/$(hostname) "${KEYVALUE}"
 	echo -e "$(hostname) set to ${KEYVALUE} for Global value"
 }
 read_etcd_clients_ip() {
-	return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
+	return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get "/decoderip/" --prefix --print-value-only)
 }
 read_etcd_clients_ip_sed() {
 	# We need this to manage the \n that etcd returns, 
 	# the above is useful for generating the reference text file but this is better for immediate processing.
-	processed_clients_ip=$(ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip --print-value-only | sed ':a;N;$!ba;s/\n/ /g')
+	processed_clients_ip=$(ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} get "/decoderip/" --prefix --print-value-only | sed ':a;N;$!ba;s/\n/ /g')
 }
 
 wavelet_reflector() {
@@ -68,7 +68,7 @@ wavelet_reflector() {
 		# v. 1.9.4 will introduce hd-rum-av which can handle both audio and video in the same reflector, so we can drop the second systemd unit.
 		# args="--tool hd-rum-av --control-port 6161 2M 5004 ${processed_clients_ip}"
 		# as of pre 1.9.5 release, --control-port appears to break hd-rum-transcode, so we will drop it for now.
-		ugargs="--tool hd-rum-multi 2M 5004 ${processed_clients_ip}"
+		ugargs="--tool hd-rum-transcode 2M 5004 ${processed_clients_ip}"
 		KEYVALUE="${ugargs}"
 		echo -e "Generating initial reflector clients list.."
 		echo "${return_etcd_clients_ip}" > /home/wavelet/reflector_clients_ip.txt
