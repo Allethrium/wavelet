@@ -47,7 +47,7 @@ exit 0
 set -x
 exec >/home/wavelet/wavelet_restart_decoder.log 2>&1
 
-KEYNAME=$(hostname)/DECODER_RESET
+KEYNAME=/$(hostname)/DECODER_RESET
 								read_etcd_global
 								if [[ "${printvalue}" == 1 ]]; then
 																echo -e "\nReset key is set to 1, continuing with task.. \n"
