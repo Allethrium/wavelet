@@ -135,7 +135,7 @@ ETCDURI=http://192.168.1.32:2379/v2/keys
 ETCDENDPOINT=192.168.1.32:2379
 ETCDCTL_API=3
 read_etcd(){
-		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME} --print-value-only)
+		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME} --print-value-only)
 		echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
 }
 
@@ -145,7 +145,7 @@ read_etcd_global(){
 }
 
 write_etcd(){
-		etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
+		etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
 		echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
 }
 
@@ -155,11 +155,11 @@ write_etcd_global(){
 }
 
 write_etcd_clientip(){
-		etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${KEYVALUE}"
+		etcdctl --endpoints=${ETCDENDPOINT} put /decoderip/$(hostname) "${KEYVALUE}"
 		echo -e "$(hostname) set to ${KEYVALUE} for Global value"
 }
 read_etcd_clients_ip() {
-		return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
+		return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix /decoderip/ --print-value-only)
 }
 
 
@@ -228,22 +228,29 @@ wavelet-dynamic() {
 	KEYNAME=uv_hash_select
 	read_etcd_global
 	controllerInputHash=${printvalue}
-	echo -e "\n \n Controller notified that input hash ${controllerInputHash} has been selected from webUI with the input label ${controllerInputLabel}, encoder restart commencing.. \n \n"
+	echo -e "\n\nController notified that input hash ${controllerInputHash} has been selected from webUI with the input label ${controllerInputLabel}, encoder restart commencing..\n\n"
 	# Kill existing streaming on the SERVER
-	systemctl --user stop UltraGrid.AppImage.service 
-	# Set encoder restart flag to 1
-	KEYNAME="encoder_restart"
+	systemctl --user stop UltraGrid.AppImage.service
+	# Set encoder restart flag to 1 for appropriate host
+	echo -e "${targetHost} encoder_restart flag set!\n"
+	targetHost=$(echo ${controllerInputLabel} | sed 's|\(.*\)/.*|\1|')
+	KEYNAME="/${targetHost}/encoder_restart"
 	KEYVALUE="1"
 	write_etcd_global
 	# Ensure input is set to 3 so we get the right selection out of the switcher.
 	# Because there are so many possibilities for video input sources, we're going to avoid using the switcher and stay with the old kill/restart method here.
 	KEYNAME=input_update
 	KEYVALUE="0"
-	echo -e "\n Task completed, resetting input_update key to 0.. \n"
+	echo -e "\n Task completed, reset input_update key to 0.. \n"
 	write_etcd_global
 	sleep 2
-	echo 'capture.data 3' | busybox nc -v 127.0.0.1 6160
+	# Set appropriate capture channel for running encoder
+	KEYNAME="/hostHash/${targetHost}/ipaddr"
+	read_etcd_global
+	echo -3 "\nAttempting to set switcher channel to new device for ${targetHost}..\n"
+	echo 'capture.data 3' | busybox nc -v ${printvalue} 6160
 }
+
 
 wavelet_foursplit() {
 	current_event="wavelet_foursplit"
@@ -508,8 +515,9 @@ wavelet-clear-inputs() {
 	etcdctl --endpoints=http://192.168.1.32:2379 del "interface" --prefix
 	etcdctl --endpoints=http://192.168.1.32:2379 del "/interface" --prefix
 	etcdctl --endpoints=http://192.168.1.32:2379 del "/hash" --prefix
-	etcdctl --endpoints=http://192.168.1.32:2379 del "/short" --prefix
+	etcdctl --endpoints=http://192.168.1.32:2379 del "/short_hash" --prefix
 	etcdctl --endpoints=http://192.168.1.32:2379 del "/long" --prefix
+	etcdctl --endpoints=http://192.168.1.32:2379 del "/$(hostname)/inputs" --prefix
 	echo -e "All interface devices and their configuration data, as well as labels have been deleted\n
 	Plugging in a new device will cause the detection module to run again.\n"
 }
