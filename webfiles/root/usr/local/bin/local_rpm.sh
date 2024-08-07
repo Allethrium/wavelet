@@ -1,5 +1,6 @@
 #!/bin/bash
 # Called as root because DNF needs superuser privileges, so must set perms after everything is completed.
+# DNF running on RPM-ostree currently broken, this step will not work until it's resolved.
 exec >/home/wavelet/local_rpm.log 2>&1
 echo -e "ensuring DNSmasq is operating and available.."
 systemctl enable dnsmasq.service --now
