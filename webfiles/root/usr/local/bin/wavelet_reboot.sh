@@ -27,7 +27,7 @@ ETCDENDPOINT=192.168.1.32:2379
 ETCDCTL_API=3
 
 event_decoder(){
-rebootflag=$(etcdctl --endpoints=192.168.1.32:2379 get $(hostname)/DECODER_REBOOT --print-value-only)
+rebootflag=$(etcdctl --endpoints=192.168.1.32:2379 get /$(hostname)/DECODER_REBOOT --print-value-only)
 if [[ "${rebootflag}" == 1 ]]; then
 		echo -e "\nSystem Reboot flag reset to 0\n\n\n\n***SYSTEM IS GOING DOWN FOR REBOOT IMMEDIATELY***\n\n\n"
 		# we wait 10 seconds so that the server has time to get out ahead and come back up before the decoders start doing anything.
@@ -57,7 +57,7 @@ systemctl reboot -i
 }
 
 event_other(){
-etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/DECODER_RESTART" -- "0"
+etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/DECODER_RESTART" -- "0"
 systemctl reboot -i
 }
 

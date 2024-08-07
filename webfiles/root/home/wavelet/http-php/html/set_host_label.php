@@ -9,7 +9,7 @@ $type = $_POST["type"]
 
 function curl_etcd($keyTarget, $keyValue) {
 		echo "Attempting to set $keyTarget for $keyValue";
-		$b64KeyTarget = base64_encode("hostlabel/$keyTarget");
+		$b64KeyTarget = base64_encode("$keyTarget");
 		$b64KeyValue = base64_encode($keyValue);
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, 'http://192.168.1.32:2379/v3/kv/put');

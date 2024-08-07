@@ -6,12 +6,12 @@ detect_self(){
 	UG_HOSTNAME=$(hostname)
 	# Create a hostname.local file in tmp so that nonprivileged users such as dnsmasq can tell who we are
 	hostname=$(hostname)
-	echo ${hostname} > /var/hostname.local
-	chmod 664 /var/hostname.local
-	chown root:root /var/hostname.local
+	echo ${hostname} > /var/tmp/hostname.local
+	chmod 664 /var/tmp/hostname.local
+	chown root:root /var/tmp/hostname.local
 	sed -i "s|!!hostnamegoeshere!!|${hostname}|g" /usr/local/bin/wavelet_network_sense.sh
 	# Check to see if hostname has changed since last reboot
-	if [[ ! -f /var/tmp/oldhostname.txt ]]; then
+	if [[ -f /var/tmp/oldhostname.txt ]]; then
 		check_hostname
 	fi
 	echo -e "Hostname is $UG_HOSTNAME \n"
@@ -42,17 +42,17 @@ check_hostname(){
 		detect_self
 	fi
 	case $oldHostName in
-	enc*) 					echo -e "\nI was an Encoder\n"					; clean_oldEncoderHostNameSettings
+	enc*) 					echo -e "\nI was an Encoder\n"					; clean_oldHostSettings ${oldHostname}
 	;;
 	decX.wavelet.local)		echo -e "\nI was an unconfigured Decoder\n"		; exit 0
 	;;
-	dec*)					echo -e "I was a Decoder \n"					; clean_oldDecoderHostnameSettings
+	dec*)					echo -e "I was a Decoder \n"					; clean_oldHostSettings ${oldHostname}
 	;;
-	livestream*)			echo -e "I was a Livestreamer \n"				; clean_oldLivestreamHostnameSettings
+	livestream*)			echo -e "I was a Livestreamer \n"				; clean_oldHostSettings ${oldHostname}
 	;;
-	gateway*)				echo -e "I was an input Gateway\n"  			; clean_oldGatewayHostnameSettings
+	gateway*)				echo -e "I was an input Gateway\n"  			; clean_oldHostSettings ${oldHostname}
 	;;
-	svr*)					echo -e "I was a Server. Proceeding..."			; clean_oldServerHostnameSettings
+	svr*)					echo -e "I was a Server. Proceeding..."			; clean_oldHostSettings ${oldHostname}
 	;;
 	*) 						echo -e "This device Hostname was not set appropriately, exiting \n" && exit 0
 	;;
@@ -63,12 +63,12 @@ check_hostname(){
 ETCDURI=http://192.168.1.32:2379/v2/keys
 ETCDENDPOINT=192.168.1.32:2379
 read_etcd(){
-		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME} --print-value-only)
+		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME} --print-value-only)
 		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
 }
 
 read_etcd_prefix(){
-		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix $(hostname)/${KEYNAME} --print-value-only)
+		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix /$(hostname)/${KEYNAME} --print-value-only)
 		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
 }
 
@@ -78,7 +78,7 @@ read_etcd_global(){
 }
 
 write_etcd(){
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
 		echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
 }
 
@@ -89,21 +89,20 @@ write_etcd_global(){
 
 write_etcd_clientip(){
 		# Variable changed to IPVALUE because the module was picking up incorrect variables and applying them to /decoderip !
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${IPVALUE}"
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /decoderip/$(hostname) "${IPVALUE}"
 		echo -e "decoderip/$(hostname) set to ${IPVALUE} for Global value"
 }
 read_etcd_clients_ip() {
-		ETCDCTL_API=3 return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
+		ETCDCTL_API=3 return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix /decoderip/ --print-value-only)
 }
 
-event_encoder_server(){
+event_encoder_server() {
 # Runs the server, then calls the encoder event.
 	if systemctl --user is-active --quiet wavelet_controller; then
 		echo -e "wavelet_controller service is running and watching for input events, continuing..."
 		event_encoder
 	else
-		echo -e "\n bringing up Wavelet controller service,
-		 and sleeping for five seconds to allow config to settle..."
+		echo -e "\n bringing up Wavelet controller service, and sleeping for five seconds to allow config to settle..."
 		systemctl --user start wavelet_init.service
 		sleep 5
 		echo -e "\n Running encoder..."
@@ -133,6 +132,8 @@ event_server(){
 
 event_encoder(){
 	# MOVED - Encoder is now self-contained service/script
+	# Registers self as a decoder in etcd for the reflector to query & include in its client args
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/$(hostname)/ipaddr" -- "${IPVALUE}"
 	echo -e "Calling wavelet_encoder systemd unit.."
 	systemctl --user daemon-reload
 	systemctl --user start wavelet_encoder.service
@@ -142,46 +143,24 @@ event_decoder(){
 	# Sleep for 5 seconds so we have a chance for the decoder to connect to the network
 	sleep 2
 	# Registers self as a decoder in etcd for the reflector to query & include in its client args
-	IPVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
-	# IP value MUST be populated or the decoder writes gibberish into the server
-	if [[ "${IPVALUE}" == "" ]] then
-			# sleep for five seconds, then call yourself again
-			echo -e "\nIP Address is null, sleeping and calling function again\n"
-			sleep 5
-			event_decoder
-		else
-			echo -e "\nIP Address is not null, testing for validity..\n"
-			valid_ipv4() {
-				local ip=$1 regex='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
-				if [[ $ip =~ $regex ]]; then
-					echo -e "\nIP Address is valid, continuing..\n"
-					return 0
-				else
-					echo "\nIP Address is not valid, sleeping and calling function again\n"
-					event_decoder
-				fi
-			}
-			valid_ipv4 "${IPVALUE}"
-	fi
 	sleep 1
 	write_etcd_clientip
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/$(hostname)/ipaddr" -- "${IPVALUE}"
 	# Ensure all reset, reveal and reboot flags are set to 0 so they are
 	# 1) populated
 	# 2) not active so the new device goes into a reboot/reset/reveal loop
 	KEYVALUE="0"
-	KEYNAME=$(hostname)/DECODER_RESET
+	KEYNAME="/$(hostname)/DECODER_RESET"
 	write_etcd_global
-	KEYNAME=$(hostname)/DECODER_REVEAL
+	KEYNAME="/$(hostname)/DECODER_REVEAL"
 	write_etcd_global
-	KEYNAME=$(hostname)/DECODER_REBOOT
+	KEYNAME="/$(hostname)/DECODER_REBOOT"
 	write_etcd_global
-	KEYNAME=$(hostname)/DECODER_BLANK
+	KEYNAME="/$(hostname)/DECODER_BLANK"
 	write_etcd_global
 	sleep 2
 	# The below will be used to generate error messages on screen, once I've written those components
 	# For now useful to track hostlabel generation properly and keep the UI synced.
-	KEYNAME="$(hostname)/decoderlabel"
+	KEYNAME="/$(hostname)/hostLabel"
 	read_etcd_global
 	echo -e "My device label is ${printvalue}\n"
 	deviceLabel=${printvalue}
@@ -195,7 +174,7 @@ event_decoder(){
 		else
 			echo -e "\nDevice label and reverse lookup label DO NOT MATCH,
 		 	reverting UI label in keystore and locally..\n"
-			KEYNAME="$(hostname)/decoderlabel"
+			KEYNAME="/$(hostname)/hostLabel"
 			KEYVALUE="${deviceHostHashLabel}"
 			write_etcd_global
 			echo "${deviceHostHashLabel}" > /home/wavelet/hostLabel.txt
@@ -208,7 +187,7 @@ event_decoder(){
 	# Note - ExecStartPre=-swaymsg workspace 2 is a failable command 
 	# It will always send the UG output to a second display.  
 	# If not connected the primary display will be used.
-	# Tries three possible GPU outputs in order of efficiency, before failing.
+	# Tries three possible GPU devices for acceleration in order of efficiency, before failing.
 	# If it crashes, you have hw/driver issues someplace or an improperly configured display env.
 		KEYNAME=UG_ARGS
 		ug_args="--tool uv -d vulkan_sdl2:fs:keep-aspect:nocursor:nodecorate -r pipewire"
@@ -326,6 +305,44 @@ event_reflector(){
 	echo "This feature is not yet implemented"
 }
 
+get_ipValue(){
+	# Gets the current IP address for this host to register into server etcd.
+	IPVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
+	# IP value MUST be populated or the decoder writes gibberish into the server
+	if [[ "${IPVALUE}" == "" ]] then
+			# sleep for five seconds, then call yourself again
+			echo -e "\nIP Address is null, sleeping and calling function again\n"
+			sleep 5
+			get_ipValue
+		else
+			echo -e "\nIP Address is not null, testing for validity..\n"
+			valid_ipv4() {
+				local ip=$1 regex='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
+				if [[ $ip =~ $regex ]]; then
+					echo -e "\nIP Address is valid, continuing..\n"
+					return 0
+				else
+					echo "\nIP Address is not valid, sleeping and calling function again\n"
+					get_ipValue
+				fi
+			}
+			valid_ipv4 "${IPVALUE}"
+	fi
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/$(hostname)/ipaddr" -- "${IPVALUE}"
+}
+
+clean_oldHostSettings(){
+	# Takes oldHostName as argument
+	# deletes etcd entries for this device, then calls build_ug to regenerate everything
+	# This is necessary because run_ug will not populate /hostLabel data for the webUI.  Only build_ug.sh will do this.
+	previousHostName=$1
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/$(previousHosName) --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostHash/$(previousHostName) --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /$(hostname} --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del $(hostname} --prefix
+	/usr/local/bin/build_ug.sh
+}
+
 ###
 #
 #
@@ -337,4 +354,5 @@ set -x
 exec >/home/wavelet/run_ug.log 2>&1
 echo -e "Pinging wavelet_detectv4l.sh to ensure any USB devices are detected prior to start.. \n"
 /usr/local/bin/wavelet_detectv4l.sh
+get_ipValue
 detect_self

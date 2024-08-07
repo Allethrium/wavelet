@@ -5,14 +5,11 @@
 # because the usb subsystem is locked until the rule execution is completed!
 # It will attempt to make sense of available v4l devices and update etcd
 # WebUI updates, and is updated from, many of these keys.
-# 11/21/2023	-	Device detection, relabeling and removal now works appropriately.
-# 12/05/2023	-	Need to make sure device labels are properly generated with hostname to support multiple encoders.
-# 12/06/2023	-	added detect_self to ensure we don't run device detection on incorrect devices.
 
 #Etcd Interaction
 ETCDENDPOINT=http://192.168.1.32:2379
 read_etcd(){
-		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME} --print-value-only)
+		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME} --print-value-only)
 		echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
 }
 
@@ -22,12 +19,12 @@ read_etcd_global(){
 }
 
 write_etcd(){
-		etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
+		etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
 		echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
 }
 
 write_etcd_inputs(){
-	etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/inputs${KEYNAME}" -- "${KEYVALUE}"
+	etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/inputs${KEYNAME}" -- "${KEYVALUE}"
 		echo -e "Set ${KEYVALUE} for /inputs/$(hostname)${KEYNAME}"
 }
 
@@ -37,11 +34,11 @@ write_etcd_global(){
 }
 
 write_etcd_clientip(){
-		etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${KEYVALUE}"
+		etcdctl --endpoints=${ETCDENDPOINT} put /decoderip/$(hostname) "${KEYVALUE}"
 		echo -e "$(hostname) set to ${KEYVALUE} for Global value"
 }
 read_etcd_clients_ip() {
-		return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
+		return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix /decoderip/ --print-value-only)
 }
 
 
@@ -129,7 +126,7 @@ set_device_input() {
 	echo -e "Attempting to set keyname ${deviceHash} for $(hostname)${device_string_long}"
 	KEYNAME="/hash/${deviceHash}"
 	# Stores the device data under hostname/inputs/device_string_long
-	KEYVALUE="$(hostname)/inputs${device_string_long}"
+	KEYVALUE="/$(hostname)/inputs${device_string_long}"
 	write_etcd_global
 	# notify watcher that input device configuration has changed
 	KEYNAME=new_device_attached
@@ -150,7 +147,6 @@ device_cleanup() {
 # Generate an associative array from etcd's /hash/ and /interface/ prefixes
 # It effectively shouldn't be possible for v4lArray to be longer than interfaceLongArray, if this is the case then something has gone wrong
 # This is because we should be cleaning up unused devices, and the pruning happens every time a device is plugged in, or a button is pressed.
-#
 declare -a interfaceLongArray=$(etcdctl --endpoints=${ETCDENDPOINT} get /long_interface/ --prefix --keys-only | sed 's/\/long_interface// ')
 	leftOversArray=(`printf '%s\n' "${interfaceLongArray[@]}" "${v4lArray[@]}" | sort | uniq -u`)
 	if (( ${#leftOversArray[@]} == 0 )); then
@@ -221,8 +217,9 @@ event_ipevo() {
 # each of these blocks contains specific configuration options that must be preset for each device in order for them to work.  
 # We will have to add to this over time to support more devices appropriately.
 # Specifically this camera supports MJPG so we will use that instead of YUYV for the capture pixel format
+# 08/07/24 - and today all of a sudden MJPG->native stopped working, so we are back to convertRBG...
 	echo -e "IPEVO Camera detection running..\n"
-	KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:device=${v4l_device_path}"
+	KEYVALUE="-t v4l2:codec=MJPG:convert=RGB:size=1920x1080:tpf=1/30:device=${v4l_device_path}"
 	KEYNAME=${device_string_long}
 	write_etcd_inputs
 	echo -e "\n Detection completed for IPEVO device.. \n \n \n \n"
@@ -230,7 +227,7 @@ event_ipevo() {
 }
 event_logitech_hdmi() {
 	KEYNAME=${device_string_long}
-	KEYVALUE="-t v4l2:codec=MJPEG:size=1920x1080:tpf=1/30:device=${v4l_device_path}"
+	KEYVALUE="-t v4l2:codec=MJPEG:convert=RGB:size=1920x1080:tpf=1/30:device=${v4l_device_path}"
 	write_etcd_inputs
 	echo -e "\n Detection completed for Logitech HDMI Capture device.. \n \n \n \n"
 	device_cleanup
@@ -253,7 +250,7 @@ event_epson() {
 }
 event_dellWB3023(){
 	echo -e "Setting up Dell WB3023 webcam..\n"
-	KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:device=${v4l_device_path}"
+	KEYVALUE="-t v4l2:codec=MJPG:size=640x480:tpf=1/30:device=${v4l_device_path}"
 		KEYNAME="${device_string_long}"
 	write_etcd_inputs
 	echo -e "\n Detection completed for device.. \n \n \n \n"
@@ -291,7 +288,7 @@ detect_self(){
 UG_HOSTNAME=$(hostname)
 	echo -e "Hostname is $UG_HOSTNAME \n"
 	case $UG_HOSTNAME in
-	enc*) 					echo -e "I am an Encoder, allowing device sense to proceed.. \n"; sense_devices
+	enc*) 					echo -e "I am an Encoder, allowing device sense to proceed.. \n"; encoder_checkNetwork 1
 	;;
 	decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.  An error has occurred at some point, and needs troubleshooting.\n Terminating process. \n"; exit 0
 	;;
@@ -306,6 +303,25 @@ UG_HOSTNAME=$(hostname)
 	*) 						echo -e "This device Hostname is not set approprately, I don't know what I am.  Exiting \n"; exit 0
 	;;
 	esac
+}
+
+encoder_checkNetwork(){
+	# Checks for a network connection, without this detection may proceed too quickly and devices may not populate
+	if [[ "$1" > 3 ]]; then
+		echo -e "\nThree repeat tries exceeded, there may be a network configuration issue.  Please troubleshoot\n"
+		touch /home/wavelet/NETWORK_ERROR_FLAG
+		exit 0
+	fi
+	ping -c 3 192.168.1.32
+	if [[ $? -eq 0 ]]; then
+		echo -e "\nOnline and connected to Wavelet Server, continuing..\n"
+		sense_devices
+	else
+		echo -e "\nNo network connection, device registration will be unsuccessful, sleeping for 5 seconds and trying again..\n"
+		sleep 5
+		let "$1=$1++"
+		encoder_checkNetwork 
+	fi
 }
 
 exec >/home/wavelet/detectv4l.log 2>&1

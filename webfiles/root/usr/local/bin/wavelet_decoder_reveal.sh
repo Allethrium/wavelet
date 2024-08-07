@@ -71,7 +71,7 @@ exit 0
 set -x
 exec >/home/wavelet/wavelet_reveal_decoder.log 2>&1
 
-KEYNAME=$(hostname)/DECODER_REVEAL
+KEYNAME=/$(hostname)/DECODER_REVEAL
 		read_etcd_global
 		if [[ "${printvalue}" == 1 ]]; then
 				echo -e "\ninput_update key is set to 1, continuing with task.. \n"

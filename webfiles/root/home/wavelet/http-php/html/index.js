@@ -34,27 +34,28 @@ function firstAjax(){
 
 function secondAjax(){
 // get dynamic hosts from etcd, and call createNewHost to generate entries and buttons for them.
-// returns:  Key (keyname), value (trimmed key = hostname), type (host type)
+// returns:  Key (keyname), type (host type), and makes one further call to get the host's hash value
 	$.ajax({
-				type: "POST",
-				url: "get_hosts.php",
-				dataType: "json",
-				success: function(returned_data) {
-						counter = 500;
-						console.log("JSON Hosts data received:");
-						console.log(returned_data);
-						returned_data.forEach(item => {
-										const functionIndex = 2;
-										var key	 = item['key'];
-										var value = item['value'];
-										var type = item['type'];
-										createNewHost(key, value, type);
-										})
-				},
-		complete: function(){
-			thirdAjax();
-		}
-		});
+		type: "POST",
+		url: "get_hosts.php",
+		dataType: "json",
+		success: function(returned_data) {
+			counter = 500;
+			console.log("JSON Hosts data received:");
+			console.log(returned_data);
+			returned_data.forEach(item => {
+				const functionIndex = 2;
+				var key		=	item['key'];
+				var type	=	item['type'];
+				var hostName	=	item['hostName'];
+				var hostHash	=	item['hostHash'];
+				createNewHost(key, type, hostName, hostHash);
+				})
+		},
+	complete: function(){
+		thirdAjax();
+	}
+	});
 }
 
 function thirdAjax(){
@@ -309,6 +310,204 @@ const callingFunction = (callback) => {
 	callback(this);
 };
 
+function createRenameButton(hostName, hostHash) {
+/* add rename button */
+	var $btn = $('<button/>', {
+		type: 'button',
+		text: 'Rename',
+		class: 'renameButton clickableButton',
+		id: 'btn_rename',
+	}).click(relabelHostElement);
+	return $btn;
+}
+
+function createDeleteButton(hostName, hostHash) {
+/* add delete button */
+	var $btn = $('<button/>', {
+		type: 'button',
+		text: 'Remove',
+		class: 'renameButton clickableButton',
+		id: 'btn_HostDelete',
+		}).click(function(){
+			console.log("Deleting host entry and associated key: " + hostName + "\nAnd Hash Value:" + hostHash);
+			$.ajax({
+				type: "POST",
+				url: "/remove_host.php",
+				data: {
+					key: hostName,
+					value: $(this).divDevID
+				},
+				success: function(response){
+					console.log(response);
+				}
+			})
+		})
+	return $btn;
+}
+
+function createIdentifyButton(hostName, hostHash) {
+/* add decoder Identify button */
+	var $btn = $('<button/>', {
+		type: 'button',
+		text: 'Identify Host (15s)',
+		class: 'renameButton clickableButton',
+		id: 'btn_identify'
+		}).click(function(){
+			console.log("Host instructed to reveal itself:" + hostName);
+			$(this).addClass('btn_active');
+			$.ajax({
+				type: "POST",
+				url: "/reveal_host.php",
+				data: {
+					key: hostName,
+					value: "1"
+					},
+			success: function(response){
+				console.log(response);
+			}
+		});
+	})
+return $btn;
+}
+
+
+function createRestartButton(hostName, hostHash) {
+/* add task restart button */
+	var $btn = $('<button/>', {
+		type: 'button',
+		text: 'Restart Codec Task',
+		class: 'renameButton clickableButton',
+		id: 'btn_restart'
+	}).click(function(){
+		console.log("Host instructed to restart UltraGrid task:" + hostName);
+		$.ajax({
+			type: "POST",
+			url: "/reset_host.php",
+			data: {
+				key: hostName,
+				value: "1"
+			},
+		success: function(response){
+			console.log(response);
+		}
+		});
+	})
+	return $btn;
+}
+
+function createRebootButton(hostName, hostHash) {
+/* add reboot button */
+	var $btn = $('<button/>', {
+		type: 'button',
+		text: 'Reboot Host',
+		class: 'renameButton clickableButton',
+		id: 'btn_reboot'
+		}).click(function(){
+			console.log("Host instructed to reboot!" + hostName);
+			$.ajax({
+				type: "POST",
+				url: "/reboot_host.php",
+				data: {
+					key: hostName,
+					value: "1"
+				},
+				success: function(response){
+					console.log(response);
+				}
+			});
+		})
+	return $btn;
+}
+	
+function createBlankButton(hostName, hostHash) {
+/* Add a client blank screen button */
+	var $btn = $('<button/>', {
+		type: 'button',
+		text: 'Blank Host',
+		class: 'blankButton',
+		id: 'btn_blank'
+		}).click(function(){
+			if ($(this).text() == "Blank Screen") {
+				console.log("Host instructed to blank screen:" + hostName);
+				$(this).text('Restore Screen')
+				$.ajax({
+					type: "POST",
+					url: "/set_blank_host.php",
+					data: {
+						key: hostName,
+						value: 1
+						},
+						success: function(response){
+							console.log(response);
+						}
+				});
+			} else {
+				console.log("Host instructed to restore display:" + hostName);
+				$.ajax({
+					type: "POST",
+					url: "/set_blank_host.php",
+					data: {
+						key: hostName,
+						value: 0
+						},
+					success: function(response){
+						console.log(response);
+					}
+				});
+				$(this).text('Blank Screen')
+				}
+				});
+	return $btn;
+}
+
+function createdecoderToencoderButton(hostName, hostHash) {
+/* Add a decoder -> encoder button */
+	var $btn = $('<button/>', {
+		type: 'button',
+		text: 'Enable Encoder',
+		class: 'encoderButton clickableButton',
+		id: 'btn_encoder'
+		}).click(function(){
+			console.log("Host instructed to perform necessary updates to turn into Encoder:" + hostName);
+			$.ajax({
+				type: "POST",
+				url: "/encoder_host.php",
+				data: {
+					key: hostName,
+					value: "1"
+				},
+				success: function(response){
+					console.log(response);
+				}
+			});
+		})
+	return $btn;
+}
+
+function createencoderTodecoderButton(hostName, hostHash) {
+/* Add a encoder -> decoder button */
+	var $btn = $('<button/>', {
+		type: 'button',
+		text: 'Disable Encoder',
+		class: 'decoderButton clickableButton',
+		id: 'btn_decoder'
+		}).click(function(){
+			console.log("Host instructed to remove Encoder capabilities:" + hostName);
+			$.ajax({
+				type: "POST",
+				url: "/decoder_host.php",
+				data: {
+					key: hostName,
+					value: "1"
+				},
+			success: function(response){
+				console.log(response);
+			}
+			});
+	})
+	return $btn;
+}
+
 function createNewButton(key, value, keyFull, functionIndex) {
 	var divEntry		=	document.createElement("Div");
 	var dynamicButton 	= 	document.createElement("Button");
@@ -390,7 +589,8 @@ function createNewButton(key, value, keyFull, functionIndex) {
 	counter++;
 }
 
-function createNewHost(key, value, type) {
+function createNewHost(key, type, hostName, hostHash, functionIndex) {
+	console.log("Supplied data-\nKey:" + key + "\nType:" +type + "\nHostname:" + hostName + "\nHash:" + hostHash);
 	// Creates a host div entry, and populates it with appropriate control buttons
 	var divEntry                            =               document.createElement("Div");
 	var dynamicButton                       =               document.createElement("Button");
@@ -405,330 +605,126 @@ function createNewHost(key, value, type) {
 	var labelEntry                          =               document.createElement("Div");
 	var labelDiv                            =               document.createElement("Div");
 	var getLabelHostName                    =               0;
-	const divHostName                       =               document.createTextNode(value);
-	const divHostType                       =               document.createTextNode(type);
-	const divHostKey                        =               document.createTextNode(key);
+	var divHostName				=               document.createTextNode(hostName);
+	var divHostHash				=				document.createTextNode(hostHash);
+	var divHostType                         =               document.createTextNode(type);
+	var divHostKey                          =               document.createTextNode(key);
 	const id                                =               document.createTextNode(counter + 1);
 	/* create a div container, where the button, relabel button and any other associated elements reside */
+	divEntry.setAttribute("divDeviceHostName", hostName);
+	divEntry.setAttribute("divHostType", type);
+	divEntry.setAttribute("divDeviceLabel", hostName);
+	divEntry.setAttribute("deviceLabel", hostName);
+	divEntry.setAttribute("divDevID", id);
+	divEntry.setAttribute("divDeviceHash", hostHash);
+	divEntry.classList.add("host_divider");
+        /* a subdiv with a text label */
+        function createLabelDiv(hostName, hostHash){
+                var labelEntry                  =               document.createElement("Div");
+                var labelText                   =               document.createTextNode(hostName);
+                labelEntry.classList.add("dynamicHostDiv");
+                labelEntry.innerHTML = ("Device:  " + hostName);
+                labelEntry.id = hostHash;
+                labelEntry.style.display = "inline-block";
+                labelEntry.style.marginRight = "20px";
+                divEntry.appendChild(labelEntry);
+        }
+
+	function createDecoderButtonSet(hostName, hostHash){
+		$(divEntry).append("<input type='text' class='hostTextBox' data-hash="+hostHash+">");
+		$(".hostTextBox").val(hostName);
+		$(".hostTextBoc").click(function() {
+		var textboxValue = $('#textBox').val(); // get value of your input box
+			$.ajax({
+				url : 'your-php-script.php',
+				type :'post',
+				data:{
+					hash: $(this).data("hash")
+				},
+				success : function(response) {
+				console.log(response);
+				}
+			});
+		});
+		/* $(divEntry).append(createLabelDiv(hostName)); */
+		$(divEntry).append(createRenameButton());
+		$(divEntry).append(createDeleteButton()); 
+		$(divEntry).append(createRestartButton());
+		$(divEntry).append(createRebootButton());
+		$(divEntry).append(createIdentifyButton());
+		$(divEntry).append(createBlankButton(key));
+		$(divEntry).append(createdecoderToencoderButton(hostHash));
+	}
+
+	function createEncoderButtonSet(hostName, hostHash){
+        	$(divEntry).append(createLabelDiv(hostName));
+	        $(divEntry).append(createRenameButton());
+	        $(divEntry).append(createDeleteButton());
+	        $(divEntry).append(createRestartButton());
+	        $(divEntry).append(createRebootButton());
+	        $(divEntry).append(createencoderTodecoderButton(hostHash));
+	}
+
+	function createServerButtonSet(hostName, hostHash){
+        	$(divEntry).append(createLabelDiv(hostName));
+	        $(divEntry).append(createRestartButton());
+	        $(divEntry).append(createRebootButton());
+	}
+
+	function createGatewayButtonSet(hostName, hostHash){
+        	$(divEntry).append(createLabelDiv(hostName));
+	        $(divEntry).append(createRenameButton());
+	        $(divEntry).append(createDeleteButton());
+	        $(divEntry).append(createRestartButton());
+	        $(divEntry).append(createRebootButton());
+	        $(divEntry).append(createIdentifyButton());
+	        $(divEntry).append(createBlankButton(hostHash));
+	}
+
+	function createLivestreamButtonSet(hostName, hostHash){
+	        $(divEntry).append(createLabelDiv(hostName));
+	        $(divEntry).append(createRenameButton());
+	        $(divEntry).append(createDeleteButton());
+	        $(divEntry).append(createRestartButton());
+	        $(divEntry).append(createRebootButton());
+	        $(divEntry).append(createIdentifyButton());
+	        $(divEntry).append(createBlankButton(hostHash));
+	}
+
 	switch(type) {
 		case 'dec':
 			console.log("This is a decoder host");
 			dynamicdecHosts.innerHTML       =       'Decoders';
 			dynamicdecHosts.appendChild(divEntry);
-			createDecoderButtonSet();
+			console.log("Calling decoder button set with options:\n" + hostName + "\n" + hostHash + "\n" + divEntry);
+			createDecoderButtonSet(hostName, hostHash, divEntry);
 			break;
 		case 'enc':
 			console.log("This is an encoder host");
 			dynamicencHosts.innerHTML       =       'Encoders';
 			dynamicencHosts.appendChild(divEntry);
-			createEncoderButtonSet();
+			createEncoderButtonSet(hostName, hostHash);
 			break;
 		case 'svr':
 			console.log("This is a Server");
 			dynamicsvrHosts.innerHTML       =       'Servers';
 			dynamicsvrHosts.appendChild(divEntry);
-			createServerButtonSet();
+			createServerButtonSet(hostName, hostHash);
 			break;
 		case 'gtwy':
 			console.log("This is a gateway host");
 			dynamicgtwyHosts.innerHTML      =       'Gateways';
 			dynamicgtwyHosts.appendChild(divEntry);
-			createGatewayButtonSet();
+			createGatewayButtonSet(hostName, hostHash);
 			break;
 			case 'lvstrm':
 			console.log("This is a livestream host");
 			dynamiclvstrmHosts.innerHTML    =       'Livestream Hosts';
 			dynamiclvstrmHosts.appendChild(divEntry);
-			createLivestreamButtonSet();
+			createLivestreamButtonSet(hostName, hostHash);
 			break;
 	}
-		divEntry.setAttribute("divDeviceHostName", key);
-		divEntry.setAttribute("deviceLabel", value);
-		divEntry.setAttribute("divDevID", value);
-		divEntry.classList.add("host_divider");
-		console.log("dynamic Host divider created for device hostname: " + key +" with label/value: " + value);
-		/* add rename button */
-		function createRenameButton() {
-				var $btn = $('<button/>', {
-								type: 'button',
-								text: 'Rename',
-								class: 'renameButton clickableButton',
-								id: 'btn_rename',
-				}).click(relabelHostElement);
-		return $btn;
-		}
-				/* add delete button */
-		//      Create a remove button
-		function createDeleteButton() {
-				var $btn = $('<button/>', {
-								type: 'button',
-								text: 'Remove',
-								class: 'renameButton clickableButton',
-								id: 'btn_HostDelete'
-				}).click(function(){
-					console.log("Deleting host entry and associated keys: " + key + " and hash value: " + value);
-					$.ajax({
-						type: "POST",
-						url: "/remove_host.php",
-						data: {
-							key: key,
-							value: value
-							},
-						success: function(response){
-						console.log(response);
-						//location.reload(true);
-						//$(this).parent().remove();
-						}
-					});
-				})
-			return $btn;
-		}
-		/* add decoder Identify button */
-		function createIdentifyButton() {
-				var $btn = $('<button/>', {
-								type: 'button',
-								text: 'Identify Host (15s)',
-								class: 'renameButton clickableButton',
-								id: 'btn_identify'
-				}).click(function(){
-						// Log action, add button active class, post via AJAX to PHP
-						console.log("Host instructed to reveal itself:" + key + "," + value);
-						$(this).addClass('btn_active');
-						$.ajax({
-								type: "POST",
-								url: "/reveal_host.php",
-								data: {
-										key: key,
-										value: "1"
-										},
-								success: function(response){
-								console.log(response);
-										}
-						});
-				})
-				return $btn;
-		}
-		/* add task restart button */
-		function createRestartButton() {
-				var $btn = $('<button/>', {
-								type: 'button',
-								text: 'Restart Codec Task',
-								class: 'renameButton clickableButton',
-								id: 'btn_restart'
-				}).click(function(){
-						console.log("Host instructed to restart UltraGrid task:" + key + "," + value);
-						$.ajax({
-								type: "POST",
-								url: "/reset_host.php",
-								data: {
-										key: key,
-										value: "1"
-										},
-								success: function(response){
-								console.log(response);
-										}
-						});
-
-				})
-				return $btn;
-		}
-		/* add decoder reboot button */
-		function createRebootButton() {
-				var $btn = $('<button/>', {
-								type: 'button',
-								text: 'Reboot Host',
-								class: 'renameButton clickableButton',
-								id: 'btn_reboot'
-				}).click(function(){
-						console.log("Host instructed to reboot:" + key);
-						$.ajax({
-								type: "POST",
-								url: "/reboot_host.php",
-								data: {
-										key: key,
-										value: "1"
-										},
-								success: function(response){
-								console.log(response);
-										}
-						});
-
-				})
-				return $btn;
-		}
-		/* a subdiv with a text label */
-		function createLabelDiv(value){
-				var labelEntry                  =               document.createElement("Div");
-				var labelText                   =               document.createTextNode(value);
-				labelEntry.classList.add("dynamicInputButtonLabelDiv");
-				labelEntry.innerHTML = ("Device: " + value);
-				labelEntry.id = value;
-				labelEntry.style.display = "inline-block";
-				labelEntry.style.marginRight = "20px";
-				divEntry.appendChild(labelEntry);
-				// This event listener monitors for DOM Nodes inserted
-				// UNDER $dynamicHosts, and checks for .dynamicCheckBox
-				// Effectively it sets the initial status of the blank function
-				// on element creation
-		}
-				/* add a blank button */
-				function createBlankButton(key) {
-				console.log('setting all hosts OFF blank mode');
-				// have to do this because JS seems to be a real mess with AJAX async calls and I couldn't get anything useful out of state detection..
-				// wrong tools for the wrong job? 
-				console.log("Host instructed to restore display:" + key);
-					$.ajax({
-						type: "POST",
-						url: "/set_blank_host.php",
-						data: {
-							key: key,
-							value: 0
-							},
-						success: function(response){
-							console.log(response);
-							}
-					});
-				console.log('hostname is: ' + key);
-				var buttonText = "Blank Screen";
-				var $btn = $('<button/>', {
-						type: 'button',
-						text: buttonText,
-						class: 'blankButton',
-						id: 'btn_blank'
-					});
-				$btn.click(function(){
-					if ($(this).text() == "Blank Screen") {
-						console.log("Host instructed to blank screen:" + key);
-						$(this).removeClass("active hover");
-						$(this).toggleClass("active");
-						$(this).text('Restore Screen')
-						$.ajax({
-							type: "POST",
-							url: "/set_blank_host.php",
-							data: {
-								key: key,
-								value: 1
-								},
-							success: function(response){
-								console.log(response);
-							}
-						});
-					} else {
-						console.log("Host instructed to restore display:" + key);
-						$.ajax({
-							type: "POST",
-							url: "/set_blank_host.php",
-							data: {
-								key: key,
-								value: 0
-								},
-						success: function(response){
-							console.log(response);
-							}
-						});
-						$(this).toggleClass('active');
-						$(this).text('Blank Screen')
-									}
-				});
-			console.log("Requested text string is:" + buttonText);
-			$btn.text(`${buttonText}`);
-			return $btn;
-		}
-		/* Add a decoder -> encoder button */
-		function createdecoderToencoderButton() {
-				var $btn = $('<button/>', {
-								type: 'button',
-								text: 'Enable Encoder',
-								class: 'encoderButton clickableButton',
-								id: 'btn_encoder'
-				}).click(function(){
-						console.log("Host instructed to perform necessary updates to turn into Encoder:" + key);
-						$.ajax({
-								type: "POST",
-								url: "/encoder_host.php",
-								data: {
-										key: key,
-										value: "1"
-										},
-								success: function(response){
-								console.log(response);
-										}
-						});
-
-				})
-				return $btn;
-		}
-		/* Add a encoder -> decoder button */
-		function createencoderTodecoderButton() {
-				var $btn = $('<button/>', {
-								type: 'button',
-								text: 'Disable Encoder',
-								class: 'decoderButton clickableButton',
-								id: 'btn_decoder'
-				}).click(function(){
-						console.log("Host instructed to remove Encoder capabilities:" + key);
-						$.ajax({
-								type: "POST",
-								url: "/decoder_host.php",
-								data: {
-										key: key,
-										value: "1"
-										},
-								success: function(response){
-								console.log(response);
-										}
-						});
-
-				})
-				return $btn;
-		}
-		// add button elements
-		function createDecoderButtonSet(){
-			// decoder has full suite + a promote button to enable encoder functionality.
-			$(divEntry).append(createLabelDiv(value));
-			$(divEntry).append(createRenameButton());
-			$(divEntry).append(createDeleteButton());
-			$(divEntry).append(createRestartButton());
-			$(divEntry).append(createRebootButton());
-			$(divEntry).append(createIdentifyButton());
-			$(divEntry).append(createBlankButton(key));
-			$(divEntry).append(createdecoderToencoderButton(key));
-		}
-		function createEncoderButtonSet(){
-			// encoder doesn't need blank or ID, gets a demote button to make it a decoder again.
-			$(divEntry).append(createLabelDiv(value));
-			$(divEntry).append(createRenameButton());
-			$(divEntry).append(createDeleteButton());
-			$(divEntry).append(createRestartButton());
-			$(divEntry).append(createRebootButton());
-			$(divEntry).append(createencoderTodecoderButton(key));				
-		}
-		function createServerButtonSet(){
-			// server doesn't blank/ID or perform decoder functions
-			$(divEntry).append(createLabelDiv(value));
-			$(divEntry).append(createRestartButton());
-			$(divEntry).append(createRebootButton());
-		}
-		function createGatewayButtonSet(){
-			// probably unnecessary but adding as placeholder
-			$(divEntry).append(createLabelDiv(value));
-			$(divEntry).append(createRenameButton());
-			$(divEntry).append(createDeleteButton());
-			$(divEntry).append(createRestartButton());
-			$(divEntry).append(createRebootButton());
-			$(divEntry).append(createIdentifyButton());
-			$(divEntry).append(createBlankButton(key));
-		}
-		function createLivestreamButtonSet(){
-			// this is basically a dedicated decoder -> ffmpeg box
-			$(divEntry).append(createLabelDiv(value));
-			$(divEntry).append(createRenameButton());
-			$(divEntry).append(createDeleteButton());
-			$(divEntry).append(createRestartButton());
-			$(divEntry).append(createRebootButton());
-			$(divEntry).append(createIdentifyButton());
-			$(divEntry).append(createBlankButton(key));			
-		}
+	console.log("dynamic Host divider created for device type: " + type + " hostname: " + hostName + " with hash: " + hostHash);
 }
 
 function sendPHPID(event) {
@@ -785,11 +781,11 @@ function relabelHostElement(label) {
 											console.log("the found hostname is: " + selectedDivHost);
 		var targetElement			=		$(this).parent().attr('deviceLabel');
 											console.log("the associated host label is: " +targetElement);
-		var devType					=       $(this).parent().attr('divHostType');		
+		var devType					=       $(this).parent().attr('divHostType');
 		const oldGenText			=       $(this).parent().attr('deviceLabel');
 		const newTextInput			=		prompt("Enter new text label for this device:");
 		console.log("Device old label is: " + oldGenText);
-		console.log("New Host label is: " + newTextInput);
+		console.log("New device label is: " +newTextInput);
 		if (newTextInput !== null && newTextInput !== "") {
 		document.getElementById(targetElement).innerText = newTextInput;
 		document.getElementById(targetElement).oldGenText = oldGenText;
@@ -805,6 +801,7 @@ function relabelHostElement(label) {
 				success: function(response){
 						console.log(response);
 						location.reload(true);
+						console.log('Task submitted successfully, Wavelet will attempt to change the target hostname and reboot the device now..');
 				}
 				});
 	} else {
@@ -842,7 +839,7 @@ function applyAudioBlueToothSettings() {
 				type: "POST",
 				url: "/set_bluetooth_mac.php",
 				data: {
-						key: "audio_interface_bluetooth_mac",
+						key: 'audio_interface_bluetooth_mac',					
 						btMAC: btMACValue
 						},
 				success: function(response){
