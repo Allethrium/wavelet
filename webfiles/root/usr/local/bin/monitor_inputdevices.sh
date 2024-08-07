@@ -11,12 +11,12 @@ read_etcd_global() {
 }
 
 read_etcd() {
-        printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME} --print-value-only)
+        printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME} --print-value-only)
         echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
 }
 
 read_etcd_input_prefix() {
-		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/interface/)
+		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/interface/)
 }
 
 write_etcd_global() {
