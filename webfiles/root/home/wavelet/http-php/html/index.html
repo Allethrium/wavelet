@@ -19,7 +19,7 @@ Static Video Inputs<div id="static_inputs_section_inner" class="input_divider_in
 </div></div>
 
 
-<div id="audio_section" class="input_divider">
+<div id="audio_section" class="audio_divider">
 Audio Controls (wip)
 <br>Toggle Audio <label class="switch" id="audio_toggle"><input type ="checkbox" id="audio_toggle_checkbox"><span class="slider round"></span></label>
 <br>
@@ -40,22 +40,23 @@ Wavelet will currently override this if a new video input device is selected!
 If bluetooth is configured, it will become the default audio output device.
 <div><label for="btMAC">Bluetooth MAC Address:</label>
 <input type="text" id="btMAC" name="btMAC">&ensp;
-<button onclick="applyAudioBlueToothSettings()" id="btApplyButton" class="btApplyButton" type="button">Apply</button><br></div>
+<button onclick="applyAudioBlueToothSettings()" id="btApplyButton" class="btApplyButton" type="button">Apply</button><br>
 </p>
 </details>
 </div>
 </div></div>
 </div>
 
-
 <div id="dynamic_inputs" class="input_divider">
 Video Sources<br>
 <button id="RD" class="inputButton inputStaticButtons" value="RD" type="button">Refresh Video Sources</button><br>
-<div id="dynamicInputs" div class="dynamicInputsTarget" div title="dynamically populated inputs for local devices, or devices attached to a wavelet encoder device."></div>
-<div id="dynamicNetworkInputs" div class="dynamicInputsTarget" div title="dynamically populated inputs for vendor network devices, such as supported IP cameras."></div>
-<br>Toggle Banner <label class="switch" id="banner_toggle"><input type ="checkbox" id="banner_toggle_checkbox"><span class="slider round"></span></label>
-</div>
 
+<div id="dynamicInputs" div class="dynamicInputsTarget" div title="dynamically populated inputs for local devices, or devices attached to a wavelet encoder device.">Local Input Devices<br></div>
+<br>
+<div id="dynamicNetworkInputs" div class="dynamicInputsTarget" div title="dynamically populated inputs for vendor network devices, such as supported IP cameras.">Network Input Devices<br></div>
+<br>
+Toggle Banner<label class="switch" id="banner_toggle"><input type ="checkbox" id="banner_toggle_checkbox"><span class="slider round"></span></label>
+</div>
 
 <div id="multiple_inputs_section" class="input_divider">
 <div id="multiple_inputs_inner" class="input_divider_inner">
@@ -65,14 +66,13 @@ Video Sources<br>
 </p>
 </details>
 </div></div></div>
-<div id="Host control" class="host_divider">Detected Wavelet Hosts<br>
-<div id="dynamicdecHosts" div class="dynamicHostsTarget"></div>
-<div id="dynamicencHosts" div class="dynamicHostsTarget"></div>
-<div id="dynamicsvrHosts" div class="dynamicHostsTarget"></div>
-<div id="dynamicgtwyHosts" div class="dynamicHostsTarget"></div>
-<div id="dynamiclvstrmHosts" div class="dynamicHostsTarget"></div>
+<div id="Host control" class="input_divider">Detected Wavelet Hosts<br>
+<div id="dynamicdecHosts" div class="host_type_divider">Decoders</div>
+<div id="dynamicencHosts" div class="host_type_divider">Encoders</div>
+<div id="dynamicsvrHosts" div class="host_type_divider">Servers</div>
+<div id="dynamicgtwyHosts" div class="host_type_divider"></div>
+<div id="dynamiclvstrmHosts" div class="host_type_divider"></div>
 </div>
-
 
 <div id="Advanced Settings" class="settings_divider">
 <details><summary>Advanced Settings<span class="icon"></span></summary>
@@ -95,7 +95,6 @@ Toggle Livestreaming <label class="switch" id="lstoggle">
 <button onclick="applyLivestreamSettings()" id="lsApplyButton" class="lsApplyButton" type="button">Apply</button><br>
 </p>
 </details>
-</div>
 </div>
 <div id="codecs_section" class="input_divider">
 <div id="codecs_section_inner" class="input_divider_inner">
@@ -125,6 +124,7 @@ Toggle Livestreaming <label class="switch" id="lstoggle">
 </div>
 </p>
 </details>
+</div>
 </div>
 
 
