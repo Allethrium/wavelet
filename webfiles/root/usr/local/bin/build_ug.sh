@@ -204,6 +204,8 @@ event_server(){
 		server_bootstrap
 	fi
 	event_generateHash svr
+	# Server always also provisions as an encoder!
+	event_encoder
 	event_reboot
 }
 
@@ -332,7 +334,7 @@ event_reboot(){
 	Wants=network-online.target
 	[Service]
 	Environment=ETCDCTL_API=3
-	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch \"SYSTEM_REBOOT\" -w simple -- sh -c \"/usr/local/bin/wavelet_reboot.sh\"
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch SYSTEM_REBOOT -w simple -- sh -c \"/usr/local/bin/wavelet_reboot.sh\"
 	Restart=on-failure
 	RestartSec=2
 	[Install]
@@ -344,7 +346,7 @@ event_reboot(){
 	Wants=network-online.target
 	[Service]
 	Type=simple
-	ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch $(hostname)/DECODER_REBOOT -w simple -- sh -c \"/usr/local/bin/wavelet_reboot.sh\"
+	ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch /$(hostname)/DECODER_REBOOT -w simple -- sh -c \"/usr/local/bin/wavelet_reboot.sh\"
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_monitor_decoder_reboot.service
 
@@ -362,7 +364,7 @@ event_reset(){
 	Wants=network-online.target
 	[Service]
 	Environment=ETCDCTL_API=3
-	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch \"SYSTEM_RESET\" -w simple -- sh -c "/usr/local/bin/wavelet_reset.sh"
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch SYSTEM_RESET -w simple -- sh -c "/usr/local/bin/wavelet_reset.sh"
 	Restart=always
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-reset.service
@@ -374,7 +376,7 @@ event_reset(){
 	Wants=network-online.target
 	[Service]
 	Type=simple
-	ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch $(hostname)/DECODER_RESET -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_reset.sh\"
+	ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/DECODER_RESET -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_reset.sh\"
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_monitor_decoder_reset.service
 
@@ -391,7 +393,7 @@ event_reveal(){
 	Wants=network-online.target
 	[Service]
 	Type=simple
-	ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch $(hostname)/DECODER_REVEAL -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_reveal.sh\"
+	ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/DECODER_REVEAL -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_reveal.sh\"
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_monitor_decoder_reveal.service
 	systemctl --user daemon-reload
@@ -406,7 +408,7 @@ event_blankhost(){
 	Wants=network-online.target
 	[Service]
 	Type=simple
-	ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch $(hostname)/DECODER_BLANK -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_blank.sh\"
+	ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/DECODER_BLANK -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_blank.sh\"
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_monitor_decoder_blank.service
 	systemctl --user daemon-reload
@@ -422,7 +424,7 @@ event_encoder_reboot(){
 	Wants=network-online.target
 	[Service]
 	Environment=ETCDCTL_API=3
-	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch \"SYSTEM_REBOOT\" -w simple -- sh -c \"/usr/local/bin/wavelet_reboot.sh\"
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/SYSTEM_REBOOT -w simple -- sh -c \"/usr/local/bin/wavelet_reboot.sh\"
 	Restart=always
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-encoder-reboot.service
@@ -440,7 +442,7 @@ event_decoder_reset(){
 	Wants=network-online.target
 	[Service]
 	Environment=ETCDCTL_API=3
-	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch $(hostname)/DECODER_RESET -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_reset.sh\"
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/DECODER_RESET -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_reset.sh\"
 	Restart=always
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-decoder-reset.service
@@ -497,13 +499,14 @@ event_generateHash(){
 		# Might need to do something more intelligent here..rn it's just sha256ing hostname+all partitions..
 		PARTUUID=$(get_os_partition_uuid)
 		echo -e "device hostname is: $(hostname)"
-		hostHash=$(echo "$PARTUUID, $(hostname)" | sha256sum)
+		# we no longer use the hostname here because the hostname now changes when the device is relabeled!
+		hostHash=$(echo "${PARTUUID}" | sha256sum)
 		echo -e "generated device hash: $hostHash \n"
 		# Check for pre-existing keys here
-		labelexists=$(ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} get /hostHash/$(hostname)/label --print-value-only)
-		if [[ -z "${labelexists}" || ${#labelexists} -le 1 ]] then
-			echo -e "\nLabel value is null, or less than one char, continuing\n"
-			echo -e "\n Label value was set to ${labelexists} \n"
+		hashExists=$(ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} get "/hostHash/${hostHash}" --print-value-only)
+		if [[ -z "${hashExists}" || ${#hashExists} -le 1 ]] then
+			echo -e "\nHash value is null, or less than one char, continuing\n"
+			echo -e "\nHash value was set to ${hashExists} \n"
 			# Populate what will initially be used as the label variable from the webUI
 			case ${1} in
 				enc*)			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/$(hostname)/type -- enc
@@ -521,11 +524,12 @@ event_generateHash(){
 			esac
 		# And the reverse lookup for the device
 		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostHash/$(hostname)/Hash -- ${hostHash}
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostHash/${hostHash} -- $(hostname)
 		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /$(hostname)/Hash -- ${hostHash}
 		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostHash/$(hostname)/label -- $(hostname)
 		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostHash/$(hostname)/ipaddr -- ${KEYVALUE}
 		else
-			echo -e "\nLabel value exists as ${labelexists}\nXcoder already populated, doing nothing and moving to run_ug.."
+			echo -e "\nHash value exists as /hosthHash/${hashExists}, this means the device is already populated, or has not been removed cleanly.  Doing nothing and moving to run_ug.."
 			:
 		fi
 }
@@ -539,7 +543,7 @@ event_device_redetect(){
 	Wants=network-online.target
 	[Service]
 	Environment=ETCDCTL_API=3
-	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch \"DEVICE_REDETECT\" -w simple -- sh -c \"/usr/local/bin/wavelet_device_redetect.sh\"
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch DEVICE_REDETECT -w simple -- sh -c \"/usr/local/bin/wavelet_detectv4l.sh\"
 	Restart=always
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-device-redetect.service
@@ -556,7 +560,7 @@ event_host_relabel_watcher(){
 	Wants=network-online.target
 	[Service]
 	Environment=ETCDCTL_API=3
-	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch $(hostname)/RELABEL -w simple -- sh -c \"/usr/local/bin/wavelet_device_relabel.sh\"
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/RELABEL -w simple -- sh -c \"/usr/local/bin/wavelet_device_relabel.sh\"
 	Restart=always
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-device-relabel.service
