@@ -36,7 +36,7 @@ UG_HOSTNAME=$(hostname)
 
 
 event_server(){
-echo -e "\n Controller Called, checking input key and acting accordingly..\n"
+echo -e "\nController Called, checking input key and acting accordingly..\n"
 # Now called by etcd so inputting standard values to etcd would overwrite everything every time an event happened.  
 # These are populated by wavelet_init.sh
 main
@@ -205,6 +205,7 @@ wavelet-seal() {
 	cd /home/wavelet/
 	# We now use the switcher for simple things
 	echo 'capture.data 1' | busybox nc -v 127.0.0.1 6160
+	echo -e "\nSEAL image activated from server encoder..\n"
 }
 
 wavelet-testcard() {
@@ -228,29 +229,35 @@ wavelet-dynamic() {
 	KEYNAME=uv_hash_select
 	read_etcd_global
 	controllerInputHash=${printvalue}
-	echo -e "\n\nController notified that input hash ${controllerInputHash} has been selected from webUI with the input label ${controllerInputLabel}, encoder restart commencing..\n\n"
+	echo -e "\nController notified that input hash ${controllerInputHash} has been selected from webUI with the input label ${controllerInputLabel}, encoder restart commencing..\n"
 	# Kill existing streaming on the SERVER
 	systemctl --user stop UltraGrid.AppImage.service
-	# Set encoder restart flag to 1 for appropriate host
-	echo -e "${targetHost} encoder_restart flag set!\n"
 	targetHost=$(echo ${controllerInputLabel} | sed 's|\(.*\)/.*|\1|')
-	KEYNAME="/${targetHost}/encoder_restart"
-	KEYVALUE="1"
-	write_etcd_global
-	# Ensure input is set to 3 so we get the right selection out of the switcher.
-	# Because there are so many possibilities for video input sources, we're going to avoid using the switcher and stay with the old kill/restart method here.
-	KEYNAME=input_update
-	KEYVALUE="0"
-	echo -e "\n Task completed, reset input_update key to 0.. \n"
-	write_etcd_global
-	sleep 2
-	# Set appropriate capture channel for running encoder
-	KEYNAME="/hostHash/${targetHost}/ipaddr"
-	read_etcd_global
-	echo -3 "\nAttempting to set switcher channel to new device for ${targetHost}..\n"
-	echo 'capture.data 3' | busybox nc -v ${printvalue} 6160
+	echo -e "Target host name is ${targetHost}"
+	# Check to see if we're running a non-UltraGrid network input device
+	if [[ ${targetHost} == *"/network_short"* ]]; then
+		echo -e "\nTarget Hostname isn't a wavelet device, it's a network device..\n"
+		echo -e "\nSkipping Input update and capture channel flags..\n"
+	else
+		# Set encoder restart flag to 1 for appropriate host
+		echo -e "${targetHost} encoder_restart flag set!\n"
+		KEYNAME="/${targetHost}/encoder_restart"
+		KEYVALUE="1"
+		write_etcd_global
+		# Ensure input is set to 3 so we get the right selection out of the switcher.
+		KEYNAME=input_update
+		KEYVALUE="0"
+		echo -e "\n Task completed, reset input_update key to 0.. \n"
+		write_etcd_global
+		sleep 2
+		# Set appropriate capture channel for running encoder
+		KEYNAME="/hostHash/${targetHost}/ipaddr"
+		read_etcd_global
+		targetIP=${printvalue}
+		echo -3 "\nAttempting to set switcher channel to new device for ${targetHost}..\n"
+		echo 'capture.data 3' | busybox nc -v ${targetIP} 6160
+	fi
 }
-
 
 wavelet_foursplit() {
 	current_event="wavelet_foursplit"
