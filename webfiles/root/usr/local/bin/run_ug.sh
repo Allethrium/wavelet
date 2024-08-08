@@ -5,13 +5,15 @@
 detect_self(){
 	UG_HOSTNAME=$(hostname)
 	# Create a hostname.local file in tmp so that nonprivileged users such as dnsmasq can tell who we are
-	hostname=$(hostname)
-	echo ${hostname} > /var/tmp/hostname.local
-	chmod 664 /var/tmp/hostname.local
-	chown root:root /var/tmp/hostname.local
-	sed -i "s|!!hostnamegoeshere!!|${hostname}|g" /usr/local/bin/wavelet_network_sense.sh
+	# we aren't allowed to write to /var/tmp..
+	#hostname=$(hostname)
+	#echo ${hostname} > /var/tmp/hostname.local
+	#chmod 664 /var/tmp/hostname.local
+	#chown root:root /var/tmp/hostname.local
+	#sed -i "s|!!hostnamegoeshere!!|${hostname}|g" /usr/local/bin/wavelet_network_sense.sh
+	
 	# Check to see if hostname has changed since last reboot
-	if [[ -f /var/tmp/oldhostname.txt ]]; then
+	if [[ -f /home/wavelet/oldhostname.txt ]]; then
 		check_hostname
 	fi
 	echo -e "Hostname is $UG_HOSTNAME \n"
@@ -35,8 +37,8 @@ detect_self(){
 
 check_hostname(){
 	# Get the old hostname from the file, then remove it because it's not necessary until the hostname is changed again.
-	oldHostName=$(echo /var/tmp/oldhostname.txt)
-	rm -rf /var/tmp/oldhostname.txt
+	oldHostName=$(echo /home/wavelet/oldhostname.txt)
+	rm -rf /home/wavelet/oldhostname.txt
 	if [[ "${oldHostName}" == "$(hostname)" ]]; then
 		echo -e "\nOld hostname is the same as the current hostname!  Doing nothing.\n"
 		detect_self
@@ -128,12 +130,12 @@ event_server(){
 		 sets default video settings and clears previous settings! \n"
 		systemctl --user start wavelet_init.service
 	fi
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/$(hostname)/ipaddr" -- "${IPVALUE}"
 }
 
 event_encoder(){
 	# MOVED - Encoder is now self-contained service/script
 	# Registers self as a decoder in etcd for the reflector to query & include in its client args
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/$(hostname)/ipaddr" -- "${IPVALUE}"
 	echo -e "Calling wavelet_encoder systemd unit.."
 	systemctl --user daemon-reload
 	systemctl --user start wavelet_encoder.service
@@ -168,7 +170,7 @@ event_decoder(){
 	read_etcd_global
 	deviceHostHashlabel=${printvalue}
 	echo -e "The reverse lookup label is ${printvalue}\n"
-	if [[ "${deviceLabel}" == "${deviceHostHashlabel}" ]] then
+	if [[ "${deviceLabel}" == "${deviceHostHashlabel}" ]]; then
 			echo -e "\nDevice label and reverse lookup label match, continuing\n"
 			echo "${deviceLabel}" > /home/wavelet/hostLabel.txt
 		else
@@ -334,12 +336,13 @@ get_ipValue(){
 clean_oldHostSettings(){
 	# Takes oldHostName as argument
 	# deletes etcd entries for this device, then calls build_ug to regenerate everything
-	# This is necessary because run_ug will not populate /hostLabel data for the webUI.  Only build_ug.sh will do this.
-	previousHostName=$1
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/$(previousHosName) --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostHash/$(previousHostName) --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /$(hostname} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del $(hostname} --prefix
+	# This is necessary because run_ug will not populate /hostLabel or /hostHash data for the webUI.  Only build_ug.sh will do this.
+	previousHostName="${1}"
+	echo -e "\nCleaning old hostname settings for ${previousHostName}\n"
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/$(previousHostName) --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/$(previousHostName) --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /$(hostname) --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del $(hostname) --prefix
 	/usr/local/bin/build_ug.sh
 }
 
