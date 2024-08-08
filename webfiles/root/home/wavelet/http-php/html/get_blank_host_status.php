@@ -29,7 +29,7 @@ function poll_etcd_inputs($keyPrefix) {
 
 // modify these strings if you want to get a different key prefix out of etcd.  For Wavelet, there's no reason to change them.
 // test string $prefixstring = "decELP0.wavelet.local/DECODER_BLANK";
-$prefixstring = "$hostName/DECODER_BLANK";
+$prefixstring = "/$hostName/DECODER_BLANK";
 $keyPrefix=base64_encode($prefixstring);
 poll_etcd_inputs($keyPrefix);
 ?>
