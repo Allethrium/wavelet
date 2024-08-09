@@ -139,6 +139,7 @@ storage:
     # Define system performance settings
     - path: /etc/sysctl.d/90-sysrq.conf
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           kernel.sysrq = 0
