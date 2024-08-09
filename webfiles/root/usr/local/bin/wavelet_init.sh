@@ -6,7 +6,7 @@
 
 ETCDENDPOINT=192.168.1.32:2379
 read_etcd(){
-	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME} --print-value-only)
+	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME} --print-value-only)
 	echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
 }
 
@@ -16,7 +16,7 @@ read_etcd_global(){
 }
 
 write_etcd(){
-	etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
+	etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
 	echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
 }
 
@@ -26,18 +26,18 @@ write_etcd_global(){
 }
 
 write_etcd_clientip(){
-	etcdctl --endpoints=${ETCDENDPOINT} put /decoderip/$(hostname) "${KEYVALUE}"
+	etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${KEYVALUE}"
 	echo -e "$(hostname) set to ${KEYVALUE} for Global value"
 }
 read_etcd_clients_ip() {
-	return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get "/decoderip/" --prefix --print-value-only)
+	return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
 }
 
 
 event_init_codec() {
 	KEYNAME=uv_encoder
 	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:threads=0:bitrate=8M"
-	write_etcd_global
+	write_etcd
 	echo -e "Default LibX265 activated, bitrate 8M\n"
 }
 
@@ -45,7 +45,7 @@ event_init_av1() {
 	KEYNAME=uv_encoder
 	KEYVALUE="libavcodec:encoder=libaom-av1:usage=realtime:cpu-used=8:safe"
 	write_etcd_global
-	echo -e "Default libaom_av1 activated, bitrate managed via codec\n"     
+	echo -e "Default libaom_av1 activated, bitrate controlled by codec\n"     
 }
 
 event_init_seal(){
@@ -80,7 +80,7 @@ event_init_seal(){
 	# Destination IP is the IP address of the UG Reflector
 	destinationipv4="192.168.1.32"
 	UGMTU="9000"
-    ugargs="--tool uv $filtervar --control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}"
+	ugargs="--tool uv $filtervar --control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}"
 	KEYNAME=UG_ARGS
 	KEYVALUE=${ugargs}
 	write_etcd
@@ -136,4 +136,6 @@ systemctl --user enable UltraGrid.Reflector.service --now
 event_init_av1
 systemctl --user restart wavelet_reflector.service --now
 systemctl --user enable wavelet_controller.service --now
+# Attempt to connect to a cached bluetooth audio output device
+/usr/local/bin/wavelet_set_bluetooth_connect.sh
 event_init_seal
