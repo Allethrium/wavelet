@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 # This forms the basis of an init script when the server starts and run_ug.sh is called to determine the system type
@@ -6,7 +7,7 @@
 
 ETCDENDPOINT=192.168.1.32:2379
 read_etcd(){
-	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/${KEYNAME} --print-value-only)
+	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME} --print-value-only)
 	echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
 }
 
@@ -16,7 +17,7 @@ read_etcd_global(){
 }
 
 write_etcd(){
-	etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
+	etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
 	echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
 }
 
@@ -26,11 +27,11 @@ write_etcd_global(){
 }
 
 write_etcd_clientip(){
-	etcdctl --endpoints=${ETCDENDPOINT} put decoderip/$(hostname) "${KEYVALUE}"
+	etcdctl --endpoints=${ETCDENDPOINT} put /decoderip/$(hostname) "${KEYVALUE}"
 	echo -e "$(hostname) set to ${KEYVALUE} for Global value"
 }
 read_etcd_clients_ip() {
-	return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --print-value-only)
+	return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix /decoderip/ --print-value-only)
 }
 
 
