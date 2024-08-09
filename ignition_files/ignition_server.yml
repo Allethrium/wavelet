@@ -28,7 +28,7 @@ storage:
       mode: 0755
       overwrite: true
       contents:
-        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.4/UltraGrid-1.9.5-x86_64.AppImage
+        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.5/UltraGrid-1.9.5-x86_64.AppImage
     # WiFi WiFi Name
     - path: /var/home/wavelet/wifi_ssid
       overwrite: true
@@ -197,6 +197,7 @@ storage:
     # Define system performance settings
     - path: /etc/sysctl.d/90-sysrq.conf
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           kernel.sysrq = 0
