@@ -54,8 +54,8 @@ client_networks(){
 			if [[ SN > 28 ]]; then
 					echo -e "Subnet mask is too small for a Wavelet system, we need at least 32 host IP's to be available!"
 			elif [[ SN < 24 ]]; then
-					echo -e "Subnet mask seems very large - please note this system would work best on a more isolated network in authoritative mode! \n
-							effective operation cannot be guaranteed when taking into account issues on larger networks with congestion, security appliances etc. \n"
+					echo -e "Subnet mask seems very large - please note this system would work best on a more isolated network in authoritative mode!\n
+							effective operation cannot be guaranteed when taking into account issues on larger networks with congestion, security appliances etc.\n"
 			else
 					echo -e "Subnet mask selected, continuing.."
 					hostname_domain
@@ -117,7 +117,7 @@ customization(){
 	
 	repl=$(cat rootpw.secure)
 	sed -i "s|waveletrootpassword|${repl}|g" ${INPUTFILES}
-		echo -e "Root password hash injected .. \n" 
+	echo -e "Root password hash injected..\n" 
 	echo -e "root pw injected..\n"
 	
 	repl=$(cat waveletpw.secure)
@@ -132,7 +132,7 @@ customization(){
 	echo -e "Ignition customization completed, and .ign files have been generated."
 
 	if [[ "${developerMode}" -eq "1" ]]; then
-		echo -e "\nInjecting dev branch into files..\n"
+		echo -e "Injecting dev branch into files..\n"
 		repl="https://raw.githubusercontent.com/Allethrium/wavelet/armelvil-working"
 		sed -i "s|https://github.com/Allethrium/wavelet/raw/master|${repl}|g" ${INPUTFILES}
 		sed -i "s|DEV_OFF|DEV_ON|g" ${INPUTFILES}
@@ -141,10 +141,10 @@ customization(){
 	# WiFi settings
 	# changed to mod ignition files w/ inline data for the scripts to call, this way I don't publish wifi secrets to github.
 	INPUTFILES="server_custom.yml encoder_custom.yml decoder_custom.yml"
-	echo -e "Moving on to WiFi settings..\n"
-	echo -e "If your Wifi AP hasn't yet been configured, please do so now, as the installer will wait for your input..\n"
-	read -p "Please input the SSID of your configured wireless network: " wifi_ssid
-	read -p "Please input the first three elements of the WiFi BSSID / MAC address, colon delimited like so AA:BB:CC ... " wifi_bssid
+	echo -e "Moving on to WiFi settings"
+	echo -e "If your Wifi AP hasn't yet been configured, please do so now, as the installer will wait for your input"
+	read -p "\nPlease input the SSID of your configured wireless network: " wifi_ssid
+	read -p "Please input the first three elements of the WiFi BSSID / MAC address, colon delimited like so AA:BB:CC:" wifi_bssid
 	read -p "Please input the configured password for your WiFi SSID: " wifi_password
 
 		repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_ssid}")
