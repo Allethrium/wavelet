@@ -162,8 +162,14 @@ event_encoder(){
 	event_reboot
 	event_reset
 	etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/wavelet_build_completed" -- "${KEYVALUE}"
-	event_generateHash enc
 	hostname=$(hostname)
+	# We need to add this switch here to ensure if we're a server we don't populate ourselves to the encoders DOM in the webUI..
+	if [[ ${hostname} == *"enc"* ]]; then
+		event_generateHash enc
+	else
+		# generateHash was already called from the server event function.
+		:
+	fi
 	systemctl --user stop watch_encoderflag.service
 	echo -e '[Unit]
 	Description=Watches etcd for encoder restart
