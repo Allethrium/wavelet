@@ -131,7 +131,7 @@ customization(){
 	sed -i "s|PUBKEYGOESHERE|${pubkey}|g" ${INPUTFILES}
 	echo -e "Ignition customization completed, and .ign files have been generated."
 
-	if [[ ${developerMode} -eq "1" ]] then;
+	if [[ "${developerMode}" -eq "1" ]]; then
 		echo -e "\nInjecting dev branch into files..\n"
 		repl="https://raw.githubusercontent.com/Allethrium/wavelet/armelvil-working"
 		sed -i "s|https://github.com/Allethrium/wavelet/raw/master|${repl}|g" ${INPUTFILES}
