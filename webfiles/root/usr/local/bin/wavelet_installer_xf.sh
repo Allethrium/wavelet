@@ -8,15 +8,15 @@ systemctl --user daemon-reload
 UG_HOSTNAME=$(hostname)
 	echo -e "Hostname is $UG_HOSTNAME \n"
 	case $UG_HOSTNAME in
-	enc*) 					echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."			;	event_encoder
+	enc*)                   echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."            ;   event_encoder
 	;;
-	decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.  Randomizing my hostname, and rebooting"	;	event_decoder 
+	decX.wavelet.local)     echo -e "I am a Decoder, but my hostname is generic.  Randomizing my hostname, and rebooting"   ;   event_decoder 
 	;;
-	dec*)					echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."				;	event_decoder
+	dec*)                   echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."              ;   event_decoder
 	;;
-	svr*)					echo -e "I am a Server. Proceeding..."  														;	event_server
+	svr*)                   echo -e "I am a Server. Proceeding..."                                                          ;   event_server
 	;;
-	*) 						echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
+	*)                      echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
 	;;
 	esac
 }
@@ -43,7 +43,7 @@ event_server(){
 	rpm_ostree_install_git
 	if [[ ! -f /var/tmp/DEV_ON ]]; then
 		echo -e "\n\n***WARNING***\n\nDeveloper Mode is ON\n\nCloning from development repository..\n"
-		git clone -b armelvil-working --single-branch https://github.com/ALLETHRIUM/wavelet	
+		git clone -b armelvil-working --single-branch https://github.com/ALLETHRIUM/wavelet 
 	else
 		echo -e "\nDeveloper Mode is off, cloning from main repository..\n"
 		git clone https://github.com/ALLETHRIUM/wavelet
@@ -176,14 +176,14 @@ install_decklink(){
 	ARG KERNEL_VERSION
 
 	RUN dnf install -y \
-	    git \
-	    make
+		git \
+		make
 
 	WORKDIR /home
 
 	# Get the kernel-headers
 	RUN KERNEL_XYZ=$(echo ${KERNEL_VERSION} | cut -d"-" -f1) && \
-  	KERNEL_DISTRO=$(echo ${KERNEL_VERSION} | cut -d"-" -f2 | cut -d"." -f-2) && \
+	KERNEL_DISTRO=$(echo ${KERNEL_VERSION} | cut -d"-" -f2 | cut -d"." -f-2) && \
 	KERNEL_ARCH=$(echo ${KERNEL_VERSION} | cut -d"-" -f2 | cut -d"." -f3) && \
 	dnf install -y \
 	https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-${KERNEL_VERSION}.rpm \
@@ -213,70 +213,81 @@ install_decklink(){
 
 	# Commit to ostree
 	RUN rpm-ostree install strace && rm -rf /var/cache && \
-  	ostree container commit
+	ostree container commit
 }
 
 install_ug_depends(){
 	# This is lifted from the UltraGrid project with a couple of tweaks for CoreOS/my purposes
 	# It builds dependencies for;
-	#	Cineform
-	#	libAJA to support AJA capture cards
-	#	Live555 for rtmp
-	#	LibNDI for Magewell devices
-
-		cd /home/wavelet
-		# CineForm SDK
-        git clone --depth 1 https://github.com/gopro/cineform-sdk
-        cd cineform-sdk
-        git apply "$curdir/0001-CMakeList.txt-remove-output-lib-name-force-UNIX.patch"
-        mkdir build && cd build
-        cmake -DBUILD_TOOLS=OFF
-        cmake --build . --parallel "$(nproc)"
-        sudo cmake --install .
-        cd /home/wavelet
-        #Install libAJA Library
-        git clone --depth 1 https://github.com/aja-video/libajantv2.git
-        # export MACOSX_DEPLOYMENT_TARGET=10.13 # needed for arm64 mac
-        cmake -DAJANTV2_DISABLE_DEMOS=ON  -DAJANTV2_DISABLE_DRIVER=ON \
-        -DAJANTV2_DISABLE_TOOLS=ON  -DAJANTV2_DISABLE_TESTS=ON \
-        -DAJANTV2_DISABLE_PLUGINS=ON  -DAJANTV2_BUILD_SHARED=ON \
-        -DCMAKE_BUILD_TYPE=Release -Blibajantv2/build -Slibajantv2
-        cmake --build libajantv2/build --config Release -j "$(nproc)"
-        sudo cmake --install libajantv2/build
-        # Live555
-        git clone --depth 1 https://github.com/xanview/live555/
-        cd live555
-		./genMakefiles linux-with-shared-libraries
-        make -j "$(nproc)"
-        make -C live555 install
-        # LibNDI
-        # Lifted from https://github.com/DistroAV/DistroAV/blob/master/CI/libndi-get.sh
-        mkdir -p /home/wavelet/libNDI
-        cd /home/wavelet/libNDI   
-        LIBNDI_INSTALLER_NAME="Install_NDI_SDK_v6_Linux"
-        LIBNDI_INSTALLER="$LIBNDI_INSTALLER_NAME.tar.gz"
-        LIBNDI_INSTALLER_URL=https://downloads.ndi.tv/SDK/NDI_SDK_Linux/$LIBNDI_INSTALLER
-        download_libndi(){
-        curl -L $LIBNDI_INSTALLER_URL -f --retry 5 > "/home/wavelet/libNDI/$LIBNDI_INSTALLER"
-        # Check if download was successful
-		if [ $? -ne 0 ]; then
-    		echo "Download failed."
-		fi
-		echo "Download complete."
-		}
-		download_libndi
-		tar -xzvf "/home/wavelet/libNDI/$LIBNDI_INSTALLER"
-		yes | PAGER="cat" sh $LIBNDI_INSTALLER_NAME.sh
-		cp -P /home/wavelet/libNDI/NDI\ SDK\ for\ Linux/lib/x86_64-linux-gnu/* /usr/local/lib/
-		ldconfig
-		ln -s /usr/local/lib/libndi.so.6 /usr/local/lib/libndi.so.5
-		chown -R wavelet:wavelet /home/wavelet/libNDI
-		echo -e "\nLibNDI Installed..\n"
+	#   Cineform
+	#   libAJA to support AJA capture cards
+	#   Live555 for rtmp
+	#   LibNDI for Magewell devices
+	cd /home/wavelet
+	# CineForm SDK
+	git clone --depth 1 https://github.com/gopro/cineform-sdk
+	cd cineform-sdk
+	git apply "$curdir/0001-CMakeList.txt-remove-output-lib-name-force-UNIX.patch"
+	mkdir build && cd build
+	cmake -DBUILD_TOOLS=OFF
+	cmake --build . --parallel "$(nproc)"
+	sudo cmake --install .
+	cd /home/wavelet
+	#Install libAJA Library
+	git clone --depth 1 https://github.com/aja-video/libajantv2.git
+	# export MACOSX_DEPLOYMENT_TARGET=10.13 # needed for arm64 mac
+	cmake -DAJANTV2_DISABLE_DEMOS=ON  -DAJANTV2_DISABLE_DRIVER=ON \
+	-DAJANTV2_DISABLE_TOOLS=ON  -DAJANTV2_DISABLE_TESTS=ON \
+	-DAJANTV2_DISABLE_PLUGINS=ON  -DAJANTV2_BUILD_SHARED=ON \
+	-DCMAKE_BUILD_TYPE=Release -Blibajantv2/build -Slibajantv2
+	cmake --build libajantv2/build --config Release -j "$(nproc)"
+	sudo cmake --install libajantv2/build
+	# Live555
+	git clone --depth 1 https://github.com/xanview/live555/
+	cd live555
+	./genMakefiles linux-with-shared-libraries
+	make -j "$(nproc)"
+	make -C live555 install
+	# LibNDI
+	# Lifted from https://github.com/DistroAV/DistroAV/blob/master/CI/libndi-get.sh
+	mkdir -p /home/wavelet/libNDI
+	cd /home/wavelet/libNDI   
+	LIBNDI_INSTALLER_NAME="Install_NDI_SDK_v6_Linux"
+	LIBNDI_INSTALLER="$LIBNDI_INSTALLER_NAME.tar.gz"
+	LIBNDI_INSTALLER_URL=https://downloads.ndi.tv/SDK/NDI_SDK_Linux/$LIBNDI_INSTALLER
+	download_libndi(){
+	curl -L $LIBNDI_INSTALLER_URL -f --retry 5 > "/home/wavelet/libNDI/$LIBNDI_INSTALLER"
+	# Check if download was successful
+	if [ $? -ne 0 ]; then
+		echo "Download failed."
+	fi
+	echo "Download complete."
+	}
+	download_libndi
+	tar -xzvf "/home/wavelet/libNDI/$LIBNDI_INSTALLER"
+	yes | PAGER="cat" sh $LIBNDI_INSTALLER_NAME.sh
+	cp -P /home/wavelet/libNDI/NDI\ SDK\ for\ Linux/lib/x86_64-linux-gnu/* /usr/local/lib/
+	ldconfig
+	ln -s /usr/local/lib/libndi.so.6 /usr/local/lib/libndi.so.5
+	chown -R wavelet:wavelet /home/wavelet/libNDI
+	echo -e "\nLibNDI Installed..\n"
 }
+
+####
+#
+# Main
+#
+####
+
 
 # Perhaps add a checksum to make sure nothing's been tampered with here..
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 systemctl disable zincati.service --now
+# Unlock RPM ostree persistently across reboots, needed for the weird library linking we are doing here and MAY sidestep the decklink issue.
+ostree admin unlock --hotfix
 set -x
 exec >/home/wavelet/wavelet_installer.log 2>&1
+
+
 detect_self
+
