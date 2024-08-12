@@ -301,7 +301,7 @@ storage:
          Wants=network-online.target
          [Service]
          Type=simple
-         ExecStart=/usr/local/bin/wavelet_init.sh
+         ExecStart=/usr/bin/sh -c "/usr/local/bin/wavelet_init.sh"
          [Install]
          WantedBy=default.target
       user:

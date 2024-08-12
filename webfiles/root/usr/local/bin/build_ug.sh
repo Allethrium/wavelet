@@ -192,12 +192,12 @@ event_server(){
 	systemctl --user start container-etcd-member.service
 	sleep 10	
 	if service_exists container-etcd-member; then
-		echo -e "Etcd service present, checking for bootstrap key\n"
+		echo -e "Etcd service presexnSLvFKyyzNXd0wuN79lfC0oEBzdhsg4nt, checking for bootstrap key\n"
 			KEYNAME=SERVER_BOOTSTRAP_COMPLETED
 			result=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
 				if [[ "${result}" = 1 ]]; then
 					echo -e "Server bootstrap is already completed, starting services and terminating process..\n"
-					systemctl --user start watch_reflectorreload.service
+					systemctl --user enable watch_reflectorreload.service --now
 					systemctl --user start wavelet_init.service
 					# N.B - the encoder reset flag script is supposed to run only on an active encoder
 					# If the server is also an encoder, run_ug.service must be enabled manually
@@ -297,20 +297,16 @@ server_bootstrap(){
 			etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/wavelet_build_completed" -- "${KEYVALUE}"
 		fi
 	echo -e "Enabling server notification services"
-	systemctl --user enable wavelet_controller.service
-	systemctl --user enable watch_reflectorreload.service
-	systemctl --user enable wavelet_reflector.service
-	# unlink build_ug service now we're done.
-	echo -e "Server configuration is now complete, rebooting system fifteen seconds.."
-	sleep 15
-	systemctl reboot -i
+	systemctl --user enable wavelet_controller.service --now
+	systemctl --user enable watch_reflectorreload.service --now
+	systemctl --user enable wavelet_reflector.service --now
 	# uncomment a firefox exec command into sway config, this will bring up the management console on the server in a new sway window, as a backup control surface.
+	# - note we need to work on a firefox policy/autoconfig.
 	sed -i '/exec firefox/s/^# *//' config $HOME/.config/sway/config
-	#same for dnsmasq because it inexplicably stopped working.
+	#same for dnsmasq because it inexplicably stops working.
 	sed -i '/exec systemctl restart dnsmasq.service/s/^# *//' config $HOME/.config/sway/config
 	#
 	sed -i '/exec \/usr\/local\/bin\/local_rpm.sh/s/^# *//' config $HOME/.config/sway/config
-
 	# Next, we build the reflector prune function.  This is necessary for removing streams for old decoders and maintaining the long term health of the system
 		# Get decoderIP list
 		# Ping each decoder on list
@@ -320,6 +316,10 @@ server_bootstrap(){
 	# Finally, add a service to prune dead FUSE mountpoints.  Every time the UltraGrid AppImage is restarted, it leaves stale mountpoints.  This timed task will help keep everything clean.
 		# Get "alive mountpoints"
 		# Prune anything !=alive
+	#  Reboot the server
+	echo -e "Server configuration is now complete, rebooting system fifteen seconds.."
+	sleep 15
+	systemctl reboot -i
 }
 
 service_exists() {
