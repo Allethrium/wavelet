@@ -125,17 +125,19 @@ storage:
     # generate dnf repository
     # looks at the server for cached packages before trying to download anything
     # saves about 800mb+ BW per install!
-    - path: /etc/yum.repos.d/wavelet.repo
-      mode: 0644
-      overwrite: true
-      contents:
-        inline: |
-          [wavelet-repo]
-          name=Wavelet local server repository
-          baseurl=http://192.168.1.32:8080/repo_mirror/fedora/releases/$releasever/$basearch
-          enabled=1
-          gpgcheck=0
-          priority=10
+    # DNF is currently not properly working on rpm-ostree systems - have to revert to pulling everything down from web
+    # https://github.com/rpm-software-management/dnf/issues/2108
+#    - path: /etc/yum.repos.d/wavelet.repo
+#      mode: 0644
+#      overwrite: true
+#      contents:
+#        inline: |
+#          [wavelet-repo]
+#          name=Wavelet local server repository
+#          baseurl=http://192.168.1.32:8080/repo_mirror/fedora/releases/$releasever/$basearch
+#          enabled=1
+#          gpgcheck=0
+#          priority=10
     # Define system performance settings
     - path: /etc/sysctl.d/90-sysrq.conf
       mode: 0644
