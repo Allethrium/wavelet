@@ -44,7 +44,8 @@ main() {
 # main thread, checks encoder restart flag in etcd
 	KEYNAME="encoder_restart"
 	read_etcd
-	if [[ "$printvalue" -eq 1 ]]; then
+	if [[ "${printvalue}" -eq 1 ]]; then
+		echo -e "Encoder restart bit is set! continuing..\n"
 		detect_self
 		if [[ "${self}" = "encoder" ]]; then		
 			systemctl --user restart run_ug.service
@@ -70,6 +71,7 @@ main() {
 		write_etcd_global
 	fi
 }
+
 set -x
 exec >/home/wavelet/monitor_encoderflag.log 2>&1
 main
