@@ -1,5 +1,6 @@
 var script = document.createElement('script');
-script.src = 'jquery-3.7.1.min.js';
+script.src = './jquery-3.7.1.min.js';
+
 document.getElementsByTagName('head')[0].appendChild(script);
 
 var dynamicInputs = document.getElementById("dynamicInputs");
@@ -98,17 +99,76 @@ function fetchHostLabelAndUpdateUI(getLabelHostName){
 
 }
 
+function sendPHPID(buttonElement) {
+	// we use id here in place of value (both are same for static items in the html)
+	// Because javascript inexplicably can access everythign EXCEPT the value??
+        const postValue = buttonElement.id;
+        const postLabel = buttonElement.innerText;
+	console.log("Sending Value: " + postValue + "\nAnd Label: " + postLabel);
+        $.ajax({
+                type: "POST",
+                        url: "/set_uv_hash_select.php",
+                        data: {
+                                value: postValue,
+                                label: postLabel
+                                  },
+                        success: function(response){
+                                console.log(response);
+				// Look at siblings and remove active bit if they have it
+				var attr	=	$(this).attr('data-active');
+				$(buttonElement).siblings().each(function () {
+						$(this).removeAttr("data-active");
+				});
+				console.log("Attempting to set data-active to 1 on: " + buttonElement);
+				buttonElement.setAttribute("data-active", "1");
+                        }
+                });
+}
+
+function sendDynamicPHPID(buttonElement) {
+        const postValue = buttonElement.value;
+        const postLabel = $(buttonElement).attr('label');
+	console.log("Sending Value: " + postValue + "\nAnd Label: " + postLabel);
+        $.ajax({
+                type: "POST",
+                        url: "/set_uv_hash_select.php",
+                        data: {
+                                value: postValue,
+                                label: postLabel
+                                  },
+                        success: function(response){
+                                console.log(response);
+                                // Look at siblings and remove active bit if they have it
+                                var attr        =       $(this).attr('data-active');
+                                $('div[id="static_inputs_section_inner"]', 'div[id="dynamicInputs"]').find('.data-active').each(function () {
+						console.log("removing data-active for: " + this);
+                                                $(this).removeAttr("data-active");
+                                });
+                                buttonElement.setAttribute("data-active", "1");
+                        }
+                });
+}
+
+function handleButtonClick() {
+	sendPHPID(this);
+}
+
+function handleDynamicButtonClick() {
+        sendDynamicPHPID(this);
+}
+
+
 function handlePageLoad() {
 	var livestreamValue		=	getLivestreamStatus(livestreamValue);
 	var bannerValue			=	getBannerStatus(bannerValue);
 	var audioValue			=	getAudioStatus(audioValue);
-	var bluetoothMACValue	=	getBluetoothMAC(bluetoothMACValue);
+	var bluetoothMACValue		=	getBluetoothMAC(bluetoothMACValue);
 	var audioStatus 		=	getAudioStatus(audioValue);
-	var selectedInputHash	=	getActiveInputHash();	
+	var selectedInputHash		=	getActiveInputHash();	
 	// Adding classes and attributes to the prepopulated 'static' buttons on the webUI
-	const staticInputElements = document.querySelectorAll(".inputStaticButtons");
+	const staticInputElements = document.querySelectorAll(".btn");
 	staticInputElements.forEach(el => 
-		el.addEventListener("click", sendPHPID, setButtonActiveStyle, true));
+		el.addEventListener("click", handleButtonClick));
 	// Apply event listener to Livestream toggle
 	$("#lstoggleinput").change
 		(function() {
@@ -197,16 +257,29 @@ function handlePageLoad() {
 
 function getActiveInputHash(activeInputHash) {
 	// this function retreives the currently active input hash
+	let returned_data;
 	$.ajax({
 		type: "POST",
 		url: "get_uv_hash_select.php",
 		dataType: "json",
 		success: function(returned_data) {
-		const activeInputHash = JSON.parse(returned_data);
-		console.log("Selected input hash is:" + activeInputHash);
+			const activeInputHash = JSON.parse(returned_data);
+			console.log("Selected input hash is:" + activeInputHash);
+		        var attr        =       $(this).attr('value');
+		        $(".btn").each(function() {
+	                if ($(this).attr('value') &&
+	                $(this).attr('value') == activeInputHash){
+        	                console.log("Found button with input hash: " + activeInputHash + ", setting as active for CSS..");
+                	        this.setAttribute("data-active", "1");
+                }
+        });
+
+
+		},
+		error: function (xhr, ajaxOptions, thrownError) {
+			console.log(thrownError);
 		}
-	})
-	return activeInputHash;
+	}).then();
 }
 
 function getLivestreamStatus(livestreamValue) {
@@ -348,7 +421,7 @@ function createRenameButton(hostName, hostHash) {
 		type: 'button',
 		text: 'Rename',
 		value: renameButtonHash,
-		class: 'renameButton clickableButton',
+		class: 'btn',
 		id: 'btn_rename',
 	}).click(relabelHostElement);
 	return $btn;
@@ -360,7 +433,7 @@ function createDeleteButton(hostName, hostHash) {
 		type: 'button',
 		text: 'Remove',
 				value: 'Remove'+hostHash,		
-		class: 'renameButton clickableButton',
+		class: 'btn renameButton',
 		id: 'btn_HostDelete',
 		}).click(function(){
 			console.log("Deleting host entry and associated key: " + hostName + "\nAnd Hash Value:" + hostHash);
@@ -385,7 +458,7 @@ function createIdentifyButton(hostName, hostHash) {
 		type: 'button',
 		text: 'Identify Host (15s)',
 				value: 'Identify'+hostHash,
-		class: 'renameButton clickableButton',
+		class: 'btn identifyButton',
 		id: 'btn_identify'
 		}).click(function(){
 			console.log("Host instructed to reveal itself:" + hostName);
@@ -412,7 +485,7 @@ function createRestartButton(hostName, hostHash) {
 		type: 'button',
 		text: 'Restart Codec Task',
 				value: 'Restart'+hostHash,
-		class: 'renameButton clickableButton',
+		class: 'btn restartButton',
 		id: 'btn_restart'
 	}).click(function(){
 		console.log("Host instructed to restart UltraGrid task:" + hostName);
@@ -436,7 +509,7 @@ function createRebootButton(hostName, hostHash) {
 	var $btn = $('<button/>', {
 		type: 'button',
 		text: 'Reboot Host',
-		class: 'renameButton clickableButton',
+		class: 'btn rebootButton',
 		id: 'btn_reboot'
 		}).click(function(){
 			console.log("Host instructed to reboot!" + hostName);
@@ -465,49 +538,56 @@ function createBlankButton(hostName, hostHash, thisHostBlankStatus) {
 	var blankHostHash = hostHash
 	var thisHostBlankStatus = (getBlankHostStatus(hostName, hostHash));
 	var blankHostText = "pending status";
-/* Add a client blank screen button */
-	var $btn = $('<button/>', {
+	var blankHostButtonOptions = {
 		type: 'button',
 		text: blankHostText,
-			'data-blankHostName': blankHostName,
-		class: 'blankHostButton',
+		'data-blankHostName': blankHostName,
+		'data_hover': 'Blank Display',
+		data_label: `${blankHostText}`,
+		class: 'btn',
 		id: 'btn_blank'
-		}).click(function(){
-						let matchedElement = $('body').find(`[data-blankHostName="${blankHostName}"]`);
-			if ($(matchedElement).text() == "Blank Host") {
-				console.log("Host instructed to blank screen:" + blankHostName);
-				$.ajax({
-					type: "POST",
-					url: "/set_blank_host.php",
-					data: {
-						key: blankHostName,
-						value: 1
-						},
-						success: function(response){
-							console.log(response);
-						}
-				});
-							console.log("Found element: " + matchedElement + ", setting to blanked status for UI..");
-							$(matchedElement).text("Unblank Host");
-							$(matchedElement).addClass('active');
-			} else {
-				console.log("Host instructed to restore display:" + blankHostName);
-				$.ajax({
-					type: "POST",
-					url: "/set_blank_host.php",
-					data: {
-						key: hostName,
-						value: 0
-						},
+	};
+	var $btn = $('<a/>', blankHostButtonOptions)
+		.append('<span class="btn__inner">')
+		.append(`<span class="btn__label" data-label="${blankHostText}"
+			data-hover="Blank Display Output">${blankHostText}</span>`)
+		.append('<span class="btn__label__background"></span>')
+		.append('<span class="btn__background"></span>').click(function(){
+		let matchedElement = $('body').find(`[data-blankHostName="${blankHostName}"]`);
+		if ($(matchedElement).text() == "Blank Host") {
+			console.log("Host instructed to blank screen:" + blankHostName);
+			$.ajax({
+				type: "POST",
+				url: "/set_blank_host.php",
+				data: {
+					key: blankHostName,
+					value: 1
+					},
 					success: function(response){
 						console.log(response);
 					}
-				});
-				console.log("Found element: " + matchedElement + ", reverting to init state..");
-				$(matchedElement).text("Blank Host");
-				$(matchedElement).removeClass('active');
-			}
-		});
+			});
+				console.log("Found element: " + matchedElement + ", setting to blanked status for UI..");
+				$(matchedElement).text("Unblank Host");
+				$(matchedElement).addClass('active');
+		} else {
+			console.log("Host instructed to restore display:" + blankHostName);
+			$.ajax({
+				type: "POST",
+				url: "/set_blank_host.php",
+				data: {
+					key: hostName,
+					value: 0
+					},
+				success: function(response){
+					console.log(response);
+				}
+			});
+			console.log("Found element: " + matchedElement + ", reverting to init state..");
+			$(matchedElement).text("Blank Host");
+			$(matchedElement).removeClass('active');
+		}
+	});
 	return $btn;
 }
 
@@ -523,7 +603,7 @@ function createCodecStateChangeButton(hostName, hostHash, type) {
 		};
 	var $btn = $('<button/>', {
 		type: 'button',
-		class: 'encoderButton clickableButton',
+		class: 'btn encoderButton',
 		id: 'btn_codec_swap',
 		text: buttonText
 	});
@@ -552,6 +632,7 @@ function createNewButton(key, value, keyFull, functionIndex) {
 	const id			=	document.createTextNode(counter + 1);
 	const title			=	document.createTextNode(key);
 	dynamicButton.id	=	counter;
+	hostNameAndDevice	=	key.replace(/\//, ':\n');
 	/* create a div container, where the button, relabel button and any other associated elements reside */
 	if (functionIndex === 1) {
 		console.log("called from firstAjax, so this is a local video source");
@@ -574,11 +655,12 @@ function createNewButton(key, value, keyFull, functionIndex) {
 	function createInputButton(text, value) {
 		var $btn = $('<button/>', {
 			type: 'button',
-			text: key,
+			text: hostNameAndDevice,
+			label: key,
 			value: value,
-			class: 'dynamicInputButton clickableButton',
+			class: 'btn',
 			id: dynamicButton.id
-		}).click(sendPHPID);
+		}).click(handleDynamicButtonClick);
 		$btn.data("fulltext", keyFull);
 		return $btn;
 	}
@@ -587,7 +669,7 @@ function createNewButton(key, value, keyFull, functionIndex) {
 		var $btn = $('<button/>', {
 			type: 'button',
 			text: 'Rename',
-			class: 'renameButton clickableButton',
+			class: 'btn renameButton',
 			id: 'btn_rename'
 			}).click(relabelInputElement);
 		$btn.data("fulltext", keyFull);
@@ -598,7 +680,7 @@ function createNewButton(key, value, keyFull, functionIndex) {
 		var $btn = $('<button/>', {
 			type: 'button',
 			text: 'Remove',
-			class: 'renameButton clickableButton',
+			class: 'btn removeButton',
 			id: 'btn_delete'
 		}).click(function(){
 			$(this).parent().remove();
@@ -621,15 +703,16 @@ function createNewButton(key, value, keyFull, functionIndex) {
 	$(divEntry).append(createRenameButton());
 	$(divEntry).append(createInputButton(text, value));
 	var createdButton = $(divEntry).find('.dynamicInputButton');
-	var currentInput = getActiveInputHash(); 
-	if (createdButton.val() == currentInput) {
+	/* We might as well do this on pageload instead of creating the buttons..
+	 * 
+	 * if (createdButton.val() == currentInput) {
 		console.log("This button is the currently selected input hash, changing CSS to active!");
 		$(createdButton.css({
 			'background-color': 'red',
 			'color': 'white',
 			'font-size': '44px'
 		}));
-	}
+	} */
 
 	/* set counter +1 for button ID */
 	const selectedDivHash			=		$(this).parent().attr('divDeviceHash');
@@ -752,22 +835,6 @@ function createNewHost(key, type, hostName, hostHash, functionIndex) {
 			createServerButtonSet(hostName, hostHash);
 			break;
 	}
-}
-
-function sendPHPID(event) {
-	postValue = (this.value);
-	postLabel = (this.innerText);
-	$.ajax({
-		type: "POST",
-			url: "/set_uv_hash_select.php",
-			data: {
-				value: postValue,
-				label: postLabel
-				  },
-			success: function(response){
-				console.log(response); 
-			}
-		});
 }
 
 function relabelInputElement() {
