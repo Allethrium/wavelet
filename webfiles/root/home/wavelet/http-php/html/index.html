@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <link rel="stylesheet" href="cf.normalize.min.5.0.0.css">
 <link rel="stylesheet" href="styles.css">
+<script src="./jquery-3.7.1.min.js"></script>
 <meta charset="utf-8">
 <html lang="en">
 
@@ -15,19 +16,19 @@
 <a class="btn" target="_blank" id="1" value="1">
  <span class="btn__inner">
 	 <span class="btn__label" data-label="Blank Screen" data-hover=">activate<" data-activated="<<<ACTIVATED>>>">
-		 Blank Screen
-		 <span class="btn__label__background"></span>
-	 </span>
-	</span>
+     Blank Screen
+     <span class="btn__label__background"></span>
+   </span>
+  </span>
  <span class="btn__background"></span>
 </a>
 <br>
 <a class="btn" target="_blank" id="2" value="2">
  <span class="btn__inner">
-	 <span class="btn__label" data-label="NY State Seal" data-hover=">activate<" data-activated="<<<ACTIVATED>>>">
-		 Static Image
-		 <span class="btn__label__background"></span>
-	 </span>
+   <span class="btn__label" data-label="NY State Seal" data-hover=">activate<" data-activated="<<<ACTIVATED>>>">
+     Static Image
+     <span class="btn__label__background"></span>
+   </span>
  </span>
  <span class="btn__background"></span>
 </a>
@@ -70,13 +71,13 @@ Video Sources
 <br>
 <br>
 <a class="btn" target="_blank">
-	<span class="btn__inner">
-		<span class="btn__label" id="RD" value="RD" data-label="Refresh Sources" data-hover=">activate<">
+  <span class="btn__inner">
+    <span class="btn__label" id="RD" value="RD" data-label="Refresh Sources" data-hover=">activate<">
 Refresh Sources
-			<span class="btn__label__background"></span>
-		</span>
-	</span>
-	<span class="btn__background"></span>
+      <span class="btn__label__background"></span>
+    </span>
+  </span>
+  <span class="btn__background"></span>
 </a>
 
 <div id="dynamicInputs" div class="input_divider_inner" div title="dynamically populated inputs for local devices, or devices attached to a wavelet encoder device.">Local Input Devices<br></div>
@@ -113,7 +114,7 @@ Toggle Banner<label class="switch" id="banner_toggle"><input type ="checkbox" id
 Toggle Livestreaming <label class="switch" id="lstoggle">
 <input type ="checkbox" id="lstoggleinput">
 <span class="slider round"></span>
-</label>  
+</label>	
 <br><br>
 <details><summary>Livestream target, API Key setup<span class="icon"></span></summary>
 <p>
@@ -133,7 +134,7 @@ Toggle Livestreaming <label class="switch" id="lstoggle">
 <button class="codecButton inputStaticButtons" value="B">H.264 QSV (recommended)
 <button class="codecButton inputStaticButtons" value="C">HEVC SW High BW (libx265)
 <button class="codecButton inputStaticButtons" value="C1">HEVC SW Low BW (libx265)
-<button class="codecButton inputStaticButtons" value="D">HEVC SW (libsvt_hevc)  
+<button class="codecButton inputStaticButtons" value="D">HEVC SW (libsvt_hevc)	
 <button class="codecButton inputStaticButtons" value="D1">HEVC SW (libsvt_hevc zerolatency)
 <button class="codecButton inputStaticButtons" value="D2">HEVC QSV
 <button class="codecButton inputStaticButtons" value="D3">HEVC VA-API
