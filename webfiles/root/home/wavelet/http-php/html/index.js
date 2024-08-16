@@ -1,6 +1,5 @@
 var script = document.createElement('script');
 script.src = './jquery-3.7.1.min.js';
-
 document.getElementsByTagName('head')[0].appendChild(script);
 
 var dynamicInputs = document.getElementById("dynamicInputs");
@@ -138,15 +137,21 @@ function sendDynamicPHPID(buttonElement) {
                                   },
                         success: function(response){
                                 console.log(response);
-                                // Look at siblings and remove active bit if they have it
-                                var attr        =       $(this).attr('data-active');
-                                $('div[id="static_inputs_section_inner"]', 'div[id="dynamicInputs"]').find('.data-active').each(function () {
-						console.log("removing data-active for: " + this);
-                                                $(this).removeAttr("data-active");
-                                });
-                                buttonElement.setAttribute("data-active", "1");
-                        }
-                });
+				var siblings	=
+					$('div[id="static_inputs_section_inner"] div[id="dynamicInputs"]').contents('.data-active');
+					if(siblings.length > 0) {
+						console.log("Found " + siblings.length + " sibling element(s).");
+						siblings.each(function () {
+	                                                console.log("removing data-active for: " + this);
+	                                                siblings.remove("data-active");
+						});
+					} else {
+						console.log("No sibling elements found!");
+					}
+				
+			}
+	});
+	buttonElement.setAttribute("data-active", "1");
 }
 
 function handleButtonClick() {
@@ -164,7 +169,6 @@ function handlePageLoad() {
 	var audioValue			=	getAudioStatus(audioValue);
 	var bluetoothMACValue		=	getBluetoothMAC(bluetoothMACValue);
 	var audioStatus 		=	getAudioStatus(audioValue);
-	var selectedInputHash		=	getActiveInputHash();	
 	// Adding classes and attributes to the prepopulated 'static' buttons on the webUI
 	const staticInputElements = document.querySelectorAll(".btn");
 	staticInputElements.forEach(el => 
@@ -253,33 +257,6 @@ function handlePageLoad() {
 	});
 	// Execute initial AJAX Call
 	inputsAjax();
-}
-
-function getActiveInputHash(activeInputHash) {
-	// this function retreives the currently active input hash
-	let returned_data;
-	$.ajax({
-		type: "POST",
-		url: "get_uv_hash_select.php",
-		dataType: "json",
-		success: function(returned_data) {
-			const activeInputHash = JSON.parse(returned_data);
-			console.log("Selected input hash is:" + activeInputHash);
-		        var attr        =       $(this).attr('value');
-		        $(".btn").each(function() {
-	                if ($(this).attr('value') &&
-	                $(this).attr('value') == activeInputHash){
-        	                console.log("Found button with input hash: " + activeInputHash + ", setting as active for CSS..");
-                	        this.setAttribute("data-active", "1");
-                }
-        });
-
-
-		},
-		error: function (xhr, ajaxOptions, thrownError) {
-			console.log(thrownError);
-		}
-	}).then();
 }
 
 function getLivestreamStatus(livestreamValue) {
@@ -628,9 +605,9 @@ function createCodecStateChangeButton(hostName, hostHash, type) {
 function createNewButton(key, value, keyFull, functionIndex) {
 	var divEntry		=	document.createElement("Div");
 	var dynamicButton 	= 	document.createElement("Button");
-	const text			=	document.createTextNode(key);
-	const id			=	document.createTextNode(counter + 1);
-	const title			=	document.createTextNode(key);
+	const text		=	document.createTextNode(key);
+	const id		=	document.createTextNode(counter + 1);
+	const title		=	document.createTextNode(key);
 	dynamicButton.id	=	counter;
 	hostNameAndDevice	=	key.replace(/\//, ':\n');
 	/* create a div container, where the button, relabel button and any other associated elements reside */
@@ -941,3 +918,38 @@ function applyAudioBlueToothSettings() {
 		}
 	});
 }
+
+function getActiveInputHash(activeInputHash) {  // Declare the function here
+       let returned_data;
+       var key         = "";
+       var value       = "";
+       $.ajax({
+           type: "POST",
+           url: "get_uv_hash_select.php",
+           dataType: "json",
+           success: function(returned_data) {
+               console.log(returned_data);
+               returned_data.forEach(item => {
+                   key             = item['key'];
+                   value           = item['value'];
+               });
+               var activeInputHash     = value; // Assign the correct variable name to store 'activeInputHash'
+               console.log("Attempting to find a button with input hash value of: " + activeInputHash);
+               $(".btn").each(function() {
+                   if ($(this).attr('value') && $(this).attr('value').trim() === activeInputHash) { // Use strict comparison and trim the 'activeInputHash' to handle any leading/trailing whitespaces.
+                       console.log("Found button with input hash: " + activeInputHash + ", setting as active for CSS..");
+                       this.setAttribute("data-active", "1");
+                   } else {
+                       console.log("No button with value: " + activeInputHash + " found.");
+                   }
+               });
+           },
+           error: function (xhr, ajaxOptions, thrownError) {
+               console.log(thrownError);
+           }
+       }).then(); // Closing the '$.ajax()' call to ensure it completes before moving on to other code.
+}
+
+$(document).ready(function() {  // Wait until document is ready before running code here
+    getActiveInputHash("your_input_hash"); // Call the function with your desired input hash value.
+});
