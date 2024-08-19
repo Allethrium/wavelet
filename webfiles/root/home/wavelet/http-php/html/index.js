@@ -5,6 +5,20 @@ document.getElementsByTagName('head')[0].appendChild(script);
 var dynamicInputs = document.getElementById("dynamicInputs");
 dynamicInputs.innerHTML = '';
 
+function escapeHTML(text) {
+	let map = {
+		'&': '&amp;',
+		'<': '&lt;',
+		'>': '&gt;',
+		'"': '&quot;',
+		"'": '&#039;'
+	};
+
+	return text.replace(/[&<>"']/g, function(m) {
+		return map[m];
+	});
+}
+
 function inputsAjax(){
 // get dynamic devices from etcd, and call createNewButton function to generate entries for them.
 // value = generated hash value of the device, this is how we track it, and how wavelet can find it
@@ -99,11 +113,11 @@ function fetchHostLabelAndUpdateUI(getLabelHostName){
 }
 
 function sendPHPID(buttonElement) {
-	// we use id here in place of value (both are same for static items in the html)
-	// Because javascript inexplicably can access everythign EXCEPT the value??
+        // we use id here in place of value (both are same for static items in the html)
+        // Because javascript inexplicably can access everythign EXCEPT the value??
         const postValue = buttonElement.id;
         const postLabel = buttonElement.innerText;
-	console.log("Sending Value: " + postValue + "\nAnd Label: " + postLabel);
+        console.log("Sending Value: " + postValue + "\nAnd Label: " + postLabel);
         $.ajax({
                 type: "POST",
                         url: "/set_uv_hash_select.php",
@@ -113,53 +127,85 @@ function sendPHPID(buttonElement) {
                                   },
                         success: function(response){
                                 console.log(response);
-				// Look at siblings and remove active bit if they have it
-				var attr	=	$(this).attr('data-active');
-				$(buttonElement).siblings().each(function () {
-						$(this).removeAttr("data-active");
-				});
-				console.log("Attempting to set data-active to 1 on: " + buttonElement);
-				buttonElement.setAttribute("data-active", "1");
                         }
                 });
+        var dynamicsArr =       Array.from($('div[id="dynamicInputs"] .btn'));
+        var staticsArr  =       Array.from($('div[id="static_inputs_section"] .btn'));
+        if (dynamicsArr.length > 0) {
+            console.log("Found " + dynamicsArr.length + " sibling element(s).");
+            dynamicsArr.forEach((element, index) => {
+                    if ($(element).hasClass ('renameButton removeButton')) {
+                        console.log("Button is a rename/remove button, doing nothing.");
+                    } else {
+                        console.log("Setting data-active to 0 for this element.");
+                        element.removeAttribute('data-active');
+                        }
+                    });
+            staticsArr.forEach((element, index) => {
+                    if ($(element).hasClass ('renameButton removeButton')) {
+                        console.log("Button is a rename/remove button, doing nothing.");
+                    } else {
+                        console.log("Setting data-active to 0 for this element.");
+                        element.removeAttribute('data-active');
+                        }
+            });
+        } else {
+            console.log("elements found!");
+        }
+        buttonElement.setAttribute("data-active", "1");
+        console.log("Set data-active to 1 for " + buttonElement + "selected element");
 }
 
+
 function sendDynamicPHPID(buttonElement) {
-        const postValue = buttonElement.value;
-        const postLabel = $(buttonElement).attr('label');
-	console.log("Sending Value: " + postValue + "\nAnd Label: " + postLabel);
-        $.ajax({
-                type: "POST",
-                        url: "/set_uv_hash_select.php",
-                        data: {
-                                value: postValue,
-                                label: postLabel
-                                  },
-                        success: function(response){
-                                console.log(response);
-				var siblings	=
-					$('div[id="static_inputs_section_inner"] div[id="dynamicInputs"]').contents('.data-active');
-					if(siblings.length > 0) {
-						console.log("Found " + siblings.length + " sibling element(s).");
-						siblings.each(function () {
-	                                                console.log("removing data-active for: " + this);
-	                                                siblings.remove("data-active");
-						});
+		const postValue = escapeHTML(buttonElement.value);
+		const postLabel = $(buttonElement).attr('label');
+		console.log("Sending Value: " + postValue + "\nAnd Label: " + postLabel);
+		$.ajax({
+				type: "POST",
+						url: "/set_uv_hash_select.php",
+						data: {
+								value: postValue,
+								label: escapeHTML(postLabel)
+								  },
+						success: function(response){
+								console.log(response);
+						}
+		});
+		var dynamicsArr =       Array.from($('div[id="dynamicInputs"] .btn'));
+	var staticsArr	=	Array.from($('div[id="static_inputs_section"] .btn'));
+		if (dynamicsArr.length > 0) {
+			console.log("Found " + dynamicsArr.length + " sibling element(s).");
+			dynamicsArr.forEach((element, index) => {
+					if ($(element).hasClass ('renameButton removeButton')) {
+						console.log("Button is a rename/remove button, doing nothing.");
 					} else {
-						console.log("No sibling elements found!");
-					}
-				
-			}
-	});
-	buttonElement.setAttribute("data-active", "1");
+						console.log("Setting data-active to 0 for this element.");
+						element.removeAttribute('data-active');
+						}
+			});
+			staticsArr.forEach((element, index) => {
+					if ($(element).hasClass ('renameButton removeButton')) {
+						console.log("Button is a rename/remove button, doing nothing.");
+					} else {
+						console.log("Setting data-active to 0 for this element.");
+						element.removeAttribute('data-active');
+						}
+		});
+		} else {
+			console.log("elements found!");
+		}
+		buttonElement.setAttribute("data-active", "1");
+		console.log("Set data-active to 1 for " + buttonElement + "selected element");
 }
+
 
 function handleButtonClick() {
 	sendPHPID(this);
 }
 
 function handleDynamicButtonClick() {
-        sendDynamicPHPID(this);
+		sendDynamicPHPID(this);
 }
 
 
@@ -515,56 +561,50 @@ function createBlankButton(hostName, hostHash, thisHostBlankStatus) {
 	var blankHostHash = hostHash
 	var thisHostBlankStatus = (getBlankHostStatus(hostName, hostHash));
 	var blankHostText = "pending status";
-	var blankHostButtonOptions = {
-		type: 'button',
+		var $btn = $('<button/>', {
+				type: 'button',
 		text: blankHostText,
 		'data-blankHostName': blankHostName,
 		'data_hover': 'Blank Display',
 		data_label: `${blankHostText}`,
 		class: 'btn',
 		id: 'btn_blank'
-	};
-	var $btn = $('<a/>', blankHostButtonOptions)
-		.append('<span class="btn__inner">')
-		.append(`<span class="btn__label" data-label="${blankHostText}"
-			data-hover="Blank Display Output">${blankHostText}</span>`)
-		.append('<span class="btn__label__background"></span>')
-		.append('<span class="btn__background"></span>').click(function(){
-		let matchedElement = $('body').find(`[data-blankHostName="${blankHostName}"]`);
-		if ($(matchedElement).text() == "Blank Host") {
-			console.log("Host instructed to blank screen:" + blankHostName);
-			$.ajax({
-				type: "POST",
-				url: "/set_blank_host.php",
-				data: {
-					key: blankHostName,
-					value: 1
-					},
+		}).click(function(){
+			let matchedElement = $('body').find(`[data-blankHostName="${blankHostName}"]`);
+			if ($(matchedElement).text() == "Blank Host") {
+				console.log("Host instructed to blank screen:" + blankHostName);
+				$.ajax({
+					type: "POST",
+					url: "/set_blank_host.php",
+					data: {
+						key: blankHostName,
+						value: 1
+						},
+						success: function(response){
+							console.log(response);
+						}
+				});
+					console.log("Found element: " + matchedElement + ", setting to blanked status for UI..");
+					$(matchedElement).text("Unblank Host");
+					$(matchedElement).addClass('active');
+			} else {
+				console.log("Host instructed to restore display:" + blankHostName);
+				$.ajax({
+					type: "POST",
+					url: "/set_blank_host.php",
+					data: {
+						key: hostName,
+						value: 0
+						},
 					success: function(response){
 						console.log(response);
 					}
-			});
-				console.log("Found element: " + matchedElement + ", setting to blanked status for UI..");
-				$(matchedElement).text("Unblank Host");
-				$(matchedElement).addClass('active');
-		} else {
-			console.log("Host instructed to restore display:" + blankHostName);
-			$.ajax({
-				type: "POST",
-				url: "/set_blank_host.php",
-				data: {
-					key: hostName,
-					value: 0
-					},
-				success: function(response){
-					console.log(response);
-				}
-			});
-			console.log("Found element: " + matchedElement + ", reverting to init state..");
-			$(matchedElement).text("Blank Host");
-			$(matchedElement).removeClass('active');
-		}
-	});
+				});
+				console.log("Found element: " + matchedElement + ", reverting to init state..");
+				$(matchedElement).text("Blank Host");
+				$(matchedElement).removeClass('active');
+			}
+		});
 	return $btn;
 }
 
@@ -621,7 +661,8 @@ function createNewButton(key, value, keyFull, functionIndex) {
 	} else {
 		console.error("createNewButton not called from a valid function");
 	}
-
+	var currentInputsHash	=	getActiveInputHash();
+	
 	//dynamicInputs.appendChild(divEntry);
 	divEntry.setAttribute("divDeviceHash", value);
 	divEntry.setAttribute("data-fulltext", keyFull);
@@ -919,37 +960,37 @@ function applyAudioBlueToothSettings() {
 	});
 }
 
-function getActiveInputHash(activeInputHash) {  // Declare the function here
-       let returned_data;
-       var key         = "";
-       var value       = "";
-       $.ajax({
-           type: "POST",
-           url: "get_uv_hash_select.php",
-           dataType: "json",
-           success: function(returned_data) {
-               console.log(returned_data);
-               returned_data.forEach(item => {
-                   key             = item['key'];
-                   value           = item['value'];
-               });
-               var activeInputHash     = value; // Assign the correct variable name to store 'activeInputHash'
-               console.log("Attempting to find a button with input hash value of: " + activeInputHash);
-               $(".btn").each(function() {
-                   if ($(this).attr('value') && $(this).attr('value').trim() === activeInputHash) { // Use strict comparison and trim the 'activeInputHash' to handle any leading/trailing whitespaces.
-                       console.log("Found button with input hash: " + activeInputHash + ", setting as active for CSS..");
-                       this.setAttribute("data-active", "1");
-                   } else {
-                       console.log("No button with value: " + activeInputHash + " found.");
-                   }
-               });
-           },
-           error: function (xhr, ajaxOptions, thrownError) {
-               console.log(thrownError);
-           }
-       }).then(); // Closing the '$.ajax()' call to ensure it completes before moving on to other code.
+function getActiveInputHash(activeInputHash) {
+	let returned_data;
+	var key         = "";
+	var value       = "";
+	   $.ajax({
+		   type: "POST",
+		   url: "get_uv_hash_select.php",
+		   dataType: "json",
+		   success: function(returned_data) {
+			   console.log(returned_data);
+			   returned_data.forEach(item => {
+				   key             = item['key'];
+				   value           = item['value'];
+			   });
+			   var activeInputHash     = value; 
+			   console.log("Attempting to find a button with input hash value of: " + activeInputHash);
+			   $(".btn").each(function() {
+				   if ($(this).attr('value') && $(this).attr('value').trim() === activeInputHash) { 
+					   console.log("Found button with input hash: " + activeInputHash + ", setting as active for CSS..");
+					   this.setAttribute("data-active", "1");
+				   } else {
+					   console.log("No button with value: " + activeInputHash + " found.");
+				   }
+			   });
+		   },
+		   error: function (xhr, ajaxOptions, thrownError) {
+			   console.log(thrownError);
+		   }
+	   }).then(); 
 }
 
-$(document).ready(function() {  // Wait until document is ready before running code here
-    getActiveInputHash("your_input_hash"); // Call the function with your desired input hash value.
+$(document).ready(function() {
+	getActiveInputHash("your_input_hash");
 });
