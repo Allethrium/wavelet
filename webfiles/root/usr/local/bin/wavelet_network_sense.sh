@@ -47,6 +47,9 @@ event_detect_networkDevice(){
 	# We write out a lease file to /var/tmp/
 	# Inotifywait will monitor this directory and process the most recent .lease file.  The actual device setup will be launched as the wavelet user.
 	touch /var/tmp/${dnsmasq_ipAddr}_${dnsmasq_mac}.lease
+	sleep .5
+	# we remove the file .5 seconds later so that the device can be re-detected once dnsmasq hands out a new lease I.E on system reboot
+	rm -rf /var/tmp/$dnsmasq_ipAddr}_${dnsmasq_max}.lease
 }
 
 ###
