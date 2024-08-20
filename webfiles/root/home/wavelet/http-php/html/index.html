@@ -1,29 +1,56 @@
 <!DOCTYPE html>
+<link rel="stylesheet" href="cf.normalize.min.5.0.0.css">
 <link rel="stylesheet" href="styles.css">
+<script src="./jquery-3.7.1.min.js"></script>
 <meta charset="utf-8">
 <html lang="en">
-
 
 <head><title>Wavelet System User Interface</title></head>
 <div id="body_div" class="body_divider">
 <div id="page title" class="title">Wavelet System User Interface</div>
-<body onload="handlePageLoad();" class="defaultBody">
+<body onload="handlePageLoad();" class="body">
+
 <div id="common_options" class="input_divider">
+<div id="static_inputs_section" class="input_divider">Static Video Inputs<br><div id="static_inputs_section_inner" class="input_divider_inner">
+<br>
+<a class="btn" target="_blank" id="1" value="1">
+ <span class="btn__inner">
+	 <span class="btn__label" data-label="Blank Screen" data-hover=">activate<" data-activated="<<<ACTIVATED>>>">
+     Blank Screen
+     <span class="btn__label__background"></span>
+   </span>
+  </span>
+ <span class="btn__background"></span>
+</a>
+<br>
+<a class="btn" target="_blank" id="2" value="2">
+ <span class="btn__inner">
+   <span class="btn__label" data-label="NY State Seal" data-hover=">activate<" data-activated="<<<ACTIVATED>>>">
+     Static Image
+     <span class="btn__label__background"></span>
+   </span>
+ </span>
+ <span class="btn__background"></span>
+</a>
+<br>
+<a class="btn" target="_blank" id="T" value="T">
+ <span class="btn__inner">
+   <span class="btn__label" data-label="SMPTE Bars" data-hover=">activate<" data-activated="<<<ACTIVATED>>>">
+     Static Image
+     <span class="btn__label__background"></span>
+   </span>
+ </span>
+ <span class="btn__background"></span>
+</a>
+</div>
+</div>
 
 
-<div id="static_inputs_section" class="input_divider">
-Static Video Inputs<div id="static_inputs_section_inner" class="input_divider_inner">
-<button id="1" class="inputButton inputStaticButtons" value="1" type="button">Blank Screen</button>
-<button id="2" class="inputButton inputStaticButtons" value="2" type="button">NY State Seal</button>
-<button id="T" class="inputButton inputStaticButtons" value="T" type="button">Test Card</button>
-</div></div>
-
-
-<div id="audio_section" class="audio_divider">
+<div id="audio_section" class="input_divider">
 Audio Controls (wip)
 <br>Toggle Audio <label class="switch" id="audio_toggle"><input type ="checkbox" id="audio_toggle_checkbox"><span class="slider round"></span></label>
 <br>
-<div id="audio_input_inner" class="audio_input_divider_inner">
+<div id="audio_input_inner" class="input_divider_inner">
 &emsp;<details><summary>Audio Input Selection<span class="icon"></span></summary>
 <p>
 <div>
@@ -34,13 +61,13 @@ Wavelet will currently override this if a new video input device is selected!
 </details>
 </div>
 <br>
-<div id="audio_output_inner" class="audio_output_divider_inner">
+<div id="audio_output_inner" class="input_divider_inner">
 &emsp;<details><summary>Audio Output Selection<span class="icon"></span></summary>
 <p>
 If bluetooth is configured, it will become the default audio output device.
 <div><label for="btMAC">Bluetooth MAC Address:</label>
-<input type="text" id="btMAC" name="btMAC">&ensp;
-<button onclick="applyAudioBlueToothSettings()" id="btApplyButton" class="btApplyButton" type="button">Apply</button><br>
+<input type="text" class="hostTextBox" id="btMAC" name="btMAC">&ensp;
+<button onclick="applyAudioBlueToothSettings()" id="btApplyButton" class="btn" type="button">Apply</button><br>
 </p>
 </details>
 </div>
@@ -48,34 +75,46 @@ If bluetooth is configured, it will become the default audio output device.
 </div>
 
 <div id="dynamic_inputs" class="input_divider">
-Video Sources<br>
-<button id="RD" class="inputButton inputStaticButtons" value="RD" type="button">Refresh Video Sources</button><br>
+Video Sources
+<br>
+<br>
+<a class="btn" target="_blank">
+  <span class="btn__inner">
+    <span class="btn__label" id="RD" value="RD" data-label="Refresh Sources" data-hover=">activate<">
+Refresh Sources
+      <span class="btn__label__background"></span>
+    </span>
+  </span>
+  <span class="btn__background"></span>
+</a>
 
-<div id="dynamicInputs" div class="dynamicInputsTarget" div title="dynamically populated inputs for local devices, or devices attached to a wavelet encoder device.">Local Input Devices<br></div>
+<div id="dynamicInputs" div class="input_divider_inner" div title="dynamically populated inputs for local devices, or devices attached to a wavelet encoder device.">Local Input Devices<br></div>
 <br>
 <div id="dynamicNetworkInputs" div class="dynamicInputsTarget" div title="dynamically populated inputs for vendor network devices, such as supported IP cameras.">Network Input Devices<br></div>
 <br>
 Toggle Banner<label class="switch" id="banner_toggle"><input type ="checkbox" id="banner_toggle_checkbox"><span class="slider round"></span></label>
 </div>
 
-<div id="multiple_inputs_section" class="input_divider">
-<div id="multiple_inputs_inner" class="input_divider_inner">
-&emsp;<details><summary>Multiple Input Selection<span class="icon"></span></summary>
-<p>
-<button id="W" class="inputButton inputStaticButtons" value="W" type="button">Activate Multi Inputs</button>
-</p>
-</details>
-</div></div></div>
-<div id="Host control" class="input_divider">Detected Wavelet Hosts<br>
-<div id="dynamicdecHosts" div class="host_type_divider">Decoders</div>
-<div id="dynamicencHosts" div class="host_type_divider">Encoders</div>
-<div id="dynamicsvrHosts" div class="host_type_divider">Servers</div>
-<div id="dynamicgtwyHosts" div class="host_type_divider"></div>
-<div id="dynamiclvstrmHosts" div class="host_type_divider"></div>
+<div id="Host control" class="input_divider">Detected Wavelet Hosts<br><br>
+<div id="dynamicdecHosts" div class="host_type_divider input_divider_inner">Decoders</div>
+<div id="dynamicencHosts" div class="host_type_divider input_divider_inner">Encoders</div>
+<div id="dynamicsvrHosts" div class="host_type_divider input_divider_inner">Servers</div>
+<div id="dynamicgtwyHosts" div class="host_type_divider input_divider_inner"></div>
+<div id="dynamiclvstrmHosts" div class="host_type_divider input_divider_inner"></div>
 </div>
 
-<div id="Advanced Settings" class="settings_divider">
+<div id="Advanced Settings" class="input_divider">
 <details><summary>Advanced Settings<span class="icon"></span></summary>
+	<div id="multiple_inputs_section" class="input_divider">
+		<div id="multiple_inputs_inner" class="input_divider_inner">
+			<details><summary>Multiple Input Selection<span class="icon"></summary>
+			<p>
+			<button id="W" class="btn" value="W" type="button">Activate Multi Inputs</button>
+			</p>
+			</details>
+		</div>
+	</div>
+<br>
 <p>
 <div id="livestreaming" class="input_divider">
 <div id="livestreaming_inner" class="input_divider_inner">
@@ -92,32 +131,31 @@ Toggle Livestreaming <label class="switch" id="lstoggle">
 <label for="lsapikey">API Key:</label>
 <input type="text" id="lsapikey" name="lsapikey">
 <br>
-<button onclick="applyLivestreamSettings()" id="lsApplyButton" class="lsApplyButton" type="button">Apply</button><br>
+<button onclick="applyLivestreamSettings()" id="lsApplyButton" class="btn" type="button">Apply</button><br>
 </p>
 </details>
 </div>
-<div id="codecs_section" class="input_divider">
-<div id="codecs_section_inner" class="input_divider_inner">
+<div id="codecs_section" class="input_divider_inner">
 &emsp;<details><summary>Codec Selection<span class="icon"></span></summary>
 <p>
-<button class="codecButton inputStaticButtons" value="A">H.264 SW
-<button class="codecButton inputStaticButtons" value="B">H.264 QSV (recommended)
-<button class="codecButton inputStaticButtons" value="C">HEVC SW High BW (libx265)
-<button class="codecButton inputStaticButtons" value="C1">HEVC SW Low BW (libx265)
-<button class="codecButton inputStaticButtons" value="D">HEVC SW (libsvt_hevc)	
-<button class="codecButton inputStaticButtons" value="D1">HEVC SW (libsvt_hevc zerolatency)
-<button class="codecButton inputStaticButtons" value="D2">HEVC QSV
-<button class="codecButton inputStaticButtons" value="D3">HEVC VA-API
-<button class="codecButton inputStaticButtons" value="E">VP9 SW
-<button class="codecButton inputStaticButtons" value="E1">VP8 SW
-<button class="codecButton inputStaticButtons" value="F">VP9 HW
-<button class="codecButton inputStaticButtons" value="G">RAV1E AV1 SW
-<button class="codecButton inputStaticButtons" value="H">AV1 QSV
-<button class="codecButton inputStaticButtons" value="H1">LIBAOM_AV1 SW
-<button class="codecButton inputStaticButtons" value="H2">LIBSVT_AV1 SW
-<button class="codecButton inputStaticButtons" value="M1">MJPEG SW
-<button class="codecButton inputStaticButtons" value="M2">MJPEG QSV 
-<button class="codecButton inputStaticButtons" value="N1">Cineform SW 
+<button class="btn" value="A">H.264 SW
+<button class="btn" value="B">H.264 QSV (recommended)
+<button class="btn" value="C">HEVC SW High BW (libx265)
+<button class="btn" value="C1">HEVC SW Low BW (libx265)
+<button class="btn" value="D">HEVC SW (libsvt_hevc)	
+<button class="btn" value="D1">HEVC SW (libsvt_hevc zerolatency)
+<button class="btn" value="D2">HEVC QSV
+<button class="btn" value="D3">HEVC VA-API
+<button class="btn" value="E">VP9 SW
+<button class="btn" value="E1">VP8 SW
+<button class="btn" value="F">VP9 HW
+<button class="btn" value="G">RAV1E AV1 SW
+<button class="btn" value="H">AV1 QSV
+<button class="btn" value="H1">LIBAOM_AV1 SW
+<button class="btn" value="H2">LIBSVT_AV1 SW
+<button class="btn" value="M1">MJPEG SW
+<button class="btn" value="M2">MJPEG QSV 
+<button class="btn" value="N1">Cineform SW 
 </p>
 </details>
 </div>
@@ -125,24 +163,20 @@ Toggle Livestreaming <label class="switch" id="lstoggle">
 </p>
 </details>
 </div>
-</div>
-
 
 <div id="systemcontrols" class="input_divider">
 <details><summary>System Controls<span class="icon"></span></summary>
 <p>
-<button id="DR" class="inputButton inputStaticButtons" value="DR" type="button">Decoder Task Restart (all)</button>
-<button id="ER" class="inputButton inputStaticButtons" value="ER" type="button">Encoder Hard Reset (all)</button>
-<button id="SR" class="inputButton inputStaticButtons" value="SR" type="button">Hard Reset (all)</button>
-<button id="SR" class="inputButton inputStaticButtons" value="CL" type="button">Clear Video Sources</button>
+<button id="DR" class="btn" value="DR" type="button">Decoder Task Restart (all)</button>
+<button id="ER" class="btn" value="ER" type="button">Encoder Hard Reset (all)</button>
+<button id="SR" class="btn" value="SR" type="button">Hard Reset (all)</button>
+<button id="SR" class="btn" value="CL" type="button">Clear Video Sources</button>
 </p>
 </div>
 </details>
 </div>
 </div>
-
-
 <br><br>
-<script src="index.js"></script>
 </body>
+<script src="index.js"></script>
 </html>

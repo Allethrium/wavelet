@@ -11,6 +11,11 @@ read_etcd_global(){
 		echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for Global value"
 }
 
+write_etcd(){
+		etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
+		echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
+}
+
 read_etcd(){
 		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME} --print-value-only)
 		echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
@@ -42,9 +47,10 @@ UG_HOSTNAME=$(hostname)
 
 main() {
 # main thread, checks encoder restart flag in etcd
-	KEYNAME="encoder_restart"
+	KEYNAME="/encoder_restart"
 	read_etcd
-	if [[ "$printvalue" -eq 1 ]]; then
+	if [[ "${printvalue}" -eq 1 ]]; then
+		echo -e "Encoder restart bit is set! continuing..\n"
 		detect_self
 		if [[ "${self}" = "encoder" ]]; then		
 			systemctl --user restart run_ug.service
@@ -67,9 +73,10 @@ main() {
 		echo -e "Resetting encoder restart flag to 0.."
 		KEYNAME=encoder_restart
 		KEYVALUE=0
-		write_etcd_global
+		write_etcd
 	fi
 }
+
 set -x
 exec >/home/wavelet/monitor_encoderflag.log 2>&1
 main

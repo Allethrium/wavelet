@@ -29,5 +29,5 @@ function curl_etcd($keyTarget, $keyValue) {
 
 // strip unnecessary prefix from the string
 $hostname	=	(str_replace("decoderlabel/", "", $hostName));
-curl_etcd("$hostname/DECODER_REBOOT", $hostResetValue);
+curl_etcd("/$hostname/DECODER_REBOOT", $hostResetValue);
 ?>

@@ -28,6 +28,6 @@ function curl_etcd($keyTarget, $keyValue) {
 }
 
 // strip unnecessary prefix from the string
-curl_etcd("$hostName/DECODER_BLANK", $hostBlankValue);
+curl_etcd("/$hostName/DECODER_BLANK", $hostBlankValue);
 echo "blanking bit set for $hostName for value $hostBlankValue\n"
 ?>
