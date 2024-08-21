@@ -1,9 +1,6 @@
-
 webfiles/root/usr/local/bin/install_ipa.sh
 wavelet.pub
 wavelet
-fedora-coreos-40.20240504.3.0-live.x86_64.iso.sig
-fedora-coreos-40.20240504.3.0-live.x86_64.iso
 waveletpw.secure
 server_custom.yml
 server.ign
@@ -11,7 +8,6 @@ encoder_custom.yml
 decoder_custom.yml
 decoder.ign
 rootpw.secure
-decoder_custom (conflicted copy 2024-08-09 074553).yml
 usrlocalbin.tar.xz
 wavelethome.tar.xz
 fedora-coreos-40.20240709.3.1-live.x86_64.iso.sig
