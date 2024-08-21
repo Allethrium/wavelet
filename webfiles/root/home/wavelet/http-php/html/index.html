@@ -15,7 +15,7 @@
 <br>
 <a class="btn" target="_blank" id="1" value="1">
  <span class="btn__inner">
-	 <span class="btn__label" data-label="Blank Screen" data-hover=">activate<" data-activated="<<<ACTIVATED>>>">
+	 <span class="btn__label" title="Blank all decoder displays" data-label="Blank Screen" data-hover=">activate<" data-activated="<<<ACTIVATED>>>">
      Blank Screen
      <span class="btn__label__background"></span>
    </span>
@@ -25,7 +25,7 @@
 <br>
 <a class="btn" target="_blank" id="2" value="2">
  <span class="btn__inner">
-   <span class="btn__label" data-label="NY State Seal" data-hover=">activate<" data-activated="<<<ACTIVATED>>>">
+   <span class="btn__label" title="Display a static Image on all decoder displays" data-label="NY State Seal" data-hover=">activate<" data-activated="<<<ACTIVATED>>>">
      Static Image
      <span class="btn__label__background"></span>
    </span>
@@ -35,7 +35,7 @@
 <br>
 <a class="btn" target="_blank" id="T" value="T">
  <span class="btn__inner">
-   <span class="btn__label" data-label="SMPTE Bars" data-hover=">activate<" data-activated="<<<ACTIVATED>>>">
+   <span class="btn__label" title="Display SMPTE bars on all decoder displays" data-label="SMPTE Bars" data-hover=">activate<" data-activated="<<<ACTIVATED>>>">
      Static Image
      <span class="btn__label__background"></span>
    </span>
@@ -48,14 +48,13 @@
 
 <div id="audio_section" class="input_divider">
 Audio Controls (wip)
-<br>Toggle Audio <label class="switch" id="audio_toggle"><input type ="checkbox" id="audio_toggle_checkbox"><span class="slider round"></span></label>
+<br>Toggle Audio <label class="switch" title="toggle audio on/off globally" id="audio_toggle"><input type ="checkbox" id="audio_toggle_checkbox"><span class="slider round"></span></label>
 <br>
-<div id="audio_input_inner" class="input_divider_inner">
+<div id="audio_input_inner" title="Right now, the audio input device is always the video input device when possible." class="input_divider_inner">
 &emsp;<details><summary>Audio Input Selection<span class="icon"></span></summary>
 <p>
 <div>
-Do not change this unless you specifically want a different audio input from the video device.<br>
-Wavelet will currently override this if a new video input device is selected!
+Audio input devices will be populated here<br>
 </div>
 </p>
 </details>
@@ -66,8 +65,8 @@ Wavelet will currently override this if a new video input device is selected!
 <p>
 If bluetooth is configured, it will become the default audio output device.
 <div><label for="btMAC">Bluetooth MAC Address:</label>
-<input type="text" class="hostTextBox" id="btMAC" name="btMAC">&ensp;
-<button onclick="applyAudioBlueToothSettings()" id="btApplyButton" class="btn" type="button">Apply</button><br>
+<input type="text" title="If available, the current Bluetooth MAC address configured in the system." class="hostTextBox" id="btMAC" name="btMAC">&ensp;
+<button onclick="applyAudioBlueToothSettings()" title="Apply the value in the textbox.  Wavelet will attempt to connect to it." id="btApplyButton" class="btn" type="button">Apply</button><br>
 </p>
 </details>
 </div>
@@ -78,24 +77,24 @@ If bluetooth is configured, it will become the default audio output device.
 Video Sources
 <br>
 <br>
-<a class="btn" target="_blank">
-  <span class="btn__inner">
-    <span class="btn__label" id="RD" value="RD" data-label="Refresh Sources" data-hover=">activate<">
-Refresh Sources
-      <span class="btn__label__background"></span>
-    </span>
-  </span>
-  <span class="btn__background"></span>
+<a class="btn" target="_blank" id="RD" value="RD">
+ <span class="btn__inner">
+   <span class="btn__label" title="Refresh available video sources" data-label="Refresh Sources" data-hover=">activate<" data-activated="<<<ACTIVATED>>>">
+     Refresh Sources
+     <span class="btn__label__background"></span>
+   </span>
+ </span>
+ <span class="btn__background"></span>
 </a>
 
 <div id="dynamicInputs" div class="input_divider_inner" div title="dynamically populated inputs for local devices, or devices attached to a wavelet encoder device.">Local Input Devices<br></div>
 <br>
 <div id="dynamicNetworkInputs" div class="dynamicInputsTarget" div title="dynamically populated inputs for vendor network devices, such as supported IP cameras.">Network Input Devices<br></div>
 <br>
-Toggle Banner<label class="switch" id="banner_toggle"><input type ="checkbox" id="banner_toggle_checkbox"><span class="slider round"></span></label>
+Toggle Banner<label class="switch" title="Toggles Wavelet to generate an informational banner showing the current active Input" id="banner_toggle"><input type ="checkbox" id="banner_toggle_checkbox"><span class="slider round"></span></label>
 </div>
 
-<div id="Host control" class="input_divider">Detected Wavelet Hosts<br><br>
+<div id="Host control" title="Hover the mouse, and the tooltip will reveal the device's IP address" class="input_divider">Detected Wavelet Hosts<br><br>
 <div id="dynamicdecHosts" div class="host_type_divider input_divider_inner">Decoders</div>
 <div id="dynamicencHosts" div class="host_type_divider input_divider_inner">Encoders</div>
 <div id="dynamicsvrHosts" div class="host_type_divider input_divider_inner">Servers</div>
@@ -103,13 +102,13 @@ Toggle Banner<label class="switch" id="banner_toggle"><input type ="checkbox" id
 <div id="dynamiclvstrmHosts" div class="host_type_divider input_divider_inner"></div>
 </div>
 
-<div id="Advanced Settings" class="input_divider">
+<div id="Advanced Settings" title="Advanced system settings" class="input_divider">
 <details><summary>Advanced Settings<span class="icon"></span></summary>
 	<div id="multiple_inputs_section" class="input_divider">
 		<div id="multiple_inputs_inner" class="input_divider_inner">
 			<details><summary>Multiple Input Selection<span class="icon"></summary>
 			<p>
-			<button id="W" class="btn" value="W" type="button">Activate Multi Inputs</button>
+			<button id="W" title="Usually broken, unless all video inputs have the same codec" class="btn" value="W" type="button">Activate Multi Inputs</button>
 			</p>
 			</details>
 		</div>
@@ -127,15 +126,15 @@ Toggle Livestreaming <label class="switch" id="lstoggle">
 <details><summary>Livestream target, API Key setup<span class="icon"></span></summary>
 <p>
 <label for="lsurl">Livestream URL target:</label>
-<input type="text" id="lsurl" name="lsurl">&ensp;
+<input type="text" title="Input a valid URL for RTSP streaming here" id="lsurl" name="lsurl">&ensp;
 <label for="lsapikey">API Key:</label>
-<input type="text" id="lsapikey" name="lsapikey">
+<input type="text" title="Most streaming services require an API key, input the provided key here." id="lsapikey" name="lsapikey">
 <br>
 <button onclick="applyLivestreamSettings()" id="lsApplyButton" class="btn" type="button">Apply</button><br>
 </p>
 </details>
 </div>
-<div id="codecs_section" class="input_divider_inner">
+<div id="codecs_section" title="WARNING:  not all codecs perform well, or run at all with all sources.  Experiment at your own risk!" class="input_divider_inner">
 &emsp;<details><summary>Codec Selection<span class="icon"></span></summary>
 <p>
 <button class="btn" value="A">H.264 SW
@@ -170,7 +169,7 @@ Toggle Livestreaming <label class="switch" id="lstoggle">
 <button id="DR" class="btn" value="DR" type="button">Decoder Task Restart (all)</button>
 <button id="ER" class="btn" value="ER" type="button">Encoder Hard Reset (all)</button>
 <button id="SR" class="btn" value="SR" type="button">Hard Reset (all)</button>
-<button id="SR" class="btn" value="CL" type="button">Clear Video Sources</button>
+<button id="CL" class="btn" value="CL" type="button">Clear Video Sources</button>
 </p>
 </div>
 </details>
