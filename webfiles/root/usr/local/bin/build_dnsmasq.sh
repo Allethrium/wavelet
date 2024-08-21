@@ -33,15 +33,34 @@ ExecStartPost=-touch /var/dnsmasq_terminated.notice
 WantedBy=multi-user.target
 " > /usr/lib/systemd/system/dnsmasq.service
 
-# Download base images, maybe leave this to the client generation scripts as it's not really necessary during server spinup.
-#podman run --security-opt label=disable --pull=always --rm -v .:/data -w /data quay.io/coreos/coreos-installer:release download -f iso
-#coreos-installer download -s stable -p metal -C /var/tftpboot
 
-#systemctl --user enable container-dnsmasq.service --now
+# Finds and parses current server IP address, then injects it as a listen address in dnsmasq.conf for DNS name resolution.
+IPVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
+if [[ "${IPVALUE}" == "" ]] then
+	# sleep for five seconds, then call yourself again
+	echo -e "\nIP Address is null, sleeping and calling function again\n"
+	sleep 5
+	get_ipValue
+else
+	echo -e "\nIP Address is not null, testing for validity..\n"
+	valid_ipv4() {
+		local ip=$1 regex='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
+		if [[ $ip =~ $regex ]]; then
+			echo -e "\nIP Address is valid, continuing..\n"
+			return 0
+		else
+			echo "\nIP Address is not valid, sleeping and calling function again\n"
+			get_ipValue
+		fi
+	}
+valid_ipv4 "${IPVALUE}"
+fi
+
+sed "s/listen-address=::1,127.0.0.1/listen-address=::1,127.0.0.1,${IPVALUE}/g" /etc/dnsmasq.conf
 systemctl stop systemd-resolved.service
 systemctl enable dnsmasq.service --now
 # Can run SystemD-resolved with StubListener set appropriately.
-systemctl start systemd-resolved.service
+systemctl enable systemd-resolved.service --now
 systemctl restart dnsmasq.service
 
-# 8/2023 - Might replace all of this with a full iDM running BIND, especially if we need WPA2-ENT
+# 8/2023 - Might replace all of this with a full iDM running BIND, especially if we need WPA2/3-ENT
