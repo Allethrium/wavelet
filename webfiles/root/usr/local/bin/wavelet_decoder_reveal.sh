@@ -35,7 +35,7 @@ event_decoder(){
 # Kill the systemd monitor task for a few moments
 systemctl --user stop wavelet-decoder-reveal.service
 echo -e "\nDecoder Reveal flag change detected, resetting flag and displaying reveal card for 15 seconds..\n\n\n"
-etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/DECODER_REVEAL" -- "0"
+etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/DECODER_REVEAL" -- "0"
 systemctl --user stop UltraGrid.AppImage.service
 mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.reveal
 # set ug_args to generate and display smpte testcard
