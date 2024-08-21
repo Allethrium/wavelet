@@ -93,7 +93,7 @@ case $event in
 	(ER)	echo -e "Encoders instructed to reload\n"					;current_event="wavelet-encoder-reboot"	;wavelet-encoder-reboot						;;
 	(SR)	echo -e "Whole system reboot\n"								;current_event="wavelet-system-reboot"	;wavelet-system-reboot						;;
 	(CL)	echo -e "Clearing All Input Sources from keystore..\n"		;current_event="wavelet-clear-inputs"	;wavelet-clear-inputs						;;
-	(RD)	echo -e "Running re-detection of source devices..\n"		;current_event="wavelet-detect-inputs"	;/usr/local/bin/wavelet_detectv4l.sh		;;
+	(RD)	echo -e "Running re-detection of source devices..\n"		;current_event="wavelet-detect-inputs"	;wavelet-refresh							;;
 #	if [ $recording = true ]; then
 #		echo "Recording to archive file" && recording=true && wavelet_record_start
 #	if [ $recording = false ]; then
@@ -230,6 +230,19 @@ wavelet-testcard() {
 	write_etcd
 	echo 'capture.data 2' | busybox nc -v 127.0.0.1 6160
 }
+
+wavelet-refresh() {
+	# This is only called by the RD, refresh-devices button, and it finds the previous hash and resets to it.
+	revisions=$(etcdctl --endpoints=192.168.1.32:2379 get -w json uv_hash_select | jq -r '.header.revision')
+	lastrev=$((${revisions} - 1))
+	previousHash=$(etcdctl --endpoints=192.168.1.32:2379 get uv_hash_select --rev=${lastrev} --print-value-only)
+	KEYNAME=uv_hash_select
+	KEYVALUE=${previousHash}
+	write_etcd_global
+	echo -e "Previous hash value reset, running detectv4l to redetect local sources on all hosts.."
+	wavelet_detect_inputs
+}
+
 
 wavelet-dynamic() {
 	# processes device hashes submitted from the WebUI through to the encoder
@@ -457,10 +470,10 @@ wavelet-foursplit() {
 	KEYNAME=uv_input
 	KEYVALUE=FOURSPLIT
 	write_etcd_global
-		# Set encoder restart flag to 1
-		KEYNAME=encoder_restart
-		KEYVALUE="1"
-		write_etcd_global
+	# Set encoder restart flag to 1
+	KEYNAME=encoder_restart
+	KEYVALUE="1"
+	write_etcd_global
 }
 wavelet-twosplit() {
 # W
@@ -468,10 +481,10 @@ wavelet-twosplit() {
 	KEYNAME=uv_input
 	KEYVALUE=TWOSPLIT
 	write_etcd_global
-		# Set encoder restart flag to 1
-		KEYNAME=encoder_restart
-		KEYVALUE="1"
-		write_etcd_global
+	# Set encoder restart flag to 1
+	KEYNAME=encoder_restart
+	KEYVALUE="1"
+	write_etcd_global
 }
 wavelet-pip1() {
 # Doesn't currently work, so disable.
@@ -479,10 +492,10 @@ wavelet-pip1() {
 	KEYNAME=uv_input
 	KEYVALUE=PIP1
 	write_etcd_global
-		# Set encoder restart flag to 1
-		KEYNAME=encoder_restart
-		KEYVALUE="1"
-		write_etcd_global
+	# Set encoder restart flag to 1
+	KEYNAME=encoder_restart
+	KEYVALUE="1"
+	write_etcd_global
 }
 wavelet-pip2() {
 # Doesn't currently work, so disable.
@@ -490,16 +503,16 @@ wavelet-pip2() {
 	KEYNAME=uv_input
 	KEYVALUE=PIP2
 	write_etcd_global
-		# Set encoder restart flag to 1
-		KEYNAME=encoder_restart
-		KEYVALUE="1"
-		write_etcd_global
+	# Set encoder restart flag to 1
+	KEYNAME=encoder_restart
+	KEYVALUE="1"
+	write_etcd_global
 }
 
 wavelet-decoder-reset() {
 # Finds all decoders and sets client reSET flag.  This restarts UltraGrid without a full system reboot.
 # Have to clean /DECODER_RESET from result or we get recursion, remember etcd isn't hierarchical!
-	return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --keys-only)
+return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --keys-only)
 	RESULT="${return_etcd_clients_ip///DECODER_RESET/}"
 	for host in ${RESULT}; do
 		trimmed_host=$(echo ${host} | sed 's|decoderip/||g')
@@ -542,12 +555,11 @@ wavelet-clear-inputs() {
 }
 
 wavelet-detect-inputs() {
-# Tells detectv4l to run on everything
+	# Tells detectv4l to run on everything
 	echo -e "\nAll devices now redetecting available input video sources..\n"
+	# here we might need a list of encoder hostNames and do a forEach loop..
 	etcdctl --endpoints=http://192.168.1.32:2379 set "DEVICE_REDETECT" -- "1"
-
 }
-
 
 
 ###

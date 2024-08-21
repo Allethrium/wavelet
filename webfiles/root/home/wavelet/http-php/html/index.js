@@ -115,8 +115,8 @@ function fetchHostLabelAndUpdateUI(getLabelHostName){
 function sendPHPID(buttonElement) {
 		// we use id here in place of value (both are same for static items in the html)
 		// Because javascript inexplicably can access everythign EXCEPT the value??
-		const postValue				=		buttonElement.id;
-		const postLabel				=		buttonElement.innerText;
+		const postValue				=		escapeHTML(buttonElement.id);
+		const postLabel				=		escapeHTML(buttonElement.innerText);
 		console.log("Sending Value: " + postValue + "\nAnd Label: " + postLabel);
 		$.ajax({
 				type: "POST",
@@ -127,7 +127,10 @@ function sendPHPID(buttonElement) {
 								  },
 						success: function(response){
 								console.log(response);
-						}
+								if (postValue == "RD" || "CL") {
+									location.reload(true);
+								}
+							}
 				});
 		var dynamicsArr		=		Array.from($('div[id="dynamicInputs"] .btn'));
 		var staticsArr		=		Array.from($('div[id="static_inputs_section"] .btn'));
@@ -159,14 +162,14 @@ function sendPHPID(buttonElement) {
 
 function sendDynamicPHPID(buttonElement) {
 		const postValue				=		escapeHTML(buttonElement.value);
-		const postLabel				=		$(buttonElement).attr('label');
+		const postLabel				=		escapeHTML($(buttonElement).attr('label'));
 		console.log("Sending Value: " + postValue + "\nAnd Label: " + postLabel);
 		$.ajax({
 				type: "POST",
 						url: "/set_uv_hash_select.php",
 						data: {
 								value: postValue,
-								label: escapeHTML(postLabel)
+								label: postLabel
 								  },
 						success: function(response){
 								console.log(response);
@@ -225,7 +228,7 @@ function handlePageLoad() {
 			if ($(this).is(':checked')) {
 				$.ajax({
 					type: "POST",
-					url: "/enable_livestream.php",
+					url: "/set_enable_livestream.php",
 					data: {
 						lsonoff: "1"
 						},
@@ -236,7 +239,7 @@ function handlePageLoad() {
 				} else {
 					$.ajax({
 						type: "POST",
-						url: "/enable_livestream.php",
+						url: "/set_enable_livestream.php",
 						data: {
 								lsonoff: "0"
 								},
@@ -253,7 +256,7 @@ function handlePageLoad() {
 			if ($(this).is(':checked')) {
 				$.ajax({
 					type: "POST",
-					url: "/enable_banner.php",
+					url: "/set_enable_banner.php",
 					data: {
 						banneronoff: "1"
 					},
@@ -264,7 +267,7 @@ function handlePageLoad() {
 			} else {
 				$.ajax({
 					type: "POST",
-					url: "/enable_banner.php",
+					url: "/set_enable_banner.php",
 					data: {
 						banneronoff: "0"
 							},
@@ -280,7 +283,7 @@ function handlePageLoad() {
 			if ($(this).is(':checked')) {
 				$.ajax({
 					type: "POST",
-					url: "/enable_audio.php",
+					url: "/set_enable_audio.php",
 					data: {
 						audioonoff: "1"
 						},
@@ -291,7 +294,7 @@ function handlePageLoad() {
 			} else {
 				$.ajax({
 					type: "POST",
-					url: "/enable_audio.php",
+					url: "/set_enable_audio.php",
 					data: {
 						audioonoff: "0"
 							},
@@ -362,10 +365,10 @@ function getAudioStatus(audioValue) {
 	})
 }
 
-function getHostIPAJAX(hostName, divEntry) {
+async function getHostIPAJAX(hostName, divEntry) {
 	/* Takes the hostname on hover and gets the IP address of the device */
 	var queryHostName			=		hostName;
-	console.log("Attempting AJAX PHP query for " + hostName);
+	console.log("Attempting AJAX PHP query for the IP Address of " + hostName);
 	$.ajax({
 			type: "POST",
 			url: "/get_host_ip.php",
@@ -484,7 +487,7 @@ function createDeleteButton(hostName, hostHash) {
 			console.log("Deleting host entry and associated key: " + hostName + "\nAnd Hash Value:" + hostHash);
 			$.ajax({
 				type: "POST",
-				url: "/remove_host.php",
+				url: "/set_remove_host.php",
 				data: {
 					key: hostName,
 					value: hostHash
@@ -511,7 +514,7 @@ function createIdentifyButton(hostName, hostHash) {
 			$(this).addClass('btn_active');
 			$.ajax({
 				type: "POST",
-				url: "/reveal_host.php",
+				url: "/set_reveal_host.php",
 				data: {
 					key: hostName,
 					value: "1"
@@ -538,7 +541,7 @@ function createRestartButton(hostName, hostHash) {
 		console.log("Host instructed to restart UltraGrid task:" + hostName);
 		$.ajax({
 			type: "POST",
-			url: "/reset_host.php",
+			url: "/set_reset_host.php",
 			data: {
 				key: hostHash,
 				value: "1"
@@ -563,7 +566,7 @@ function createRebootButton(hostName, hostHash) {
 			console.log("Host instructed to reboot!" + hostName);
 			$.ajax({
 				type: "POST",
-				url: "/reboot_host.php",
+				url: "/set_reboot_host.php",
 				data: {
 					key: hostName,
 					value: "1"
@@ -735,7 +738,7 @@ function createNewButton(key, value, keyFull, functionIndex) {
 			console.log("Deleting input entry and associated key: " + key + " and value: " + value);
 			$.ajax({
 				type: "POST",
-				url: "/remove_input.php",
+				url: "/set_remove_input.php",
 				data: {
 					key: key,
 					value: value
@@ -794,8 +797,9 @@ function createNewHost(key, type, hostName, hostHash, functionIndex) {
 				data:{
 					hash:       phpHostHash,
 					newName:    phpHostName,
-					oldName:    phpOldValue
-				},
+					oldName:    phpOldValue,
+					type   :    type
+					},
 				success : function(response) {
 					console.log(response);
 				}
@@ -838,6 +842,7 @@ function createNewHost(key, type, hostName, hostHash, functionIndex) {
 		$(divEntry).append(createRestartButton());
 		$(divEntry).append(createRebootButton());
 		$(divEntry).append(createCodecStateChangeButton(hostName, hostHash, type));
+		getHostIPAJAX(hostName, divEntry);
 		$(this).addClass('host_divider');
 	}
 	function createServerButtonSet(hostName, hostHash){
@@ -845,6 +850,7 @@ function createNewHost(key, type, hostName, hostHash, functionIndex) {
 		console.log("Generating Server label and buttons.");
 		$(divEntry).append(createRestartButton());
 		$(divEntry).append(createRebootButton());
+		getHostIPAJAX(hostName, divEntry);
 	}
 	function createGatewayButtonSet(hostName, hostHash){
 		$(divEntry).append(createRenameButton());
@@ -886,37 +892,38 @@ function createNewHost(key, type, hostName, hostHash, functionIndex) {
 }
 
 function relabelInputElement() {
-	const selectedDivHash			=		$(this).parent().attr('divDeviceHash');
-											console.log("the found hash is: " + selectedDivHash);
-	const relabelTarget				=		$(this).parent().attr('divDevID');
-											console.log("the found button ID is: " + relabelTarget);
-	const oldGenText				=		$(this).parent().attr('data-fulltext');
-	const newTextInput				=		prompt("Enter new text label for this device:");
-	console.log("Device full label is: " + oldGenText);
-	console.log("New input label is: " +newTextInput);
+	const selectedDivHash                           =               $(this).parent().attr('divDeviceHash');
+	const relabelTarget                             =               $(this).parent().attr('divDevID');
+	const oldGenText                                =               $(this).parent().attr('data-fulltext');
+	const newTextInput                              =               prompt("Enter new text label for this device:");
+	const inputButtonLabel                          =               $(this).next('button').attr('label');
+	const hostName                                  =               $(this).next('button').attr('label').split('/')[0];
+	console.log("Found Hash is: " + selectedDivHash + "\nFound button ID is: " + relabelTarget + "\nFound Label is: " + inputButtonLabel);
+	console.log("Device full label is: " + oldGenText + "\nNew device label: " + newTextInput + "\nHostname: " + hostName);
 	if (newTextInput !== null && newTextInput !== "") {
-		document.getElementById(relabelTarget).innerText = newTextInput;
-		document.getElementById(relabelTarget).oldGenText = oldGenText;
-		console.log("Button text successfully applied as: " + newTextInput);
-		console.log("The originally generated device field from Wavelet was: " + oldGenText);
-		console.log("The button must be activated for any changes to reflect on the video banner!");
-		$.ajax({
-			type: "POST",
-			url: "/set_input_label.php",
-			data: {
-					value: selectedDivHash,
-					label: newTextInput,
-					oldvl: oldGenText
+			document.getElementById(relabelTarget).innerText = `${hostName}: ${newTextInput}`;
+			document.getElementById(relabelTarget).oldGenText = oldGenText;
+			console.log("Button text successfully applied as: " + newTextInput);
+			console.log("The originally generated device field from Wavelet was: " + oldGenText);
+			console.log("The button must be activated for any changes to reflect on the video banner!");
+			$.ajax({
+				type: "POST",
+				url: "/set_input_label.php",
+				data: {
+					value:          selectedDivHash,
+					label:          newTextInput,
+					oldvl:          oldGenText,
+					hostName:       hostName
 				  },
-			success: function(response){
-				console.log(response);
-				location.reload(true);
-			}
-		});
-	} else {
-		return;
+				success: function(response){
+					console.log(response);
+				}
+			});
+		} else {
+			return;
 	}
 }
+
 
 function relabelHostElement(label) {
 	var selectedDivHost			=		$(this).parent().attr('divDeviceHostName');
@@ -962,7 +969,7 @@ function applyLivestreamSettings() {
 	var vapikey	=	$("#lsapikey").val();
 	$.ajax({
 		type: "POST",
-		url: "/apply_livestream.php",
+		url: "/set_apply_livestream.php",
 		data: {
 			lsurl: vlsurl,
 			apikey: vapikey
@@ -1009,7 +1016,11 @@ function getActiveInputHash(activeInputHash) {
 				$(".btn").each(function() {
 					if ($(this).attr('value') && $(this).attr('value').trim() === activeInputHash) { 
 						console.log("Found button with input hash: " + activeInputHash + ", setting as active for CSS..");
+						if ( activeInputHash == "RD") {
+							console.log("input source refresh is the selected hash, doing nothing..")
+						} else {
 						this.setAttribute("data-active", "1");
+						}
 					} else {
 						console.log("No button with value: " + activeInputHash + " found.");
 					}

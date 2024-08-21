@@ -324,8 +324,26 @@ encoder_checkNetwork(){
 	fi
 }
 
-exec >/home/wavelet/detectv4l.log 2>&1
-# check to see if I'm a server or an encoder
 
+#####
+#
+# Main
+#
+#####
+
+exec >/home/wavelet/detectv4l.log 2>&1
+
+# Check RD flag set here, if it's on we need to reset the device_redetect global flag first.
+if [[ "${1}" = "RD" ]]; then
+	echo -e "Called by refresh devices, hanging watcher for two seconds whilst we reset the key.."
+	systemctl --user disable wavelet_device_redetect.service --now
+	KEYNAME="DEVICE_REDETECT"
+	KEYVALUE="0"
+	write_etcd_global
+	sleep 2
+	systemctl --user enable wavelet_device_redetect.service --now
+fi
+
+# check to see if I'm a server or an encoder
 echo -e "\n \n \n ********Begin device detection and registration process...******** \n \n \n"
 detect_self

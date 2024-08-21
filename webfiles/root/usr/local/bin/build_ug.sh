@@ -59,11 +59,11 @@ detect_self(){
 
 check_hostname(){
 	# Get the old hostname from the file, then remove it because it's not necessary until the hostname is changed again.
-
 	oldHostName=$(echo /var/tmp/oldhostname.txt)
 	if [[ "${oldHostName}" == "$(hostname)" ]]; then
 		echo -e "\nOld hostname is the same as the current hostname!  Doing nothing.\n"
-		rm -rf /var/tmp/oldhostname.txt
+		rm -rf /var/tmp/old
+		.txt
 		exit 0
 	fi
 	case $oldHostName in
@@ -101,7 +101,7 @@ event_gateway(){
 
 
 event_livestreamer(){
-	# creates wavelet-livestream systemd unit.
+	# creates wavelet_livestream systemd unit.
 	# Livestreamer box runs only when livestream flag is enabled - we "secure" this with hardware.
 	echo -e "Generating Livestream SystemdD unit in /.config/systemd/user.."
 	echo "
@@ -115,12 +115,12 @@ event_livestreamer(){
 	Restart=always
 	[Install]
 	WantedBy=default.target
-	" > /home/wavelet/.config/systemd/user/wavelet-livestream.service
+	" > /home/wavelet/.config/systemd/user/wavelet_livestream.service
 		echo -e "Calling run_ug.service.."; exit 0
 	systemctl --user daemon-reload
 	event_decoder_restart
 	event_reboot
-	systemctl --user enable wavelet-livestream.service --now
+	systemctl --user enable wavelet_livestream.service --now
 	systemctl --user start run_ug.service
 	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/wavelet_build_completed" -- "${KEYVALUE}"
 	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/livestream_capable" -- 1
@@ -161,6 +161,7 @@ event_encoder(){
 	event_encoder_reboot
 	event_reboot
 	event_reset
+	event_device_redetect
 	etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/wavelet_build_completed" -- "${KEYVALUE}"
 	hostname=$(hostname)
 	# We need to add this switch here to ensure if we're a server we don't populate ourselves to the encoders DOM in the webUI..
@@ -344,7 +345,7 @@ event_reboot(){
 	Restart=on-failure
 	RestartSec=2
 	[Install]
-	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-reboot.service
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_reboot.service
 	# and the same for the host reboot
 	echo "[Unit]
 	Description=Wavelet System Reboot Service
@@ -357,7 +358,7 @@ event_reboot(){
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_monitor_decoder_reboot.service
 
 	systemctl --user daemon-reload
-	systemctl --user enable wavelet-reboot.service --now
+	systemctl --user enable wavelet_reboot.service --now
 	systemctl --user enable wavelet_monitor_decoder_reboot.service --now
 }
 
@@ -373,7 +374,7 @@ event_reset(){
 	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch SYSTEM_RESET -w simple -- sh -c "/usr/local/bin/wavelet_reset.sh"
 	Restart=always
 	[Install]
-	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-reset.service
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_reset.service
 
 	# and the same for the host reset
 	echo -e "[Unit]
@@ -387,7 +388,7 @@ event_reset(){
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_monitor_decoder_reset.service
 
 	systemctl --user daemon-reload
-	systemctl --user enable wavelet-reset.service --now
+	systemctl --user enable wavelet_reset.service --now
 	systemctl --user enable wavelet_monitor_decoder_reset.service --now
 }
 
@@ -433,10 +434,10 @@ event_encoder_reboot(){
 	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/SYSTEM_REBOOT -w simple -- sh -c \"/usr/local/bin/wavelet_reboot.sh\"
 	Restart=always
 	[Install]
-	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-encoder-reboot.service
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_encoder_reboot.service
 
 	systemctl --user daemon-reload
-	systemctl --user enable wavelet-encoder-reboot.service --now
+	systemctl --user enable wavelet_encoder_reboot.service --now
 }
 
 event_decoder_reset(){
@@ -451,10 +452,10 @@ event_decoder_reset(){
 	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/DECODER_RESET -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_reset.sh\"
 	Restart=always
 	[Install]
-	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-decoder-reset.service
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_decoder_reset.service
 
 	systemctl --user daemon-reload
-	systemctl --user enable wavelet-decoder-reset.service --now
+	systemctl --user enable wavelet_decoder_reset.service --now
 }
 
 event_audio_toggle(){
@@ -469,10 +470,10 @@ event_audio_toggle(){
 	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /interface/audio/enabled -w simple -- sh -c \"/usr/local/bin/wavelet_audio_toggle.sh\"
 	Restart=always
 	[Install]
-	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-audio-toggle.service
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_audio_toggle.service
 
 	systemctl --user daemon-reload
-	systemctl --user enable wavelet-audio-toggle.service --now
+	systemctl --user enable wavelet_audio_toggle.service --now
 }
 
 event_audio_bluetooth_connect(){
@@ -487,10 +488,10 @@ event_audio_bluetooth_connect(){
 	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /audio_interface_bluetooth_mac -w simple -- sh -c \"/usr/local/bin/wavelet_set_bluetooth_connect.sh\"
 	Restart=always
 	[Install]
-	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-bluetooth-audio.service
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_bluetooth_audio.service
 
 	systemctl --user daemon-reload
-	systemctl --user enable wavelet-bluetooth-audio.service --now
+	systemctl --user enable wavelet_bluetooth_audio.service --now
 }
 
 get_os_partition_uuid() {
@@ -549,19 +550,19 @@ event_device_redetect(){
 	Wants=network-online.target
 	[Service]
 	Environment=ETCDCTL_API=3
-	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch DEVICE_REDETECT -w simple -- sh -c \"/usr/local/bin/wavelet_detectv4l.sh\"
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch DEVICE_REDETECT -w simple -- sh -c \"/usr/local/bin/wavelet_detectv4l.sh rd\"
 	Restart=always
 	[Install]
-	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-device-redetect.service
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_device_redetect.service
 	systemctl --user daemon-reload
-	systemctl --user enable wavelet-device-redetect.service --now
+	systemctl --user enable wavelet_device_redetect.service --now
 }
 
 event_host_relabel_watcher(){
-	# Watches for a device relabel flag, then runs wavelet-device-relabel.sh
+	# Watches for a device relabel flag, then runs wavelet_device_relabel.sh
 	echo -e "Generating Reboot SystemdD unit in /.config/systemd/user.."
 	echo -e "[Unit]
-	Description=etcd Device redetection watcher
+	Description=etcd Device hostname change watcher
 	After=network-online.target
 	Wants=network-online.target
 	[Service]
@@ -569,16 +570,16 @@ event_host_relabel_watcher(){
 	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/RELABEL -w simple -- sh -c \"/usr/local/bin/wavelet_device_relabel.sh\"
 	Restart=always
 	[Install]
-	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-device-relabel.service
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_device_relabel.service
 	systemctl --user daemon-reload
-	systemctl --user enable wavelet-device-relabel.service --now
+	systemctl --user enable wavelet_device_relabel.service --now
 }
 
 clean_oldEncoderHostnameSettings(){
 	# Finds and cleans up any references in etcd to the old hostname
 	# First, disable all reset watchers so that the host isn't instructed to reboot the moment a flag changes!
-	systemctl --user disable wavelet-device-redetect.service --now
-	systemctl --user disable wavelet-encoder-reboot.service --now
+	systemctl --user disable wavelet_device_redetect.service --now
+	systemctl --user disable wavelet_encoder_reboot.service --now
 	systemctl --user disable wavelet_monitor_decoder_reboot.service --now
 	systemctl --user disable wavelet_monitor_decoder_reset.service --now
 	# Delete all reverse lookups, labels and hashes for this device
@@ -590,7 +591,7 @@ clean_oldEncoderHostnameSettings(){
 clean_oldDecoderHostnameSettings(){
 	# Finds and cleans up any references in etcd to the old hostname
 	# First, disable all reset watchers so that the host isn't instructed to reboot the moment a flag changes!
-	systemctl --user disable wavelet-decoder-reset.service --now
+	systemctl --user disable wavelet_decoder_reset.service --now
 	systemctl --user disable wavelet_monitor_decoder_reveal.service --now
 	systemctl --user disable wavelet_monitor_decoder_reboot.service --now
 	systemctl --user disable wavelet_monitor_decoder_reset.service --now

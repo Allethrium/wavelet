@@ -3,8 +3,9 @@
 // Hash = device hash from webUI, 
 // label = device label from webUI, this is used to overwrite the device string in /interface/ and make the label persistent.
 // oldText = the old device label, which we need to delete from ETCD.
-$key = $_POST["key"];
-$value = $_POST["value"];
+$hash = $_POST["hash"];
+$newName = $_POST["newName"];
+$oldName = $_POST["oldName"]
 $type = $_POST["type"]
 
 function curl_etcd($keyTarget, $keyValue) {
@@ -68,11 +69,10 @@ function set_etcd_hostHash($keyTarget, $keyValue) {
 }
 
 
-// curl etcd uv_hash_select for the value of the device hash we want to see streaming on the system
-// please note how we have to call the function twice to set the reverse lookup values as well as the fwd values!
+//
 
 // add an IF argument here to set decoderlabel/encoderlabel etc.
-echo "posted data are: \n New Label: $value\n Key: $key \n";
+echo "posted data are: \n New Label: $value\n Hash: $key \n";
 curl_etcd("$key", "$value");
 curl_etcd_hostname("$key", "$value");
 set_etcd_hosthash("$key", "$value");
