@@ -12,7 +12,7 @@ detect_self(){
 	#chown root:root /var/tmp/hostname.local
 	#sed -i "s|!!hostnamegoeshere!!|${hostname}|g" /usr/local/bin/wavelet_network_sense.sh
 	
-	# Check to see if hostname has changed since last reboot
+	# Check to see if hostname has changed since last session
 	if [[ -f /home/wavelet/oldhostname.txt ]]; then
 		check_hostname
 	fi
@@ -255,7 +255,7 @@ event_decoder(){
 
 event_livestream(){
 	echo "In our use case, this is a decoder with an HDMI output to a Windows machine."
-	rm -rf /home/wavelet/.config/systemd/user/wavelet-livestream.service
+	rm -rf /home/wavelet/.config/systemd/user/wavelet_livestream.service
 	echo "
 	[Unit]
 	Description=ETCD Livestream watcher
@@ -265,11 +265,11 @@ event_livestream(){
 	ExecStart=ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch uv_islivestreaming -w simple -- sh -c "/usr/local/bin/wavelet_livestream.sh"
 	Restart=always
 	[Install]
-	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet-livestream.service
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_livestream.service
 	systemctl --user daemon-reload
-	systemctl --user start wavelet-livestream.service
+	systemctl --user start wavelet_livestream.service
 	echo -e "Livestream decoder systemd units instructed to start..\n"
-	return=$(systemctl --user is-active --quiet wavelet-livestream.service)
+	return=$(systemctl --user is-active --quiet wavelet_livestream.service)
 	if [[ ${return} -eq !0 ]]; then
 		echo "Livestream failed to start, there may be something wrong with the system."
 	else
@@ -343,7 +343,21 @@ clean_oldHostSettings(){
 	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/$(previousHostName) --prefix
 	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /$(hostname) --prefix
 	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del $(hostname) --prefix
-	/usr/local/bin/build_ug.sh
+	set_newHostName
+}
+
+set_newHostName(){
+	myNewHostname=$(echo /home/wavelet/newHostName.txt)
+	if hostnamectl hostname ${myNewHostname}; then
+		echo -e "\n Host Name set successfully!, writing relabel_active to 0 and calling build_ug.sh!\n"
+		KEYNAME="/hostHash/$(myNewHostname)/relabel_active"
+		KEYVALUE="0"
+		write_etcd_global
+		/usr/local/bin/build_ug.sh
+	else
+		echo -e "\n Hostname change command failed, aborting\n"
+		exit 1
+	fi
 }
 
 ###
@@ -355,6 +369,8 @@ clean_oldHostSettings(){
 ###
 set -x
 exec >/home/wavelet/run_ug.log 2>&1
+# Disable systemd-resolved, because it interferes with name resolution despite DNSSstublistener=no being set.  sigh.
+systemctl disable systemd-resolved.service --now
 echo -e "Pinging wavelet_detectv4l.sh to ensure any USB devices are detected prior to start.. \n"
 /usr/local/bin/wavelet_detectv4l.sh
 get_ipValue
