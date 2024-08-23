@@ -293,6 +293,12 @@ storage:
       overwrite: true
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/home/wavelet/.config/waybar/time.sh
+    # Firefox policies.json to precustomize the firefox UI
+    - path: /etc/firefox/policies
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root//etc/firefox/policies
 # Systemd user units
     # systemD user unit for wavelet initialization
     # Called with other initializations when Sway is executed from;
