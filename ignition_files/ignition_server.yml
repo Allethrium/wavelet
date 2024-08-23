@@ -6,7 +6,7 @@ variant: fcos
 version: 1.5.0
 kernel_arguments:
   should_exist:
-    #- nosmt
+    # - nosmt
     - preempt=full
     - threadirqs
     - mitigations=off
@@ -24,6 +24,13 @@ kernel_arguments:
 # UltraGrid AppImage
 storage:
   files:
+    # Inhibit systemd suspend
+    - path: /etc/systemd/logind.conf.d/inhibit-suspend.conf
+      mode: 0644
+      contents:
+        inline: |
+          [Login]
+          HandleLidSwitch=ignore
     - path: /usr/local/bin/UltraGrid.AppImage
       mode: 0755
       overwrite: true
