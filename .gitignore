@@ -12,3 +12,5 @@ usrlocalbin.tar.xz
 wavelethome.tar.xz
 fedora-coreos-40.20240709.3.1-live.x86_64.iso.sig
 fedora-coreos-40.20240709.3.1-live.x86_64.iso
+*.iso
+*.sig

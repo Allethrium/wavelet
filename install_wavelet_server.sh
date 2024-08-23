@@ -142,8 +142,8 @@ customization(){
 	# changed to mod ignition files w/ inline data for the scripts to call, this way I don't publish wifi secrets to github.
 	INPUTFILES="server_custom.yml encoder_custom.yml decoder_custom.yml"
 	echo -e "Moving on to WiFi settings"
-	echo -e "If your Wifi AP hasn't yet been configured, please do so now, as the installer will wait for your input"
-	read -p "\nPlease input the SSID of your configured wireless network: " wifi_ssid
+	echo -e "If your Wifi AP hasn't yet been configured, please do so now, as the installer will wait for your input\n"
+	read -p "Please input the SSID of your configured wireless network: " wifi_ssid
 	read -p "Please input the first three elements of the WiFi BSSID / MAC address, colon delimited like so AA:BB:CC:" wifi_bssid
 	read -p "Please input the configured password for your WiFi SSID: " wifi_password
 
