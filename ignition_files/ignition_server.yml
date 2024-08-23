@@ -298,7 +298,7 @@ storage:
       mode: 0644
       overwrite: true
       contents:
-        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root//etc/firefox/policies
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/firefox/policies
 # Systemd user units
     # systemD user unit for wavelet initialization
     # Called with other initializations when Sway is executed from;
