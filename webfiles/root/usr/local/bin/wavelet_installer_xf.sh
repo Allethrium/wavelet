@@ -65,13 +65,13 @@ event_server(){
 
 rpm_ostree_install_git(){
 # Needed because otherwise sway launches the userspace setup before everything is ready
-/usr/bin/rpm-ostree install -y git 
+/usr/bin/rpm-ostree install -y -A git 
 }
 
 rpm_ostree_install(){
 	rpm_ostree_install_step1(){
 	/usr/bin/rpm-ostree install \
-	-y \
+	-y -A \
 	wget fontawesome-fonts wl-clipboard nnn mako sway bemenu rofi-wayland lxsession sway-systemd waybar \
 	foot vim powerline powerline-fonts vim-powerline NetworkManager-wifi iw wireless-regdb wpa_supplicant \
 	cockpit-bridge cockpit-networkmanager cockpit-system cockpit-ostree cockpit-podman buildah rdma avahi \
@@ -87,7 +87,7 @@ rpm_ostree_install(){
 
 	rpm_ostree_install_step2(){
 	/usr/bin/rpm-ostree install \
-	-y \
+	-y -A \
 	https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
 	https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
 	echo -e "\nRPM Fusion repo installed, waiting for 1 second..\n"
@@ -100,7 +100,7 @@ rpm_ostree_install(){
 	# Refresh Metadata
 	/usr/bin/rpm-ostree refresh-md
 	/usr/bin/rpm-ostree install \
-	-y --idempotent \
+	-y -A --idempotent \
 	intel-media-driver \
 	intel-gpu-tools intel-compute-runtime oneVPL-intel-gpu intel-media-driver intel-gmmlib \
 	intel-level-zero oneapi-level-zero libvpl intel-mediasdk libva libva-utils libva-v4l2-request libva-vdpau-driver intel-ocloc \
@@ -121,7 +121,7 @@ rpm_ostree_install(){
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
 	rpm_ostree_install_step3
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-	/usr/bin/rpm-ostree install -y --idempotent firefox
+	/usr/bin/rpm-ostree install -y -A --idempotent firefox
 	echo -e "RPM package updates completed, finishing installer task..\n"
 }
 
@@ -284,7 +284,7 @@ install_ug_depends(){
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 systemctl disable zincati.service --now
 # Unlock RPM ostree persistently across reboots, needed for the weird library linking we are doing here and MAY sidestep the decklink issue.
-ostree admin unlock --hotfix
+# ostree admin unlock --hotfix
 set -x
 exec >/home/wavelet/wavelet_installer.log 2>&1
 detect_self
