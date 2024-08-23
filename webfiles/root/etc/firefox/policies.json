@@ -1,0 +1,198 @@
+{
+	"policies": {
+		"AppAutoUpdate": false,
+		"AppUpdatePin": "106.",
+		"Authentication": {
+			"AllowNonFQDN": {
+				"SPNEGO": false,
+				"NTLM": false
+			},
+			"AllowProxies": {
+				"SPNEGO": false,
+				"NTLM": false
+			},
+			"Locked": true,
+			"PrivateBrowsing": false
+		},
+		"BackgroundAppUpdate": false,
+		"BlockAboutAddons": true,
+		"BlockAboutConfig": true,
+		"BlockAboutProfiles": true,
+		"BlockAboutSupport": true,
+		"Bookmarks": [
+			{
+				"Title": "Wavelet User Interface",
+				"URL": "http://192.168.1.32:8180",
+				"Favicon": "https://example.com/favicon.ico",
+				"Placement": "toolbar"
+			}
+		],
+		"CaptivePortal": false,
+		"Certificates": {
+			"Install": ["cert1.der", "/home/username/cert2.pem"],
+		},
+		"DefaultDownloadDirectory": "${home}/Downloads",
+		"DisableBuiltinPDFViewer": true,
+		"DisableDeveloperTools": true,
+		"DisableEncryptedClientHello": false,
+		"DisableFeedbackCommands": true,
+		"DisableFirefoxAccounts": true,
+		"DisableFirefoxScreenshots": true,
+		"DisableFirefoxStudies": true,
+		"DisableForgetButton": true,
+		"DisableFormHistory": true,
+		"DisableMasterPasswordCreation": true,
+		"DisablePasswordReveal": true,
+		"DisablePocket": true,
+		"DisablePrivateBrowsing": true,
+		"DisableProfileImport": true,
+		"DisableProfileRefresh": true,
+		"DisableSafeMode": true,
+		"DisableSecurityBypass": {
+			"InvalidCertificate": true,
+			"SafeBrowsing": true
+		},
+		"DisableSetDesktopBackground": true,
+		"DisableSystemAddonUpdate": true,
+		"DisableTelemetry": true,
+		"DisplayBookmarksToolbar": "never",
+		"DisplayMenuBar": "never",
+		"DNSOverHTTPS": {
+			"Enabled":  false,
+			"Locked": true,
+		},
+		"DontCheckDefaultBrowser": true,
+		"DownloadDirectory": "${home}/Downloads",
+		"EnableTrackingProtection": {
+			"Value": true,
+			"Locked": true,
+			"Cryptomining": true,
+			"Fingerprinting": true,
+			"EmailTracking": true,
+		},
+		"EncryptedMediaExtensions": {
+			"Enabled": true,
+			"Locked": true
+		},
+		"ExtensionUpdate": false,
+		"FirefoxHome": {
+			"Search": false,
+			"TopSites": false,
+			"SponsoredTopSites": false,
+			"Highlights": false,
+			"Pocket": false,
+			"SponsoredPocket": false,
+			"Snippets": false,
+			"Locked": false
+		},
+		"FirefoxSuggest": {
+			"WebSuggestions": false,
+			"SponsoredSuggestions": false,
+			"ImproveSuggest": false,
+			"Locked": false
+		},
+		"HardwareAcceleration": true,
+		"Homepage": {
+			"URL": "http://192.168.1.32:8180/",
+			"Locked": true,
+			"StartPage": "homepage-locked"
+		},
+		"InstallAddonsPermission": {
+			"Default": false
+		},
+		"NetworkPrediction": false,
+		"NewTabPage": false,
+		"NoDefaultBookmarks": true,
+		"OfferToSaveLogins": false,
+		"OfferToSaveLoginsDefault": false,
+		"OverrideFirstRunPage": "http://192.168.1.32:8180",
+		"PasswordManagerEnabled": false,
+		"PDFjs": {
+			"Enabled": false,
+			"EnablePermissions": false
+		},
+		"Permissions": {
+			"Camera": {
+				"BlockNewRequests": true,
+				"Locked": true
+			},
+			"Microphone": {
+
+				"BlockNewRequests": true,
+				"Locked": true
+			},
+			"Location": {
+				"BlockNewRequests": true,
+				"Locked": true
+			},
+			"Notifications": {
+				"BlockNewRequests": true,
+				"Locked": true
+			},
+			"Autoplay": {
+				"Default": "block-audio-video",
+				"Locked": true
+			}
+		},
+		"PictureInPicture": {
+			"Enabled": false,
+			"Locked": true 
+		},
+		"PopupBlocking": {
+			"Default": true ,
+			"Locked": true
+		},
+		"PostQuantumKeyAgreementEnabled": true,
+		"Preferences": {
+			"accessibility.force_disabled": {
+				"Value": 1,
+				"Status": "default"
+			},
+			"browser.tabs.warnOnClose": {
+				"Value": false,
+				"Status": "locked"
+			}
+		},
+		"PrimaryPassword": false,
+		"PrintingEnabled": false,
+		"PromptForDownloadLocation": false,
+		"Proxy": {
+			"Mode": "none",
+			"Locked": true,
+			"HTTPProxy": "hostname",
+			"SSLProxy": "hostname",
+			"FTPProxy": "hostname",
+			"SOCKSProxy": "hostname",
+			"Passthrough": "<local>",
+			"AutoConfigURL": "URL_TO_AUTOCONFIG",
+		},
+		"RequestedLocales": "de,en-US",
+		"SanitizeOnShutdown": {
+			"Cache": true,
+			"Cookies": true,
+			"Downloads": true,
+			"FormData": true,
+			"History": true,
+			"Sessions": true,
+			"SiteSettings": true,
+			"OfflineApps": true,
+			"Locked": true
+		},
+		"SearchSuggestEnabled": false,
+		"SecurityDevices": {
+			"NAME_OF_DEVICE": "PATH_TO_LIBRARY_FOR_DEVICE"
+		},
+		"ShowHomeButton": true,
+		"StartDownloadsInTempDirectory": true,
+		"TranslateEnabled": false,
+		"UserMessaging": {
+			"ExtensionRecommendations": false,
+			"FeatureRecommendations": false,
+			"UrlbarInterventions": false,
+			"SkipOnboarding": true ,
+			"MoreFromMozilla": false,
+			"Locked": true
+		},
+		"UseSystemPrintDialog": false
+	}
+}
