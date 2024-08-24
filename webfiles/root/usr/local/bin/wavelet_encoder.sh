@@ -193,7 +193,7 @@ event_encoder(){
 	# can be used remote with this kind of tool (netcat) : echo 'capture.data 0' | busybox nc localhost <control_port>
 	# not using right now as different inputs have different formats.. may be problematic.
 	UGMTU="9000"
-	echo -e "Assembled command is:\n--tool uv $filtervar -f V:rs:200:250 --control-port 6160 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar}-c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4} \n"
+	echo -e "Assembled command is:\n--tool uv $filtervar -f V:rs:200:250 --control-port 6160 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4} \n"
 	ugargs="--tool uv $filtervar--control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4} --param control-accept-global"
 	KEYNAME=UG_ARGS
 	KEYVALUE=${ugargs}
