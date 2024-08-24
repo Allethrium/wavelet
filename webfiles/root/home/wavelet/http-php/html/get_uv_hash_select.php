@@ -28,6 +28,7 @@ function poll_etcd_inputs($keyPrefix) {
 		}
 		$output = json_encode($newData);
 		echo $output;
+}
 
 $prefixstring = "uv_hash_select";
 $keyPrefix=base64_encode($prefixstring);
