@@ -368,12 +368,12 @@ function getAudioStatus(audioValue) {
 async function getHostIPAJAX(hostName, divEntry) {
 	/* Takes the hostname on hover and gets the IP address of the device */
 	var queryHostName			=		hostName;
-	console.log("Attempting AJAX PHP query for the IP Address of " + hostName);
+	console.log("Attempting AJAX PHP query for the IP Address of " + queryHostName);
 	$.ajax({
 			type: "POST",
 			url: "/get_host_ip.php",
 			data: {
-				key: hostName,
+				key: queryHostName,
 			},
 			success: function(returned_data){
 				console.log(returned_data);
