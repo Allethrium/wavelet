@@ -1,12 +1,8 @@
 <?php
-// Here we are called from JS with 
-// key = device hostname
-// value = device label (initially ALSO device hostname)
-$key = $_POST["hostName"];
+$key = $_POST["key"];
 
-function curl_etcd($key) {
-        echo "Attempting to get $key";
-        $b64KeyTarget = base64_encode($key);
+function curl_etcd($keyTarget) {
+        $b64KeyTarget = base64_encode($keyTarget);
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, 'http://192.168.1.32:2379/v3/kv/range');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
@@ -20,12 +16,14 @@ function curl_etcd($key) {
                 echo 'Error:' . curl_error($ch);
         }
         curl_close($ch);
-        echo "\n Successfully got {$key} for {$result} \n";
-        return $result;
+        $dataArray = json_decode($result, true);
+        foreach ($dataArray['kvs'] as $x => $item) {
+                $decodedKey = base64_decode($item['key']);
+                $decodedValue = base64_decode($item['value']);
+        }
+        return $decodedValue;
 }
 
-// curl etcd uv_hash_select for the value of the device hash we want to see streaming on the system
-// please note how we have to call the function twice to set the reverse lookup values as well as the fwd values!
-echo "posted data are: Host: $key \n";
-curl_etcd("/hostHash/$key/ipaddr");
+$keyTarget = ("/hostHash/$key/ipaddr");
+curl_etcd($keyTarget);
 ?>
