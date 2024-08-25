@@ -21,6 +21,7 @@ function curl_etcd($keyTarget) {
                 $decodedKey = base64_decode($item['key']);
                 $decodedValue = base64_decode($item['value']);
         }
+        echo $decodedValue;
         return $decodedValue;
 }
 
