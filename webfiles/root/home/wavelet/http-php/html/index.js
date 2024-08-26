@@ -458,22 +458,6 @@ const callingFunction = (callback) => {
 	callback(this);
 };
 
-function createRenameButton(hostName, hostHash) {
-	var hostName			=		hostName;
-	var hostHash			=		hostHash;
-	var renameButtonHash	=		`Rename${hostHash}`;
-	console.log("generating a rename button with unique value: " +renameButtonHash);
-/* add rename button */
-	var $btn				=		$('<button/>', {
-		type:	'button',
-		text:	'Rename',
-		value:	renameButtonHash,
-		class:	'btn',
-		id:		'btn_rename',
-	}).click(relabelHostElement);
-	return $btn;
-}
-
 function createDeleteButton(hostName, hostHash) {
 /* add delete button */
 	var $btn				=		$('<button/>', {
@@ -790,9 +774,9 @@ function createNewHost(key, type, hostName, hostHash, functionIndex) {
 			var phpOldValue =   $(this).attr("value");
 			var phpHostName =   $(this).val();
 			var phpHostHash =   $(this).attr("data-hostHash");
-			console.log("submitting to set_hostname.php with values---\nHash: " + phpHostHash + "\nHostname: " + phpHostName + "\nOld Hostname: " + phpOldValue);
+			console.log("submitting to set_hostlabel.php with values---\nHash: " + phpHostHash + "\nHostname: " + phpHostName + "\nOld Hostname: " + phpOldValue + "\nType: " + type);
 			$.ajax({
-				url : '/set_hostname.php',
+				url : '/set_host_label.php',
 				type :'post',
 				data:{
 					hash:       phpHostHash,
@@ -921,40 +905,6 @@ function relabelInputElement() {
 			});
 		} else {
 			return;
-	}
-}
-
-
-function relabelHostElement(label) {
-	var selectedDivHost			=		$(this).parent().attr('divDeviceHostName');
-										console.log("the found hostname is: " + selectedDivHost);
-	var targetElement			= 		$(this).parent().attr('deviceLabel');
-										console.log("the associated host label is: " +targetElement);
-	var devType					= 		$(this).parent().attr('divHostType');
-	const oldGenText			=		$(this).parent().attr('deviceLabel');
-	const newTextInput			=		prompt("Enter new text label for this device:");
-	console.log("Device old label is: " + oldGenText);
-	console.log("New device label is: " +newTextInput);
-	if (newTextInput !== null && newTextInput !== "") {
-		document.getElementById(targetElement).innerText = newTextInput;
-		document.getElementById(targetElement).oldGenText = oldGenText;
-		console.log("Button text successfully applied as: " + newTextInput);
-		console.log("The originally generated device field from Wavelet was: " + oldGenText);
-		$.ajax({
-				type: "POST",
-				url: "/set_host_label.php",
-				data: {
-					key:	"value", selectedDivHost,
-					value:	"value", newTextInput,
-				},
-				success: function(response){
-					console.log(response);
-					location.reload(true);
-					console.log('Task submitted successfully, Wavelet will attempt to change the target hostname and reboot the device now..');
-				}
-		});
-	} else {
-		return;
 	}
 }
 
