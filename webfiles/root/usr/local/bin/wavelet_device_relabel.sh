@@ -61,43 +61,44 @@ check_label(){
 	KEYNAME="/hostHash/$(hostname)/relabel_active"
 	KEYVALUE="1"
 	write_etcd_global
-	KEYNAME="/$(hostname)/hash"
+	KEYNAME="/$(hostname)/Hash"
 	read_etcd_global
-	myHostHash= ${printvalue}
-	echo -e "My hash is ${myHostHash}, attempting to find a new device label..\n"
+	myHostHash="${printvalue}"
+	echo -e "My hash is ${myHostHash}, attempting to find a my Current device label..\n"
 	KEYNAME="/hostHash/${myHostHash}/hostLabel"
-	myNewHostLabel = ${printvalue}
-	echo -e "My new host label is ${myNewHostLabel}!\n"
+	myNewHostLabel="${printvalue}"
+	echo -e "My *New* host label is ${myNewHostLabel}!\n"
 	if [[ "$(hostname)" == "${myNewHostLabel}" ]]; then
 		echo -e "New label and current hostname are identical, doing nothing..\n"
+		KEYNAME="/hostHash/$(hostname)/relabel_active"
+		KEYVALUE="0"
+		write_etcd_global
 		exit 0
 	else
 		echo -e "New label and current hostname are different, proceding to initiate change.."
 		echo $(hostname) > /home/wavelet/oldhostname.txt
-		get_newLabel
+		set_newLabel
 	fi
 }
 
 
-get_newLabel(){
+set_newLabel(){
 	# Finds our current hash and gets the new label from Etcd as set from UI
-	KEYNAME="/hostHash/$(hostname)/relabel_active"
-	KEYVALUE="1"
-	write_etcd_global
-	KEYNAME="/$(hostname)/hash"
+	KEYNAME="/$(hostname)/Hash"
 	read_etcd_global
-	myHostHash= ${printvalue}
+	myHostHash="${printvalue}"
 	echo -e "My hash is ${myHostHash}, attempting to find a new device label..\n"
-	KEYNAME="/hostHash/${myHostHash}/hostLabel"
-	myNewHostLabel = ${printvalue}
+	KEYNAME="/hostHash/${myHostHash}/newHostLabel"
+	read_etcd_global
+	myNewHostLabel="${printvalue}"
 	echo -e "My new host label is ${myNewHostLabel}!\n"
 	# Check for current FQDN in the case someone wrote gibberish in the text box.
 	FQDN=$(nslookup $(hostname) -i | grep $(hostname) | head -n 1)
 	NAME=${FQDN##*:}
 	echo -e "HostName FQDN is ${NAME}"
 	# Compare current FQDN with input FQDN and append if necessary
-	currentfqdnString=$(${NAME}%.*)
-	inputfqdnString=$(${myNewHostLabel}%.*)
+	currentfqdnString=$(echo "${NAME}%.*")
+	inputfqdnString=$(echo "${myNewHostLabel}%.*")
 	if [[ "${currentfqdnString} == ${inputfqdnString}" ]]; then
 		echo -e "FQDN strings are correct, proceeding.."
 		appendedHostName=${myNewHostLabel}
@@ -107,6 +108,11 @@ get_newLabel(){
 		echo -e "Generated FQDN hostname as ${appendedHostName}\n"
 	fi
 	echo "${appendedHostName}" > newHostName.txt
+	KEYNAME="/hostHash/${myHostHash}/newHostLabel"
+	# remove the newHostLabel value
+	etcdctl --endpoints=${ETCDENDPOINT} del ${KEYNAME}
+	# At this point we issue a reboot call and run_ug/build_ug handle the rest upon reboot
+	systemctl reboot
 }
 
 ###
@@ -117,6 +123,29 @@ get_newLabel(){
 #
 ###
 
-set -x
-exec >/home/wavelet/changehostname.log 2>&1
+
+name=/home/wavelet/changehostname.log
+if [[ -e $name.ext || -L $name.ext ]] ; then
+    i=0
+    while [[ -e $name-$i.ext || -L $name-$i.ext ]] ; do
+        let i++
+    done
+    name=$name-$i
+fi
+exec > "${name}".ext 2>&1
+
+
+KEYNAME="/$(hostname)/RELABEL"
+read_etcd_global
+if [[ "${printvalue}" -eq "0" ]]; then
+	echo -e "Relabel bit for this hostname is set to 0, doing nothing.."
+	exit 0
+fi
+echo -e "Relabel bits active, resetting them to 0 prior to starting task.."
+KEYNAME="/hostHash/$(hostname)/relabel_active"
+KEYVALUE="0"
+write_etcd_global
+KEYNAME="/$(hostname)/RELABEL"
+KEYVALUE="0"
+write_etcd_global
 detect_self
