@@ -191,7 +191,7 @@ read_leasefile(){
 	#	
 	#	Like DetectV4L, this gives us three independent values - a label which can change, a device hash which is a UUID, and a full device ID for state tracking
 	leasefile=$(basename $(ls -t /var/tmp/*.lease | head -n1))
-	deviceHash=$(echo $leasefile | sha256sum)
+	deviceHash=$(echo $leasefile | sha256sum | tr -d "[:space:]-")
 	ipAddr=${leasefile%_*}
 	interimMacAddr=${leasefile#*_}
 	macAddr=$(echo ${interimMacAddr} | cut -d . -f 1)
