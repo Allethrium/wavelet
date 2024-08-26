@@ -75,7 +75,7 @@ generate_device_info() {
 	echo -e "card type is: $cardType"
 	echo -e "bus address is: $bus_info"
 	echo -e "device serial is: $serial"
-	deviceHash=$(echo "$device_string_short, $cardType , $bus_info, $serial" | sha256sum)
+	deviceHash=$(echo "$device_string_short, $cardType , $bus_info, $serial" | sha256sum | tr -d "[:space:]-")
 	echo -e "generated device hash: $deviceHash \n"
 	device_string_short=$(echo "${device_string_long}" | sed 's/.*usb-//')
 	# Let's look for the device hash in the /interface prefix to make sure it doesn't already exist!
