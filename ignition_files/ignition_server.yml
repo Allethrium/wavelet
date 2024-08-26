@@ -146,6 +146,7 @@ storage:
          repo_gpgcheck=0
          gpgkey=https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
     # PolKit entries for systemd services the wavelet user is allowed to manage
+    # SystemD unit control
     - path: /etc/polkit-1/rules.d/1337-wavelet.rules
       mode: 0644
       overwrite: true
@@ -167,7 +168,7 @@ storage:
               }
           }
           polkit.log("returning NO") });
-    # PolKit entries for systemd services the wavelet user is allowed to manage
+    # Wifi control
     - path: /etc/polkit-1/rules.d/1338-wavelet-wifi.rules
       mode: 0644
       overwrite: true
@@ -294,7 +295,7 @@ storage:
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/home/wavelet/.config/waybar/time.sh
     # Firefox policies.json to precustomize the firefox UI
-    - path: /etc/firefox/policies
+    - path: /etc/firefox/policies.json
       mode: 0644
       overwrite: true
       contents:
