@@ -193,7 +193,7 @@ event_server(){
 	systemctl --user start container-etcd-member.service
 	sleep 10	
 	if service_exists container-etcd-member; then
-		echo -e "Etcd service presexnSLvFKyyzNXd0wuN79lfC0oEBzdhsg4nt, checking for bootstrap key\n"
+		echo -e "Etcd service present, checking for bootstrap key\n"
 			KEYNAME=SERVER_BOOTSTRAP_COMPLETED
 			result=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
 				if [[ "${result}" = 1 ]]; then
@@ -494,20 +494,11 @@ event_audio_bluetooth_connect(){
 	systemctl --user enable wavelet_bluetooth_audio.service --now
 }
 
-get_os_partition_uuid() {
-		os_rootfs="/boot" # Replace with your actual OS root filesystem path
-		uuid=$(lsblk -f)
-}
-
 event_generateHash(){
 		# Can be modified from webUI, populates with hostname by default
-		# We will generate a hash from the root UUID and hostname, which we will use to track the label state
-		# This works much the same way as the label function on the detected input devices.
-		# Might need to do something more intelligent here..rn it's just sha256ing hostname+all partitions..
-		PARTUUID=$(get_os_partition_uuid)
+		currentHostName=$(hostname)
 		echo -e "device hostname is: $(hostname)"
-		# we no longer use the hostname here because the hostname now changes when the device is relabeled!
-		hostHash=$(echo "${PARTUUID}" | sha256sum)
+		hostHash=$(cat /etc/machine-id | sha256sum | tr -d "[:space:]-")
 		echo -e "generated device hash: $hostHash \n"
 		# Check for pre-existing keys here
 		hashExists=$(ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} get "/hostHash/${hostHash}" --print-value-only)
@@ -516,27 +507,26 @@ event_generateHash(){
 			echo -e "\nHash value was set to ${hashExists} \n"
 			# Populate what will initially be used as the label variable from the webUI
 			case ${1} in
-				enc*)			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/$(hostname)/type -- enc
+				enc*)			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/${currentHostName}/type -- enc
 				;;
-				dec*)			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/$(hostname)/type -- dec
+				dec*)			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/${currentHostName}/type -- dec
 				;;
-				livestream*)	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/$(hostname)/type -- lvstr
+				livestream*)	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/${currentHostName}/type -- lvstr
 				;;
-				gateway*)		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/$(hostname)/type -- gtwy
+				gateway*)		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/${currentHostName}/type -- gtwy
 				;;
-				svr*)			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/$(hostname)/type -- svr
+				svr*)			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/${currentHostName}/type -- svr
 				;;
 				*)				echo -e "hostname invalid, exiting."	;	exit 0
 				;;
 			esac
 		# And the reverse lookup for the device
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostHash/$(hostname)/Hash -- ${hostHash}
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostHash/${hostHash} -- $(hostname)
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /$(hostname)/Hash -- ${hostHash}
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostHash/$(hostname)/label -- $(hostname)
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostHash/$(hostname)/ipaddr -- ${KEYVALUE}
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/${currentHostName}/Hash" -- "${hostHash}"
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/${hostHash}" -- "${currentHostName}"
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/${currentHostName}/Hash" -- "${hostHash}"
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/${currentHostName}/label" -- "${currentHostName}"
 		else
-			echo -e "\nHash value exists as /hosthHash/${hashExists}, this means the device is already populated, or has not been removed cleanly.  Doing nothing and moving to run_ug.."
+			echo -e "\nHash value exists as /hostHash/${hashExists}, this means the device is already populated, or has not been removed cleanly.  Doing nothing and moving to run_ug.."
 			:
 		fi
 }
@@ -583,9 +573,9 @@ clean_oldEncoderHostnameSettings(){
 	systemctl --user disable wavelet_monitor_decoder_reboot.service --now
 	systemctl --user disable wavelet_monitor_decoder_reset.service --now
 	# Delete all reverse lookups, labels and hashes for this device
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /encoderlabel/$(oldHostName)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/$(oldHostName)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /$(oldHostName)
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /encoderlabel/${oldHostName}
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName}
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName}
 }
 
 clean_oldDecoderHostnameSettings(){
@@ -597,27 +587,27 @@ clean_oldDecoderHostnameSettings(){
 	systemctl --user disable wavelet_monitor_decoder_reset.service --now
 	systemctl --user disable wavelet_monitor_decoder_blank.service --now
 	# Delete all reverse lookups, labels and hashes for this device
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/$(oldHostName)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/$(oldHostName)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /$(oldHostName)
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName}
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName}
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName}
 }
 
 clean_oldLivestreamHostnameSettings(){
 	# Finds and cleans up any references in etcd to the old hostname
 	# We'd be doing livestream specific stuff here, but since we haven't developed that feature this is just here as a placeholder
 	echo -e "\nRemoving and disabling services referring to his host's previous role as a livestreamer..\n"
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /livestreamlabel/$(oldHostName)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/$(oldHostName)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /$(oldHostName)
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /livestreamlabel/${oldHostName}
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName}
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName}
 }
 
 clean_oldGatewayHostnameSettings(){
 	# Finds and cleans up any references in etcd to the old hostname
 	# We'd be doing gateway specific stuff here, but since we haven't developed that feature this is just here as a placeholder
 	# Delete all reverse lookups, labels and hashes for this device
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /gatewaylabel/$(oldHostName)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/$(oldHostName)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /$(oldHostName)
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /gatewaylabel/${oldHostName}
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName}
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName}
 }
 
 clean_oldServerHostnameSettings(){
