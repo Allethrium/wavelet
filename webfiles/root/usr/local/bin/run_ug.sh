@@ -30,14 +30,14 @@ detect_self(){
 	;;
 	svr*)					echo -e "I am a Server."; event_server
 	;;
-	*) 						echo -e "This device Hostname is not set approprately, exiting \n"; exit 0
+	*) 						echo -e "This device Hostname is not set appropriately, exiting \n"; exit 0
 	;;
 	esac
 }
 
 check_hostname(){
 	# Get the old hostname from the file, then remove it because it's not necessary until the hostname is changed again.
-	oldHostName=$(echo /home/wavelet/oldhostname.txt)
+	oldHostName=$(cat /home/wavelet/oldhostname.txt)
 	rm -rf /home/wavelet/oldhostname.txt
 	if [[ "${oldHostName}" == "$(hostname)" ]]; then
 		echo -e "\nOld hostname is the same as the current hostname!  Doing nothing.\n"
@@ -130,7 +130,6 @@ event_server(){
 		 sets default video settings and clears previous settings! \n"
 		systemctl --user start wavelet_init.service
 	fi
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/$(hostname)/ipaddr" -- "${IPVALUE}"
 }
 
 event_encoder(){
@@ -162,7 +161,9 @@ event_decoder(){
 	sleep 2
 	# The below will be used to generate error messages on screen, once I've written those components
 	# For now useful to track hostlabel generation properly and keep the UI synced.
-	KEYNAME="/$(hostname)/hostLabel"
+
+	# I can't work out what I was trying to accomplish here..
+	KEYNAME="/hostHash/$(hostname)/label"
 	read_etcd_global
 	echo -e "My device label is ${printvalue}\n"
 	deviceLabel=${printvalue}
@@ -171,16 +172,16 @@ event_decoder(){
 	deviceHostHashlabel=${printvalue}
 	echo -e "The reverse lookup label is ${printvalue}\n"
 	if [[ "${deviceLabel}" == "${deviceHostHashlabel}" ]]; then
-			echo -e "\nDevice label and reverse lookup label match, continuing\n"
-			echo "${deviceLabel}" > /home/wavelet/hostLabel.txt
-		else
-			echo -e "\nDevice label and reverse lookup label DO NOT MATCH,
-		 	reverting UI label in keystore and locally..\n"
-			KEYNAME="/$(hostname)/hostLabel"
-			KEYVALUE="${deviceHostHashLabel}"
-			write_etcd_global
-			echo "${deviceHostHashLabel}" > /home/wavelet/hostLabel.txt
+		echo -e "\nDevice label and reverse lookup label match, continuing\n"
+		echo "${deviceLabel}" > /home/wavelet/hostLabel.txt
+	else
+		echo -e "\nDevice label and reverse lookup label DO NOT MATCH, reverting UI label in keystore and locally..\n"
+		KEYNAME="/$(hostname)/hostLabel"
+		KEYVALUE="${deviceHostHashLabel}"
+		write_etcd_global
+		echo "${deviceHostHashLabel}" > /home/wavelet/hostLabel.txt
 	fi
+
 	# Enable watcher services now all task activation keys are set to 0
 	systemctl --user enable wavelet_monitor_decoder_reset.service --now
 	systemctl --user enable wavelet_monitor_decoder_reveal.service --now
@@ -251,6 +252,7 @@ event_decoder(){
 			# wavelet_errorgen.sh build imagemagick / "Host has no network connectivity
 	# - other possible failure modes
 	#	???
+	get_ipValue
 	}
 
 event_livestream(){
@@ -339,18 +341,19 @@ clean_oldHostSettings(){
 	# This is necessary because run_ug will not populate /hostLabel or /hostHash data for the webUI.  Only build_ug.sh will do this.
 	previousHostName="${1}"
 	echo -e "\nCleaning old hostname settings for ${previousHostName}\n"
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/$(previousHostName) --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/$(previousHostName) --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${previousHostName} --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${previousHostName} --prefix
 	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /$(hostname) --prefix
 	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del $(hostname) --prefix
 	set_newHostName
 }
 
 set_newHostName(){
-	myNewHostname=$(echo /home/wavelet/newHostName.txt)
-	if hostnamectl hostname ${myNewHostname}; then
+	myNewHostname=$(cat /home/wavelet/newHostName.txt)
+	# added a sudo rule for this.. less than idea but.. meh
+	if sudo hostnamectl hostname ${myNewHostname}; then
 		echo -e "\n Host Name set successfully!, writing relabel_active to 0 and calling build_ug.sh!\n"
-		KEYNAME="/hostHash/$(myNewHostname)/relabel_active"
+		KEYNAME="/hostHash/${myNewHostname}/relabel_active"
 		KEYVALUE="0"
 		write_etcd_global
 		/usr/local/bin/build_ug.sh
