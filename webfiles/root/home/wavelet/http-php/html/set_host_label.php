@@ -25,7 +25,7 @@ function curl_etcd($keyTarget, $keyValue) {
 				echo 'Error:' . curl_error($ch);
 		}
 		curl_close($ch);
-		echo "\n Succesfully set {$keyTarget} for {$keyValue} \n";
+		echo "\n Succesfully set {$keyTarget} for:\n{$keyValue}";
 }
 
 echo "posted data are: \nNew Label: $newName\nHash: $hash \nOld Label: $oldName\nType: $type\n";
