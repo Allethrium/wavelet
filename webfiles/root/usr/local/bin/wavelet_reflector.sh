@@ -60,15 +60,17 @@ wavelet_reflector() {
 	if [[ ! -z "${return_etcd_clients_ip}" ]]; then
 		reflectorclients_file=/home/wavelet/reflector_clients_ip.txt
 		# KEYNAME=uv_filter_cmd
-		# read_etcd
-		# uv_filterString=return_etcd
 		echo -e "Systemd will execute hd-rum-transcode with commandline: \n\nhd-rum-transcode 2M 5004 ${return_etcd_clients_ip}\nafter a half-second delay"
 		KEYNAME=REFLECTOR_ARGS
 		# Reduce HD-RUM buffer to 2M
 		# v. 1.9.4 will introduce hd-rum-av which can handle both audio and video in the same reflector, so we can drop the second systemd unit.
 		# args="--tool hd-rum-av --control-port 6161 2M 5004 ${processed_clients_ip}"
 		# as of pre 1.9.5 release, --control-port appears to break hd-rum-transcode, so we will drop it for now.
-		ugargs="--tool hd-rum-transcode 2M 5004 ${processed_clients_ip}"
+		# this removes duplicate IP's from the subscription
+		variable=$(echo "${processed_clients_ip}" | tr ' ' '\n' | nl | sort -u -k2 | sort -n | cut -f2-)
+		return_etcd_clients_ip=$(echo "${return_etcd_clients_ip}" | tr ' ' '\n' | nl | sort -u -k2 | sort -n | cut -f2-)
+		# Set reflector args
+		ugargs="--tool hd-rum-transcode 2M 5004 ${variable}"
 		KEYVALUE="${ugargs}"
 		echo -e "Generating initial reflector clients list.."
 		echo "${return_etcd_clients_ip}" > /home/wavelet/reflector_clients_ip.txt
