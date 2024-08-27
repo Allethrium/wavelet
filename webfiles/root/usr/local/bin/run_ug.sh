@@ -12,10 +12,6 @@ detect_self(){
 	#chown root:root /var/tmp/hostname.local
 	#sed -i "s|!!hostnamegoeshere!!|${hostname}|g" /usr/local/bin/wavelet_network_sense.sh
 	
-	# Check to see if hostname has changed since last session
-	if [[ -f /home/wavelet/oldhostname.txt ]]; then
-		check_hostname
-	fi
 	echo -e "Hostname is $UG_HOSTNAME \n"
 	case $UG_HOSTNAME in
 	enc*) 					echo -e "I am an Encoder \n"; event_encoder
@@ -31,32 +27,6 @@ detect_self(){
 	svr*)					echo -e "I am a Server."; event_server
 	;;
 	*) 						echo -e "This device Hostname is not set appropriately, exiting \n"; exit 0
-	;;
-	esac
-}
-
-check_hostname(){
-	# Get the old hostname from the file, then remove it because it's not necessary until the hostname is changed again.
-	oldHostName=$(cat /home/wavelet/oldhostname.txt)
-	rm -rf /home/wavelet/oldhostname.txt
-	if [[ "${oldHostName}" == "$(hostname)" ]]; then
-		echo -e "\nOld hostname is the same as the current hostname!  Doing nothing.\n"
-		detect_self
-	fi
-	case $oldHostName in
-	enc*) 					echo -e "\nI was an Encoder\n"					; clean_oldHostSettings ${oldHostname}
-	;;
-	decX.wavelet.local)		echo -e "\nI was an unconfigured Decoder\n"		; exit 0
-	;;
-	dec*)					echo -e "I was a Decoder \n"					; clean_oldHostSettings ${oldHostname}
-	;;
-	livestream*)			echo -e "I was a Livestreamer \n"				; clean_oldHostSettings ${oldHostname}
-	;;
-	gateway*)				echo -e "I was an input Gateway\n"  			; clean_oldHostSettings ${oldHostname}
-	;;
-	svr*)					echo -e "I was a Server. Proceeding..."			; clean_oldHostSettings ${oldHostname}
-	;;
-	*) 						echo -e "This device Hostname was not set appropriately, exiting \n" && exit 0
 	;;
 	esac
 }
@@ -136,13 +106,17 @@ event_encoder(){
 	# MOVED - Encoder is now self-contained service/script
 	# Registers self as a decoder in etcd for the reflector to query & include in its client args
 	echo -e "Calling wavelet_encoder systemd unit.."
+	# I've added a blank bit here too.. it might make more sense to call it "host blank" though..
+	KEYVALUE="0"
+	KEYNAME="/$(hostname)/DECODER_BLANK"
+	write_etcd_global
 	systemctl --user daemon-reload
 	systemctl --user start wavelet_encoder.service
 }
 
 event_decoder(){
 	# Sleep for 5 seconds so we have a chance for the decoder to connect to the network
-	sleep 2
+	sleep 3
 	# Registers self as a decoder in etcd for the reflector to query & include in its client args
 	sleep 1
 	write_etcd_clientip
@@ -158,30 +132,7 @@ event_decoder(){
 	write_etcd_global
 	KEYNAME="/$(hostname)/DECODER_BLANK"
 	write_etcd_global
-	sleep 2
-	# The below will be used to generate error messages on screen, once I've written those components
-	# For now useful to track hostlabel generation properly and keep the UI synced.
-
-	# I can't work out what I was trying to accomplish here..
-	KEYNAME="/hostHash/$(hostname)/label"
-	read_etcd_global
-	echo -e "My device label is ${printvalue}\n"
-	deviceLabel=${printvalue}
-	KEYNAME="/hostHash/$(hostname)/label"
-	read_etcd_global
-	deviceHostHashlabel=${printvalue}
-	echo -e "The reverse lookup label is ${printvalue}\n"
-	if [[ "${deviceLabel}" == "${deviceHostHashlabel}" ]]; then
-		echo -e "\nDevice label and reverse lookup label match, continuing\n"
-		echo "${deviceLabel}" > /home/wavelet/hostLabel.txt
-	else
-		echo -e "\nDevice label and reverse lookup label DO NOT MATCH, reverting UI label in keystore and locally..\n"
-		KEYNAME="/$(hostname)/hostLabel"
-		KEYVALUE="${deviceHostHashLabel}"
-		write_etcd_global
-		echo "${deviceHostHashLabel}" > /home/wavelet/hostLabel.txt
-	fi
-
+	sleep 1
 	# Enable watcher services now all task activation keys are set to 0
 	systemctl --user enable wavelet_monitor_decoder_reset.service --now
 	systemctl --user enable wavelet_monitor_decoder_reveal.service --now
@@ -209,7 +160,7 @@ event_decoder(){
 		[Install]
 		WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 		systemctl --user daemon-reload
-		systemctl --user start UltraGrid.AppImage.service
+		systemctl --user restart UltraGrid.AppImage.service
 		echo -e "Decoder systemd units instructed to start..\n"
 		sleep 3
 		return=$(systemctl --user is-active --quiet UltraGrid.AppImage.service)
@@ -232,6 +183,8 @@ event_decoder(){
 			Restart=always
 			[Install]
 			WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
+			systemctl --user daemon-reload
+			systemctl --user restart UltraGrid.AppImage.service
 		else
 			:
 		fi
@@ -324,6 +277,7 @@ get_ipValue(){
 				local ip=$1 regex='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
 				if [[ $ip =~ $regex ]]; then
 					echo -e "\nIP Address is valid, continuing..\n"
+					ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/$(hostname)/ipaddr" -- "${IPVALUE}"
 					return 0
 				else
 					echo "\nIP Address is not valid, sleeping and calling function again\n"
@@ -331,35 +285,6 @@ get_ipValue(){
 				fi
 			}
 			valid_ipv4 "${IPVALUE}"
-	fi
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/$(hostname)/ipaddr" -- "${IPVALUE}"
-}
-
-clean_oldHostSettings(){
-	# Takes oldHostName as argument
-	# deletes etcd entries for this device, then calls build_ug to regenerate everything
-	# This is necessary because run_ug will not populate /hostLabel or /hostHash data for the webUI.  Only build_ug.sh will do this.
-	previousHostName="${1}"
-	echo -e "\nCleaning old hostname settings for ${previousHostName}\n"
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${previousHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${previousHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /$(hostname) --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del $(hostname) --prefix
-	set_newHostName
-}
-
-set_newHostName(){
-	myNewHostname=$(cat /home/wavelet/newHostName.txt)
-	# added a sudo rule for this.. less than idea but.. meh
-	if sudo hostnamectl hostname ${myNewHostname}; then
-		echo -e "\n Host Name set successfully!, writing relabel_active to 0 and calling build_ug.sh!\n"
-		KEYNAME="/hostHash/${myNewHostname}/relabel_active"
-		KEYVALUE="0"
-		write_etcd_global
-		/usr/local/bin/build_ug.sh
-	else
-		echo -e "\n Hostname change command failed, aborting\n"
-		exit 1
 	fi
 }
 
