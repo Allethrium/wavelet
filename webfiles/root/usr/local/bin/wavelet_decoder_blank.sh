@@ -1,5 +1,4 @@
 #!/bin/bash
-#
 # This script resets the appropriate flag back to 0 and then resets the AppImage service.
 # Should fix some errors and cheaper than a reboot.
 detect_self(){
