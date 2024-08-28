@@ -58,23 +58,17 @@ UG_HOSTNAME=$(hostname)
 
 check_label(){
 	# Finds our current hash and gets the new label from Etcd as set from UI
+	oldHostName=$(hostname)
 	KEYNAME="/hostHash/$(hostname)/relabel_active"
 	KEYVALUE="1"
 	write_etcd_global
 	KEYNAME="/$(hostname)/Hash"
 	read_etcd_global
 	myHostHash="${printvalue}"
-	echo -e "My hash is ${myHostHash}, attempting to find a my Current device label..\n"
+	echo -e "My hash is ${myHostHash}, attempting to find a my new device label..\n"
 	KEYNAME="/hostHash/${myHostHash}/newHostLabel"
+	read_etcd_global
 	myNewHostLabel="${printvalue}"
-	# Validate domain name
-	validate="^([a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]\.)+[a-zA-Z]{2,}$"
-	if [[ "$domain" =~ $validate ]]; then
-    	echo "Valid $domain name."
-	else
-		echo "Not valid $domain name!"
-		exit 1
-	fi
 	echo -e "My *New* host label is ${myNewHostLabel}!\n"
 	if [[ "$(hostname)" == "${myNewHostLabel}" ]]; then
 		echo -e "New label and current hostname are identical, doing nothing..\n"
@@ -84,21 +78,14 @@ check_label(){
 		exit 0
 	else
 		echo -e "New label and current hostname are different, proceding to initiate change.."
-		check_hostname ${myNewHostLabel}
 		set_newLabel
 	fi
 }
 
 set_newLabel(){
-	# Finds our current hash and gets the new label from Etcd as set from UI
-	KEYNAME="/$(hostname)/Hash"
-	read_etcd_global
-	myHostHash="${printvalue}"
-	echo -e "My hash is ${myHostHash}, attempting to find a new device label..\n"
-	KEYNAME="/hostHash/${myHostHash}/newHostLabel"
-	read_etcd_global
-	myNewHostLabel="${printvalue}"
-	echo -e "My new host label is ${myNewHostLabel}!\n"
+	# Verifies fqdn and parses new label
+	echo -e "My old host label is ${oldHostName}\n"
+	echo -e "My new host label is ${myNewHostLabel}\n"
 	# Check for current FQDN in the case someone wrote gibberish in the text box.
 	FQDN=$(nslookup $(hostname) -i | grep $(hostname) | head -n 1)
 	NAME=$(echo "${FQDN##*:}" | xargs)
@@ -127,6 +114,14 @@ set_newLabel(){
 
 event_prefix_set(){
 	# Finds our current hash and gets the current label from Etcd as set from UI
+	# First, disable all reset watchers so that the host isn't instructed to reboot the moment a flag changes!
+	systemctl --user disable wavelet_device_redetect.service --now
+	systemctl --user disable wavelet_encoder_reboot.service --now
+	systemctl --user disable wavelet_monitor_decoder_blank.service --now
+	systemctl --user disable wavelet_monitor_decoder_reboot.service --now
+	systemctl --user disable wavelet_monitor_decoder_reveal.service --now
+	systemctl --user disable wavelet_monitor_decoder_reset.service --now
+	systemctl --user disable wavelet_device_relabel.service --now
 	KEYNAME="/$(hostname)/Hash"
 	read_etcd_global
 	myHostHash="${printvalue}"
@@ -149,96 +144,87 @@ event_prefix_set(){
 		echo -e "Generated FQDN hostname as ${appendedHostName}\n"
 	fi
 	# Replace dec with enc or enc with dec as appropriate..
+	echo -e "Performing search and replace for ${arg} in ${appendedHostName}\n"
 	if [[ "${arg}" == "dec" ]]; then
-		appendedHostName=$(echo -e "${appendedHostName}" | sed "s|${arg}|enc|g")
+		concatHostName=$(echo -e "${appendedHostName,,}" | sed "s|${arg,,}|enc|g")
 	else
-		appendedHostName=$(echo -e "${appendedHostName}" | sed "s|${arg}|dec|g")
+		concatHostName=$(echo -e "${appendedHostName,,}" | sed "s|${arg,,}|dec|g")
 	fi
 	# Generate the necessary files, then reboot.
-	echo -e "Switched host identifier from ${arg}, generating ref file as ${appendedHostName}, and instructing host to reboot..\n"
-	KEYNAME="/hostHash/${myHostHash}/newHostLabel"
-	KEYVALUE="${appendedHostName}"
-	write_etcd_global
+	echo -e "Switched host identifier from ${arg}, generating new host label as: ${concatHostName,,}, and instructing host to reboot..\n"
+	KEYNAME="/hostHash/${myHostHash}/newHostLabel";	KEYVALUE="${concatHostName}";	write_etcd_global
+	KEYNAME="/${concatHostName}/RECENT_RELABEL";	KEYVALUE="1";	write_etcd_global
 	echo $(hostname) > /home/wavelet/oldHostName.txt
-	echo -e "${appendedHostName}" > newHostName.txt
-	KEYNAME="${currentHostName}/RECENT_RELABEL"
-	KEYVALUE="1"
-	write_etcd_global
-	set_newHostName ${appendedHostName}
+	echo -e "${concatHostName,,}" > /home/wavelet/newHostName.txt
+	remove_old_keys ${oldHostName}
+	if sudo hostnamectl hostname ${concatHostName,,}; then
+		echo -e "\nHost Name set as ${concatHostName,,} successfully!  rebooting!\n"
+		systemctl reboot
+	else
+		echo -e "\n Hostname change command failed, please check logs\n"
+		exit 1
+	fi	
 }
 
-check_hostname(){
+remove_old_keys(){
 	# Get the old hostname from the file, then remove it because it's not necessary until the hostname is changed again.
-	oldHostName=${myNewHostLabel}
-	if [[ "${oldHostName}" == "$(hostname)" ]]; then
-		echo -e "\nOld hostname is the same as the current hostname!  Doing nothing.\n"
-		detect_self
-	fi
-	case $oldHostName in
-	enc*) 					echo -e "\nI was an Encoder\n"					; clean_oldHostSettings ${oldHostname}
+	oldHostName=$(cat /home/wavelet/oldHostName.txt)
+	echo -e "Detecting device type of ${oldHostName}"
+	case ${oldHostName} in
+	enc*) 					echo -e "\nI was an Encoder\n"					; clean_oldEncoderHostnameSettings ${oldHostname}
 	;;
 	decX.wavelet.local)		echo -e "\nI was an unconfigured Decoder\n"		; exit 0
 	;;
-	dec*)					echo -e "I was a Decoder \n"					; clean_oldHostSettings ${oldHostname}
+	dec*)					echo -e "\nI was a Decoder \n"					; clean_oldDecoderHostnameSettings ${oldHostname}
 	;;
-	livestream*)			echo -e "I was a Livestreamer \n"				; clean_oldHostSettings ${oldHostname}
+	livestream*)			echo -e "\nI was a Livestreamer \n"				; clean_oldLivestreamHostnameSettings ${oldHostname}
 	;;
-	gateway*)				echo -e "I was an input Gateway\n"  			; clean_oldHostSettings ${oldHostname}
+	gateway*)				echo -e "\nI was an input Gateway\n"  			; clean_oldGatewayHostnameSettings ${oldHostname}
 	;;
-	svr*)					echo -e "I was a Server. Proceeding..."			; clean_oldHostSettings ${oldHostname}
+	svr*)					echo -e "\nI was a Server. Proceeding..."			; clean_oldServerHostnameSettings ${oldHostname}
 	;;
-	*) 						echo -e "This device Hostname was not set appropriately, exiting \n" && exit 0
+	*) 						echo -e "\nThis device Hostname was not set appropriately, exiting \n" && exit 0
 	;;
 	esac
 }
 
 clean_oldEncoderHostnameSettings(){
 	# Finds and cleans up any references in etcd to the old hostname
-	# First, disable all reset watchers so that the host isn't instructed to reboot the moment a flag changes!
-	systemctl --user disable wavelet_device_redetect.service --now
-	systemctl --user disable wavelet_encoder_reboot.service --now
-	systemctl --user disable wavelet_monitor_decoder_reboot.service --now
-	systemctl --user disable wavelet_monitor_decoder_reset.service --now
 	# Delete all reverse lookups, labels and hashes for this device
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /encoderlabel/${oldHostName}
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName}
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName}
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName}
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /encoderlabel/${oldHostName} --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName} --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName} --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName} --prefix
 }
 
 clean_oldDecoderHostnameSettings(){
 	# Finds and cleans up any references in etcd to the old hostname
-	# First, disable all reset watchers so that the host isn't instructed to reboot the moment a flag changes!
-	systemctl --user disable wavelet_decoder_reset.service --now
-	systemctl --user disable wavelet_monitor_decoder_reveal.service --now
-	systemctl --user disable wavelet_monitor_decoder_reboot.service --now
-	systemctl --user disable wavelet_monitor_decoder_reset.service --now
-	systemctl --user disable wavelet_monitor_decoder_blank.service --now
 	# Delete all reverse lookups, labels and hashes for this device
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName}
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName}
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName}
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName}
+	echo -e "Attempting to remove all legacy keys for: ${oldHostName}\n"
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName} --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName} --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName} --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName} --prefix
 }
 
 clean_oldLivestreamHostnameSettings(){
 	# Finds and cleans up any references in etcd to the old hostname
 	# We'd be doing livestream specific stuff here, but since we haven't developed that feature this is just here as a placeholder
 	echo -e "\nRemoving and disabling services referring to his host's previous role as a livestreamer..\n"
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /livestreamlabel/${oldHostName}
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName}
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName}
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName}
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /livestreamlabel/${oldHostName} --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName} --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName} --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName} --prefix
 }
 
 clean_oldGatewayHostnameSettings(){
 	# Finds and cleans up any references in etcd to the old hostname
 	# We'd be doing gateway specific stuff here, but since we haven't developed that feature this is just here as a placeholder
 	# Delete all reverse lookups, labels and hashes for this device
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /gatewaylabel/${oldHostName}
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName}
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName}
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName}
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /gatewaylabel/${oldHostName} --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName} --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName} --prefix
+	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName} --prefix
 }
 
 clean_oldServerHostnameSettings(){
@@ -252,15 +238,12 @@ clean_oldServerHostnameSettings(){
 
 set_newHostName(){
 	myNewHostname=${appendedHostName}
+	remove_old_keys "${oldHostName}"
 	# added a sudo rule for this.. less than ideal but.. meh
 	if sudo hostnamectl hostname ${myNewHostname}; then
-		echo -e "\n Host Name set successfully!, writing relabel_active to 0 and rebooting!\n"
-		KEYNAME="/hostHash/${myNewHostname}/relabel_active"
-		KEYVALUE="0"
-		write_etcd_global
-		KEYNAME="${myNewHostName}/RECENT_RELABEL"
-		KEYVALUE="1"
-	write_etcd_global
+		echo -e "\n Host Name set as ${myNewHostName} successfully!, writing relabel_active to 0 and rebooting!\n"
+		KEYNAME="/hostHash/${myNewHostname}/relabel_active";	KEYVALUE="0"; write_etcd_global
+		KEYNAME="/${myNewHostname}/RECENT_RELABEL";	KEYVALUE="1"; write_etcd_global
 		systemctl reboot
 	else
 		echo -e "\n Hostname change command failed, please check logs\n"
@@ -268,22 +251,35 @@ set_newHostName(){
 	fi
 }
 
+event_hostnameChange() {
+# Check to see if hostname has changed since last session
+if [[ -f /home/wavelet/oldhostname.txt ]]; then
+		check_hostname
+fi
+
+
+KEYNAME="/$(hostname)/RELABEL"
+read_etcd_global
+if [[ "${printvalue}" -eq "0" ]]; then
+	echo -e "Relabel task bit for this hostname is set to 0, doing nothing.."
+	exit 0
+fi
+
+echo -e "Relabel bits active, resetting them to 0 prior to starting task.."
+KEYNAME="/hostHash/$(hostname)/relabel_active"
+KEYVALUE="0"
+write_etcd_global
+KEYNAME="/$(hostname)/RELABEL"
+KEYVALUE="0"
+write_etcd_global
+detect_self
+}
+
 ###
 #
 # Main
 #
 ###
-
-# Parse input options (I.E if called by promote service)
-for arg in "$@"; do
-	case  ${arg^^} in
-		DEC*)   echo -e "Called with decoder argument, promoting to Encoder\n" 			 	;	event_prefix_set "${arg}"; exit 0
-		;;
-		ENC*)   echo -e "Called with encoder argument, promoting to Decoder\n"  			;	event_prefix_set "${arg}"; exit 0
-		;;
-		*)  	echo -e "Called with invalid argument, not calling prefix function..\n"		;
-	esac
-done
 
 # Check for pre-existing log file
 # This is necessary because of system restarts, the log will get overwritten, and we need to see what it's doing across reboots.
@@ -297,24 +293,14 @@ if [[ -e $logName || -L $logName ]] ; then
 fi
 exec > "${logName}" 2>&1
 
-
-# Check to see if hostname has changed since last session
-if [[ -f /home/wavelet/oldhostname.txt ]]; then
-		check_hostname
-fi
-
-
-KEYNAME="/$(hostname)/RELABEL"
-read_etcd_global
-if [[ "${printvalue}" -eq "0" ]]; then
-	echo -e "Relabel bit for this hostname is set to 0, doing nothing.."
-	exit 0
-fi
-echo -e "Relabel bits active, resetting them to 0 prior to starting task.."
-KEYNAME="/hostHash/$(hostname)/relabel_active"
-KEYVALUE="0"
-write_etcd_global
-KEYNAME="/$(hostname)/RELABEL"
-KEYVALUE="0"
-write_etcd_global
-detect_self
+# Parse input options (I.E if called by promote service)
+for arg in "$@"; do
+	echo -e "\nArgument is: ${arg}\n"
+	case  ${arg} in
+		dec*)   echo -e "\nCalled with decoder argument, promoting to Encoder\n"				;	event_prefix_set "${arg}"
+		;;
+		enc*)   echo -e "\nCalled with encoder argument, promoting to Decoder\n"				;	event_prefix_set "${arg}"
+		;;
+		*)  	echo -e "\nCalled with invalid argument, not calling prefix function..\n"		;	event_hostNameChange
+	esac
+done
