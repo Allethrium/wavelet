@@ -260,9 +260,13 @@ wavelet-dynamic() {
 	targetHost=$(echo ${controllerInputLabel} | sed 's|\(.*\)/.*|\1|')
 	echo -e "Target host name is ${targetHost}"
 	# Check to see if we're running a non-UltraGrid network input device
-	if [[ ${targetHost} == *"/network_short"* ]]; then
+	if [[ ${targetHost} == *"/network_interface/short"* ]]; then
 		echo -e "\nTarget Hostname isn't a wavelet device, it's a network device..\n"
 		echo -e "\nSkipping Input update and capture channel flags..\n"
+		echo -e "\setting encoder task to restart on server..\n"
+		KEYNAME="/$(hostname)/encoder_restart";	KEYVALUE="1";	write_etcd_global
+		KEYNAME=input_update;	KEYVALUE="0";	echo -e "\n Task completed, reset input_update key to 0.. \n";	write_etcd_global
+		sleep 2
 	else
 		# Set encoder restart flag to 1 for appropriate host
 		echo -e "${targetHost} encoder_restart flag set!\n"
