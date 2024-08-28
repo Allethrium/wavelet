@@ -38,27 +38,22 @@ read_etcd(){
 		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME} --print-value-only)
 		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
 }
-
 read_etcd_prefix(){
 		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix /$(hostname)/${KEYNAME} --print-value-only)
 		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
 }
-
 read_etcd_global(){
 		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
 		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for Global value"
 }
-
 write_etcd(){
 		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
 		echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
 }
-
 write_etcd_global(){
 		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
 		echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
 }
-
 write_etcd_clientip(){
 		# Variable changed to IPVALUE because the module was picking up incorrect variables and applying them to /decoderip !
 		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /decoderip/$(hostname) "${IPVALUE}"
@@ -78,7 +73,7 @@ event_encoder_server() {
 		systemctl --user start wavelet_init.service
 		sleep 5
 		echo -e "\n Running encoder..."
-		systemctl --user start wavelet_encoder.service
+		event_encoder
 	fi
 }
 
@@ -88,7 +83,9 @@ event_server(){
 	KEYNAME=INPUT_DEVICE_PRESENT
 	read_etcd
 	echo -e "Ensuring dnsmasq service is up.."
+	hostname=$(hostname)
 	systemctl enable dnsmasq.service --now
+	sed -i '/!!hostnamegoeshere!!/s/${hostname} //' /usr/local/bin/wavelet_network_sense.sh
 	if [[ "$printvalue" -eq 1 ]]; then
 		echo -e "An input device is present on this host,
 		 assuming we want an encoder running on the server.. \n"
@@ -111,6 +108,9 @@ event_encoder(){
 	KEYNAME="/$(hostname)/DECODER_BLANK"
 	write_etcd_global
 	systemctl --user daemon-reload
+	systemctl enable systemd-resolved.service --now
+	echo -e "Pinging wavelet_detectv4l.sh to ensure any USB devices are detected prior to start.. \n"
+	/usr/local/bin/wavelet_detectv4l.sh
 	systemctl --user start wavelet_encoder.service
 }
 
@@ -206,6 +206,8 @@ event_decoder(){
 	# - other possible failure modes
 	#	???
 	get_ipValue
+	# Resolved is necessary on decoders, encoders
+	systemctl enable systemd-resolved.service --now
 	}
 
 event_livestream(){
@@ -299,7 +301,5 @@ set -x
 exec >/home/wavelet/run_ug.log 2>&1
 # Disable systemd-resolved, because it interferes with name resolution despite DNSSstublistener=no being set.  sigh.
 systemctl disable systemd-resolved.service --now
-echo -e "Pinging wavelet_detectv4l.sh to ensure any USB devices are detected prior to start.. \n"
-/usr/local/bin/wavelet_detectv4l.sh
 get_ipValue
 detect_self
