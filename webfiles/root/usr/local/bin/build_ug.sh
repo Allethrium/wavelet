@@ -5,10 +5,29 @@
 # it launches run_ug if hostname/config flag are set.
 
 
+#Etcd Interaction
 ETCDURI=http://192.168.1.32:2379/v2/keys
 ETCDENDPOINT=192.168.1.32:2379
-KEYVALUE=TRUE
-
+read_etcd(){
+		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME} --print-value-only)
+		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
+}
+read_etcd_prefix(){
+		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix /$(hostname)/${KEYNAME} --print-value-only)
+		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
+}
+read_etcd_global(){
+		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
+		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for Global value"
+}
+write_etcd(){
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
+		echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
+}
+write_etcd_global(){
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
+		echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
+}
 detect_ug_version(){
 	APPIMAGE=/usr/local/bin/UltraGrid.AppImage
 	if test -f "$APPIMAGE"; then
@@ -118,6 +137,7 @@ event_decoder(){
 	event_reboot
 	event_reset
 	event_blankhost
+	event_host_relabel_watcher
 	event_promote
 	event_generateHash dec
 	etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/wavelet_build_completed" -- "${KEYVALUE}"
@@ -134,6 +154,7 @@ event_encoder(){
 	event_reboot
 	event_reset
 	event_device_redetect
+	event_host_relabel_watcher
 	event_promote
 	etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/wavelet_build_completed" -- "${KEYVALUE}"
 	hostname=$(hostname)
@@ -232,7 +253,7 @@ server_bootstrap(){
 		[Install]
 		WantedBy=default.target" > wavelet_dnsmasq_inotify.service
 		systemctl --user daemon-reload
-		systemctl --user enable wavelet_dnsmasq_netsense_inotify.service --now
+		systemctl --user enable wavelet_dnsmasq_inotify.service --now
 		echo -e "\ninotify service enabled for wavelet network sense via dnsmasq..\n"
 	}
 
@@ -355,7 +376,7 @@ event_reset(){
 	Wants=network-online.target
 	[Service]
 	Type=simple
-	ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/DECODER_RESET -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_reset.sh\"
+	ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch /%H/DECODER_RESET -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_reset.sh\"
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_monitor_decoder_reset.service
 
@@ -372,7 +393,7 @@ event_reveal(){
 	Wants=network-online.target
 	[Service]
 	Type=simple
-	ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/DECODER_REVEAL -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_reveal.sh\"
+	ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch /%H/DECODER_REVEAL -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_reveal.sh\"
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_monitor_decoder_reveal.service
 	systemctl --user daemon-reload
@@ -387,7 +408,7 @@ event_blankhost(){
 	Wants=network-online.target
 	[Service]
 	Type=simple
-	ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/DECODER_BLANK -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_blank.sh\"
+	ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch /%H/DECODER_BLANK -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_blank.sh\"
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_monitor_decoder_blank.service
 	systemctl --user daemon-reload
@@ -403,7 +424,7 @@ event_promote(){
 	Wants=network-online.target
 	[Service]
 	Environment=ETCDCTL_API=3
-	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/PROMOTE -w simple -- sh -c \"/usr/local/bin/wavelet_promote.sh\"
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /%H/PROMOTE -w simple -- sh -c \"/usr/local/bin/wavelet_promote.sh\"
 	Restart=always
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_promote.service
@@ -421,7 +442,7 @@ event_encoder_reboot(){
 	Wants=network-online.target
 	[Service]
 	Environment=ETCDCTL_API=3
-	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/SYSTEM_REBOOT -w simple -- sh -c \"/usr/local/bin/wavelet_reboot.sh\"
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /%H/SYSTEM_REBOOT -w simple -- sh -c \"/usr/local/bin/wavelet_reboot.sh\"
 	Restart=always
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_encoder_reboot.service
@@ -439,7 +460,7 @@ event_decoder_reset(){
 	Wants=network-online.target
 	[Service]
 	Environment=ETCDCTL_API=3
-	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/DECODER_RESET -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_reset.sh\"
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /%H/DECODER_RESET -w simple -- sh -c \"/usr/local/bin/wavelet_decoder_reset.sh\"
 	Restart=always
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_decoder_reset.service
@@ -486,14 +507,16 @@ event_audio_bluetooth_connect(){
 
 event_generateHash(){
 		# Can be modified from webUI, populates with hostname by default
+		# arg is the device type I.E enc, dec, svr etc.
+		hashType=${1}
 		currentHostName=$(hostname)
 		echo -e "device hostname is: $(hostname)"
 		hostHash=$(cat /etc/machine-id | sha256sum | tr -d "[:space:]-")
 		echo -e "generated device hash: ${hostHash} \n"
 		# Check for pre-existing keys here
 		hashExists=$(ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} get "/hostHash/${hostHash}" --print-value-only)
-		if [[ -z "${hashExists}" || ${#hashExists} -le 40 ]] then
-			echo -e "\nHash value was set to ${hashExists}, which is null or less than 40 chars. \n"
+		if [[ -z "${hashExists}" || ${#hashExists} -le 1 ]] then
+			echo -e "\nHostname value was set to ${hashExists}, which is null or less than 1 char, therefore it is not valid. \n"
 			# Populate what will initially be used as the label variable from the webUI
 			case ${1} in
 				enc*)			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/${currentHostName}/type -- enc
@@ -506,14 +529,14 @@ event_generateHash(){
 				;;
 				svr*)			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/${currentHostName}/type -- svr
 				;;
-				*)				echo -e "hostname invalid, exiting."	;	exit 0
+				*)				echo -e "host type is invalid, exiting."	;	exit 0
 				;;
 			esac
-		# And the reverse lookup for the device
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/${currentHostName}/Hash" -- "${hostHash}"
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/${hostHash}" -- "${currentHostName}"
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/${currentHostName}/Hash" -- "${hostHash}"
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/${currentHostName}/label" -- "${currentHostName}"
+			# And the reverse lookup for the device
+			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/${currentHostName}/Hash" -- "${hostHash}"
+			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/${hostHash}" -- "${currentHostName}"
+			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/${currentHostName}/Hash" -- "${hostHash}"
+			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/${currentHostName}/label" -- "${currentHostName}"
 		else
 			echo -e "\nHash value exists as /hostHash/${hashExists}\n"
 			echo -e "This means the device is already populated, or has not been removed cleanly. Checking to see if we've been relabeled.."
@@ -525,7 +548,7 @@ event_generateHash(){
 				KEYVALUE="0"
 				write_etcd_global
 				ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del "/hostHash/${hostHash}"
-				event_generateHash
+				event_generateHash ${hashType}
 			fi
 		fi
 }
