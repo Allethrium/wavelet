@@ -72,6 +72,7 @@ storage:
       contents:
         source: http://192.168.1.32:8080/ignition/skel_profile.txt
     # PolKit entries for systemd services the wavelet user is allowed to manage
+    # SystemD unit control
     - path: /etc/polkit-1/rules.d/1337-wavelet.rules
       mode: 0644
       overwrite: true
@@ -96,7 +97,7 @@ storage:
               }
           }
           polkit.log("returning NO") });
-# PolKit entries for systemd services the wavelet user is allowed to manage
+    # WiFI control
     - path: /etc/polkit-1/rules.d/1338-wavelet-wifi.rules
       mode: 0644
       overwrite: true
@@ -108,7 +109,7 @@ storage:
           ResultAny=yes
           ResultInactive=yes
           ResultActive=yes
-# Allow wavelet user access to hostnamectl
+    # Hostnamectl control
     - path: /etc/polkit-1/rules.d/49-wavelet-hostnamectl.rules
       mode: 0644
       overwrite: true
@@ -212,6 +213,14 @@ storage:
       overwrite: true
       contents:
         source: http://192.168.1.32:8080/ignition/wavelet_installer_xf.sh
+    # We don't want rolling updates enabled via Zincati, as this is an offline appliance
+    - path: /etc/sudoers.d/hostnamectl
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          # Allow wavelet to set device hostname
+          wavelet ALL=(ALL) NOPASSWD: /usr/bin/hostnamectl
 # Systemd user units
     # systemD user unit for wavelet initialization
     # Called with other initializations when Sway is executed from;

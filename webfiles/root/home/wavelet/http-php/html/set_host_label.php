@@ -5,12 +5,12 @@
 // oldText = the old device label, which we need to delete from ETCD.
 $hash = $_POST["hash"];
 $newName = $_POST["newName"];
-$oldName = $_POST["oldName"]
-$type = $_POST["type"]
+$oldName = $_POST["oldName"];
+$type = $_POST["type"];
 
 function curl_etcd($keyTarget, $keyValue) {
-		echo "Attempting to set $keyTarget for $keyValue";
-		$b64KeyTarget = base64_encode("$keyTarget");
+		// sets the type for the NEW hostname so it populates to the correct DOM
+		$b64KeyTarget = base64_encode("/$keyTarget");
 		$b64KeyValue = base64_encode($keyValue);
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, 'http://192.168.1.32:2379/v3/kv/put');
@@ -25,55 +25,18 @@ function curl_etcd($keyTarget, $keyValue) {
 				echo 'Error:' . curl_error($ch);
 		}
 		curl_close($ch);
-		echo "\n Succesfully set hostlabel/{$keyTarget} for {$keyValue} \n";
+		echo "\n Succesfully set {$keyTarget} for:\n{$keyValue}";
 }
 
-function curl_etcd_hostname($keyTarget, $keyValue) {
-		echo "Attempting to set $keyTarget for $keyValue";
-		$b64KeyTarget = base64_encode("$keyTarget/hostlabel");
-		$b64KeyValue = base64_encode($keyValue);
-		$ch = curl_init();
-		curl_setopt($ch, CURLOPT_URL, 'http://192.168.1.32:2379/v3/kv/put');
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-		curl_setopt($ch, CURLOPT_POST, 1);
-		curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\":\"$b64KeyTarget\", \"value\":\"$b64KeyValue\"}");
-		$headers = array();
-		$headers[] = 'Content-Type: application/x-www-form-urlencoded';
-		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-		$result = curl_exec($ch);
-		if (curl_errno($ch)) {
-				echo 'Error:' . curl_error($ch);
-		}
-		curl_close($ch);
-		echo "\n Succesfully set {$keyTarget}/hostlabel for {$keyValue} \n";
-}
+echo "posted data are: \nNew Label: $newName\nHash: $hash \nOld Label: $oldName\nType: $type\n";
+// This script sets the NEW hostname object and then a reset flag.  Everything else is handled by run_ug/build_ug on reboot
+$keyTarget="hostHash/${hash}/newHostLabel";
+$keyValue=$newName;
+curl_etcd("$keyTarget", "$keyValue");
 
-function set_etcd_hostHash($keyTarget, $keyValue) {
-		echo "Attempting to set $keyTarget for $keyValue";
-		$b64KeyTarget = base64_encode("/hostHash/$keyTarget/$keyValue");
-		$b64KeyValue = base64_encode($keyValue);
-		$ch = curl_init();
-		curl_setopt($ch, CURLOPT_URL, 'http://192.168.1.32:2379/v3/kv/put');
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-		curl_setopt($ch, CURLOPT_POST, 1);
-		curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\":\"$b64KeyTarget\", \"value\":\"$b64KeyValue\"}");
-		$headers = array();
-		$headers[] = 'Content-Type: application/x-www-form-urlencoded';
-		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-		$result = curl_exec($ch);
-		if (curl_errno($ch)) {
-				echo 'Error:' . curl_error($ch);
-		}
-		curl_close($ch);
-		echo "\n Succesfully set /hostHash/{$keyTarget}/label for {$keyValue} \n";
-}
-
-
-//
-
-// add an IF argument here to set decoderlabel/encoderlabel etc.
-echo "posted data are: \n New Label: $value\n Hash: $key \n";
-curl_etcd("$key", "$value");
-curl_etcd_hostname("$key", "$value");
-set_etcd_hosthash("$key", "$value");
+// set old hostname relabel bit to activate process on target host
+// after the task on the target host is completed, it will remove its old entries automatically
+$keyTarget="$oldName/RELABEL";
+$keyValue="1";
+curl_etcd("$keyTarget", "$keyValue");
 ?>

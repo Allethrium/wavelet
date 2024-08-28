@@ -1,10 +1,9 @@
 <?php
 header('Content-type: application/json');
-// this script curls etcd for available input devices, cleans out the cruft and re-encodes a JSON object that should be handled by the webui index.html via AJAX
+// this script curls etcd for available hosts.
 
-function poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit) {
+function poll_etcd_hosts($keyPrefix, $keyPrefixPlusOneBit) {
 	$ch = curl_init();
-	// CURL example:  curl -L http://192.168.1.32:2379/v3/kv/range -X POST -d '{"key": "L2ludGVyZmFjZQ==", "range_end": "L2ludGVyZmFjZTA="}'
 	curl_setopt($ch, CURLOPT_URL, 'http://192.168.1.32:2379/v3/kv/range');
 	curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 	curl_setopt($ch, CURLOPT_POST, 1);
@@ -21,13 +20,11 @@ function poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit) {
 	$dataArray = json_decode($result, true); // this decodes the JSON string as an associative array
 	$newData = [];
 	foreach ($dataArray['kvs'] as $x => $item) {
-		$decodedKeyShort = (str_replace("-video-index0", "", (str_replace("/interface/", "", (base64_decode($item['key']))))));
 		$decodedKey = base64_decode($item['key']);
 		$decodedValue = base64_decode($item['value']);
 		$hostName = (str_replace ("/hostLabel/", "", (str_replace("/type", "", $decodedKey))));
-//		$hostHash = "";
 		array_push($newData, [
-			'key'		=>	$decodedKeyShort,
+			'key'		=>	$decodedKey,
 			'type'		=>	$decodedValue,
 			'hostName'	=> 	(str_replace ("/hostLabel/", "", (str_replace("/type", "", $decodedKey)))),
 			'hostHash'	=>	(str_replace ("\"", "", curl_etcd($hostName))),
@@ -37,8 +34,8 @@ function poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit) {
 	echo $output;
 }
 
-function curl_etcd($inputValue) {
-		$b64KeyTarget = base64_encode("/$inputValue/Hash");
+function curl_etcd($hostName) {
+		$b64KeyTarget = base64_encode("/$hostName/Hash");
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, 'http://192.168.1.32:2379/v3/kv/range');
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
@@ -66,5 +63,5 @@ $prefixstring = '/hostLabel';
 $prefixstringplusone = '/hostLabel0';
 $keyPrefix=base64_encode($prefixstring);
 $keyPrefixPlusOneBit=base64_encode($prefixstringplusone);
-poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit);
+poll_etcd_hosts($keyPrefix, $keyPrefixPlusOneBit);
 ?>

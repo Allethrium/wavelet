@@ -1,9 +1,9 @@
 #!/bin/bash
 # Builds UltraGrid systemD user unit files and configures other basic parameters during initial deployment
-# This is launched in userspace.  The service is called each logon from Sway, checks to see if already built, then calls other scripts as required.
+# This is launched in userspace.  
+# The service is called each logon from Sway, checks to see if already built, then calls other scripts as required.
 # it launches run_ug if hostname/config flag are set.
-# 
-# run_ug.sh initially started out doing some of this.
+
 
 ETCDURI=http://192.168.1.32:2379/v2/keys
 ETCDENDPOINT=192.168.1.32:2379
@@ -57,37 +57,9 @@ detect_self(){
 	esac
 }
 
-check_hostname(){
-	# Get the old hostname from the file, then remove it because it's not necessary until the hostname is changed again.
-	oldHostName=$(echo /var/tmp/oldhostname.txt)
-	if [[ "${oldHostName}" == "$(hostname)" ]]; then
-		echo -e "\nOld hostname is the same as the current hostname!  Doing nothing.\n"
-		rm -rf /var/tmp/old
-		.txt
-		exit 0
-	fi
-	case $oldHostName in
-	enc*) 					echo -e "\nI was an Encoder, and I am currently an Encoder, removing hostname file and exiting.\n"	; exit 0
-	;;
-	decX.wavelet.local)		echo -e "\nI was an unconfigured Decoder, removing hostname file and exiting.\n"					; exit 0
-	;;
-	dec*)					echo -e "I was a Decoder \n"																		; clean_oldDecoderHostnameSettings
-	;;
-	livestream*)			echo -e "I was a Livestreamer \n"																	; clean_oldLivestreamHostnameSettings
-	;;
-	gateway*)				echo -e "I was an input Gateway\n"  																; clean_oldGatewayHostnameSettings
-	;;
-	svr*)					echo -e "I was a Server. Proceeding..."																; clean_oldServerHostnameSettings
-	;;
-	*) 						echo -e "This device Hostname was not set appropriately, exiting \n" && exit 0
-	;;
-	esac
-}
-
 # These codeblocks directly enable the appropriate service immediately.
 # run_ug.sh will perform its own autodetection logic, this might seem redundant and probably is.
 # It was written before the need for this script became apparent.
-# OK and now it won't let us enable anything like it's supposed to?  have to do this manually in Ignition via hardlinks?????
 # to run systemd as another user (IE from root) do systemctl --user -M wavelet@  service.service
 
 event_gateway(){
@@ -146,11 +118,11 @@ event_decoder(){
 	event_reboot
 	event_reset
 	event_blankhost
+	event_promote
 	event_generateHash dec
-	systemctl --user enable run_ug.service --now
 	etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/wavelet_build_completed" -- "${KEYVALUE}"
 	sleep 1
-
+	/usr/local/bin/run_ug.sh
 }
 
 event_encoder(){
@@ -162,6 +134,7 @@ event_encoder(){
 	event_reboot
 	event_reset
 	event_device_redetect
+	event_promote
 	etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/wavelet_build_completed" -- "${KEYVALUE}"
 	hostname=$(hostname)
 	# We need to add this switch here to ensure if we're a server we don't populate ourselves to the encoders DOM in the webUI..
@@ -185,7 +158,6 @@ event_encoder(){
 	WantedBy=default.target' > /home/wavelet/.config/systemd/user/watch_encoderflag.service
 	systemctl --user daemon-reload
 	systemctl --user enable watch_encoderflag.service --now
-	systemctl --user status watch_encoderflag.service
 	sleep 1
 }
 
@@ -193,7 +165,7 @@ event_server(){
 	systemctl --user start container-etcd-member.service
 	sleep 10	
 	if service_exists container-etcd-member; then
-		echo -e "Etcd service presexnSLvFKyyzNXd0wuN79lfC0oEBzdhsg4nt, checking for bootstrap key\n"
+		echo -e "Etcd service present, checking for bootstrap key\n"
 			KEYNAME=SERVER_BOOTSTRAP_COMPLETED
 			result=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
 				if [[ "${result}" = 1 ]]; then
@@ -422,6 +394,24 @@ event_blankhost(){
 	systemctl --user enable wavelet_monitor_decoder_blank.service --now
 }
 
+event_promote(){
+	# This flag watches the hostname to instruct the machine to (pro/de)mote the (en/de)coder as appropriate.
+	echo -e "Generating Promoter SystemdD unit in /.config/systemd/user.."
+	echo -e "[Unit]
+	Description=etcd Host Promotion watcher 
+	After=network-online.target
+	Wants=network-online.target
+	[Service]
+	Environment=ETCDCTL_API=3
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/PROMOTE -w simple -- sh -c \"/usr/local/bin/wavelet_promote.sh\"
+	Restart=always
+	[Install]
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_promote.service
+
+	systemctl --user daemon-reload
+	systemctl --user enable wavelet_promote.service --now
+}
+
 event_encoder_reboot(){
 	# Encoders have their own reboot flag should watch the system reboot flag for a hard reset
 	echo -e "Generating Encoder Reboot SystemdD unit in /.config/systemd/user.."
@@ -494,50 +484,49 @@ event_audio_bluetooth_connect(){
 	systemctl --user enable wavelet_bluetooth_audio.service --now
 }
 
-get_os_partition_uuid() {
-		os_rootfs="/boot" # Replace with your actual OS root filesystem path
-		uuid=$(lsblk -f)
-}
-
 event_generateHash(){
 		# Can be modified from webUI, populates with hostname by default
-		# We will generate a hash from the root UUID and hostname, which we will use to track the label state
-		# This works much the same way as the label function on the detected input devices.
-		# Might need to do something more intelligent here..rn it's just sha256ing hostname+all partitions..
-		PARTUUID=$(get_os_partition_uuid)
+		currentHostName=$(hostname)
 		echo -e "device hostname is: $(hostname)"
-		# we no longer use the hostname here because the hostname now changes when the device is relabeled!
-		hostHash=$(echo "${PARTUUID}" | sha256sum)
-		echo -e "generated device hash: $hostHash \n"
+		hostHash=$(cat /etc/machine-id | sha256sum | tr -d "[:space:]-")
+		echo -e "generated device hash: ${hostHash} \n"
 		# Check for pre-existing keys here
 		hashExists=$(ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} get "/hostHash/${hostHash}" --print-value-only)
-		if [[ -z "${hashExists}" || ${#hashExists} -le 1 ]] then
-			echo -e "\nHash value is null, or less than one char, continuing\n"
-			echo -e "\nHash value was set to ${hashExists} \n"
+		if [[ -z "${hashExists}" || ${#hashExists} -le 40 ]] then
+			echo -e "\nHash value was set to ${hashExists}, which is null or less than 40 chars. \n"
 			# Populate what will initially be used as the label variable from the webUI
 			case ${1} in
-				enc*)			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/$(hostname)/type -- enc
+				enc*)			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/${currentHostName}/type -- enc
 				;;
-				dec*)			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/$(hostname)/type -- dec
+				dec*)			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/${currentHostName}/type -- dec
 				;;
-				livestream*)	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/$(hostname)/type -- lvstr
+				livestream*)	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/${currentHostName}/type -- lvstr
 				;;
-				gateway*)		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/$(hostname)/type -- gtwy
+				gateway*)		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/${currentHostName}/type -- gtwy
 				;;
-				svr*)			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/$(hostname)/type -- svr
+				svr*)			ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostLabel/${currentHostName}/type -- svr
 				;;
 				*)				echo -e "hostname invalid, exiting."	;	exit 0
 				;;
 			esac
 		# And the reverse lookup for the device
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostHash/$(hostname)/Hash -- ${hostHash}
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostHash/${hostHash} -- $(hostname)
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /$(hostname)/Hash -- ${hostHash}
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostHash/$(hostname)/label -- $(hostname)
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /hostHash/$(hostname)/ipaddr -- ${KEYVALUE}
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/${currentHostName}/Hash" -- "${hostHash}"
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/${hostHash}" -- "${currentHostName}"
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/${currentHostName}/Hash" -- "${hostHash}"
+		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/hostHash/${currentHostName}/label" -- "${currentHostName}"
 		else
-			echo -e "\nHash value exists as /hosthHash/${hashExists}, this means the device is already populated, or has not been removed cleanly.  Doing nothing and moving to run_ug.."
-			:
+			echo -e "\nHash value exists as /hostHash/${hashExists}\n"
+			echo -e "This means the device is already populated, or has not been removed cleanly. Checking to see if we've been relabeled.."
+			KEYNAME="/${currentHostName}/RECENT_RELABEL"
+			read_etcd_global
+			if [[ "${printvalue}" == "1" ]]; then
+				echo -e "This device was recently relabeled!  Clearing hash and running this function again..\n"
+				KEYNAME="${currentHostName}/RECENT_RELABEL"
+				KEYVALUE="0"
+				write_etcd_global
+				ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del "/hostHash/${hostHash}"
+				event_generateHash
+			fi
 		fi
 }
 
@@ -573,60 +562,6 @@ event_host_relabel_watcher(){
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_device_relabel.service
 	systemctl --user daemon-reload
 	systemctl --user enable wavelet_device_relabel.service --now
-}
-
-clean_oldEncoderHostnameSettings(){
-	# Finds and cleans up any references in etcd to the old hostname
-	# First, disable all reset watchers so that the host isn't instructed to reboot the moment a flag changes!
-	systemctl --user disable wavelet_device_redetect.service --now
-	systemctl --user disable wavelet_encoder_reboot.service --now
-	systemctl --user disable wavelet_monitor_decoder_reboot.service --now
-	systemctl --user disable wavelet_monitor_decoder_reset.service --now
-	# Delete all reverse lookups, labels and hashes for this device
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /encoderlabel/$(oldHostName)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/$(oldHostName)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /$(oldHostName)
-}
-
-clean_oldDecoderHostnameSettings(){
-	# Finds and cleans up any references in etcd to the old hostname
-	# First, disable all reset watchers so that the host isn't instructed to reboot the moment a flag changes!
-	systemctl --user disable wavelet_decoder_reset.service --now
-	systemctl --user disable wavelet_monitor_decoder_reveal.service --now
-	systemctl --user disable wavelet_monitor_decoder_reboot.service --now
-	systemctl --user disable wavelet_monitor_decoder_reset.service --now
-	systemctl --user disable wavelet_monitor_decoder_blank.service --now
-	# Delete all reverse lookups, labels and hashes for this device
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/$(oldHostName)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/$(oldHostName)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /$(oldHostName)
-}
-
-clean_oldLivestreamHostnameSettings(){
-	# Finds and cleans up any references in etcd to the old hostname
-	# We'd be doing livestream specific stuff here, but since we haven't developed that feature this is just here as a placeholder
-	echo -e "\nRemoving and disabling services referring to his host's previous role as a livestreamer..\n"
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /livestreamlabel/$(oldHostName)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/$(oldHostName)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /$(oldHostName)
-}
-
-clean_oldGatewayHostnameSettings(){
-	# Finds and cleans up any references in etcd to the old hostname
-	# We'd be doing gateway specific stuff here, but since we haven't developed that feature this is just here as a placeholder
-	# Delete all reverse lookups, labels and hashes for this device
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /gatewaylabel/$(oldHostName)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/$(oldHostName)
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /$(oldHostName)
-}
-
-clean_oldServerHostnameSettings(){
-	# Finds and cleans up any references in etcd to the old hostname
-	# The server has many more settings than any other device with the way the system currently works.
-	# This is also a silly function to have, but putting it here for completeness' sake.
-	# Delete all reverse lookups, labels and hashes for this device
-	echo -e "\nDeleting the server is quite a silly thing to do.\n"  
-	exit 0
 }
 
 # Execution order

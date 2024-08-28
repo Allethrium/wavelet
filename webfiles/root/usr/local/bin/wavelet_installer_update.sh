@@ -77,7 +77,7 @@ extract_usrlocalbin(){
 #github now generates checksum on push
 
 # curl $checksum URL
-checksum=$(echo sha256sumfile)
+checksum=$(echo sha256sum file)
 filesum=$(shasum wavelet-files.tar.xz)
 if [[ "${checksum}" == "${filesum}" ]]; then
 	echo "Checksums match, the file is correct.."
