@@ -13,7 +13,8 @@ dnsmasq_hostName=$4
 
 detect_self(){
 	# hostname.local populated by run_ug.sh on system boot
-	# necessary because this script is spawned with restricted privileges
+	# necessary because this script is spawned with restricted privileges, if already set SED won't do anything.
+	# This isn't a problem because once set the hostname of the server is static.
 	UG_HOSTNAME=!!hostnamegoeshere!!
 	echo -e "Hostname is ${UG_HOSTNAME} \n"
 	case ${UG_HOSTNAME} in
@@ -49,7 +50,7 @@ event_detect_networkDevice(){
 	touch /var/tmp/${dnsmasq_ipAddr}_${dnsmasq_mac}.lease
 	sleep .5
 	# we remove the file .5 seconds later so that the device can be re-detected once dnsmasq hands out a new lease I.E on system reboot
-	rm -rf /var/tmp/$dnsmasq_ipAddr}_${dnsmasq_max}.lease
+	rm -rf /var/tmp/${dnsmasq_ipAddr}_${dnsmasq_mac}.lease
 }
 
 ###
