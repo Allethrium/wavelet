@@ -132,7 +132,7 @@ function sendPHPID(buttonElement) {
 								}
 							}
 				});
-		var dynamicsArr		=		Array.from($('div[id="dynamicInputs"] .btn'));
+		var dynamicsArr		=		Array.from($('div[id="dynamic_inputs"] .btn'));
 		var staticsArr		=		Array.from($('div[id="static_inputs_section"] .btn'));
 		if (dynamicsArr.length > 0) {
 			console.log("Found " + dynamicsArr.length + " sibling element(s).");
@@ -778,10 +778,10 @@ function createNewHost(key, type, hostName, hostHash, functionIndex) {
 			var phpOldValue =   $(this).attr("value");
 			var phpHostName =   $(this).val();
 			var phpHostHash =   $(this).attr("data-hostHash");
-			if ( oldValue == phpHostName ) {
+			if ( phpOldValue == phpHostName ) {
 				console.log("Error, values have not changed, doing nothing")
-
 			} else {
+			confirm('This will reboot the target host!\nProceed?');
 			console.log("submitting to set_hostlabel.php with values---\nHash: " + phpHostHash + "\nHostname: " + phpHostName + "\nOld Hostname: " + phpOldValue + "\nType: " + type);
 			$.ajax({
 				url : '/set_host_label.php',
