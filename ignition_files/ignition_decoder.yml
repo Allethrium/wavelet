@@ -109,6 +109,20 @@ storage:
           ResultAny=yes
           ResultInactive=yes
           ResultActive=yes
+    # SystemD resolved
+    - path: /etc/polkit-1/rules.d/51-systemd-resolved.rules
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          polkit.addRule(function(action, subject) {
+          if (action.id == "org.freedesktop.resolve1") {
+              if (subject.user == "wavelet") {
+                  return polkit.Result.YES;
+              }
+          }
+          polkit.log("returning NO") });
+          });
     # Hostnamectl control
     - path: /etc/polkit-1/rules.d/49-wavelet-hostnamectl.rules
       mode: 0644

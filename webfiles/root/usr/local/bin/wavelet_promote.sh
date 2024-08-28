@@ -34,7 +34,7 @@ event_decoder(){
 	etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/PROMOTE" -- "0"
 	etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/RELABEL" -- "1"
 	systemctl --user enable wavelet_promote.service --now
-	/usr/local/bin/wavelet_device_relabel.sh "DEC"
+	/usr/local/bin/wavelet_device_relabel.sh "dec"
 	exit 0
 }
 
@@ -44,7 +44,7 @@ event_encoder(){
 	etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/PROMOTE" -- "0"
 	etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/RELABEL" -- "1"
 	systemctl --user enable wavelet_promote.service --now
-	/usr/local/bin/wavelet_device_relabel.sh "ENC"
+	/usr/local/bin/wavelet_device_relabel.sh "enc"
 	exit 0
 }
 

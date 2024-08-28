@@ -35,7 +35,7 @@ storage:
       mode: 0755
       overwrite: true
       contents:
-        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.5/UltraGrid-1.9.5-x86_64.AppImage
+        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.6/UltraGrid-1.9.6-x86_64.AppImage
     # WiFi WiFi Name
     - path: /var/home/wavelet/wifi_ssid
       overwrite: true
@@ -180,6 +180,20 @@ storage:
           ResultAny=yes
           ResultInactive=yes
           ResultActive=yes
+    # SystemD resolved
+    - path: /etc/polkit-1/rules.d/51-systemd-resolved.rules
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          polkit.addRule(function(action, subject) {
+          if (action.id == "org.freedesktop.resolve1") {
+              if (subject.user == "wavelet") {
+                  return polkit.Result.YES;
+              }
+          }
+          polkit.log("returning NO") });
+          });
     # Wavelet user does NOT have access to change hostname on the server
     # hence missing the polkit entry that's in the decoder ignition file!
     # disable systemd-resolved to free up port 53 and allow dnsmasq to launch
@@ -295,7 +309,7 @@ storage:
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/home/wavelet/.config/waybar/time.sh
     # Firefox policies.json to precustomize the firefox UI
-    - path: /etc/firefox/policies.json
+    - path: /etc/firefox/policies/policies.json
       mode: 0644
       overwrite: true
       contents:

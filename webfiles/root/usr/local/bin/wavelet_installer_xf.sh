@@ -60,6 +60,8 @@ event_server(){
 	# install_decklink
 	# sets up local rpm repository - there's an issue with importing Intel repo GPG keys which might need user intervention.
 	/usr/local/bin/local_rpm.sh
+	# Add various libraries required for NDI and capture card support
+	install_ug_depends
 }
 
 
@@ -225,44 +227,44 @@ install_ug_depends(){
 	#   LibNDI for Magewell devices
 	cd /home/wavelet
 	# CineForm SDK
-	git clone --depth 1 https://github.com/gopro/cineform-sdk
-	cd cineform-sdk
-	git apply "$curdir/0001-CMakeList.txt-remove-output-lib-name-force-UNIX.patch"
-	mkdir build && cd build
-	cmake -DBUILD_TOOLS=OFF
-	cmake --build . --parallel "$(nproc)"
-	sudo cmake --install .
-	cd /home/wavelet
+		git clone --depth 1 https://github.com/gopro/cineform-sdk
+		cd cineform-sdk
+		git apply "$curdir/0001-CMakeList.txt-remove-output-lib-name-force-UNIX.patch"
+		mkdir build && cd build
+		cmake -DBUILD_TOOLS=OFF
+		cmake --build . --parallel "$(nproc)"
+		sudo cmake --install .
+		cd /home/wavelet
 	#Install libAJA Library
-	git clone --depth 1 https://github.com/aja-video/libajantv2.git
-	# export MACOSX_DEPLOYMENT_TARGET=10.13 # needed for arm64 mac
-	cmake -DAJANTV2_DISABLE_DEMOS=ON  -DAJANTV2_DISABLE_DRIVER=ON \
-	-DAJANTV2_DISABLE_TOOLS=ON  -DAJANTV2_DISABLE_TESTS=ON \
-	-DAJANTV2_DISABLE_PLUGINS=ON  -DAJANTV2_BUILD_SHARED=ON \
-	-DCMAKE_BUILD_TYPE=Release -Blibajantv2/build -Slibajantv2
-	cmake --build libajantv2/build --config Release -j "$(nproc)"
-	sudo cmake --install libajantv2/build
+		git clone --depth 1 https://github.com/aja-video/libajantv2.git
+		# export MACOSX_DEPLOYMENT_TARGET=10.13 # needed for arm64 mac
+		cmake -DAJANTV2_DISABLE_DEMOS=ON  -DAJANTV2_DISABLE_DRIVER=ON \
+		-DAJANTV2_DISABLE_TOOLS=ON  -DAJANTV2_DISABLE_TESTS=ON \
+		-DAJANTV2_DISABLE_PLUGINS=ON  -DAJANTV2_BUILD_SHARED=ON \
+		-DCMAKE_BUILD_TYPE=Release -Blibajantv2/build -Slibajantv2
+		cmake --build libajantv2/build --config Release -j "$(nproc)"
+		sudo cmake --install libajantv2/build
 	# Live555
-	git clone --depth 1 https://github.com/xanview/live555/
-	cd live555
-	./genMakefiles linux-with-shared-libraries
-	make -j "$(nproc)"
-	make -C live555 install
+		git clone --depth 1 https://github.com/xanview/live555/
+		cd live555
+		./genMakefiles linux-with-shared-libraries
+		make -j "$(nproc)"
+		make -C live555 install
 	# LibNDI
 	# Lifted from https://github.com/DistroAV/DistroAV/blob/master/CI/libndi-get.sh
-	mkdir -p /home/wavelet/libNDI
-	cd /home/wavelet/libNDI   
-	LIBNDI_INSTALLER_NAME="Install_NDI_SDK_v6_Linux"
-	LIBNDI_INSTALLER="$LIBNDI_INSTALLER_NAME.tar.gz"
-	LIBNDI_INSTALLER_URL=https://downloads.ndi.tv/SDK/NDI_SDK_Linux/$LIBNDI_INSTALLER
-	download_libndi(){
-	curl -L $LIBNDI_INSTALLER_URL -f --retry 5 > "/home/wavelet/libNDI/$LIBNDI_INSTALLER"
-	# Check if download was successful
-	if [ $? -ne 0 ]; then
-		echo "Download failed."
-	fi
-	echo "Download complete."
-	}
+		mkdir -p /home/wavelet/libNDI
+		cd /home/wavelet/libNDI   
+		LIBNDI_INSTALLER_NAME="Install_NDI_SDK_v6_Linux"
+		LIBNDI_INSTALLER="$LIBNDI_INSTALLER_NAME.tar.gz"
+		LIBNDI_INSTALLER_URL=https://downloads.ndi.tv/SDK/NDI_SDK_Linux/$LIBNDI_INSTALLER
+		download_libndi(){
+			curl -L $LIBNDI_INSTALLER_URL -f --retry 5 > "/home/wavelet/libNDI/$LIBNDI_INSTALLER"
+			# Check if download was successful
+			if [ $? -ne 0 ]; then
+				echo "Download failed."
+			fi
+			echo "Download complete."
+		}
 	download_libndi
 	tar -xzvf "/home/wavelet/libNDI/$LIBNDI_INSTALLER"
 	yes | PAGER="cat" sh $LIBNDI_INSTALLER_NAME.sh
@@ -279,11 +281,11 @@ install_ug_depends(){
 #
 ####
 
-
 # Perhaps add a checksum to make sure nothing's been tampered with here..
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 systemctl disable zincati.service --now
 # Unlock RPM ostree persistently across reboots, needed for the weird library linking we are doing here and MAY sidestep the decklink issue.
+# - update, NOPE.  and it breaks rpm-ostree installing anything so that's a no-go.
 # ostree admin unlock --hotfix
 set -x
 exec >/home/wavelet/wavelet_installer.log 2>&1
