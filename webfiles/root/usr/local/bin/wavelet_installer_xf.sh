@@ -82,7 +82,7 @@ rpm_ostree_install(){
 	ImageMagick intel-opencl mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
 	mesa-libxatracker alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools dkms kernel-headers usbutils \
 	tuned realtime-setup realtime-tests rtkit jo netcat busybox inotify-tools \
-	gcc gcc-c++ openssl-devel bzip2-devel libffi-devel zlib-devel make cmake libuuid-devel
+	gcc gcc-c++ openssl-devel bzip2-devel libffi-devel zlib-devel make cmake libuuid-devel libudev-devel
 	echo -e "\nBase RPM Packages installed, waiting for 1 second..\n"
 	sleep 1
 	}
@@ -227,29 +227,30 @@ install_ug_depends(){
 	#   LibNDI for Magewell devices
 	cd /home/wavelet
 	# CineForm SDK
-		git clone --depth 1 https://github.com/gopro/cineform-sdk
+		git clone https://github.com/gopro/cineform-sdk
 		cd cineform-sdk
-		git apply "$curdir/0001-CMakeList.txt-remove-output-lib-name-force-UNIX.patch"
-		mkdir build && cd build
+		# Broken command: git apply "$curdir/0001-CMakeList.txt-remove-output-lib-name-force-UNIX.patch"
+		# removed mkdir build && cd build too
 		cmake -DBUILD_TOOLS=OFF
 		cmake --build . --parallel "$(nproc)"
 		sudo cmake --install .
 		cd /home/wavelet
 	#Install libAJA Library
-		git clone --depth 1 https://github.com/aja-video/libajantv2.git
+		git clone https://github.com/aja-video/libajantv2.git
+		cd libajantv2/
 		# export MACOSX_DEPLOYMENT_TARGET=10.13 # needed for arm64 mac
-		cmake -DAJANTV2_DISABLE_DEMOS=ON  -DAJANTV2_DISABLE_DRIVER=ON \
-		-DAJANTV2_DISABLE_TOOLS=ON  -DAJANTV2_DISABLE_TESTS=ON \
-		-DAJANTV2_DISABLE_PLUGINS=ON  -DAJANTV2_BUILD_SHARED=ON \
+		cmake -DAJANTV2_DISABLE_DEMOS=ON  -DAJANTV2_DISABLE_DRIVER=OFF \
+		-DAJANTV2_DISABLE_TOOLS=OFF  -DAJANTV2_DISABLE_TESTS=ON \
+		-DAJANTV2_BUILD_SHARED=ON \
 		-DCMAKE_BUILD_TYPE=Release -Blibajantv2/build -Slibajantv2
 		cmake --build libajantv2/build --config Release -j "$(nproc)"
 		sudo cmake --install libajantv2/build
 	# Live555
-		git clone --depth 1 https://github.com/xanview/live555/
+		git clone https://github.com/xanview/live555/
 		cd live555
 		./genMakefiles linux-with-shared-libraries
 		make -j "$(nproc)"
-		make -C live555 install
+		make install
 	# LibNDI
 	# Lifted from https://github.com/DistroAV/DistroAV/blob/master/CI/libndi-get.sh
 		mkdir -p /home/wavelet/libNDI
