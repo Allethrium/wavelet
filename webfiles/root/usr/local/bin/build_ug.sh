@@ -562,7 +562,7 @@ event_device_redetect(){
 	Wants=network-online.target
 	[Service]
 	Environment=ETCDCTL_API=3
-	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch DEVICE_REDETECT -w simple -- sh -c \"/usr/local/bin/wavelet_detectv4l.sh rd\"
+	ExecStart=/usr/bin/etcdctl --endpoints=192.168.1.32:2379 watch DEVICE_REDETECT -w simple -- sh -c \"/usr/local/bin/wavelet_detectv4l.sh\"
 	Restart=always
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/wavelet_device_redetect.service
