@@ -5,7 +5,9 @@ document.getElementsByTagName('head')[0].appendChild(script);
 var dynamicInputs = document.getElementById("dynamicInputs");
 dynamicInputs.innerHTML = '';
 
-function escapeHTML(text) {
+function escapeHTML(val) {
+	console.log("Escaping html for: " + val);
+	let text 	=	val;
 	let map = {
 		'&': '&amp;',
 		'<': '&lt;',
@@ -13,14 +15,13 @@ function escapeHTML(text) {
 		'"': '&quot;',
 		"'": '&#039;'
 	};
-
 	return text.replace(/[&<>"']/g, function(m) {
 		return map[m];
 	});
 }
 
 function inputsAjax(){
-// get dynamic devices from etcd, and call createNewButton function to generate entries for them.
+// get dynamic devices from etcd, and call createInputButton function to generate entries for them.
 // value = generated hash value of the device, this is how we track it, and how wavelet can find it
 // keyfull = the pathname of the device in /interface/friendlyname
 // key = the key of the device (also friendlyname)
@@ -37,7 +38,7 @@ function inputsAjax(){
 				var key			=	item['key'];
 				var value		=	item['value'];
 				var keyFull		=	item['keyFull'];
-				createNewButton(key, value, keyFull, functionIndex);
+				createInputButton(key, value, keyFull, functionIndex);
 				})
 		},
 		complete: function(){
@@ -88,7 +89,8 @@ function networkInputsAjax(){
 				var key				=	item['key'];
 				var value			=	item['value'];
 				var keyFull			=	item['keyFull'];
-				createNewButton(key, value, keyFull, functionIndex);
+				var IPAddr			=	item['IP'];
+				createInputButton(key, value, keyFull, functionIndex, IPAddr);
 			})
 		},
 	});
@@ -115,8 +117,8 @@ function fetchHostLabelAndUpdateUI(getLabelHostName){
 function sendPHPID(buttonElement) {
 		// we use id here in place of value (both are same for static items in the html)
 		// Because javascript inexplicably can access everythign EXCEPT the value??
-		const postValue				=		escapeHTML(buttonElement.id);
-		const postLabel				=		escapeHTML(buttonElement.innerText);
+		const postValue				=		(buttonElement.id);
+		const postLabel				=		($(this).innerText);
 		console.log("Sending Value: " + postValue + "\nAnd Label: " + postLabel);
 		$.ajax({
 				type: "POST",
@@ -128,76 +130,87 @@ function sendPHPID(buttonElement) {
 						success: function(response){
 								console.log(response);
 								if (postValue == "RD" || "CL") {
-									location.reload(true);
+									setTimeout(() => window.location.reload(), 750);
 								}
 							}
 				});
-		var dynamicsArr		=		Array.from($('div[id="dynamic_inputs"] .btn'));
-		var staticsArr		=		Array.from($('div[id="static_inputs_section"] .btn'));
+		var dynamicsArr				=		Array.from($('div[id="dynamic_inputs"] .btn'));
+		//var dynamicsLclArr		=		Array.from($('div[id="dynamicInputs"] .btn'));
+		//var dynamicsNetArr		=		Array.from($('div[id="dynamicNetworkInputs"] .btn'));
+		var staticsArr				=		Array.from($('div[id="static_inputs_section"] .btn'));
 		if (dynamicsArr.length > 0) {
 			console.log("Found " + dynamicsArr.length + " sibling element(s).");
-			dynamicsArr.forEach((element, index) => {
+		} else {
+			console.log("No elements found!");
+		}
+			for (const element of dynamicsArr) {
 					if ($(element).hasClass ('renameButton removeButton')) {
-						console.log("Button is a rename/remove button, doing nothing.");
 					} else {
-						console.log("Setting data-active to 0 for this element.");
+						console.log("Setting data-active to 0 for this Dynamic element ID:" + element);
 						element.removeAttribute('data-active');
 						}
-					});
+					};			
 			staticsArr.forEach((element, index) => {
 					if ($(element).hasClass ('renameButton removeButton')) {
-						console.log("Button is a rename/remove button, doing nothing.");
 					} else {
-						console.log("Setting data-active to 0 for this element.");
+						console.log("Setting data-active to 0 for this  Static element ID:" + element);
 						element.removeAttribute('data-active');
 						}
 			});
-		} else {
-			console.log("elements found!");
-		}
 		buttonElement.setAttribute("data-active", "1");
 		console.log("Set data-active to 1 for " + buttonElement + "selected element");
 }
 
 
 function sendDynamicPHPID(buttonElement) {
-		const postValue				=		escapeHTML(buttonElement.value);
-		const postLabel				=		escapeHTML($(buttonElement).attr('label'));
-		console.log("Sending Value: " + postValue + "\nAnd Label: " + postLabel);
+	const selectedDivHash                           =               $(this).parent().attr('divDeviceHash');
+	const targetID									=               $(this).parent().attr('divDevID');
+	const inputButtonKeyFull                        =               $(this).parent().attr('data-fulltext');
+	const postValue									=				escapeHTML($(buttonElement).attr('value'))
+	const postLabel									=				escapeHTML($(buttonElement).attr('label'));
+	const keyNameFull								=				$(this).parent().attr('data-fulltext');
+	const functionID								=				$(buttonElement).parent().attr('data-functionID');
+	console.log("function ID is:" + functionID + "\npostLabel is: " + postLabel);
+	if (functionID == 3) {
+		setLabel= ("/network_interface/" + postLabel);
+	} else {
+		setLabel = postLabel;
+	}
+	console.log("Sending Value: " + postValue + "\nAnd Label: " + setLabel);
 		$.ajax({
 				type: "POST",
 						url: "/set_uv_hash_select.php",
 						data: {
 								value: postValue,
-								label: postLabel
+								label: setLabel
 								  },
 						success: function(response){
 								console.log(response);
 						}
 		});
-		var dynamicsArr				=		Array.from($('div[id="dynamicInputs"] .btn'));
+		var dynamicsArr				=		Array.from($('div[id="dynamic_inputs"] .btn'));
+		//var dynamicsLclArr		=		Array.from($('div[id="dynamicInputs"] .btn'));
+		//var dynamicsNetArr		=		Array.from($('div[id="dynamicNetworkInputs"] .btn'));
 		var staticsArr				=		Array.from($('div[id="static_inputs_section"] .btn'));
 		if (dynamicsArr.length > 0) {
 			console.log("Found " + dynamicsArr.length + " sibling element(s).");
-			dynamicsArr.forEach((element, index) => {
+		} else {
+			console.log("No elements found!");
+		}
+			for (const element of dynamicsArr) {
 					if ($(element).hasClass ('renameButton removeButton')) {
-						console.log("Button is a rename/remove button, doing nothing.");
 					} else {
-						console.log("Setting data-active to 0 for this element.");
+						console.log("Setting data-active to 0 for this Dynamic element ID:" + element);
+						element.removeAttribute('data-active');
+						}
+					};			
+			staticsArr.forEach((element, index) => {
+					if ($(element).hasClass ('renameButton removeButton')) {
+					} else {
+						console.log("Setting data-active to 0 for this  Static element ID:" + element);
 						element.removeAttribute('data-active');
 						}
 			});
-			staticsArr.forEach((element, index) => {
-					if ($(element).hasClass ('renameButton removeButton')) {
-						console.log("Button is a rename/remove button, doing nothing.");
-					} else {
-						console.log("Setting data-active to 0 for this element.");
-						element.removeAttribute('data-active');
-						}
-		});
-		} else {
-			console.log("elements found!");
-		}
 		buttonElement.setAttribute("data-active", "1");
 		console.log("Set data-active to 1 for " + buttonElement + "selected element");
 }
@@ -220,6 +233,15 @@ function handlePageLoad() {
 	var audioStatus					=		getAudioStatus(audioValue);
 	// Adding classes and attributes to the prepopulated 'static' buttons on the webUI
 	const staticInputElements		=		document.querySelectorAll(".btn");
+	var confirmElements = document.getElementsByClassName('serious');
+    
+    var confirmIt = function (e) {
+        if (!confirm('Are you sure?')) e.preventDefault();
+    };
+    for (var i = 0, l = confirmElements.length; i < l; i++) {
+        confirmElements[i].addEventListener('click', confirmIt, false);
+    }
+
 	staticInputElements.forEach(el => 
 		el.addEventListener("click", handleButtonClick));
 	// Apply event listener to Livestream toggle
@@ -656,33 +678,36 @@ function createCodecStateChangeButton(hostName, hostHash, type) {
 	return $btn;
 }
 
-function createNewButton(key, value, keyFull, functionIndex) {
+function createInputButton(key, value, keyFull, functionIndex, IP) {
 	var divEntry					=		document.createElement("Div");
 	var dynamicButton				=		document.createElement("Button");
 	const text						=		document.createTextNode(key);
 	const id						=		document.createTextNode(counter + 1);
-	const title						=		document.createTextNode(key);
 	dynamicButton.id				=		counter;
 	hostNameAndDevice				=		key.replace(/\//, ':\n');
 	/* create a div container, where the button, relabel button and any other associated elements reside */
 	if (functionIndex === 1) {
 		console.log("called from firstAjax, so this is a local video source");
 		dynamicInputs.appendChild(divEntry);
+		divEntry.setAttribute("data-functionID", functionIndex);
+		const title						=		document.createTextNode(key);
 	} else if (functionIndex === 3) {
 		console.log("called from thirdAjax, so this is a network video source");
+		hostNameAndDevice			=		(IP + ": " + key);
 		dynamicNetworkInputs.appendChild(divEntry);
+		divEntry.setAttribute("data-functionID", functionIndex);
+		divEntry.setAttribute("title", IP);
 		$('#dynamicNetworkInputs').addClass('dynamicNetworkInputs');
 	} else {
-		console.error("createNewButton not called from a valid function");
+		console.error("createInputButton not called from a valid function");
 	}
 	var currentInputsHash			=		getActiveInputHash();
 	
-	//dynamicInputs.appendChild(divEntry);
 	divEntry.setAttribute("divDeviceHash", value);
 	divEntry.setAttribute("data-fulltext", keyFull);
 	divEntry.setAttribute("divDevID", dynamicButton.id);
-	divEntry.classList.add("dynamicInputButtonDiv");
-	console.log("dynamic video source div created for device hash: " + value + "and label:  " + key);
+	$(divEntry).addClass('input_divider_device');
+	console.log("dynamic video source div created for device hash: " + value + " and label:  " + key);
 	// Create the device button
 	function createInputButton(text, value) {
 		var $btn = $('<button/>', {
@@ -692,7 +717,8 @@ function createNewButton(key, value, keyFull, functionIndex) {
 			value:	value,
 			class:	'btn',
 			title:	'Select this input',
-			id:		dynamicButton.id
+			id:		dynamicButton.id,
+			func:	$(this).parent().attr('data-functionID')
 		}).click(handleDynamicButtonClick);
 		$btn.data("fulltext", keyFull);
 		return $btn;
@@ -704,7 +730,8 @@ function createNewButton(key, value, keyFull, functionIndex) {
 			text:	'Rename',
 			class:	'btn renameButton',
 			title:	'Relabel this item',
-			id:		'btn_rename'
+			id:		'btn_rename',
+			func:	$(this).parent().attr('data-functionID')
 			}).click(relabelInputElement);
 		$btn.data("fulltext", keyFull);
 		return $btn;
@@ -716,22 +743,9 @@ function createNewButton(key, value, keyFull, functionIndex) {
 			text:	'Remove',
 			title:	'Delete this entry',
 			class:	'btn removeButton',
-			id:		'btn_delete'
-		}).click(function(){
-			$(this).parent().remove();
-			console.log("Deleting input entry and associated key: " + key + " and value: " + value);
-			$.ajax({
-				type: "POST",
-				url: "/set_remove_input.php",
-				data: {
-					key: key,
-					value: value
-				},
-				success: function(response){
-					console.log(response);
-				}
-			});
-		})
+			id:		'btn_delete',
+			func:	$(this).parent().attr('data-functionID')
+		}).click(removeInputElement);
 		return $btn;
 	}
 	$(divEntry).append(createDeleteButton());
@@ -891,31 +905,70 @@ function relabelInputElement() {
 	const oldGenText                                =               $(this).parent().attr('data-fulltext');
 	const newTextInput                              =               prompt("Enter new text label for this device:");
 	const inputButtonLabel                          =               $(this).next('button').attr('label');
-	const hostName                                  =               $(this).next('button').attr('label').split('/')[0];
+	var hostName									=               $(this).next('button').attr('label').split('/')[0];
+	const functionID								=				$(this).parent().attr('data-functionID');
+	var deviceIpAddr								=				$(this).parent().attr('title');
 	console.log("Found Hash is: " + selectedDivHash + "\nFound button ID is: " + relabelTarget + "\nFound Label is: " + inputButtonLabel);
 	console.log("Device full label is: " + oldGenText + "\nNew device label: " + newTextInput + "\nHostname: " + hostName);
-	if (newTextInput !== null && newTextInput !== "") {
-			document.getElementById(relabelTarget).innerText = `${hostName}: ${newTextInput}`;
-			document.getElementById(relabelTarget).oldGenText = oldGenText;
-			console.log("Button text successfully applied as: " + newTextInput);
-			console.log("The originally generated device field from Wavelet was: " + oldGenText);
-			console.log("The button must be activated for any changes to reflect on the video banner!");
-			$.ajax({
-				type: "POST",
-				url: "/set_input_label.php",
-				data: {
-					value:          selectedDivHash,
-					label:          newTextInput,
-					oldvl:          oldGenText,
-					hostName:       hostName
-				  },
-				success: function(response){
-					console.log(response);
-				}
-			});
-		} else {
-			return;
+	if (functionID == 3) {
+		hashValue	= ("/network_interface/" + selectedDivHash);
+		hostName	= `${deviceIpAddr}`;
+		console.log('This is a network device, substituting path strings for PHP handler\nSetting hostname to IP Address:' + deviceIpAddr);
+	} else {
+		hashValue = selectedDivHash;
 	}
+	if (newTextInput !== null && newTextInput !== "") {
+		document.getElementById(relabelTarget).innerText = `${hostName}: ${newTextInput}`;
+		document.getElementById(relabelTarget).oldGenText = oldGenText;
+		console.log("Button text successfully applied as: " + hostName + newTextInput);
+		console.log("The originally generated device field from Wavelet was: " + oldGenText);
+		console.log("The button must be activated for any changes to reflect on the video banner!");
+		$.ajax({
+			type: "POST",
+			url: "/set_input_label.php",
+			data: {
+				value:          hashValue,
+				label:          (hostName + "/" + newTextInput),
+				oldvl:          oldGenText,
+				hostName:       hostName
+			  },
+			success: function(response){
+				console.log(response);
+			}
+			});
+	} else {
+		return;
+	}
+}
+
+function removeInputElement() {
+	const selectedDivHash                           =               $(this).parent().attr('divDeviceHash');
+	const relabelTarget                             =               $(this).parent().attr('divDevID');
+	const inputButtonKeyFull                        =               $(this).parent().attr('data-fulltext');
+	const functionID								=				$(this).parent().attr('data-functionID');
+	console.log("Found Hash for removal is: " + selectedDivHash + "\nFound button ID is: " + relabelTarget + "\nFound Label is: " + inputButtonKeyFull);
+	if (functionID == 3) {
+		console.log("Network device, function ID 3");
+		hashValue = ("/network_ip/" + selectedDivHash);
+	} else {
+		console.log("Local device or other, function ID not 3");
+		hashValue = selectedDivHash;
+	}
+	console.log("Deleting input entry and associated key: " + inputButtonKeyFull + " and value: " + hashValue);
+		$.ajax({
+			type: "POST",
+			url: "/set_remove_input.php",
+			data: {
+				key: inputButtonKeyFull,
+				value: hashValue
+			},
+			success: function(response){
+				console.log(response);
+			}
+		});
+	$(this).parent().remove();
+	sleep(300);
+	//setTimeout(() => window.location.reload(), 750);
 }
 
 function setButtonActiveStyle(button) {
