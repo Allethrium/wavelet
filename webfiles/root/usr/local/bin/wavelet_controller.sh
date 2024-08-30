@@ -1,3 +1,4 @@
+
 #!/bin/bash
 #
 # The controller is responsible for orchestrating the rest of the system
@@ -79,21 +80,21 @@ waveletcontroller() {
 # 11/2023 - note that hardcoded inputs are no longer used here, the case $event in line just tests static buttons from the webUI.  The rest is handled between detectv4l and wavelet_encoder, for the most part.
 case $event in
 	# 1
-	(1) 	echo -e "Option One, Blank activated\n"						;current_event="wavelet-blank"			;wavelet-blank								;;
+	(1) 	echo -e "Option One, Blank activated\n"						;current_event="wavelet-blank"			;wavelet_blank								;;
 	# Display a black screen on all devices
 	# 2
-	(2) 	echo -e "Option Two, Seal activated\n"						;current_event="wavelet-seal"			;wavelet-seal								;;
+	(2) 	echo -e "Option Two, Seal activated\n"						;current_event="wavelet-seal"			;wavelet_seal								;;
 	# Display a static image of a court seal (find a better image!)
 	# 3-8 are all dynamic inputs populated from v4l2 (or in the future, hopefully Decklink)
 	# 9
 	(9)		echo -e "Recording currently Not implemented"				;is_recording=false																	;;
-	(T)		echo "Test Card activated"									;current_event="wavelet-testcard"		;wavelet-testcard							;;
+	(T)		echo "Test Card activated"									;current_event="wavelet-testcard"		;wavelet_testcard							;;
 	# System control options
-	# (DR)	echo -e "Decoders instructed to reload\n"					;current_event="wavelet-decoder-reboot"	;wavelet-decoder-reset						;;
-	(ER)	echo -e "Encoders instructed to reload\n"					;current_event="wavelet-encoder-reboot"	;wavelet-encoder-reboot						;;
-	(SR)	echo -e "Whole system reboot\n"								;current_event="wavelet-system-reboot"	;wavelet-system-reboot						;;
-	(CL)	echo -e "Clearing All Input Sources from keystore..\n"		;current_event="wavelet-clear-inputs"	;wavelet-clear-inputs						;;
-	(RD)	echo -e "Running re-detection of source devices..\n"		;current_event="wavelet-detect-inputs"	;wavelet-refresh							;;
+	# (DR)	echo -e "Decoders instructed to reload\n"					;current_event="wavelet-decoder-reboot"	;wavelet_decoder-reset						;;
+	(ER)	echo -e "Encoders instructed to reload\n"					;current_event="wavelet-encoder-reboot"	;wavelet_encoder_reboot						;;
+	(SR)	echo -e "Whole system reboot\n"								;current_event="wavelet-system-reboot"	;wavelet_system_reboot						;;
+	(CL)	echo -e "Clearing All Input Sources from keystore..\n"		;current_event="wavelet-clear-inputs"	;wavelet_clear_inputs						;;
+	(RD)	echo -e "Running re-detection of source devices..\n"		;current_event="wavelet-detect-inputs"	;wavelet_refresh							;;
 #	if [ $recording = true ]; then
 #		echo "Recording to archive file" && recording=true && wavelet_record_start
 #	if [ $recording = false ]; then
@@ -121,11 +122,11 @@ case $event in
 	#
 	# Multiple input modes go here (I wonder if there's a better, matrix-based approach to this?)
 	#
-	(W) echo "Four-way panel split activated \n"						;current_event="event_foursplit";wavelet-foursplit			;;
-	(X) echo "Two-way panel split activated \n"							;current_event="event_twosplit"	;wavelet-twosplit		;;
-	(Y) echo "Picture-in-Picture 1 activated \n"						;current_event="event_pip1"		;wavelet-pip1			;;
-	(Z) echo "Picture-in-Picture 2 activated \n"						;current_event="event_pip2"		;wavelet-pip2			;;
-	(*) echo "Unknown predefined input, passing hash to encoders.. \n"	;current_event="dynamic"		;wavelet-dynamic				;;
+	(W) echo "Four-way panel split activated \n"						;current_event="event_foursplit";wavelet_foursplit			;;
+	(X) echo "Two-way panel split activated \n"							;current_event="event_twosplit"	;wavelet_twosplit		;;
+	(Y) echo "Picture-in-Picture 1 activated \n"						;current_event="event_pip1"		;wavelet_pip1			;;
+	(Z) echo "Picture-in-Picture 2 activated \n"						;current_event="event_pip2"		;wavelet_pip2			;;
+	(*) echo "Unknown predefined input, passing hash to encoders.. \n"	;current_event="dynamic"		;wavelet_dynamic				;;
 esac
 }
 
@@ -183,7 +184,7 @@ write_etcd_global
 echo -e "Processes kill flags set, services should restart within ~5 seconds \n"
 }
 
-wavelet-blank() {
+wavelet_blank() {
 # 1
 # Displays a black jpg to blank the screen fully
 	current_event="wavelet-blank"
@@ -197,7 +198,7 @@ wavelet-blank() {
 	echo 'capture.data 0' | busybox nc -v 127.0.0.1 6160
 }
 
-wavelet-seal() {
+wavelet_seal() {
 # 2
 # Serves a static image in .jpg format in a loop to the encoder.
 	current_event="wavelet-seal"
@@ -216,7 +217,7 @@ wavelet-seal() {
 	echo -e "\nSEAL image activated from server encoder..\n"
 }
 
-wavelet-testcard() {
+wavelet_testcard() {
 # T
 # Test Card
 	current_event="wavelet-testcard"
@@ -231,7 +232,7 @@ wavelet-testcard() {
 	echo 'capture.data 2' | busybox nc -v 127.0.0.1 6160
 }
 
-wavelet-refresh() {
+wavelet_refresh() {
 	# This is only called by the RD, refresh-devices button, and it finds the previous hash and resets to it.
 	revisions=$(etcdctl --endpoints=192.168.1.32:2379 get -w json uv_hash_select | jq -r '.header.revision')
 	lastrev=$((${revisions} - 1))
@@ -244,7 +245,7 @@ wavelet-refresh() {
 }
 
 
-wavelet-dynamic() {
+wavelet_dynamic() {
 	# processes device hashes submitted from the WebUI through to the encoder
 	# This is really all handled on the encoder side, the only thing the controller is doing here ought to be notifying the controller of a restart..
 	current_event="wavelet-dynamic"
@@ -257,10 +258,10 @@ wavelet-dynamic() {
 	echo -e "\nController notified that input hash ${controllerInputHash} has been selected from webUI with the input label ${controllerInputLabel}, encoder restart commencing..\n"
 	# Kill existing streaming on the SERVER
 	systemctl --user stop UltraGrid.AppImage.service
-	targetHost=$(echo ${controllerInputLabel} | sed 's|\(.*\)/.*|\1|')
+	targetHost="${controllerInputLabel}"
 	echo -e "Target host name is ${targetHost}"
 	# Check to see if we're running a non-UltraGrid network input device
-	if [[ ${targetHost} == *"/network_interface/short"* ]]; then
+	if [[ ${targetHost} == *"/network_interface/"* ]]; then
 		echo -e "\nTarget Hostname isn't a wavelet device, it's a network device..\n"
 		echo -e "\nSkipping Input update and capture channel flags..\n"
 		echo -e "\setting encoder task to restart on server..\n"
@@ -269,6 +270,7 @@ wavelet-dynamic() {
 		sleep 2
 	else
 		# Set encoder restart flag to 1 for appropriate host
+		targetHost=$(echo ${controllerInputLabel} | sed 's|\(.*\)/.*|\1|')
 		echo -e "${targetHost} encoder_restart flag set!\n"
 		KEYNAME="/${targetHost}/encoder_restart"
 		KEYVALUE="1"
@@ -468,7 +470,7 @@ event_libsvt_av1() {
 	wavelet-decoder-reset
 }
 
-wavelet-foursplit() {
+wavelet_foursplit() {
 # W
 	current_event="wavelet-foursplit"
 	KEYNAME=uv_input
@@ -479,7 +481,7 @@ wavelet-foursplit() {
 	KEYVALUE="1"
 	write_etcd_global
 }
-wavelet-twosplit() {
+wavelet_twosplit() {
 # W
 	current_event="wavelet-twosplit"
 	KEYNAME=uv_input
@@ -490,7 +492,7 @@ wavelet-twosplit() {
 	KEYVALUE="1"
 	write_etcd_global
 }
-wavelet-pip1() {
+wavelet_pip1() {
 # Doesn't currently work, so disable.
 	current_event="wavelet-pip1"
 	KEYNAME=uv_input
@@ -501,7 +503,7 @@ wavelet-pip1() {
 	KEYVALUE="1"
 	write_etcd_global
 }
-wavelet-pip2() {
+wavelet_pip2() {
 # Doesn't currently work, so disable.
 	current_event="wavelet-pip2"
 	KEYNAME=uv_input
@@ -513,7 +515,7 @@ wavelet-pip2() {
 	write_etcd_global
 }
 
-wavelet-decoder-reset() {
+wavelet_decoder_reset() {
 # Finds all decoders and sets client reSET flag.  This restarts UltraGrid without a full system reboot.
 # Have to clean /DECODER_RESET from result or we get recursion, remember etcd isn't hierarchical!
 return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --keys-only)
@@ -528,7 +530,7 @@ return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decode
 	echo -e "Decoder tasks instructed to reset on all attached decoders.\n"
 }
 
-wavelet-encoder-reboot() {
+wavelet_encoder_reboot() {
 # Finds all encoders and sets client reboot flag (need to implement reboot watcher service)
 # re-use the reflector code and then foreach hostname set it to reboot encoders
 # UltraGrid encoder task will SIGTERM every time a source is changed, this on the other hand reboots the WHOLE encoder.
@@ -536,14 +538,14 @@ wavelet-encoder-reboot() {
 	echo -e "Encoder reboot flag enabled, encoders will hard reset momentarily.."
 }
 
-wavelet-system-reboot() {
+wavelet_system_reboot() {
 # This hard reboots everything, including the server.
 # set reboot flag on every host in etcd
 	etcdctl --endpoints=${ETCDENDPOINT} put "SYSTEM_REBOOT" -- "1"
 	echo -e "All hosts instructed to hard reset.  Server and all reachable devices will restart immediately..\n"
 }
 
-wavelet-clear-inputs() {
+wavelet_clear_inputs() {
 # Removes all input devices from their appropriate prefixes.
 # Until I fix the detection/removal stuff so that it works perfectly, this will effectively clean out any cruft from 'stuck'
 # source devices which no longer exist, but still populate on the UI.
@@ -554,15 +556,20 @@ wavelet-clear-inputs() {
 	etcdctl --endpoints=http://192.168.1.32:2379 del "/short_hash" --prefix
 	etcdctl --endpoints=http://192.168.1.32:2379 del "/long" --prefix
 	etcdctl --endpoints=http://192.168.1.32:2379 del "/$(hostname)/inputs" --prefix
+	etcdctl --endpoints=http://192.168.1.32:2379 del "/network_long" --prefix
+	etcdctl --endpoints=http://192.168.1.32:2379 del "/network_short" --prefix
+	etcdctl --endpoints=http://192.168.1.32:2379 del "/network_interface" --prefix
+	etcdctl --endpoints=http://192.168.1.32:2379 del "/network_ip" --prefix
+	etcdctl --endpoints=http://192.168.1.32:2379 del "/network_uv_stream_command" --prefix
 	echo -e "All interface devices and their configuration data, as well as labels have been deleted\n
 	Plugging in a new device will cause the detection module to run again.\n"
 }
 
-wavelet-detect-inputs() {
+wavelet_detect_inputs() {
 	# Tells detectv4l to run on everything
 	echo -e "\nAll devices now redetecting available input video sources..\n"
 	# here we might need a list of encoder hostNames and do a forEach loop..
-	etcdctl --endpoints=http://192.168.1.32:2379 set "DEVICE_REDETECT" -- "1"
+	etcdctl --endpoints=http://192.168.1.32:2379 put "DEVICE_REDETECT" -- "1"
 }
 
 

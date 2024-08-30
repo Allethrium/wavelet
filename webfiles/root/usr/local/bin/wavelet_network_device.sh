@@ -209,9 +209,9 @@ populate_to_etcd(){
 	KEYNAME="/network_shorthash/${deviceHash}"
 	KEYVALUE="${deviceHostName}"
 	write_etcd_global
-	KEYNAME="/network_long/${leasefile}"
-	KEYVALUE="${devicehash}"
-	write_etcd_global
+	#KEYNAME="/network_long/${leasefile}"
+	#KEYVALUE="${devicehash}"
+	#write_etcd_global
 	KEYNAME="/network_longhash/${deviceHash}"
 	KEYVALUE="${leasefile}"
 	write_etcd_global

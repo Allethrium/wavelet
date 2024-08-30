@@ -59,18 +59,18 @@ wavelet_reflector() {
 	# 4) echo 'root add-port ${i%}' | busybox nc -v 127.0.0.1 6161
 	if [[ ! -z "${return_etcd_clients_ip}" ]]; then
 		reflectorclients_file=/home/wavelet/reflector_clients_ip.txt
+		# this removes duplicate IP's from the subscription
+		deDupReturnClientsIP=$(echo "${return_etcd_clients_ip}" | tr ' ' '\n' | nl | sort -u -k2 | sort -n | cut -f2- | tr '\n' ' ')
+		deDupProcessedIP=$(echo "${processed_clients_ip}" | tr ' ' '\n' | nl | sort -u -k2 | sort -n | cut -f2-)
 		# KEYNAME=uv_filter_cmd
-		echo -e "Systemd will execute hd-rum-transcode with commandline: \n\nhd-rum-transcode 2M 5004 ${return_etcd_clients_ip}\nafter a half-second delay"
+		echo -e "Systemd will execute hd-rum-transcode with commandline:\nhd-rum-transcode 2M 5004 ${return_etcd_clients_ip}"
 		KEYNAME=REFLECTOR_ARGS
 		# Reduce HD-RUM buffer to 2M
 		# v. 1.9.4 will introduce hd-rum-av which can handle both audio and video in the same reflector, so we can drop the second systemd unit.
 		# args="--tool hd-rum-av --control-port 6161 2M 5004 ${processed_clients_ip}"
 		# as of pre 1.9.5 release, --control-port appears to break hd-rum-transcode, so we will drop it for now.
-		# this removes duplicate IP's from the subscription
-		variable=$(echo "${processed_clients_ip}" | tr ' ' '\n' | nl | sort -u -k2 | sort -n | cut -f2-)
-		return_etcd_clients_ip=$(echo "${return_etcd_clients_ip}" | tr ' ' '\n' | nl | sort -u -k2 | sort -n | cut -f2-)
 		# Set reflector args
-		ugargs="--tool hd-rum-transcode 2M 5004 ${variable}"
+		ugargs="--tool hd-rum-transcode 2M 5004 ${deDupReturnClientsIP}"
 		KEYVALUE="${ugargs}"
 		echo -e "Generating initial reflector clients list.."
 		echo "${return_etcd_clients_ip}" > /home/wavelet/reflector_clients_ip.txt
@@ -98,11 +98,10 @@ wavelet_reflector() {
 		write_etcd_global
 		# Audio reflector, IP settings identical to video reflector so we don't need to do all that again
 		KEYNAME=AUDIO_REFLECTOR_ARGS
-		ugargs="--tool hd-rum-transcode 2M 5006 ${processed_clients_ip}"
+		ugargs="--tool hd-rum-transcode 2M 5006 ${deDupReturnClientsIP}"
 		KEYVALUE="${ugargs}"
 		write_etcd_global
-		echo "
-		[Unit]
+		echo -e "[Unit]
 		Description=UltraGrid AppImage Audio Reflector
 		After=network-online.target
 		Wants=network-online.target
@@ -114,6 +113,28 @@ wavelet_reflector() {
 		systemctl --user restart UltraGrid.Audio.Reflector.service
 		echo -e "Reload_reflector flag is being set to 0.."
 
+		# setup Reflector cleanup service
+		# This timer and systemd unit call a script which will attempt to ping for dead hosts every five minutes, and trim dead IP's.
+		echo -e "[Unit]
+		Description=Wavelet Reflector Janitor Service
+		After=network-online.target
+		Wants=network-online.target
+		[Service]
+		Type=onshot
+		ExecStart=/usr/local/bin/wavelet_host_janitor.sh
+		[Install]
+		WantedBy=timers.target
+		" > /home/wavelet/.config/systemd/user/Wavelet_reflector_janitor.service
+		echo -e "[Unit]
+		Description=Wavelet Reflector Janitor Service
+		After=network-online.target
+		Wants=network-online.target
+		[Timer]
+		OnBootSec=300s
+		OnUnitActiveSec=300s
+		[Install]
+		WantedBy=default.target
+		" > /home/wavelet/.config/systemd/user/Wavelet_reflector_janitor.timer
 	else
 		echo -e "It appears there are no populated client IP's for the reflector, sleeping for two minutes and exiting.  The reflector reload watcher will re-launch this script at that time."
 		sleep 120

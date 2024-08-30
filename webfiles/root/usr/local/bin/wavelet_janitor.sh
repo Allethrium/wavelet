@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# PLACEHOLDER
 # Wavelet Janitor service, cleans up old fusermount filesystems, call from crontab every 15 minutes or so?
 
 # ps ax | grep for running UltraGrid instances

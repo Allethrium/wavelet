@@ -491,7 +491,7 @@ body:before {
 	padding: 5px 5px 5px 5px;
 	margin:  5px 5px 5px 5px;
 	color:white;
-	background: #023240;
+	background: #133446;
 	outline: 1px solid white;
 	outline-offset: 2px;
 	font-size: small;
@@ -500,6 +500,19 @@ body:before {
 .input_divider_inner {
 	display: inline-block;
 	background: #055280;
+	padding: .6em;
+	margin: .5em;
+	border-radius:.8em;
+	outline: 1px solid white;
+	outline-offset: 2px;
+	text-transform: uppercase;
+	font-size:small;
+	text-align:left;
+	border: .5px solid white;
+}
+.input_divider_device {
+	display: inline-block;
+	background: #087fc4;
 	padding: .6em;
 	margin: .5em;
 	border-radius:.8em;
