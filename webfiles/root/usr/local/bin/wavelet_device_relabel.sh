@@ -59,6 +59,7 @@ UG_HOSTNAME=$(hostname)
 check_label(){
 	# Finds our current hash and gets the new label from Etcd as set from UI
 	oldHostName=$(hostname)
+	echo "${oldHostName}" > /home/wavelet/oldHostName.txt
 	KEYNAME="/hostHash/$(hostname)/relabel_active"
 	KEYVALUE="1"
 	write_etcd_global
@@ -78,6 +79,7 @@ check_label(){
 		exit 0
 	else
 		echo -e "New label and current hostname are different, proceding to initiate change.."
+		currentHostName=$(hostname)
 		set_newLabel
 	fi
 }
@@ -251,7 +253,7 @@ set_newHostName(){
 	fi
 }
 
-event_hostnameChange() {
+event_hostNameChange() {
 # Check to see if hostname has changed since last session
 if [[ -f /home/wavelet/oldhostname.txt ]]; then
 		check_hostname
@@ -281,6 +283,7 @@ detect_self
 #
 ###
 
+set -x
 # Check for pre-existing log file
 # This is necessary because of system restarts, the log will get overwritten, and we need to see what it's doing across reboots.
 logName=/home/wavelet/changehostname.log
@@ -294,13 +297,17 @@ fi
 exec > "${logName}" 2>&1
 
 # Parse input options (I.E if called by promote service)
+echo -e "Parsing input options..\n"
 for arg in "$@"; do
 	echo -e "\nArgument is: ${arg}\n"
-	case  ${arg} in
-		dec*)   echo -e "\nCalled with decoder argument, promoting to Encoder\n"				;	event_prefix_set "${arg}"
+	case ${arg} in
+		dec*)		echo -e "\nCalled with decoder argument, promoting to Encoder\n"				;	event_prefix_set "${arg}"
 		;;
-		enc*)   echo -e "\nCalled with encoder argument, promoting to Decoder\n"				;	event_prefix_set "${arg}"
+		enc*)		echo -e "\nCalled with encoder argument, promoting to Decoder\n"				;	event_prefix_set "${arg}"
 		;;
-		*)  	echo -e "\nCalled with invalid argument, not calling prefix function..\n"		;	event_hostNameChange
+		"relabel")	echo -e "\nCalled with relabel argument, not calling prefix function..\n"		;	event_hostNameChange
+		;;
+		*)			echo -e "\nCalled with invalid argument, not calling prefix function..\n"		;	event_hostNameChange
+		;;
 	esac
 done
