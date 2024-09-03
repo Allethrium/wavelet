@@ -226,6 +226,7 @@ install_ug_depends(){
 	#   Live555 for rtmp
 	#   LibNDI for Magewell devices
 	cd /home/wavelet
+	install_cineform(){
 	# CineForm SDK
 		git clone https://github.com/gopro/cineform-sdk
 		cd cineform-sdk
@@ -235,9 +236,10 @@ install_ug_depends(){
 		cmake --build . --parallel "$(nproc)"
 		sudo cmake --install .
 		cd /home/wavelet
+	}
+	install_libaja(){
 	#Install libAJA Library
 		git clone https://github.com/aja-video/libajantv2.git
-		cd libajantv2/
 		# export MACOSX_DEPLOYMENT_TARGET=10.13 # needed for arm64 mac
 		cmake -DAJANTV2_DISABLE_DEMOS=ON  -DAJANTV2_DISABLE_DRIVER=OFF \
 		-DAJANTV2_DISABLE_TOOLS=OFF  -DAJANTV2_DISABLE_TESTS=ON \
@@ -245,12 +247,17 @@ install_ug_depends(){
 		-DCMAKE_BUILD_TYPE=Release -Blibajantv2/build -Slibajantv2
 		cmake --build libajantv2/build --config Release -j "$(nproc)"
 		sudo cmake --install libajantv2/build
+	}
+	install_live555(){
 	# Live555
 		git clone https://github.com/xanview/live555/
 		cd live555
 		./genMakefiles linux-with-shared-libraries
 		make -j "$(nproc)"
 		make install
+		cd /home/wavelet
+	}
+	install_libndi(){
 	# LibNDI
 	# Lifted from https://github.com/DistroAV/DistroAV/blob/master/CI/libndi-get.sh
 		mkdir -p /home/wavelet/libNDI
@@ -274,6 +281,11 @@ install_ug_depends(){
 	ln -s /usr/local/lib/libndi.so.6 /usr/local/lib/libndi.so.5
 	chown -R wavelet:wavelet /home/wavelet/libNDI
 	echo -e "\nLibNDI Installed..\n"
+	}
+	install_libndi
+	install_libaja
+	install_cineform
+	install_live555
 }
 
 ####
