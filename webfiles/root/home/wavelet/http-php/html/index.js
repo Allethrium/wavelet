@@ -115,50 +115,50 @@ function fetchHostLabelAndUpdateUI(getLabelHostName){
 }
 
 function sendPHPID(buttonElement) {
-		// we use id here in place of value (both are same for static items in the html)
-		// Because javascript inexplicably can access everythign EXCEPT the value??
-		const postValue				=		(buttonElement.id);
-		const postLabel				=		($(this).innerText);
-		console.log("Sending Value: " + postValue + "\nAnd Label: " + postLabel);
-		$.ajax({
-				type: "POST",
-						url: "/set_uv_hash_select.php",
-						data: {
-								value: postValue,
-								label: postLabel
-								  },
-						success: function(response){
-								console.log(response);
-								if (postValue == "RD" || "CL") {
-									setTimeout(() => window.location.reload(), 750);
-								}
-							}
-				});
-		var dynamicsArr				=		Array.from($('div[id="dynamic_inputs"] .btn'));
-		//var dynamicsLclArr		=		Array.from($('div[id="dynamicInputs"] .btn'));
-		//var dynamicsNetArr		=		Array.from($('div[id="dynamicNetworkInputs"] .btn'));
-		var staticsArr				=		Array.from($('div[id="static_inputs_section"] .btn'));
-		if (dynamicsArr.length > 0) {
-			console.log("Found " + dynamicsArr.length + " sibling element(s).");
+	// we use id here in place of value (both are same for static items in the html)
+	// Because javascript inexplicably can access everythign EXCEPT the value??
+	const postValue				=		(buttonElement.id);
+	const postLabel				=		($(this).innerText);
+	console.log("Sending Value: " + postValue + "\nAnd Label: " + postLabel);
+	$.ajax({
+		type: "POST",
+			url: "/set_uv_hash_select.php",
+			data: {
+				value: postValue,
+				label: postLabel
+			},
+			success: function(response){
+				console.log(response);
+				if (postValue == "RD" || "CL") {
+					setTimeout(() => window.location.reload(), 750);
+				}
+			}
+	});
+	var dynamicsArr				=		Array.from($('div[id="dynamic_inputs"] .btn'));
+	//var dynamicsLclArr		=		Array.from($('div[id="dynamicInputs"] .btn'));
+	//var dynamicsNetArr		=		Array.from($('div[id="dynamicNetworkInputs"] .btn'));
+	var staticsArr				=		Array.from($('div[id="static_inputs_section"] .btn'));
+	if (dynamicsArr.length > 0) {
+		console.log("Found " + dynamicsArr.length + " sibling element(s).");
+	} else {
+		console.log("No elements found!");
+	}
+	for (const element of dynamicsArr) {
+		if ($(element).hasClass ('renameButton removeButton')) {
 		} else {
-			console.log("No elements found!");
+			console.log("Setting data-active to 0 for this Dynamic element ID:" + element);
+			element.removeAttribute('data-active');
 		}
-			for (const element of dynamicsArr) {
-					if ($(element).hasClass ('renameButton removeButton')) {
-					} else {
-						console.log("Setting data-active to 0 for this Dynamic element ID:" + element);
-						element.removeAttribute('data-active');
-						}
-					};			
-			staticsArr.forEach((element, index) => {
-					if ($(element).hasClass ('renameButton removeButton')) {
-					} else {
-						console.log("Setting data-active to 0 for this  Static element ID:" + element);
-						element.removeAttribute('data-active');
-						}
-			});
-		buttonElement.setAttribute("data-active", "1");
-		console.log("Set data-active to 1 for " + buttonElement + "selected element");
+	};			
+	staticsArr.forEach((element, index) => {
+		if ($(element).hasClass ('renameButton removeButton')) {
+		} else {
+			console.log("Setting data-active to 0 for this  Static element ID:" + element);
+			element.removeAttribute('data-active');
+			}
+		});
+	buttonElement.setAttribute("data-active", "1");
+	console.log("Set data-active to 1 for " + buttonElement + "selected element");
 }
 
 
@@ -221,9 +221,8 @@ function handleButtonClick() {
 }
 
 function handleDynamicButtonClick() {
-		sendDynamicPHPID(this);
+	sendDynamicPHPID(this);
 }
-
 
 function handlePageLoad() {
 	var livestreamValue				=		getLivestreamStatus(livestreamValue);
@@ -234,14 +233,12 @@ function handlePageLoad() {
 	// Adding classes and attributes to the prepopulated 'static' buttons on the webUI
 	const staticInputElements		=		document.querySelectorAll(".btn");
 	var confirmElements = document.getElementsByClassName('serious');
-    
-    var confirmIt = function (e) {
-        if (!confirm('Are you sure?')) e.preventDefault();
-    };
-    for (var i = 0, l = confirmElements.length; i < l; i++) {
-        confirmElements[i].addEventListener('click', confirmIt, false);
-    }
-
+	var confirmIt = function (e) {
+		if (!confirm('Are you sure?')) e.preventDefault();
+	};
+	for (var i = 0, l = confirmElements.length; i < l; i++) {
+		confirmElements[i].addEventListener('click', confirmIt, false);
+	}
 	staticInputElements.forEach(el => 
 		el.addEventListener("click", handleButtonClick));
 	// Apply event listener to Livestream toggle
@@ -533,7 +530,6 @@ function createIdentifyButton(hostName, hostHash) {
 return $btn;
 }
 
-
 function createRestartButton(hostName, hostHash) {
 /* add task restart button */
 	var $btn					=		$('<button/>', {
@@ -678,6 +674,100 @@ function createCodecStateChangeButton(hostName, hostHash, type) {
 	return $btn;
 }
 
+function createDecoderMenuSet(hostName, hostHash, type) {
+	console.log("Generating Decoder buttons in Hamburger Menu..");
+	let activeMenuSelector			=	(`#hamburgerMenu_${hostHash}`);
+	$(activeMenuSelector).append(createRestartButton(hostName, hostHash));
+	$(activeMenuSelector).append(createRebootButton(hostName, hostHash));
+	$(activeMenuSelector).append(createIdentifyButton(hostName, hostHash));
+	$(activeMenuSelector).append(createCodecStateChangeButton(hostName, hostHash, type));
+}
+
+function createEncoderMenuSet(hostName, hostHash, type) {
+	console.log("Generating Decoder buttons in Hamburger Menu..");
+	let activeMenuSelector			=	(`#hamburgerMenu_${hostHash}`);
+	$(activeMenuSelector).append(createRestartButton(hostName, hostHash));
+	$(activeMenuSelector).append(createRebootButton(hostName, hostHash));
+	$(activeMenuSelector).append(createCodecStateChangeButton(hostName, hostHash, type));
+}
+
+function createServerMenuSet(hostName, hostHash, type) {
+	console.log("Generating Decoder buttons in Hamburger Menu..");
+	let activeMenuSelector			=	(`#hamburgerMenu_${hostHash}`);
+	$(activeMenuSelector).append(createRestartButton(hostName, hostHash));
+	$(activeMenuSelector).append(createRebootButton(hostName, hostHash));
+}
+
+function hostMenuCheckBoxHandler() {
+	var checkBoxHostHash			=	$(this);
+	var checkBoxMenuElement			=	$(this).siblings(".sidebarMenuInner");
+	console.log("Working on: " + checkBoxHostHash);
+	if ($(this).is(':checked')) {
+		console.log($(this).attr("id") + ' is now checked, revealing details menu..\n');
+	} else {
+		console.log($(this).attr("id") + ' is now unchecked, hiding menu');
+	}
+}
+
+function createDetailMenu(hostName, hostHash, type, divEntry) {
+	/* Generates an HTML span for the hamburger menu */
+	console.log("creating a detail menu element and populating with appropriate menu options.\n")
+	var hostMenuElement		=	$("<span>",	{
+		class:	'hostMenuElement',
+		id:	`hostMenuElement_${hostHash}`,
+		type:	type
+	}).appendTo(divEntry);
+	var hamburgerCheckBox		=	$("<input>",	{
+		type:			"checkbox", 
+		class:			`openHostMenuCheckbox openHostMenu openHostMenu_${hostHash}`,
+		id:			`openHostMenu_${hostHash}`,
+		attribute:		`data-hosthash=${hostHash}`
+	}).on({
+		change: hostMenuCheckBoxHandler,
+		/* this does actually work with two caveats:  clicking a button kills the menu, and clicking the menu close reopens the menu. */
+		/* how can we implement intelligently so clicking away from this element kills the menu, but clicking close actually closes? */
+		/* blur: function(){
+			$(this).prop('checked', false);
+		}*/
+	});
+	var hamburgerLabel		=       $("<label>",    {
+		for:	`openHostMenu_${hostHash}`,
+		class:	`hostMenuIconToggle hostManuIconToggle_${hostHash}`
+	});
+		var hamburgerMenu               =       $("<div>",      {
+		/* The actual Menu content, in our case - the host control button suite */
+				class: `hostMenu hostMenu_${hostHash}`,
+		id: `hamburgerMenu_${hostHash}`
+		});
+	var hamburgerMenuOverlay	=	$("<div>",	{
+		class: 'hostMenuOverlay'
+	});
+	hamburgerCheckBox.appendTo(hostMenuElement);
+		hamburgerLabel.appendTo(hostMenuElement);
+		hamburgerMenu.appendTo(hostMenuElement);
+	hamburgerLabel.append(
+		`<div class="spinner diagonal part-1"></div>
+		<div class="spinner horizontal"></div>
+		<div class="spinner diagonal part-2"></div>`
+	);
+	hamburgerMenuOverlay.appendTo(hamburgerMenu);
+	hostMenuElement.appendTo(divEntry);
+	switch(type) {
+		case 'dec':
+			console.log("This is a decoder host, adding button set to hamburger menu\n");
+			createDecoderMenuSet(hostName, hostHash, type, divEntry);
+			break;
+		case 'enc':
+			console.log("This is an encoder host");
+			createEncoderMenuSet(hostName, hostHash, type, divEntry);
+			break;
+		case 'svr':
+			console.log("This is a Server");
+			createServerMenuSet(hostName, hostHash);
+			break;
+	}
+}
+
 function createInputButton(key, value, keyFull, functionIndex, IP) {
 	var divEntry					=		document.createElement("Div");
 	var dynamicButton				=		document.createElement("Button");
@@ -780,47 +870,42 @@ function createNewHost(key, type, hostName, hostHash, functionIndex) {
 	$(divEntry).addClass('host_divider');
 	/* This needs to be done "backwards" insofar as the type needs to be determined before we can start creating a new DIV */
 	console.log("Supplied data are---\nKey:" + key + "\nType:" +type + "\nHostname:" + hostName + "\nHash:" + hostHash);
-
+	
 	function createDecoderButtonSet(hostName, hostHash){
-	console.log("Generating decoder label and buttons with\nHost Name: " + hostName +"\nAnd Host Hash: " + hostHash + "\nAnd type: " + type + "\nIn Decoders div..\n");
-	$(divEntry).append("Host: <input type='text' value="+hostName+" class='hostTextBox'" + " data-hostHash=" + hostHash + " class='input_textbox'>");
-		var uiElement = $(".hostTextBox").last();
-		uiElement.bind('focus', function() {
-			var oldValue 	= $(this).attr("value");	
-		});
-		uiElement.bind('blur', function() {
-			var phpOldValue =   $(this).attr("value");
-			var phpHostName =   $(this).val();
-			var phpHostHash =   $(this).attr("data-hostHash");
-			if ( phpOldValue == phpHostName ) {
-				console.log("Error, values have not changed, doing nothing")
-			} else {
-			confirm('This will reboot the target host!\nProceed?');
-			console.log("submitting to set_hostlabel.php with values---\nHash: " + phpHostHash + "\nHostname: " + phpHostName + "\nOld Hostname: " + phpOldValue + "\nType: " + type);
-			$.ajax({
-				url : '/set_host_label.php',
-				type :'post',
-				data:{
-					hash:       phpHostHash,
-					newName:    phpHostName,
-					oldName:    phpOldValue,
-					type   :    type
-					},
-				success : function(response) {
-					console.log(response);
-				}
+		console.log("Generating decoder label and buttons with\nHost Name: " + hostName +"\nAnd Host Hash: " + hostHash + "\nAnd type: " + type + "\nIn Decoders div..\n");
+		$(divEntry).append("Host: <input type='text' value="+hostName+" class='hostTextBox'" + " data-hostHash=" + hostHash + " class='input_textbox'>");
+			var uiElement = $(".hostTextBox").last();
+			uiElement.bind('focus', function() {
+				var oldValue 	= $(this).attr("value");	
 			});
-		}});
-
-	$(divEntry).append(createDeleteButton(hostName, hostHash)); 
-	$(divEntry).append(createRestartButton(hostName, hostHash));
-	$(divEntry).append(createRebootButton(hostName, hostHash));
-	$(divEntry).append(createIdentifyButton(hostName, hostHash));
-	var thisHostBlankStatus = (getBlankHostStatus(hostName, hostHash));
-	getHostIPAJAX(hostName, divEntry);
-	$(divEntry).append(createBlankButton(hostName, hostHash, thisHostBlankStatus));
-	$(divEntry).append(createCodecStateChangeButton(hostName, hostHash, type));
-	counter ++;
+			uiElement.bind('blur', function() {
+				var phpOldValue =   $(this).attr("value");
+				var phpHostName =   $(this).val();
+				var phpHostHash =   $(this).attr("data-hostHash");
+				if ( phpOldValue == phpHostName ) {
+					console.log("Error, values have not changed, doing nothing")
+				} else {
+				confirm('This will reboot the target host!\nProceed?');
+				console.log("submitting to set_hostlabel.php with values---\nHash: " + phpHostHash + "\nHostname: " + phpHostName + "\nOld Hostname: " + phpOldValue + "\nType: " + type);
+				$.ajax({
+					url : '/set_host_label.php',
+					type :'post',
+					data:{
+						hash:       phpHostHash,
+						newName:    phpHostName,
+						oldName:    phpOldValue,
+						type   :    type
+						},
+					success : function(response) {
+						console.log(response);
+					}
+				});
+			}});
+		var thisHostBlankStatus	=	(getBlankHostStatus(hostName, hostHash));
+		getHostIPAJAX(hostName, divEntry);
+		$(divEntry).append(createBlankButton(hostName, hostHash, thisHostBlankStatus));
+		$(divEntry).append(createDetailMenu(hostName, hostHash, type, divEntry));
+		counter ++;
 	}
 	
 	function createEncoderButtonSet(hostName, hostHash){
@@ -845,35 +930,21 @@ function createNewHost(key, type, hostName, hostHash, functionIndex) {
 				}
 			});
 		});
-		$(divEntry).append(createDeleteButton(hostName, hostHash));
-		$(divEntry).append(createRestartButton(hostName, hostHash));
-		$(divEntry).append(createRebootButton(hostName, hostHash));
 		var thisHostBlankStatus = (getBlankHostStatus(hostName, hostHash));
 		getHostIPAJAX(hostName, divEntry);
 		$(divEntry).append(createBlankButton(hostName, hostHash, thisHostBlankStatus));
-		$(divEntry).append(createCodecStateChangeButton(hostName, hostHash, type));
 		$(this).addClass('host_divider');
+		$(divEntry).append(createDetailMenu(hostName, hostHash, type, divEntry));
 	}
 	function createServerButtonSet(hostName, hostHash){
 		(divEntry).append("Host:" + hostName);
 		console.log("Generating Server label and buttons.");
-		$(divEntry).append(createRestartButton(hostName, hostHash));
-		$(divEntry).append(createRebootButton(hostName, hostHash));
 		getHostIPAJAX(hostName, divEntry);
+		$(divEntry).append(createDetailMenu(hostName, hostHash, type, divEntry));
 	}
 	function createGatewayButtonSet(hostName, hostHash){
-		$(divEntry).append(createDeleteButton(hostName, hostHash));
-		$(divEntry).append(createRestartButton(hostName, hostHash));
-		$(divEntry).append(createRebootButton(hostName, hostHash));
-		$(divEntry).append(createIdentifyButton(hostName, hostHash));
-		$(divEntry).append(createBlankButton(hostHash));
 	}
 	function createLivestreamButtonSet(hostName, hostHash){
-		$(divEntry).append(createDeleteButton(hostName, hostHash));
-		$(divEntry).append(createRestartButton(hostName, hostHash));
-		$(divEntry).append(createRebootButton(hostName, hostHash));
-		$(divEntry).append(createIdentifyButton(hostName, hostHash));
-		$(divEntry).append(createBlankButton(hostHash));
 	}
 	switch(type) {
 		case 'dec':
