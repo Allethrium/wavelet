@@ -57,19 +57,46 @@ event_server(){
 	# generate a hostname file so that dnsmasq's dhcp-script call works properly
 	echo -e "${hostname}" > /var/lib/dnsmasq/hostname.local
 	# Build and install decklink kmod/akmod to support pcie cards - **not functional yet, needs a lot of work**
-	# install_decklink
 	# sets up local rpm repository - there's an issue with importing Intel repo GPG keys which might need user intervention.
-	/usr/local/bin/local_rpm.sh
+	# **NOTE** Broken until DNF is made to work with rpm-ostree installations again. **NOTE**
+	# /usr/local/bin/local_rpm.sh
 	# Add various libraries required for NDI and capture card support
 	install_ug_depends
+	# Perform any further customization required in our scripts
+	hostname=$(hostname)
+	sed -i "s/!!hostnamegoeshere!!/${hostname}/g" /usr/local/bin/wavelet_network_sense.sh
+	get_ipValue
+	sed -i "s/SVR_IPADDR/${IPVALUE}/g" /etc/dnsmasq.conf
 }
 
+get_ipValue(){
+	# Gets the current IP address for this host
+	IPVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
+	if [[ "${IPVALUE}" == "" ]] then
+			# sleep for five seconds, then call yourself again
+			echo -e "\nIP Address is null, sleeping and calling function again\n"
+			sleep 5
+			get_ipValue
+		else
+			echo -e "\nIP Address is not null, testing for validity..\n"
+			valid_ipv4() {
+				local ip=$1 regex='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
+				if [[ $ip =~ $regex ]]; then
+					echo -e "\nIP Address is valid, continuing..\n"
+					return 0
+				else
+					echo "\nIP Address is not valid, sleeping and calling function again\n"
+					get_ipValue
+				fi
+			}
+			valid_ipv4 "${IPVALUE}"
+	fi
+}
 
 rpm_ostree_install_git(){
-# Needed because otherwise sway launches the userspace setup before everything is ready
-/usr/bin/rpm-ostree install -y -A git 
+	# Needed because otherwise sway launches the userspace setup before everything is ready
+	/usr/bin/rpm-ostree install -y -A git 
 }
-
 rpm_ostree_install(){
 	rpm_ostree_install_step1(){
 	/usr/bin/rpm-ostree install \
@@ -86,7 +113,6 @@ rpm_ostree_install(){
 	echo -e "\nBase RPM Packages installed, waiting for 1 second..\n"
 	sleep 1
 	}
-
 	rpm_ostree_install_step2(){
 	/usr/bin/rpm-ostree install \
 	-y -A \
@@ -95,7 +121,6 @@ rpm_ostree_install(){
 	echo -e "\nRPM Fusion repo installed, waiting for 1 second..\n"
 	sleep 1
 	}
-
 	rpm_ostree_install_step3(){
 	# This is everything-and-the-kitchen sink approach to media acceleration.
 	# libvpl libvpl-devel required for older intel CPU, has clash with oneVPL library however, so need detection logic.
@@ -116,7 +141,6 @@ rpm_ostree_install(){
 	echo -e "\nRPMFusion Media Packages installed, waiting for 1 second..\n"
 	sleep 1
 	}
-
 	rpm_ostree_install_step1
 	touch /var/rpm-ostree-overlay.complete
 	rpm_ostree_install_step2
@@ -128,13 +152,13 @@ rpm_ostree_install(){
 }
 
 generate_tarfiles(){
-		echo -e "Generating tar.xz files for upload to distribution server..\n"
-		tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /home/wavelet/wavelet/webfiles/root/usr/local/bin/ .
-		tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /home/wavelet/wavelet/webfiles/root/home/wavelet/ .
-		echo -e "Packaging files together..\n"
-		tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz}
-		echo -e "Done."
-		rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz}
+	echo -e "Generating tar.xz files for upload to distribution server..\n"
+	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /home/wavelet/wavelet/webfiles/root/usr/local/bin/ .
+	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /home/wavelet/wavelet/webfiles/root/home/wavelet/ .
+	echo -e "Packaging files together..\n"
+	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz}
+	echo -e "Done."
+	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz}
 }
 
 extract_base(){
@@ -171,18 +195,13 @@ install_decklink(){
 	# Download Decklink software, extract and install base RPM's (required for Decklink support)
 	# Won't work because.. i lack brain cells, apparently.
 	cd /home/wavelet/
-
 	podman build --build-arg KERNEL_VERSION=$(uname -r) -t quay.io/fedora/fedora-coreos:stable:kmm-kmod -f Containerfile
-
 	FROM fedora:40 as builder
 	ARG KERNEL_VERSION
-
 	RUN dnf install -y \
 		git \
 		make
-
 	WORKDIR /home
-
 	# Get the kernel-headers
 	RUN KERNEL_XYZ=$(echo ${KERNEL_VERSION} | cut -d"-" -f1) && \
 	KERNEL_DISTRO=$(echo ${KERNEL_VERSION} | cut -d"-" -f2 | cut -d"." -f-2) && \
@@ -193,26 +212,18 @@ install_decklink(){
 	https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-modules-${KERNEL_VERSION}.rpm \
 	https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-modules-core-${KERNEL_VERSION}.rpm \
 	https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/x86_64/kernel-devel-${KERNEL_VERSION}.rpm
-
 	# Here is where we'd want to copy the blackmagic DKMS modules into our container
 	RUN git clone https://github.com/kubernetes-sigs/kernel-module-management
 	RUN wget https://www.andymelville.net/wavelet/desktopvideo-12.7.1a1.x86_64.rpm
 	# Extract RPM
-
-
 	WORKDIR /home/kernel-module-management/ci/kmm-kmod
-
 	RUN KERNEL_SRC_DIR=/lib/modules/${KERNEL_VERSION}/build make all
-
 	FROM quay.io/fedora/fedora-coreos:stable
 	ARG KERNEL_VERSION
-
 	# Copy into overlay
 	COPY --from=builder /home/kernel-module-management/ci/kmm-kmod/kmm_ci_a.ko /usr/lib/modules/${KERNEL_VERSION}/
-
 	# This is needed in order to autoload the module at boot time.
 	RUN depmod -a "${KERNEL_VERSION}" && echo kmm_ci_a > /etc/modules-load.d/kmm_ci_a.conf
-
 	# Commit to ostree
 	RUN rpm-ostree install strace && rm -rf /var/cache && \
 	ostree container commit
@@ -227,7 +238,7 @@ install_ug_depends(){
 	#   LibNDI for Magewell devices
 	cd /home/wavelet
 	install_cineform(){
-	# CineForm SDK
+		# CineForm SDK
 		git clone https://github.com/gopro/cineform-sdk
 		cd cineform-sdk
 		# Broken command: git apply "$curdir/0001-CMakeList.txt-remove-output-lib-name-force-UNIX.patch"
@@ -238,7 +249,7 @@ install_ug_depends(){
 		cd /home/wavelet
 	}
 	install_libaja(){
-	#Install libAJA Library
+		#Install libAJA Library
 		git clone https://github.com/aja-video/libajantv2.git
 		# export MACOSX_DEPLOYMENT_TARGET=10.13 # needed for arm64 mac
 		cmake -DAJANTV2_DISABLE_DEMOS=ON  -DAJANTV2_DISABLE_DRIVER=OFF \
@@ -249,7 +260,7 @@ install_ug_depends(){
 		sudo cmake --install libajantv2/build
 	}
 	install_live555(){
-	# Live555
+		# Live555
 		git clone https://github.com/xanview/live555/
 		cd live555
 		./genMakefiles linux-with-shared-libraries
@@ -258,8 +269,8 @@ install_ug_depends(){
 		cd /home/wavelet
 	}
 	install_libndi(){
-	# LibNDI
-	# Lifted from https://github.com/DistroAV/DistroAV/blob/master/CI/libndi-get.sh
+		# LibNDI
+		# Lifted from https://github.com/DistroAV/DistroAV/blob/master/CI/libndi-get.sh
 		mkdir -p /home/wavelet/libNDI
 		cd /home/wavelet/libNDI   
 		LIBNDI_INSTALLER_NAME="Install_NDI_SDK_v6_Linux"
@@ -290,7 +301,9 @@ install_ug_depends(){
 
 ####
 #
+#
 # Main
+#
 #
 ####
 
@@ -300,6 +313,6 @@ systemctl disable zincati.service --now
 # Unlock RPM ostree persistently across reboots, needed for the weird library linking we are doing here and MAY sidestep the decklink issue.
 # - update, NOPE.  and it breaks rpm-ostree installing anything so that's a no-go.
 # ostree admin unlock --hotfix
-set -x
+#set -x
 exec >/home/wavelet/wavelet_installer.log 2>&1
 detect_self
