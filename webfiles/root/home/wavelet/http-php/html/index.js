@@ -698,53 +698,45 @@ function createServerMenuSet(hostName, hostHash, type) {
 	$(activeMenuSelector).append(createRebootButton(hostName, hostHash));
 }
 
-function hostMenuCheckBoxHandler() {
-	var checkBoxHostHash			=	$(this);
-	var checkBoxMenuElement			=	$(this).siblings(".sidebarMenuInner");
-	console.log("Working on: " + checkBoxHostHash);
-	if ($(this).is(':checked')) {
-		console.log($(this).attr("id") + ' is now checked, revealing details menu..\n');
-	} else {
-		console.log($(this).attr("id") + ' is now unchecked, hiding menu');
-	}
-}
-
 function createDetailMenu(hostName, hostHash, type, divEntry) {
 	/* Generates an HTML span for the hamburger menu */
 	console.log("creating a detail menu element and populating with appropriate menu options.\n")
-	var hostMenuElement		=	$("<span>",	{
+	var hostMenuElement		=	$("<div>",	{
 		class:	'hostMenuElement',
 		id:	`hostMenuElement_${hostHash}`,
 		type:	type
 	}).appendTo(divEntry);
-	var hamburgerCheckBox		=	$("<input>",	{
-		type:			"checkbox", 
-		class:			`openHostMenuCheckbox openHostMenu openHostMenu_${hostHash}`,
-		id:			`openHostMenu_${hostHash}`,
-		attribute:		`data-hosthash=${hostHash}`
-	}).on({
-		change: hostMenuCheckBoxHandler,
-		/* this does actually work with two caveats:  clicking a button kills the menu, and clicking the menu close reopens the menu. */
-		/* how can we implement intelligently so clicking away from this element kills the menu, but clicking close actually closes? */
-		/* blur: function(){
-			$(this).prop('checked', false);
-		}*/
-	});
+		var hostMenuElementInner	=       $("<div>",      {
+				class:  'hostMenuElementInner',
+				id:     `hostMenuElementInner_${hostHash}`,
+		}).appendTo(hostMenuElement);
 	var hamburgerLabel		=       $("<label>",    {
-		for:	`openHostMenu_${hostHash}`,
-		class:	`hostMenuIconToggle hostManuIconToggle_${hostHash}`
+		for:	`openHostMenuID_${hostHash}`,
+		class:	`hostMenuIconToggle hostMenuIconToggle_${hostHash}`
 	});
-		var hamburgerMenu               =       $("<div>",      {
+	var hamburgerMenu               =       $("<div>",      {
 		/* The actual Menu content, in our case - the host control button suite */
 				class: `hostMenu hostMenu_${hostHash}`,
 		id: `hamburgerMenu_${hostHash}`
-		});
+	});
 	var hamburgerMenuOverlay	=	$("<div>",	{
 		class: 'hostMenuOverlay'
 	});
-	hamburgerCheckBox.appendTo(hostMenuElement);
-		hamburgerLabel.appendTo(hostMenuElement);
-		hamburgerMenu.appendTo(hostMenuElement);
+		var hamburgerCheckBox           =       $("<input>",    {
+				type:                   "radio",
+		name:			"hostRadioCheck",
+				class:                  "openHostMenuCheckbox openHostMenu",
+				id:                     `openHostMenuID_${hostHash}`,
+				attribute:              `data-hosthash=${hostHash}`
+		}).on('click change', function () {
+		$(this).prop('checked')//if checked
+			? $(this).prop('checked',false).data('waschecked', false)//uncheck
+		: $(this).prop('checked',true).data('waschecked', true)//else check
+		.siblings('input[name="'+$(this).prop('name')+'"]').data('waschecked', false);//make siblings false
+	});
+	hamburgerCheckBox.appendTo(hostMenuElementInner);
+	hamburgerLabel.appendTo(hostMenuElementInner);
+	hamburgerMenu.appendTo(hostMenuElementInner);
 	hamburgerLabel.append(
 		`<div class="spinner diagonal part-1"></div>
 		<div class="spinner horizontal"></div>
