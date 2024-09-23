@@ -98,18 +98,17 @@ rpm_ostree_install_git(){
 	/usr/bin/rpm-ostree install -y -A git 
 }
 rpm_ostree_install(){
+	echo -e "Installing packages..\n"
 	rpm_ostree_install_step1(){
 	/usr/bin/rpm-ostree install \
 	-y -A \
 	wget fontawesome-fonts wl-clipboard nnn mako sway bemenu rofi-wayland lxsession sway-systemd waybar \
 	foot vim powerline powerline-fonts vim-powerline NetworkManager-wifi iw wireless-regdb wpa_supplicant \
 	cockpit-bridge cockpit-networkmanager cockpit-system cockpit-ostree cockpit-podman buildah rdma avahi \
-	iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd dnf yum-utils createrepo sha \
-	libsrtp libdrm python3-pip srt srt-libs libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
-	ImageMagick intel-opencl mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
-	mesa-libxatracker alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools dkms kernel-headers usbutils \
-	tuned realtime-setup realtime-tests rtkit jo netcat busybox inotify-tools \
-	gcc gcc-c++ openssl-devel bzip2-devel libffi-devel zlib-devel make cmake libuuid-devel libudev-devel
+	iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd sha libsrtp libdrm python3-pip srt srt-libs \
+	libv4l v4l-utils libva-v4l2-request pipewire-v4l2 ImageMagick intel-opencl \
+	mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
+	mesa-libxatracker alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools netcat busybox inotify-tools \
 	echo -e "\nBase RPM Packages installed, waiting for 1 second..\n"
 	sleep 1
 	}
@@ -141,12 +140,23 @@ rpm_ostree_install(){
 	echo -e "\nRPMFusion Media Packages installed, waiting for 1 second..\n"
 	sleep 1
 	}
+	rpm_ostree_install_step4(){
+	usr/bin/rpm-ostree install \
+	-y -A --idempotent \
+	make cmake dnf yum-utils createrepo dkms kernel-headers usbutils tuned realtime-setup realtime-tests rtkit jo \
+	gcc openssl-devel bzip2-devel libffi-devel zlib-devel libuuid-devel libudev-devel \
+	#gcc-c++ - BROKEN right now???
+	echo -e "\nBuild and Dev packages installed, waiting for one second..\n"
+	sleep 1
+	}
 	rpm_ostree_install_step1
 	touch /var/rpm-ostree-overlay.complete
 	rpm_ostree_install_step2
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
 	rpm_ostree_install_step3
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+	rpm_ostree_install_step4
+	touch /var/rpm-ostree-overlay.dev.pkgs.complete
 	/usr/bin/rpm-ostree install -y -A --idempotent firefox
 	echo -e "RPM package updates completed, finishing installer task..\n"
 }
@@ -294,9 +304,10 @@ install_ug_depends(){
 	echo -e "\nLibNDI Installed..\n"
 	}
 	install_libndi
-	install_libaja
-	install_cineform
-	install_live555
+	# Disabled these as GCC-C++ package is broken for CoreOS at the moment.
+	#install_libaja
+	#install_cineform
+	#install_live555
 }
 
 ####
