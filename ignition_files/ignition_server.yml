@@ -24,6 +24,20 @@ kernel_arguments:
 # UltraGrid AppImage
 storage:
   files:
+    # Setup Ignition Files
+    # This is required to spinup the decoder ISO once the server boots.
+    # the local file is relative to --files-dir cmdline option in Butane
+    # This should be set from the wavelet_installer.sh initial config script
+    - path: /home/wavelet/http/ignition/decoder.ign
+      mode: 0644
+      contents:
+        local: |
+          - decoder.ign
+    - path: /usr/local/bin/UltraGrid.AppImage
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.6/UltraGrid-1.9.6-x86_64.AppImage    
     # Inhibit systemd suspend
     - path: /etc/systemd/logind.conf.d/inhibit-suspend.conf
       mode: 0644
@@ -710,7 +724,7 @@ systemd:
         Description=Run local container registry
         After=network-online.target
         Wants=network-online.target
-        ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+#        ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
         [Service]
         Type=forking
         Restart=on-failure
