@@ -29,7 +29,7 @@
 		],
 		"CaptivePortal": false,
 		"Certificates": {
-			"Install": ["cert1.der", "/home/username/cert2.pem"],
+			"Install": ["cert1.der", "/home/wavelet/svrCert.pem"],
 		},
 		"DefaultDownloadDirectory": "${home}/Downloads",
 		"DisableBuiltinPDFViewer": true,
