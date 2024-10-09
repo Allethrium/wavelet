@@ -27,3 +27,4 @@ ContainerFiles/create_dkms_overlay.sh
 ContainerFiles/DKMS-Install.ContainerFile
 ContainerFiles/DKMS-Install.ContainerFile
 ContainerFiles/ContainerFile.dkms_build
+ContainerFiles/DKMS-Install.ContainerFile
