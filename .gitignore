@@ -15,3 +15,15 @@ fedora-coreos-40.20240709.3.1-live.x86_64.iso
 *.iso
 *.sig
 test.sh
+ContainerFiles/DKMS-Install.ContainerFile
+ContainerFiles/DKMS-Install (conflicted copy 2024-09-26 110154).ContainerFile
+ContainerFiles/bootc_overlay_test.sh
+webfiles/root/usr/local/bin/wavelet_install_clienthost.sh
+webfiles/root/usr/local/bin/wavelet_bootc_installer.sh
+ContainerFiles/GetShim.Containerfile
+ContainerFiles/DKMS-Install.ContainerFile
+ContainerFiles/DKMS-Install.ContainerFile
+ContainerFiles/create_dkms_overlay.sh
+ContainerFiles/DKMS-Install.ContainerFile
+ContainerFiles/DKMS-Install.ContainerFile
+ContainerFiles/ContainerFile.dkms_build
