@@ -1,0 +1,32 @@
+# This container should download appropriate packages,
+# And generate a fully functional /var/lib/tftpboot directory.
+# It takes a bash script input from the launch directory.
+# Called from systemd init unit during server spinup
+# Order is:
+# ExecStartPre = build
+# Exec = RUN
+# ExecPost = wavelet_pxe_grubconfig.sh
+
+FROM quay.io/fedora/fedora:40
+RUN mkdir -p /tmp/boot_rpms && dnf update --refresh 
+RUN dnf install -y grub2-efi-x64-modules grub2-tools-extra grub2-pc-modules shadow-utils podman fuse-overlayfs cpio --exclude container-selinux && \
+grub2-mknetdir --net-directory /tmp/var/lib/tftpboot/
+RUN dnf install -y --downloadonly --downloaddir=/tmp/boot_rpms/ shim shim-x64 grub2-efi grub2-efi-x64
+RUN grub2efi=$(ls /tmp/boot_rpms/grub2-efi-*.rpm) && \
+shim=$(ls /tmp/boot_rpms/shim*.rpm | grep shim) && \
+cd /tmp/boot_rpms && \
+(echo -e "Grub EFI Package: ${grub2efi}") && \
+(echo -e "Secureboot Shim Package: $shim") && \
+rpm2cpio ${grub2efi} | cpio -idmv && \
+rpm2cpio ${shim} | cpio -idmv && \
+# Notes, mmx64.efi = MokManager
+cp /tmp/boot_rpms/boot/efi/EFI/fedora/{grubx64.efi,shim.efi,shimx64.efi,BOOTX64.CSV,mmx64.efi} /tmp/var/lib/tftpboot/
+RUN mkdir -p /tar_root && tar -cf tftpboot.tar.xz /tmp/var/lib/tftpboot && cp tftpboot.tar.xz /tar_root
+CMD cd /tmp && mkdir -p tftpboot && cp /tar_root/tftpboot.tar.xz /tmp && ls -lah && \
+tar -xvf tftpboot.tar.xz --strip-components=3
+
+# TO USE:
+# chdir to containerfile dir
+# sudo podman build --tag shim -f ./<PATH>/Containerfile.tftpboot
+# Yes, we're mounting directly to root.  Yes, this is dangerous.
+# podman run --privileged --security-opt label=disable -v /var/lib:/tmp/ shim
