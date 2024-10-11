@@ -8,7 +8,7 @@ systemctl --user daemon-reload
 UG_HOSTNAME=$(hostname)
 	echo -e "Hostname is $UG_HOSTNAME \n"
 	case $UG_HOSTNAME in
-	enc*)                   echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."            ;   event_encoder
+	enc*)                   echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."            ;   event_decoder
 	;;
 	decX.wavelet.local)     echo -e "I am a Decoder, but my hostname is generic.  Randomizing my hostname, and rebooting"   ;   event_decoder 
 	;;
@@ -21,17 +21,12 @@ UG_HOSTNAME=$(hostname)
 	esac
 }
 
-event_encoder(){
-	extract_base
-	extract_home && extract_usrlocalbin
-	rpm_ostree_install
-	exit 0
-}
-
 event_decoder(){
 	extract_base
 	extract_home && extract_usrlocalbin
-	rpm_ostree_install
+	rpm_ostree_install_decoder
+	echo -e "Initial provisioning completed, attempting to connect to WiFi..\n"
+	connectwifi
 	exit 0
 }
 
@@ -67,6 +62,8 @@ event_server(){
 	sed -i "s/!!hostnamegoeshere!!/${hostname}/g" /usr/local/bin/wavelet_network_sense.sh
 	get_ipValue
 	sed -i "s/SVR_IPADDR/${IPVALUE}/g" /etc/dnsmasq.conf
+	# Generate the wavelet decoder ISO
+	generate_decoder_iso
 }
 
 get_ipValue(){
@@ -97,6 +94,7 @@ rpm_ostree_install_git(){
 	# Needed because otherwise sway launches the userspace setup before everything is ready
 	/usr/bin/rpm-ostree install -y -A git 
 }
+
 rpm_ostree_install(){
 	echo -e "Installing packages..\n"
 	rpm_ostree_install_step1(){
@@ -109,18 +107,15 @@ rpm_ostree_install(){
 	libv4l v4l-utils libva-v4l2-request pipewire-v4l2 ImageMagick intel-opencl \
 	mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
 	mesa-libxatracker alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools netcat busybox inotify-tools \
+	butane tftp-server ipxe-bootimgs-x86.noarch syslinux-nonlinux syslinux syslinux-efi64 \
+	https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
+	https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm \
+	make cmake dnf yum-utils createrepo dkms kernel-headers usbutils tuned realtime-setup realtime-tests rtkit jo \
+	gcc openssl-devel bzip2-devel libffi-devel zlib-devel libuuid-devel libudev-devel
 	echo -e "\nBase RPM Packages installed, waiting for 1 second..\n"
 	sleep 1
 	}
 	rpm_ostree_install_step2(){
-	/usr/bin/rpm-ostree install \
-	-y -A \
-	https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
-	https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
-	echo -e "\nRPM Fusion repo installed, waiting for 1 second..\n"
-	sleep 1
-	}
-	rpm_ostree_install_step3(){
 	# This is everything-and-the-kitchen sink approach to media acceleration.
 	# libvpl libvpl-devel required for older intel CPU, has clash with oneVPL library however, so need detection logic.
 	# Refresh Metadata
@@ -136,29 +131,23 @@ rpm_ostree_install(){
 	neofetch htop \
 	mesa-libOpenCL python3-pip srt srt-libs ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
 	ImageMagick mplayer \
-	libndi libndi-devel ndi-sdk obs-ndi pipewire-utils
+	libndi libndi-devel ndi-sdk obs-ndi pipewire-utils \
+	firefox
 	echo -e "\nRPMFusion Media Packages installed, waiting for 1 second..\n"
-	sleep 1
-	}
-	rpm_ostree_install_step4(){
-	usr/bin/rpm-ostree install \
-	-y -A --idempotent \
-	make cmake dnf yum-utils createrepo dkms kernel-headers usbutils tuned realtime-setup realtime-tests rtkit jo \
-	gcc openssl-devel bzip2-devel libffi-devel zlib-devel libuuid-devel libudev-devel \
-	#gcc-c++ - BROKEN right now???
-	echo -e "\nBuild and Dev packages installed, waiting for one second..\n"
 	sleep 1
 	}
 	rpm_ostree_install_step1
 	touch /var/rpm-ostree-overlay.complete
 	rpm_ostree_install_step2
-	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
-	rpm_ostree_install_step3
-	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-	rpm_ostree_install_step4
+	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
+	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
 	touch /var/rpm-ostree-overlay.dev.pkgs.complete
-	/usr/bin/rpm-ostree install -y -A --idempotent firefox
 	echo -e "RPM package updates completed, finishing installer task..\n"
+}
+
+generate_decoder_iso(){
+	echo -e "\n\nCreating PXE functionality..\n\n"
+	wavelet_pxe_grubconfig.sh
 }
 
 generate_tarfiles(){
@@ -173,7 +162,6 @@ generate_tarfiles(){
 
 extract_base(){
 	tar xf /home/wavelet/wavelet-files.tar.xz -C /home/wavelet --no-same-owner
-	cd /home/wavelet
 	mv ./usrlocalbin.tar.xz /usr/local/bin/
 }
 
@@ -197,46 +185,6 @@ extract_usrlocalbin(){
 	chmod +x /usr/local/bin
 	chmod 0755 /usr/local/bin/*
 	echo -e "Wavelet application modules setup successfully..\n"
-}
-
-install_decklink(){
-	# I can't seem to work this out.  It also seems like Fedora are experimenting more with bootc containers now?
-	# adapted from https://github.com/coreos/layering-examples/tree/main/loading-kernel-module
-	# Download Decklink software, extract and install base RPM's (required for Decklink support)
-	# Won't work because.. i lack brain cells, apparently.
-	cd /home/wavelet/
-	podman build --build-arg KERNEL_VERSION=$(uname -r) -t quay.io/fedora/fedora-coreos:stable:kmm-kmod -f Containerfile
-	FROM fedora:40 as builder
-	ARG KERNEL_VERSION
-	RUN dnf install -y \
-		git \
-		make
-	WORKDIR /home
-	# Get the kernel-headers
-	RUN KERNEL_XYZ=$(echo ${KERNEL_VERSION} | cut -d"-" -f1) && \
-	KERNEL_DISTRO=$(echo ${KERNEL_VERSION} | cut -d"-" -f2 | cut -d"." -f-2) && \
-	KERNEL_ARCH=$(echo ${KERNEL_VERSION} | cut -d"-" -f2 | cut -d"." -f3) && \
-	dnf install -y \
-	https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-${KERNEL_VERSION}.rpm \
-	https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-core-${KERNEL_VERSION}.rpm \
-	https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-modules-${KERNEL_VERSION}.rpm \
-	https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/${KERNEL_ARCH}/kernel-modules-core-${KERNEL_VERSION}.rpm \
-	https://kojipkgs.fedoraproject.org//packages/kernel/${KERNEL_XYZ}/${KERNEL_DISTRO}/x86_64/kernel-devel-${KERNEL_VERSION}.rpm
-	# Here is where we'd want to copy the blackmagic DKMS modules into our container
-	RUN git clone https://github.com/kubernetes-sigs/kernel-module-management
-	RUN wget https://www.andymelville.net/wavelet/desktopvideo-12.7.1a1.x86_64.rpm
-	# Extract RPM
-	WORKDIR /home/kernel-module-management/ci/kmm-kmod
-	RUN KERNEL_SRC_DIR=/lib/modules/${KERNEL_VERSION}/build make all
-	FROM quay.io/fedora/fedora-coreos:stable
-	ARG KERNEL_VERSION
-	# Copy into overlay
-	COPY --from=builder /home/kernel-module-management/ci/kmm-kmod/kmm_ci_a.ko /usr/lib/modules/${KERNEL_VERSION}/
-	# This is needed in order to autoload the module at boot time.
-	RUN depmod -a "${KERNEL_VERSION}" && echo kmm_ci_a > /etc/modules-load.d/kmm_ci_a.conf
-	# Commit to ostree
-	RUN rpm-ostree install strace && rm -rf /var/cache && \
-	ostree container commit
 }
 
 install_ug_depends(){
@@ -309,6 +257,7 @@ install_ug_depends(){
 	#install_cineform
 	#install_live555
 }
+
 
 ####
 #
