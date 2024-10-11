@@ -23,12 +23,10 @@ read -p "Continue? (Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][e
 echo -e "Continuing, copying base ignition files for customization.."
 cp ./ignition_files/ignition_server.yml ./server_custom.yml
 cp ./ignition_files/ignition_decoder.yml ./decoder_custom.yml
-cp ./ignition_files/ignition_encoder.yml ./encoder_custom.yml
 # IPv6 mode eventually? Just to be snazzy?
 # remove old iso files
 rm -rf $HOME/Downloads/wavelet_server.iso
 rm -rf $HOME/Downloads/wavelet_decoder.iso
-rm -rf $HOME/Downloads/wavelet_encoder.iso
 
 client_networks(){
 	echo -e "System configured to be run on a larger network."
@@ -143,9 +141,9 @@ customization(){
 	INPUTFILES="server_custom.yml encoder_custom.yml decoder_custom.yml"
 	echo -e "Moving on to WiFi settings"
 	echo -e "If your Wifi AP hasn't yet been configured, please do so now, as the installer will wait for your input\n"
-	read -p "Please input the SSID of your configured wireless network: " wifi_ssid
-	read -p "Please input the first three elements of the WiFi BSSID / MAC address, colon delimited like so AA:BB:CC:" wifi_bssid
-	read -p "Please input the configured password for your WiFi SSID: " wifi_password
+	read -p "Please input the SSID of your configured wireless network:  " wifi_ssid
+	read -p "Please input the first three elements of the WiFi BSSID / MAC address, colon delimited like so AA:BB:CC:  " wifi_bssid
+	read -p "Please input the configured password for your WiFi SSID:  " wifi_password
 
 		repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_ssid}")
 		sed -i "s/SEDwaveletssid/${repl}/g" ${INPUTFILES}
@@ -169,4 +167,4 @@ read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] 
 echo -e "System configured for isolated, authoritative mode."
 customization
 echo -e "Calling coreos_installer.sh to generate ISO images.  You will then need to burn them to USB/SD cards."
-./coreos_installer.sh
+./coreos_installer.sh "${developerMode}"

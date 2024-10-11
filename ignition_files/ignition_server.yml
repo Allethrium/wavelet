@@ -31,8 +31,7 @@ storage:
     - path: /home/wavelet/http/ignition/decoder.ign
       mode: 0644
       contents:
-        local: |
-          - decoder.ign
+        local: decoder.ign
     - path: /usr/local/bin/UltraGrid.AppImage
       mode: 0755
       overwrite: true
@@ -45,11 +44,6 @@ storage:
         inline: |
           [Login]
           HandleLidSwitch=ignore
-    - path: /usr/local/bin/UltraGrid.AppImage
-      mode: 0755
-      overwrite: true
-      contents:
-        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.6/UltraGrid-1.9.6-x86_64.AppImage
     # WiFi WiFi Name
     - path: /var/home/wavelet/wifi_ssid
       overwrite: true
