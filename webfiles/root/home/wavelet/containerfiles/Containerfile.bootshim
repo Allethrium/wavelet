@@ -1,0 +1,28 @@
+# This container should download appropriate packages,
+# And generate a fully functional /var/lib/tftpboot directory.
+# It takes a bash script input from the launch directory.
+# Called from systemd init unit during server spinup
+# Order is:
+# ExecStartPre = build
+# Exec = RUN
+# ExecPost = wavelet_pxe_grubconfig.sh
+
+FROM quay.io/fedora/fedora:40
+
+# Make temporary directories and download necessary packages
+RUN mkdir -p /tmp/boot_rpms && mkdir -p /tmp/ipxe && dnf update --refresh
+RUN dnf install -y --downloadonly --downloaddir=/tmp/boot_rpms/ shim shim-x64 grub2-efi grub2-efi-x64 && tar -czvf boot_rpms.tar /tmp/boot_rpms/
+RUN dnf install -y --downloadonly --downloaddir=/tmp/ipxe/ ipxe-bootimgs-x86.noarch && tar -czvf ipxe-imgs.tar /tmp/ipxe/
+RUN dnf install -y grub2-efi-x64-modules grub2-tools-extra grub2-pc-modules shadow-utils podman fuse-overlayfs --exclude container-selinux
+RUN grub2-mknetdir --net-directory /var/lib/tftpboot/ 
+RUN tar -czvf tftpboot.tar /var/lib/tftpboot/ && rm -rf /var/lib/tftpboot
+
+# Move files to output on container execute (oneshot after build)
+CMD mv boot_rpms.tar /output && mv ipxe-imgs.tar /output && mv tftpboot.tar /output
+
+
+
+# TO USE:
+# chdir to containerfile dir
+# podman build --tag shim .
+# podman run --security-opt label=disable -v /home/wavelet/pxe:/output shim
