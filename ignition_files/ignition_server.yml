@@ -688,22 +688,6 @@ systemd:
         ExecStart=-/usr/local/bin/configure_ethernet.sh
         [Install]
         WantedBy=multi-user.target
-    # Cockpit for remote management
-    - name: cockpit.enable.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Enable Cockpit WS
-        After=network-online.target
-        Wants=network-online.target
-        ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-        [Service]
-        Type=oneshot
-        ExecStartPre=podman pull quay.io/cockpit/ws
-        ExecStartPre=podman container runlabel INSTALL quay.io/cockpit/ws:latest
-        ExecStart=systemctl enable cockpit.service --now
-        [Install]
-        WantedBy=multi-user.target
     # Generate wavelet Cgroup
     - name: wavelet.cgroup.service
       enabled: true
@@ -724,7 +708,6 @@ systemd:
         Description=Run local container registry
         After=network-online.target
         Wants=network-online.target
-#        ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
         [Service]
         Type=forking
         Restart=on-failure
