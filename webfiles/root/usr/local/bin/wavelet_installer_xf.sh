@@ -148,7 +148,6 @@ rpm_ostree_install(){
 generate_decoder_iso(){
 	echo -e "\n\nCreating PXE functionality..\n\n"
 	wavelet_pxe_grubconfig.sh
-	echo -e "\n\nGenerated bootable ISO files for client devices..\n\n"
 }
 
 generate_tarfiles(){
