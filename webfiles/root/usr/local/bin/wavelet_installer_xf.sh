@@ -107,19 +107,15 @@ rpm_ostree_install(){
 	libv4l v4l-utils libva-v4l2-request pipewire-v4l2 ImageMagick intel-opencl \
 	mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
 	mesa-libxatracker alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools netcat busybox inotify-tools \
-	butane tftp-server syslinux-nonlinux syslinux syslinux-efi64 dnf
+	butane tftp-server ipxe-bootimgs-x86.noarch syslinux-nonlinux syslinux syslinux-efi64 \
+	https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
+	https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm \
+	make cmake dnf yum-utils createrepo dkms kernel-headers usbutils tuned realtime-setup realtime-tests rtkit jo \
+	gcc openssl-devel bzip2-devel libffi-devel zlib-devel libuuid-devel libudev-devel
 	echo -e "\nBase RPM Packages installed, waiting for 1 second..\n"
 	sleep 1
 	}
 	rpm_ostree_install_step2(){
-	/usr/bin/rpm-ostree install \
-	-y -A \
-	https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
-	https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
-	echo -e "\nRPM Fusion repo installed, waiting for 1 second..\n"
-	sleep 1
-	}
-	rpm_ostree_install_step3(){
 	# This is everything-and-the-kitchen sink approach to media acceleration.
 	# libvpl libvpl-devel required for older intel CPU, has clash with oneVPL library however, so need detection logic.
 	# Refresh Metadata
@@ -135,41 +131,26 @@ rpm_ostree_install(){
 	neofetch htop \
 	mesa-libOpenCL python3-pip srt srt-libs ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
 	ImageMagick mplayer \
-	libndi libndi-devel ndi-sdk obs-ndi pipewire-utils
+	libndi libndi-devel ndi-sdk obs-ndi pipewire-utils \
+	firefox
 	echo -e "\nRPMFusion Media Packages installed, waiting for 1 second..\n"
-	sleep 1
-	}
-	rpm_ostree_install_step4(){
-	usr/bin/rpm-ostree install \
-	-y -A --idempotent \
-	make cmake dnf yum-utils createrepo dkms kernel-headers usbutils tuned realtime-setup realtime-tests rtkit jo \
-	gcc openssl-devel bzip2-devel libffi-devel zlib-devel libuuid-devel libudev-devel \
-	#gcc-c++ - BROKEN right now???
-	echo -e "\nBuild and Dev packages installed, waiting for one second..\n"
 	sleep 1
 	}
 	rpm_ostree_install_step1
 	touch /var/rpm-ostree-overlay.complete
 	rpm_ostree_install_step2
-	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
-	rpm_ostree_install_step3
-	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-	rpm_ostree_install_step4
+	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
+	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
 	touch /var/rpm-ostree-overlay.dev.pkgs.complete
-	/usr/bin/rpm-ostree install -y -A --idempotent firefox
 	echo -e "RPM package updates completed, finishing installer task..\n"
 }
 
-rpm_ostree_install_decoder() {
-	# here, we'll be generating a decoder ISO to be distributed via PXE http
+generate_decoder_iso(){
+	echo -e "\n\nCreating PXE functionality..\n\n"
+	wavelet_pxe_grubconfig.sh
+	echo -e "\n\nGenerated bootable ISO files for client devices..\n\n"
 }
 
-generate_decoder_iso(){
-	echo -e "Generating the Decoder ISO and placing in the http server..\n"
-	/var/home/wavelet/wavelet/coreos_installer.sh D
-	cp /var/home/
-	/home/wavelet/http/ignition/
-}
 generate_tarfiles(){
 	echo -e "Generating tar.xz files for upload to distribution server..\n"
 	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /home/wavelet/wavelet/webfiles/root/usr/local/bin/ .
@@ -278,52 +259,6 @@ install_ug_depends(){
 	#install_live555
 }
 
-configure_pxe_depends() {
-	# Get FCOS Pxe kernel, initramfs, and rootfs image
-	# Reference at:  https://docs.fedoraproject.org/en-US/fedora-coreos/live-reference/
-	# And at:  https://coreos.github.io/coreos-installer/customizing-install/#creating-customized-iso-and-pxe-images
-	mkdir -p /home/wavelet/pxe/coreos && cd /home/wavelet/pxe/coreos
-	podman run --security-opt label=disable \
-	--pull=always \
-	--rm -v .:/data \
-	-w /data \
-    quay.io/coreos/coreos-installer:release download -f pxe
-    mkdir -p /home/wavelet/pxe/shim && cd /home/wavelet/pxe/shim
-    podman build -t shim /home/wavelet/containerfiles/Containerfile.bootshim
-    podman run --security-opt label=disable \
-    -v .:/output shim 
-    rpm2cpio grub2-efi-*.rpm | cpio -idmv
-    rpm2cpio shim*.rpm | cpio -idmv
-    cp boot/efi/EFI/fedora/{grubx64.efi,shim.efi,shimx64.efi} /var/lib/tftpboot/efi64/
-	systemctl enable tftpd --now
-	mkdir -p /var/lib/tftpboot/{grub,bios,efi64,netboot,pxelinux.cfg}
-	mkdir -p /var/lib/tftpboot/netboot/amd64/{coreos,fedora_bootc}
-	cp /home/wavelet/pxe/* /var/lib/tftpboot/netboot/amd64/coreos
-	echo -e "
-	DEFAULT pxeboot
-	TIMEOUT 20
-	PROMPT 0
-	LABEL pxeboot
-    KERNEL fedora-coreos-40.20240906.3.0-live-kernel-x86_64
-    APPEND initrd=fedora-coreos-40.20240906.3.0-live-initramfs.x86_64.img,fedora-coreos-40.20240906.3.0-live-rootfs.x86_64.img ignition.firstboot ignition.platform.id=metal ignition.config.url=http://192.168.1.32:8080/ignition/decoder.ign
-	IPAPPEND 2" > /var/lib/tftpboot/pxelinux.cfg/default
-	cp /boot/grub2/fonts/unicode.pf2 /var/lib/tftpboot
-	cp /boot/grub2/fonts/unicode.pf2 /var/lib/tftpboot
-	cp /usr/share/syslinux/{ldlinux,vesamenu,libcom32,libutil}.c32 /var/lib/tftpboot/bios
-	cp /usr/share/syslinux/pxelinux.0 /var/lib/tftpboot/bios
-	cp /usr/share/syslinux/efi64/ldlinux.e64 /var/lib/tftpboot/efi64
-	cp /usr/share/syslinux/efi64/{vesamenu,libcom32,libutil}.c32 /var/lib/tftpboot/efi64
-	cp /usr/share/syslinux/efi64/syslinux.efi /var/lib/tftpboot/efi64
-	cp /usr/lib/bootupd/updates/EFI/fedora/{shim.efi,shimx64.efi,grubx64.efi} /var/lib/tftpboot/grub
-	cp /usr/lib/bootupd/updates/EFI/BOOT/BOOTX64.EFI /var/lib/tftpboot/grub/bootx64.efi
-	cd /tmp/boot_rpms
-	rpm2cpio grub2-efi-version.rpm | cpio -idmv 
-	rpm2cpio shim-version.rpm | cpio -idmv
-	# Ensure perms are set properly along with SELinux context!
-	# 755 ensures executable + world readable
-	chmod -R 755 /var/lib/tftpboot
-
-}
 
 ####
 #
