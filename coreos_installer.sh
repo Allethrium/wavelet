@@ -3,9 +3,11 @@
 for i in "$@"
 	do
 		case $i in
-			"D")	echo -e "\nProvisioning mode enabled, running from server and provisioning Decoder ISO only..\n."
+			"D")		echo -e "\nProvisioning mode enabled, running from server and provisioning Decoder ISO only..\n"
 			;;
-			*)		echo -e "\nInitial Setup mode running, configuring Server + Decoder ISO Files..\n"	;	serverMode="1"
+			"mode=iso") echo -e "\nRunning in network isolation mode, enabling kargs for faster provisioning..\n"	;	isoMode="1"
+			;;
+			*)			echo -e "\nInitial Setup mode running, configuring Server + Decoder ISO Files..\n"			;	serverMode="1"
 			;;
 		esac
 done
@@ -48,13 +50,17 @@ IMAGEFILE=$(ls -t *.iso | head -n1)
 	fi
 
 echo "Customizing ISO files with Ignition\n"
+	# This will only want to be switched on if we are using an isolated system, it will significantly speed up boot time;
+	if [[ "${isoMode}" = "1" ]]; then 
+		liveKarg="--live-karg-append ip=192.168.1.32::192.168.1.1:255.255.255.0:svr.ignition.local::on"
+	fi
 	if [[ "${serverMode}" = "1" ]]; then
 		echo -e "\nISO files output to ${HOME}/Downloads..\n"
 		# Generate Server ISO
 		echo -e "Provision Server ISO..\n"
 		coreos-installer iso customize \
 		--dest-device ${DESTINATION_DEVICE} \
-		--dest-ignition server.ign \
+		--dest-ignition server.ign ${liveKarg} \
 		-o $HOME/Downloads/wavelet_server.iso ${IMAGEFILE}
 		# Generate Decoder ISO
 		echo -e "Provision Decoder ISO..\n"
