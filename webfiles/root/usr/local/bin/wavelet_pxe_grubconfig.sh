@@ -59,21 +59,27 @@ generate_coreos_image() {
 	#    quay.io/coreos/coreos-installer:release download -s stable -p metal -f iso
 	#mount -vvv /home/wavelet/pxe/wavelet-coreos-decoder.iso /var/mnt
 
+	# Remove custom-initramfs if already exists
+	rm -rf /home/wavelet/pxe/custom-initramfs.img
 	# Pull coreOS PXE
 	podman run --security-opt label=disable --pull=always --rm -v .:/data -w /data \
 	quay.io/coreos/coreos-installer:release download -f pxe
+	echo -e "\nCoreOS Image files downloaded, continuing..\n"
+	# Set destination device and find downloaded initramfs file to customize
 	DESTINATION_DEVICE="/dev/disk/by-id/coreos-boot-disk"
 	IMAGEFILE=$(ls -t *.img | grep 'initramfs')
-	echo "Generating Ignition files with Butane..\n"
+	echo "Generating client machine ISO files..\n"
 	# Customize iso for PXE boot
 	# Ref https://coreos.github.io/coreos-installer/customizing-install/
+	# We seem to have an issue where the installer will fail fue to updating kernel arguments, but we have already customized them in the liveCD?
+	# I appear to have misunderstood something about the pxe baremetal installation instructions here..
 	coreos-installer pxe customize \
 			--dest-device ${DESTINATION_DEVICE} \
 			--dest-ignition /home/wavelet/http/ignition/decoder.ign \
-			-o /home/wavelet/pxe/custom-initramfs.img ${IMAGEFILE}
+			-o /home/wavelet/pxe/custom-initramfs ${IMAGEFILE}
 	FILES=$(find *img*)
 	KERNEL=$(find *kernel*)
-	# Copy boot images to both tftp and http server
+	# Copy boot images to both tftp and http server - NOTE /home/wavelet/pxe and /home/wavelet/http/pxe are NOT the same dirs!
 	mkdir -p /var/lib/tftpboot/wavelet-coreos
 	mkdir -p /home/wavelet/http/pxe
 	cp ${FILES} /var/lib/tftpboot/wavelet-coreos && cp ${KERNEL} /var/lib/tftpboot/wavelet-coreos
@@ -196,7 +202,12 @@ kernel=$(echo ${kernel##*coreos/})
 #
 ###
 
-generate_tftpboot
+exec >/home/wavelet/pxe_grubconfig.log 2>&1
+
 generate_coreos_image
 #generate_bootc_image
+# Generate TFTPBOOT folder along with appropriate entries for our populated boot options
+generate_tftpboot
+# Set Apache +x and read perms on http folder
+chmod -R 0755 /home/wavelet/http
 echo -e "PXE bootable images completed and populated in http serverdir, now client provisioning available.."
