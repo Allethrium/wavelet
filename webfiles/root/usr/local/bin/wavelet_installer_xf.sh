@@ -48,13 +48,10 @@ event_server(){
 	extract_base
 	extract_home && extract_usrlocalbin
 	# Install dependencies and base packages.  Could definitely be pared down.
+	/usr/local/bin/local_rpm.sh
 	rpm_ostree_install
 	# generate a hostname file so that dnsmasq's dhcp-script call works properly
 	echo -e "${hostname}" > /var/lib/dnsmasq/hostname.local
-	# Build and install decklink kmod/akmod to support pcie cards - **not functional yet, needs a lot of work**
-	# sets up local rpm repository - there's an issue with importing Intel repo GPG keys which might need user intervention.
-	# **NOTE** Broken until DNF is made to work with rpm-ostree installations again. **NOTE**
-	# /usr/local/bin/local_rpm.sh
 	# Add various libraries required for NDI and capture card support
 	install_ug_depends
 	# Perform any further customization required in our scripts
@@ -100,45 +97,21 @@ rpm_ostree_install(){
 	rpm_ostree_install_step1(){
 	/usr/bin/rpm-ostree install \
 	-y -A \
-	wget fontawesome-fonts wl-clipboard nnn mako sway bemenu rofi-wayland lxsession sway-systemd waybar \
-	foot vim powerline powerline-fonts vim-powerline NetworkManager-wifi iw wireless-regdb wpa_supplicant \
-	cockpit-bridge cockpit-networkmanager cockpit-system cockpit-ostree cockpit-podman buildah rdma avahi \
-	iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd sha libsrtp libdrm python3-pip srt srt-libs \
-	libv4l v4l-utils libva-v4l2-request pipewire-v4l2 ImageMagick intel-opencl \
-	mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
-	mesa-libxatracker alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools netcat busybox inotify-tools \
-	butane tftp-server ipxe-bootimgs-x86.noarch syslinux-nonlinux syslinux syslinux-efi64 \
-	https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
-	https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm \
-	make cmake dnf yum-utils createrepo dkms kernel-headers usbutils tuned realtime-setup realtime-tests rtkit jo \
-	gcc openssl-devel bzip2-devel libffi-devel zlib-devel libuuid-devel libudev-devel
-	echo -e "\nBase RPM Packages installed, waiting for 1 second..\n"
-	sleep 1
-	}
-	rpm_ostree_install_step2(){
-	# This is everything-and-the-kitchen sink approach to media acceleration.
-	# libvpl libvpl-devel required for older intel CPU, has clash with oneVPL library however, so need detection logic.
-	# Refresh Metadata
-	/usr/bin/rpm-ostree refresh-md
-	/usr/bin/rpm-ostree install \
-	-y -A --idempotent \
-	intel-media-driver \
-	intel-gpu-tools intel-compute-runtime oneVPL-intel-gpu intel-media-driver intel-gmmlib \
-	intel-level-zero oneapi-level-zero libvpl intel-mediasdk libva libva-utils libva-v4l2-request libva-vdpau-driver intel-ocloc \
-	ocl-icd opencl-headers mpv libsrtp mesa-dri-drivers intel-opencl \
-	libvdpau-va-gl mesa-vdpau-drivers libvdpau libvdpau-devel libva-intel-driver \
-	ffmpeg ffmpeg-libs libheif-freeworld \
-	neofetch htop \
-	mesa-libOpenCL python3-pip srt srt-libs ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 \
-	ImageMagick mplayer \
-	libndi libndi-devel ndi-sdk obs-ndi pipewire-utils \
-	firefox
+	alsa-firmware alsa-lib alsa-plugins-speex avahi bemenu bluez-tools buildah busybox butane bzip2-devel \
+	cmake cockpit-bridge cockpit-networkmanager cockpit-ostree cockpit-podman cockpit-system createrepo \
+	dkms dnf etcd ffmpeg ffmpeg ffmpeg-libs firefox fontawesome-fonts foot gcc htop \
+	ImageMagick ImageMagick inotify-tools \
+	intel-compute-runtime intel-gmmlib intel-gpu-tools intel-level-zero intel-media-driver \
+	intel-media-driver intel-mediasdk intel-ocloc intel-opencl intel-opencl ipxe-bootimgs-x86.noarch iw iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch \
+	jo kernel-headers libdrm libdrm libffi-devel libheif-freeworld libndi libndi-devel libsrtp libsrtp libudev-devel libuuid-devel \
+	libv4l libv4l libva libva-intel-driver libva-utils libva-v4l2-request libva-v4l2-request libva-v4l2-request libva-vdpau-driver \
+	libvdpau libvdpau-devel libvdpau-va-gl libvpl lxsession \
+	make mako mesa-dri-drivers mesa-dri-drivers mesa-libEGL mesa-libgbm mesa-libGL mesa-libOpenCL mesa-libxatracker mesa-vdpau-drivers mesa-vdpau-drivers mesa-vulkan-drivers mplayer mpv ndi-sdk neofetch netcat NetworkManager-wifi nnn obs-ndi ocl-icd oneapi-level-zero oneVPL-intel-gpu opencl-headers openssl-devel pipewire-alsa pipewire-utils pipewire-v4l2 pipewire-v4l2 powerline powerline-fonts python3-pip python3-pip rdma realtime-setup realtime-tests rofi-wayland rtkit sha srt srt srt-libs srt-libs sway sway-systemd syslinux syslinux-efi64 syslinux-nonlinux tftp-server tuned usbutils v4l-utils v4l-utils vim vim-powerline vlc waybar wget wireless-regdb wl-clipboard wpa_supplicant yum-utils zlib-devel
 	echo -e "\nRPMFusion Media Packages installed, waiting for 1 second..\n"
 	sleep 1
 	}
 	rpm_ostree_install_step1
 	touch /var/rpm-ostree-overlay.complete
-	rpm_ostree_install_step2
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
 	touch /var/rpm-ostree-overlay.dev.pkgs.complete
