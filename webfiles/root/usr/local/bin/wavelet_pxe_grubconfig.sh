@@ -42,6 +42,9 @@ generate_tftpboot() {
 	${coreOShttpEntry}
 	${bootCentry}
 	}" > /var/lib/tftpboot/efi/grub.cfg
+	cp /var/lib/tftpboot/efi/grub.cfg /home/wavelet/http/pxe
+	chmod -R 0755 /home/wavelet/http
+	chown -R wavelet:wavelet /home/wavelet/http
 }
 
 generate_coreos_image() {
