@@ -196,7 +196,7 @@ kernel=$(echo ${kernel##*coreos/})
 #
 ###
 
-set -x 
 generate_tftpboot
 generate_coreos_image
 #generate_bootc_image
+echo -e "PXE bootable images completed and populated in http serverdir, now client provisioning available.."
