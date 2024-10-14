@@ -66,6 +66,7 @@ client_networks(){
 	# SED for nameserver and remove args
 	sed -i 's/- nameserver/d' ${INPUTFILES}
 	# SED for FQDN and replace
+	isoMode="mode=client"
 }
 
 hostname_domain(){
@@ -138,7 +139,7 @@ customization(){
 
 	# WiFi settings
 	# changed to mod ignition files w/ inline data for the scripts to call, this way I don't publish wifi secrets to github.
-	INPUTFILES="server_custom.yml encoder_custom.yml decoder_custom.yml"
+	INPUTFILES="server_custom.yml decoder_custom.yml"
 	echo -e "Moving on to WiFi settings"
 	echo -e "If your Wifi AP hasn't yet been configured, please do so now, as the installer will wait for your input\n"
 	read -p "Please input the SSID of your configured wireless network:  " wifi_ssid
@@ -163,8 +164,7 @@ customization(){
 ####
 
 echo -e "Will this system run on an isolated network?"
-read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || client_networks
-echo -e "System configured for isolated, authoritative mode."
+read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || client_networks || echo -e "System configured for isolated, authoritative mode." && isoMode="mode=iso"
 customization
 echo -e "Calling coreos_installer.sh to generate ISO images.  You will then need to burn them to USB/SD cards."
-./coreos_installer.sh "${developerMode}"
+./coreos_installer.sh "${developerMode}" "${isoMode}"
