@@ -1,0 +1,38 @@
+# This Container downloads RPM packages for both the server and decoders, then provisions a repository in $HOME/http/rep
+# Replaces local_rpm.sh
+
+FROM quay.io/fedora/fedora:latest
+ARG DKMS_KERNEL_VERSION
+
+# Kernel packages (may be required for kmod builds)
+RUN	mkdir -p /rpm && cd rpm && dnf -y install koji && \
+koji download-build --rpm --arch=x86_64 kernel-core-${DKMS_KERNEL_VERSION} && \
+koji download-build --rpm --arch=x86_64 kernel-devel-${DKMS_KERNEL_VERSION} && \
+koji download-build --rpm --arch=x86_64 kernel-modules-${DKMS_KERNEL_VERSION} && \
+koji download-build --rpm --arch=x86_64 kernel-modules-core-${DKMS_KERNEL_VERSION} && \
+koji download-build --rpm --arch=x86_64 kernel-devel-matched-${DKMS_KERNEL_VERSION} && \
+dnf erase -y kernel-core kernel-devel kernel-modules kernel-modules-core
+
+# RPMfusion and third party repos, core packages, update metadata
+RUN	echo -e "[oneAPI] \n\
+name=Intel® oneAPI repository \n\
+baseurl=https://yum.repos.intel.com/oneapi \n\
+enabled=1 \n\
+gpgcheck=1 \n\
+repo_gpgcheck=1 \n\
+gpgkey=https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \n\
+priority=150" > /etc/yum.repos.d/oneapi.repo && \
+cat /etc/yum.repos.d/oneapi.repo && \
+dnf --setopt=fastestmirror=1 install -y \
+https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
+https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm && \
+dnf update --refresh && \
+dnf install -y createrepo_c
+RUN dnf install -x kernel-core kernel-devel kernel-modules kernel-modules-core --setopt=fastestmirror=1 --nodocs -y --downloadonly --downloaddir=/tmp/ \
+alsa-firmware alsa-lib alsa-plugins-speex avahi bemenu bluez-tools buildah busybox butane bzip2-devel cmake cockpit-bridge cockpit-networkmanager cockpit-ostree cockpit-podman cockpit-system createrepo dkms etcd fontawesome-fonts foot gcc ImageMagick inotify-tools intel-opencl ipxe-bootimgs-x86.noarch iw iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch jo kernel-headers libdrm libdrm libffi-devel libsrtp libudev-devel libuuid-devel libv4l libva-v4l2-request lxsession make mako mesa-dri-drivers mesa-libEGL mesa-libgbm mesa-libGL mesa-libxatracker mesa-vdpau-drivers mesa-vulkan-drivers netcat NetworkManager-wifi nnn openssl-devel pipewire-alsa pipewire-v4l2 powerline powerline-fonts python3-pip rdma realtime-setup realtime-tests rofi-wayland rtkit sha srt srt-libs sway sway-systemd syslinux syslinux-efi64 syslinux-nonlinux tftp-server tuned usbutils v4l-utils vim vim-powerline waybar wget wireless-regdb wl-clipboard wpa_supplicant yum-utils zlib-devel \
+&& \
+# 3rd party packages
+dnf install -y --downloadonly --downloaddir=/tmp/ --setopt=fastestmirror=1 \
+ffmpeg ffmpeg ffmpeg-libs firefox htop ImageMagick intel-compute-runtime intel-gmmlib intel-gpu-tools intel-level-zero intel-media-driver intel-media-driver intel-mediasdk intel-ocloc intel-opencl libheif-freeworld libndi libndi-devel libsrtp libv4l libva libva-intel-driver libva-utils libva-v4l2-request libva-v4l2-request libva-vdpau-driver libvdpau libvdpau-devel libvdpau-va-gl libvpl mesa-dri-drivers mesa-libOpenCL mesa-vdpau-drivers mplayer mpv ndi-sdk neofetch obs-ndi ocl-icd oneapi-level-zero oneVPL-intel-gpu opencl-headers pipewire-utils pipewire-v4l2 python3-pip srt srt-libs v4l-utils vlc
+
+CMD mv /tmp/* /output/ && createrepo /output
