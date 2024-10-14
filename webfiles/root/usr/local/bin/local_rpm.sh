@@ -8,25 +8,34 @@ systemctl enable dnsmasq.service --now
 echo -e "Setting Date/Time to default inception location America/New_York.."
 timedatectl set-timezone America/New_York
 
-echo -e "generating a local folder in /http server directory and creating an RPM repository to serve packages locally \n"
-echo -e "This will recatalog and copy all the packages currently in use on this system.  Download of about ~1Gb is required, which is the slowest operation here.\n"
-echo -e "We do this so that new downloads aren't performed on every single additional device that's added."
-# Added this so we don't get caught out the next time I rebase..
 releasever=$(python -c 'import dnf, json; db = dnf.dnf.Base(); print("releasever=%s" % (db.conf.releasever))' | sed -e 's/releasever=//g')
 echo -e "Fedora CoreOS releasever is ${releasever}\n"
+export DKMS_KERNEL_VERSION=$(uname -r)
+repodir="/home/wavelet/http/repo_mirror/fedora/releases/${releasever}/x86_64/"
+mkdir -p ${repodir}
 
-# dnf downloads only installed packages
-# This is a lazy way to do it - there may be unnecessary packages redownloaded here which we do not need to add.
-mkdir -p /home/wavelet/http/repo_mirror/fedora/releases/${releasever}/x86_64/
-#rpm --import https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
-#rpmkeys --import https://yum.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+# Build & run containerfile
+podman build -t localrpm --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -f Containerfile.localrpm
+podman run --privileged --security-opt label=disable -v ${repodir}:/output/ localrpm
 
-# We spin up a local repository to speed up imaging tasks for the clients.  It would make more sense to maintain a full local repository mirror, but I don't have the bandwidth in my lab to do this.
-dnf reinstall -y --nogpgcheck --downloadonly --downloaddir=/home/wavelet/http/repo_mirror/fedora/releases/${releasever}/x86_64/ `rpm -qa`
-createrepo /home/wavelet/http/repo_mirror/fedora/releases/${releasever}/x86_64/
-chown -R wavelet:wavelet /home/wavelet/
-find /home/wavelet/http -type d -exec chmod 755 {} +
-
+# May not need these parts anymore
+#createrepo /home/wavelet/http/repo_mirror/fedora/releases/${releasever}/x86_64/
+#chown -R wavelet:wavelet /home/wavelet/
+#find /home/wavelet/http -type d -exec chmod 755 {} +
 touch /home/wavelet/local_rpm_setup.complete
 chown wavelet:wavelet /home/wavelet/local_rpm_setup.complete
-exit 0
+echo -e "\n
+[local]
+name=local repo
+baseurl=file://${repodir}
+enabled=1
+gpgcheck=0
+exit 0" > /etc/yum.repos.d/local.repo
+echo -e "\n
+[local]
+name=local repo
+baseurl=http://192.168.1.32:8080/repo/
+enabled=1
+gpgcheck=0
+exit 0" > /home/wavelet/https/repo/local.repo
+echo -e "Repository generated for both local and http clients, continuing installation procedure.."
