@@ -42,3 +42,4 @@ enabled=1
 gpgcheck=0" > /home/wavelet/http/repo/local.repo
 echo -e "Repository generated for both local and http clients, continuing installation procedure.."
 chown -R wavelet:wavelet /home/wavelet/
+chmod -R 0755 /home/wavelet/http
