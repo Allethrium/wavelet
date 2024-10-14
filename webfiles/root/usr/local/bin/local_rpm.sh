@@ -15,7 +15,7 @@ repodir="/home/wavelet/http/repo_mirror/fedora/releases/${releasever}/x86_64/"
 mkdir -p ${repodir}
 
 # Build & run containerfile
-podman build -t localrpm --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -f Containerfile.localrpm
+podman build -t localrpm --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -f /home/wavelet/containerfiles/Containerfile.localrpm
 podman run --privileged --security-opt label=disable -v ${repodir}:/output/ localrpm
 
 # May not need these parts anymore
