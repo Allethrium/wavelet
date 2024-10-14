@@ -616,12 +616,12 @@ storage:
         name: wavelet
       group:
         name: wavelet
-    - path: /var/tftpboot
+    - path: /var/lib/tftpboot
       mode: 0755
       user:
-        name: dnsmasq
+        name: root
       group:
-        name: dnsmasq
+        name: root
 # user accounts, passwords and pubkeys
 passwd:
   users:
