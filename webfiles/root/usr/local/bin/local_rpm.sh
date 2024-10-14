@@ -1,6 +1,6 @@
 #!/bin/bash
 # Called as root because DNF needs superuser privileges, so must set perms after everything is completed.
-# DNF running on RPM-ostree currently broken, this step will not work until it's resolved.
+# Can still run if local dhcp is not running, however engineers will need to configure PXE appropriately for their environment
 exec >/home/wavelet/local_rpm.log 2>&1
 echo -e "ensuring DNSmasq is operating and available.."
 systemctl enable dnsmasq.service --now
@@ -29,13 +29,11 @@ echo -e "\n
 name=local repo
 baseurl=file://${repodir}
 enabled=1
-gpgcheck=0
-exit 0" > /etc/yum.repos.d/local.repo
+gpgcheck=0" > /etc/yum.repos.d/local.repo
 echo -e "\n
 [local]
 name=local repo
 baseurl=http://192.168.1.32:8080/repo/
 enabled=1
-gpgcheck=0
-exit 0" > /home/wavelet/https/repo/local.repo
+gpgcheck=0" > /home/wavelet/http/repo/local.repo
 echo -e "Repository generated for both local and http clients, continuing installation procedure.."

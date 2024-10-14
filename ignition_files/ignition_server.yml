@@ -604,6 +604,13 @@ storage:
         name: wavelet
       group:
         name: wavelet
+    # Needed for podman ostree bug https://github.com/containers/podman/issues/23515
+    - path: /home/wavelet/.local/share/containers/storage/volumes
+      mode: 0755
+      user:
+        name: wavelet
+      group:
+        name: wavelet
     - path: /home/wavelet/http-php/nginx
       mode: 0755
       user:
