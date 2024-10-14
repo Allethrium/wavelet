@@ -18,9 +18,10 @@ fi
 
 echo -e "\n	**	Note: Put the drive controller for target devices in AHCI mode from BIOS setup!\n	**	RAID or other modes have been observed to interfere with the process.\n"
 #read -p "Please input the FULL path of your destination device I.E /dev/nvme0n1.  Could also be /dev/vda if VM:" DESTINATION_DEVICE
-#DESTINATION_DEVICE="/dev/nvme0n1"
+DESTINATION_DEVICE="/dev/nvme0n1"
 # Symlink as per: https://docs.fedoraproject.org/en-US/fedora-coreos/storage/
-DESTINATION_DEVICE="/dev/disk/by-id/coreos-boot-disk"
+# Doesn't work.
+# DESTINATION_DEVICE="/dev/disk/by-id/coreos-boot-disk"
 #echo -e "Destination device is set to ${DESTINATION_DEVICE}, please verify!"
 #read -p "Continue? (Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit
 
