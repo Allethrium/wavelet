@@ -29,12 +29,11 @@ echo -e "\n
 name=local repo
 baseurl=file://${repodir}
 enabled=1
-gpgcheck=0
-exit 0" > /etc/yum.repos.d/local.repo
+gpgcheck=0" > /etc/yum.repos.d/local.repo
 echo -e "\n
 [local]
 name=local repo
 baseurl=http://192.168.1.32:8080/repo/
 enabled=1
-gpgcheck=0" > /home/wavelet/https/repo/local.repo
+gpgcheck=0" > /home/wavelet/http/repo/local.repo
 echo -e "Repository generated for both local and http clients, continuing installation procedure.."
