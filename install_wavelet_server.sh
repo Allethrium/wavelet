@@ -99,7 +99,7 @@ customization
 
 customization(){
 	echo -e "Generating ignition files with appropriate settings.."
-	INPUTFILES="server_custom.yml encoder_custom.yml decoder_custom.yml"
+	INPUTFILES="server_custom.yml decoder_custom.yml"
 	touch rootpw.secure
 	touch waveletpw.secure
 	chmod 0600 *.secure
