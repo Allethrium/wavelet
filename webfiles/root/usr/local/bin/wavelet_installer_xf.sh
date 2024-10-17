@@ -49,7 +49,8 @@ event_server(){
 	extract_home && extract_usrlocalbin
 	# Install dependencies and base packages.  Could definitely be pared down.
 	/usr/local/bin/local_rpm.sh
-	rpm_ostree_install
+	# Attempt to install from overlay container, if fails, we will run old method.
+	rpm_overlay_install
 	# generate a hostname file so that dnsmasq's dhcp-script call works properly
 	echo -e "${hostname}" > /var/lib/dnsmasq/hostname.local
 	# Add various libraries required for NDI and capture card support
@@ -122,6 +123,23 @@ rpm_ostree_install(){
 	echo -e "RPM package updates completed, finishing installer task..\n"
 }
 
+rpm_overlay_install(){
+	echo -e "Installing via container and applying as Ostree overlay..\n"
+	DKMS_KERNEL_VERSION=$(uname -r)
+	podman build -t localhost/coreos_overlay --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -f /home/wavelet/containerfiles/Containerfile.coreos.overlay
+	if rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:localhost/coreos_overlay; then
+		touch /var/rpm-ostree-overlay.complete
+		touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
+		touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
+		touch /var/rpm-ostree-overlay.dev.pkgs.complete
+		echo -e "RPM package updates completed, finishing installer task..\n"
+	else
+		echo -e "RPM Ostree overlay failed!  Reverting to old method..\n"
+		rpm_ostree_install_git
+		rpm_ostree_install
+	fi
+}
+
 generate_decoder_iso(){
 	echo -e "\n\nCreating PXE functionality..\n\n"
 	wavelet_pxe_grubconfig.sh
@@ -171,6 +189,7 @@ install_ug_depends(){
 	#   libAJA to support AJA capture cards
 	#   Live555 for rtmp
 	#   LibNDI for Magewell devices
+	pip install zfec
 	cd /home/wavelet
 	install_cineform(){
 		# CineForm SDK
@@ -235,6 +254,18 @@ install_ug_depends(){
 	#install_live555
 }
 
+leftovers(){
+#RUN	mkdir desktopvideo
+#WORKDIR	/
+#RUN	rpm2cpio desktopvideo.rpm | cpio -idmv
+#RUN	rpm-ostree cliwrap install-to-root / && cd /usr/src/blackmagic-14.2.1a1/ && make
+#RUN	rpm-ostree cliwrap install-to-root / && cd /usr/src/blackmagic-io-14.2.1a1/ && make
+	# kernel mods now generated and should be able to be applied to base OS?
+#RUN	find /usr/src/blackmagic*/*.ko -type f | xargs cp -t /desktopvideo && ls -l /desktopvideo        # Needs sed to point to /var/usr/local  
+#RUN    cd live555 && ./genMakefiles linux-with-shared-libraries && make -j "$(nproc)" && make install && cd .. 
+#       # Needs sed to repoint to /var/usr/local
+#RUN    cd cineform-sdk && cmake -DBUILD_TOOLS=OFF && cmake --build . --parallel "$(nproc)" && cmake --install . && cd ..
+}
 
 ####
 #
