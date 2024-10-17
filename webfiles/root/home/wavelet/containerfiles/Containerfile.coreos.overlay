@@ -1,0 +1,56 @@
+# This containerfile aims to build all dependencies for Wavelet in a container
+# To be applied as an ostree rebase
+
+FROM quay.io/fedora/fedora-coreos:stable as kernel-query
+ARG DKMS_KERNEL_VERSION
+ARG KOJI_PATH
+# Base packages and build tools
+RUN	rpm-ostree cliwrap install-to-root / && rpm-ostree install -y -A koji && \
+	koji download-build --rpm --arch=x86_64 kernel-${DKMS_KERNEL_VERSION} && \
+	koji download-build --rpm --arch=x86_64 kernel-core-${DKMS_KERNEL_VERSION} && \
+	koji download-build --rpm --arch=x86_64 kernel-devel-${DKMS_KERNEL_VERSION} && \
+	koji download-build --rpm --arch=x86_64 kernel-modules-${DKMS_KERNEL_VERSION} && \
+	koji download-build --rpm --arch=x86_64 kernel-modules-core-${DKMS_KERNEL_VERSION} && \
+	koji download-build --rpm --arch=x86_64 kernel-modules-extra-${DKMS_KERNEL_VERSION} && \
+	koji download-build --rpm --arch=x86_64 kernel-devel-matched-${DKMS_KERNEL_VERSION}
+RUN	rpm-ostree override replace \
+	kernel-${DKMS_KERNEL_VERSION}.rpm \
+	kernel-core-${DKMS_KERNEL_VERSION}.rpm \
+	kernel-devel-${DKMS_KERNEL_VERSION}.rpm \
+	kernel-devel-matched-${DKMS_KERNEL_VERSION}.rpm \
+	kernel-modules-${DKMS_KERNEL_VERSION}.rpm \
+	kernel-modules-core-${DKMS_KERNEL_VERSION}.rpm \
+	kernel-modules-extra-${DKMS_KERNEL_VERSION}.rpm 
+	# Install all layered packages required for further tasks
+RUN	rpm-ostree install -y -A \
+	https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
+        https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+RUN	rpm-ostree cliwrap install-to-root / && \
+	rpm-ostree install -y -A \
+	wget fontawesome-fonts wl-clipboard nnn mako sway bemenu rofi-wayland lxsession sway-systemd waybar \
+	foot vim powerline powerline-fonts vim-powerline NetworkManager-wifi iw wireless-regdb wpa_supplicant \
+	cockpit-bridge cockpit-networkmanager buildah rdma avahi \
+	iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd sha libsrtp libdrm python3-pip srt srt-libs \
+	libv4l v4l-utils libva-v4l2-request pipewire-v4l2 ImageMagick intel-opencl \
+	mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
+	mesa-libxatracker alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools netcat busybox inotify-tools \
+	make cmake coreutils binutils binutils-gold libtool gcc gcc-c++ glibc libgcc libstdc++ zlib-ng-compat glibc-devel \
+	dnf yum-utils cpio createrepo dkms usbutils tuned realtime-setup realtime-tests rtkit jo openssl-devel \
+	autoconf automake libtirpc-devel libblkid-devel libaio-devel libattr-devel elfutils-libelf-devel ncompress libcurl-devel \
+	bzip2-devel libffi-devel zlib-devel libuuid-devel libudev-devel git chkconfig akmods kmod kmod-devel kmodtool \
+	intel-media-driver intel-gpu-tools intel-compute-runtime oneVPL-intel-gpu intel-media-driver intel-gmmlib \
+        intel-level-zero oneapi-level-zero libvpl intel-mediasdk libva libva-utils libva-v4l2-request libva-vdpau-driver intel-ocloc \
+        ocl-icd opencl-headers mpv libsrtp mesa-dri-drivers intel-opencl libvdpau-va-gl mesa-vdpau-drivers libvdpau libvdpau-devel \
+        libva-intel-driver ffmpeg ffmpeg-libs libheif-freeworld neofetch htop mesa-libOpenCL python3-pip srt srt-libs firefox \
+        ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 ImageMagick mplayer libndi libndi-devel ndi-sdk obs-ndi pipewire-utils && \
+	ln -s /usr/bin/ld.bfd /etc/alternatives/ld && ln -s /etc/alternatives/ld /usr/bin/ld
+	# Clone git repos and get all the packages installed
+RUN	curl -L https://www.andymelville.net/wavelet/desktopvideo-14.2.1a1.x86_64.rpm -f --retry 5 > "desktopvideo.rpm" && \
+	git clone https://github.com/xanview/live555/ && \
+	git clone https://github.com/gopro/cineform-sdk && \
+	curl -L https://downloads.ndi.tv/SDK/NDI_SDK_Linux/Install_NDI_SDK_v6_Linux.tar.gz -f --retry 5 > "Install_NDI_SDK_v6_Linux.tar.gz" && \
+	tar -xzvf Install_NDI_SDK_v6_Linux.tar.gz && \
+	yes | PAGER="cat" sh Install_NDI_SDK_v6_Linux.sh && \
+	ldconfig 
+RUN	rpm-ostree install -y -A desktopvideo.rpm
+RUN	ostree container commit
