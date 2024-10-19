@@ -48,9 +48,10 @@ event_server(){
 	extract_base
 	extract_home && extract_usrlocalbin
 	# Install dependencies and base packages.  Could definitely be pared down.
-	/usr/local/bin/local_rpm.sh
 	# Attempt to install from overlay container, if fails, we will run old method.
 	rpm_overlay_install
+	# Generating a local repository is no longer needed, because we are using an ostree overlay for the server and for future client machines.
+	#/usr/local/bin/local_rpm.sh
 	# generate a hostname file so that dnsmasq's dhcp-script call works properly
 	echo -e "${hostname}" > /var/lib/dnsmasq/hostname.local
 	# Add various libraries required for NDI and capture card support
@@ -132,8 +133,11 @@ rpm_overlay_install(){
 		touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
 		touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
 		touch /var/rpm-ostree-overlay.dev.pkgs.complete
-		echo -e "RPM package updates completed, pushing container to registry for client availability, and finishing installer task..\n"
-		podman push coreos_overlay docker://localhost:5000/coreos_overlay:server 
+		echo -e "\n\nRPM package updates completed, pushing container to registry for client availability, and finishing installer task..\n\n"
+		# Push the image to the registry and ensure it's tagged, then remove local image to save storage.
+		podman tag localhost/coreos_overlay localhost:5000/coreos_overlay:latest
+		podman push localhost:5000/coreos_overlay:latest --tls-verify=false 
+		podman rmi localhost:5000/coreos_overlay -f
 	else
 		echo -e "RPM Ostree overlay failed!  Reverting to old method..\n"
 		rpm_ostree_install_git
