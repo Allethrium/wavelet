@@ -61,5 +61,5 @@ RUN	curl -L https://www.andymelville.net/wavelet/desktopvideo-14.2.1a1.x86_64.rp
 	ldconfig 
 RUN mkdir -p /var/lib/blackmagic && \
 	mokdir="/var/lib/blackmagic" && \
-	openssl req -new -x509 -days 3650 -subj '/CN=MOK_generated' -keyout "$mokdir/MOK.priv" -outform der -out "$mokdir/MOK.der"
+	openssl req -nodes -new -x509 -days 3650 -subj '/CN=MOK_generated' -keyout "$mokdir/MOK.priv" -outform der -out "$mokdir/MOK.der"
 RUN	rpm-ostree install -y -A desktopvideo.rpm && ostree container commit
