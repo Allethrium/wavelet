@@ -24,7 +24,7 @@ UG_HOSTNAME=$(hostname)
 event_decoder(){
 	extract_base
 	extract_home && extract_usrlocalbin
-	rpm_ostree_install_decoder
+	rpm_overlay_install_decoder
 	echo -e "Initial provisioning completed, attempting to connect to WiFi..\n"
 	connectwifi
 	exit 0
@@ -128,6 +128,25 @@ rpm_overlay_install(){
 	DKMS_KERNEL_VERSION=$(uname -r)
 	podman build -t localhost/coreos_overlay --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -f /home/wavelet/containerfiles/Containerfile.coreos.overlay
 	if rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:localhost/coreos_overlay; then
+		touch /var/rpm-ostree-overlay.complete
+		touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
+		touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
+		touch /var/rpm-ostree-overlay.dev.pkgs.complete
+		echo -e "RPM package updates completed, pushing container to registry for client availability, and finishing installer task..\n"
+		podman push coreos_overlay docker://localhost:5000/coreos_overlay:server 
+	else
+		echo -e "RPM Ostree overlay failed!  Reverting to old method..\n"
+		rpm_ostree_install_git
+		rpm_ostree_install
+	fi
+}
+
+rpm_overlay_install_decoder(){
+	# This differs from the server in that we don't need to build the container,
+	# and we pull the already generated overlay from the server registry
+	echo -e "Installing via container and applying as Ostree overlay..\n"
+	DKMS_KERNEL_VERSION=$(uname -r)
+	if rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:192.168.1.32:5000/coreos_overlay; then
 		touch /var/rpm-ostree-overlay.complete
 		touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
 		touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
@@ -239,6 +258,7 @@ install_ug_depends(){
 			echo "Download complete."
 		}
 	download_libndi
+	}
 	tar -xzvf "/home/wavelet/libNDI/$LIBNDI_INSTALLER"
 	yes | PAGER="cat" sh $LIBNDI_INSTALLER_NAME.sh
 	cp -P /home/wavelet/libNDI/NDI\ SDK\ for\ Linux/lib/x86_64-linux-gnu/* /usr/local/lib/
@@ -248,23 +268,9 @@ install_ug_depends(){
 	echo -e "\nLibNDI Installed..\n"
 	}
 	install_libndi
-	# Disabled these as GCC-C++ package is broken for CoreOS at the moment.
-	#install_libaja
-	#install_cineform
-	#install_live555
-}
-
-leftovers(){
-#RUN	mkdir desktopvideo
-#WORKDIR	/
-#RUN	rpm2cpio desktopvideo.rpm | cpio -idmv
-#RUN	rpm-ostree cliwrap install-to-root / && cd /usr/src/blackmagic-14.2.1a1/ && make
-#RUN	rpm-ostree cliwrap install-to-root / && cd /usr/src/blackmagic-io-14.2.1a1/ && make
-	# kernel mods now generated and should be able to be applied to base OS?
-#RUN	find /usr/src/blackmagic*/*.ko -type f | xargs cp -t /desktopvideo && ls -l /desktopvideo        # Needs sed to point to /var/usr/local  
-#RUN    cd live555 && ./genMakefiles linux-with-shared-libraries && make -j "$(nproc)" && make install && cd .. 
-#       # Needs sed to repoint to /var/usr/local
-#RUN    cd cineform-sdk && cmake -DBUILD_TOOLS=OFF && cmake --build . --parallel "$(nproc)" && cmake --install . && cd ..
+	install_libaja
+	install_cineform
+	install_live555
 }
 
 ####
@@ -278,9 +284,7 @@ leftovers(){
 # Perhaps add a checksum to make sure nothing's been tampered with here..
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 systemctl disable zincati.service --now
-# Unlock RPM ostree persistently across reboots, needed for the weird library linking we are doing here and MAY sidestep the decklink issue.
-# - update, NOPE.  and it breaks rpm-ostree installing anything so that's a no-go.
-# ostree admin unlock --hotfix
-#set -x
+# Debug flag
+# set -x
 exec >/home/wavelet/wavelet_installer.log 2>&1
 detect_self
