@@ -257,13 +257,14 @@ install_ug_depends(){
 			fi
 			echo "Download complete."
 		}
+	}
 	download_libndi
 	}
 	tar -xzvf "/home/wavelet/libNDI/$LIBNDI_INSTALLER"
 	yes | PAGER="cat" sh $LIBNDI_INSTALLER_NAME.sh
 	cp -P /home/wavelet/libNDI/NDI\ SDK\ for\ Linux/lib/x86_64-linux-gnu/* /usr/local/lib/
 	ldconfig
-	ln -s /usr/local/lib/libndi.so.6 /usr/local/lib/libndi.so.5
+	# ln -s /usr/local/lib/libndi.so.6 /usr/local/lib/libndi.so.5
 	chown -R wavelet:wavelet /home/wavelet/libNDI
 	echo -e "\nLibNDI Installed..\n"
 	}
