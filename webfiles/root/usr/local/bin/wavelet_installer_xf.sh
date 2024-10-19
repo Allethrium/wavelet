@@ -53,8 +53,6 @@ event_server(){
 	#/usr/local/bin/local_rpm.sh
 	# generate a hostname file so that dnsmasq's dhcp-script call works properly
 	echo -e "${hostname}" > /var/lib/dnsmasq/hostname.local
-	# Add various libraries required for NDI and capture card support
-	install_ug_depends
 	# Perform any further customization required in our scripts
 	hostname=$(hostname)
 	sed -i "s/!!hostnamegoeshere!!/${hostname}/g" /usr/local/bin/wavelet_network_sense.sh
@@ -129,13 +127,13 @@ rpm_overlay_install(){
 	podman build -t localhost/coreos_overlay --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -f /home/wavelet/containerfiles/Containerfile.coreos.overlay
 	# Push the image to the registry and ensure it's tagged, then remove local image to save storage.
 	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay:latest
-	podman push localhost:5000/coreos_overlay:latest --tls-verify=false 
-	podman rmi localhost:5000/coreos_overlay -f
-	if rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:localhost/coreos_overlay; then
+	if rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay; then
 		touch /var/rpm-ostree-overlay.complete
 		touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
 		touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
 		touch /var/rpm-ostree-overlay.dev.pkgs.complete
+		podman push localhost:5000/coreos_overlay:latest --tls-verify=false
+		podman rmi localhost:5000/coreos_overlay -f
 		echo -e "\n\nRPM package updates completed, pushing container to registry for client availability, and finishing installer task..\n\n"
 	else
 		echo -e "RPM Ostree overlay failed!  Reverting to old method..\n"
