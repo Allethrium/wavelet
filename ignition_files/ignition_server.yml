@@ -742,19 +742,19 @@ systemd:
         ExecStartPost=systemctl start systemd-resolved.service
         [Install]
         WantedBy=multi-user.target
-# Install UG depends
-    - name: install-ug-depends.service
+# Service to launch ug_depends after initial config  completed (this would be AFTER build_ug restarts the machine for the second time!)
+    - name: ug-depends.service
       enabled: true
       contents: |
         [Unit]
-        Description=Install UG dependencies on second boot
+        Description=Run UG Dependency installer
         After=network-online.target
         Wants=network-online.target
         ConditionPathExists=/var/secondboot.active
         [Service]
         Type=oneshot
-        ExecStart=/bin/bash -c "/usr/local/bin/wavelet_install_ug_depends.sh"
-        ExecStartPost=/bin/bash -c "rm -rf /var/secondboot.active"
+        ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_install_ug_depends.sh"
+        ExecStartPost=usr/bin/bash -c "rm -rf /var/secondboot.active"
         [Install]
         WantedBy=multi-user.target
     # Reboot service
