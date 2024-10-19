@@ -590,6 +590,6 @@ event_host_relabel_watcher(){
 
 # Execution order
 
-set -x
+#set -x
 exec >/home/wavelet/build_ug.log 2>&1
 detect_self
