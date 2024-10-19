@@ -210,8 +210,7 @@ event_server(){
 }
 
 server_bootstrap(){
-# Bootstraps the server processes including Apache HTTP server for repo and distribution files, and the web interface NGINX/PHP pod
-	# Disabled, because we will call with the installer script
+# Bootstraps the server processes including Apache HTTP server for distribution files, and the web interface NGINX/PHP pod
 	until [ -f /var/ug_depends.complete ]
 	do
 		sleep 2
@@ -278,6 +277,8 @@ server_bootstrap(){
 	bootstrap_nginx_php
 	bootstrap_nodejs
 	bootstrap_dnsmasq_watcher_service
+	chown -R wavelet:wavelet /home/wavelet/http
+	chmod -R 0755 /home/wavelet/http
 	KEYNAME=SERVER_BOOTSTRAP_COMPLETED
 	KEYVALUE=1
 	touch /var/server_bootstrap_completed
