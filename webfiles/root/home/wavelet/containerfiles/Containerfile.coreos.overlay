@@ -45,7 +45,7 @@ RUN	rpm-ostree install -y -A \
 	make cmake coreutils binutils binutils-gold libtool gcc gcc-c++ glibc libgcc libstdc++ zlib-ng-compat glibc-devel \
 	dnf yum-utils cpio createrepo dkms usbutils tuned realtime-setup realtime-tests rtkit jo openssl openssl-devel \
 	autoconf automake libtirpc-devel libblkid-devel libaio-devel libattr-devel elfutils-libelf-devel ncompress libcurl-devel \
-	bzip2-devel libffi-devel zlib-devel libuuid-devel libudev-devel git chkconfig akmods kmod kmod-devel kmodtool \
+	bzip2-devel libffi-devel zlib-devel libuuid-devel libudev-devel chkconfig akmods kmod kmod-devel kmodtool \
 	intel-media-driver intel-gpu-tools intel-compute-runtime oneVPL-intel-gpu intel-media-driver intel-gmmlib \
     intel-level-zero oneapi-level-zero libvpl intel-mediasdk libva libva-utils libva-v4l2-request libva-vdpau-driver intel-ocloc \
     ocl-icd opencl-headers mpv libsrtp mesa-dri-drivers intel-opencl libvdpau-va-gl mesa-vdpau-drivers libvdpau libvdpau-devel \
@@ -53,7 +53,6 @@ RUN	rpm-ostree install -y -A \
     ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 ImageMagick mplayer libndi libndi-devel ndi-sdk obs-ndi pipewire-utils && \
 	ln -s /usr/bin/ld.bfd /etc/alternatives/ld && ln -s /etc/alternatives/ld /usr/bin/ld && \
 	ostree container commit
-	# Clone git repos and get all the packages installed
 RUN	curl -L https://www.andymelville.net/wavelet/desktopvideo-14.2.1a1.x86_64.rpm -f --retry 5 > "desktopvideo.rpm" && \
 	mkdir -p /var/lib/blackmagic && \
 	mokdir="/var/lib/blackmagic" && \
