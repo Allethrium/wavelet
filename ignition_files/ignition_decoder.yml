@@ -257,25 +257,6 @@ storage:
         name: wavelet
       group:
         name: wavelet
-    # Etcd watch controller input channel service
-    - path: /home/wavelet/.config/systemd/user/wavelet_controller.service
-      mode: 0644
-      contents:
-        inline: |
-          [Unit]
-          Description=Wavelet Controller - etcd input triggers orchestration
-          After=network-online.target etcd-member.service
-          Wants=network-online.target
-          [Service]
-          Environment=ETCDCTL_API=3
-          RemainAfterExit=yes
-          ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch "input_update" -w simple -- sh -c "/usr/local/bin/wavelet_controller.sh"
-          [Install]
-          WantedBy=default.target
-      user:
-        name: wavelet
-      group:
-        name: wavelet
     # Etcd watch reflectorflag service
     - path: /home/wavelet/.config/systemd/user/watch_reflectorreload.service
       mode: 0644
@@ -347,41 +328,6 @@ storage:
         name: wavelet
       group:
         name: wavelet
-    # Reflector script service - populates all reflector data, sets flags, calls Reflector proper.
-    - path: /home/wavelet/.config/systemd/user/wavelet_reflector.service
-      mode: 0644
-      contents:
-        inline: |
-          [Unit]
-          Description=UltraGrid AppImage executable
-          After=network-online.target etcd-member.service
-          Wants=network-online.target
-          [Service]
-          ExecStart=/usr/local/bin/wavelet_reflector.sh
-          [Install]
-          WantedBy=default.target
-      user:
-        name: wavelet
-      group:
-        name: wavelet
-    # UltraGrid reflector - placeholder, it's overwritten in the reflector script, like the AppImage unit file!
-    - path: /home/wavelet/.config/systemd/user/UltraGrid.Reflector.service
-      mode: 0644
-      contents:
-        inline: |
-          [Unit]
-          Description=UltraGrid AppImage executable
-          After=network-online.target etcd-member.service
-          Wants=network-online.target
-          [Service]
-          Environment=ETCDENDPOINT=192.168.1.32:2379
-          ExecStart=/usr/local/bin/UltraGrid.AppImage $(etcdctl --endpoints=${ETCDENDPOINT} get REFLECTOR_ARGS --print-value-only)
-          [Install]
-          WantedBy=default.target
-      user:
-        name: wavelet
-      group:
-        name: wavelet
     # run_ug.sh determines system local functions and calls the AppImage launcher as appropriate.
     - path: /home/wavelet/.config/systemd/user/run_ug.service
       mode: 0644
@@ -413,26 +359,6 @@ storage:
           ExecStart=/usr/local/bin/build_ug.sh
           [Install]
           WantedBy=default.target
-      user:
-        name: wavelet
-      group:
-        name: wavelet
-    # .htaccess dynamic index listing
-    - path: /home/wavelet/http/.htaccess
-      mode: 0664
-      overwrite: true
-      contents:
-        inline: |
-         Options +Indexes
-         <Limit GET POST>
-         order deny,allow
-         deny from all
-         allow from 192.168.1.0/24
-         </Limit>
-         IndexIgnore tabele_remote.php
-         IndexIgnore demo.txt
-         IndexIgnore functions.php
-         IndexIgnore config.php
       user:
         name: wavelet
       group:
