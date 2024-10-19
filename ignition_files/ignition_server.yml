@@ -32,6 +32,11 @@ storage:
       mode: 0644
       contents:
         local: decoder.ign
+    - path: /var/isolationMode.enabled
+      mode: 0644
+      contents:
+        inline: |
+          enabled
     - path: /usr/local/bin/UltraGrid.AppImage
       mode: 0755
       overwrite: true
@@ -702,6 +707,7 @@ systemd:
         [Install]
         WantedBy=multi-user.target
     # Container registry to host and serve containers to local clients
+    # N.B needs dns resolution
     - name: registry.service
       enabled: true
       contents: |
@@ -715,6 +721,7 @@ systemd:
         RemainAfterExit=yes
         ExecStartPre=-/bin/podman kill registry
         ExecStartPre=-/bin/podman rm registry
+        ExecStartPre=mkdir -p /var/lib/registry
         ExecStart=/bin/podman run --privileged -d --name registry -p 5000:5000 -v /home/wavelet/registry/:/var/lib/registry/:z --restart=always registry:2
         ExecStop=/bin/podman stop registry
         [Install]
@@ -727,6 +734,7 @@ systemd:
         Description=Switch DNS resolution to DNSmasq
         After=network-online.target
         Wants=network-online.target
+        ConditionPathExists=/var/isolationMode.enabled
         [Service]
         Type=oneshot
         ExecStartPre=systemctl stop systemd-resolved.service
