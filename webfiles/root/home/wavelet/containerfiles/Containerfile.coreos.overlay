@@ -55,11 +55,7 @@ RUN	rpm-ostree install -y -A \
 	ostree container commit
 	# Clone git repos and get all the packages installed
 RUN	curl -L https://www.andymelville.net/wavelet/desktopvideo-14.2.1a1.x86_64.rpm -f --retry 5 > "desktopvideo.rpm" && \
-	curl -L https://downloads.ndi.tv/SDK/NDI_SDK_Linux/Install_NDI_SDK_v6_Linux.tar.gz -f --retry 5 > "Install_NDI_SDK_v6_Linux.tar.gz" && \
-	tar -xzvf Install_NDI_SDK_v6_Linux.tar.gz && \
-	yes | PAGER="cat" sh Install_NDI_SDK_v6_Linux.sh && \
-	ldconfig 
-RUN mkdir -p /var/lib/blackmagic && \
+	mkdir -p /var/lib/blackmagic && \
 	mokdir="/var/lib/blackmagic" && \
 	openssl req -nodes -new -x509 -days 3650 -subj '/CN=MOK_generated' -keyout "$mokdir/MOK.priv" -outform der -out "$mokdir/MOK.der"
 RUN	rpm-ostree install -y -A desktopvideo.rpm && ostree container commit
