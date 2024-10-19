@@ -126,16 +126,16 @@ rpm_overlay_install(){
 	echo -e "Installing via container and applying as Ostree overlay..\n"
 	DKMS_KERNEL_VERSION=$(uname -r)
 	podman build -t localhost/coreos_overlay --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -f /home/wavelet/containerfiles/Containerfile.coreos.overlay
-	# Push the image to the registry and ensure it's tagged, then remove local image to save storage.
 	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay:latest
 	if rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay; then
 		touch /var/rpm-ostree-overlay.complete
 		touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
 		touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
 		touch /var/rpm-ostree-overlay.dev.pkgs.complete
-		podman push localhost:5000/coreos_overlay:latest --tls-verify=false
-		podman rmi localhost:5000/coreos_overlay -f
+		#podman push localhost:5000/coreos_overlay:latest --tls-verify=false
+		#podman rmi localhost:5000/coreos_overlay -f
 		echo -e "\n\nRPM package updates completed, pushing container to registry for client availability, and finishing installer task..\n\n"
+	# Push the image to the registry and ensure it's tagged, then remove local image to save storage.
 	else
 		echo -e "RPM Ostree overlay failed!  Reverting to old method..\n"
 		rpm_ostree_install_git
