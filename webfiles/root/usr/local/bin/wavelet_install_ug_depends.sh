@@ -68,5 +68,5 @@ install_ug_depends(){
 	install_live555
 	touch /var/ug_depends.complete
 }
-
+exec >/home/wavelet/ug_depends.log 2>&1
 install_ug_depends
