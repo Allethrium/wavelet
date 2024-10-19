@@ -135,7 +135,7 @@ rpm_overlay_install(){
 	touch /var/rpm-ostree-overlay.dev.pkgs.complete
 	podman push 192.168.1.32:5000/coreos_overlay:latest --tls-verify=false
 	podman rmi localhost/coreos_overlay -f
-	rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:192.168.1.32:5000/coreos_overlay
+	rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay
 	echo -e "\n\nRPM package updates completed, pushing container to registry for client availability, and finishing installer task..\n\n"
 }
 
