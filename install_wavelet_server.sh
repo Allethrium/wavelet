@@ -65,8 +65,11 @@ client_networks(){
 	sed -i 's/255.255.255.0/${SN}/g' ${INPUTFILES}
 	# SED for nameserver and remove args
 	sed -i 's/- nameserver/d' ${INPUTFILES}
-	# SED for FQDN and replace
-	isoMode="mode=client"
+	# SED to tell ignition that we aren't running in isolation mode, therefore DNSMasq should not be started via a FileExists arg in the systemD unit.
+	sed -i 's/isolationMode.enabled/isolationMode.disabled/g' ${INPUTFILES}
+	# FQDN would now be set from the DNS/DHCP server in the environment.  This also obviously disables network sense, TFTPBOOT and PXE.
+	# The assumption here is that an engineer would have already configured these services elsewhere, I can write some automation scripts later
+	# if this proves to be a need.
 }
 
 hostname_domain(){
