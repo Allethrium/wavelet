@@ -66,6 +66,7 @@ install_ug_depends(){
 	install_libaja
 	install_cineform
 	install_live555
+	touch /var/ug_depends.complete
 }
 
 install_ug_depends
