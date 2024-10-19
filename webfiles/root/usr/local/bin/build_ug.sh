@@ -312,6 +312,7 @@ server_bootstrap(){
 		# Get "alive mountpoints"
 		# Prune anything !=alive
 	#  Reboot the server
+	touch /var/secondboot.active
 	echo -e "Server configuration is now complete, rebooting system fifteen seconds.."
 	sleep 15
 	systemctl reboot -i

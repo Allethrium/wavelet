@@ -35,6 +35,7 @@ event_server(){
 	mkdir -p /home/wavelet/.config/containers/systemd/
 	chown -R wavelet:wavelet /home/wavelet
 	cd /home/wavelet
+	rpm_ostree_install_git
 	if [[ ! -f /var/tmp/DEV_ON ]]; then
 		echo -e "\n\n***WARNING***\n\nDeveloper Mode is ON\n\nCloning from development repository..\n"
 		git clone -b armelvil-working --single-branch https://github.com/ALLETHRIUM/wavelet 

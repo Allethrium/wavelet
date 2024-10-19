@@ -199,8 +199,8 @@ generate_coreos_image
 generate_tftpboot
 # Set Apache +x and read perms on http folder
 chmod -R 0755 /home/wavelet/http
+chown -R wavelet /home/wavelet/http
 echo -e "PXE bootable images completed and populated in http serverdir, client provisioning should now be available..\n"
 echo -e "Rebooting system to continue to userland setup..\n"
-sleep 10
-touch /var/secondboot.active
+sleep 2
 systemctl reboot
