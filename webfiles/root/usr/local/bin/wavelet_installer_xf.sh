@@ -53,9 +53,9 @@ event_server(){
 	# Generating a local repository is no longer needed, because we are using an ostree overlay for the server and for future client machines.
 	#/usr/local/bin/local_rpm.sh
 	# generate a hostname file so that dnsmasq's dhcp-script call works properly
+	hostname=$(hostname)
 	echo -e "${hostname}" > /var/lib/dnsmasq/hostname.local
 	# Perform any further customization required in our scripts
-	hostname=$(hostname)
 	sed -i "s/!!hostnamegoeshere!!/${hostname}/g" /usr/local/bin/wavelet_network_sense.sh
 	get_ipValue
 	sed -i "s/SVR_IPADDR/${IPVALUE}/g" /etc/dnsmasq.conf
@@ -89,15 +89,17 @@ get_ipValue(){
 
 rpm_ostree_install_git(){
 	# Needed because otherwise sway launches the userspace setup before everything is ready
-	/usr/bin/rpm-ostree install -y -A git 
+	# Some other packages which do not install properly in the ostree container build are also included here
+	/usr/bin/rpm-ostree install -y -A git avahi
 }
 
 rpm_ostree_install(){
+	# Retained as failover encase the new procedure breaks
 	echo -e "Installing packages..\n"
 	rpm_ostree_install_step1(){
 	/usr/bin/rpm-ostree install \
 	-y -A \
-	alsa-firmware alsa-lib alsa-plugins-speex avahi bemenu bluez-tools buildah busybox butane bzip2-devel \
+	alsa-firmware alsa-lib alsa-plugins-speex bemenu bluez-tools buildah busybox butane bzip2-devel \
 	cmake cockpit-bridge cockpit-networkmanager cockpit-ostree cockpit-podman cockpit-system createrepo \
 	dkms dnf etcd ffmpeg ffmpeg ffmpeg-libs firefox fontawesome-fonts foot gcc htop \
 	ImageMagick ImageMagick inotify-tools \
@@ -127,20 +129,14 @@ rpm_overlay_install(){
 	DKMS_KERNEL_VERSION=$(uname -r)
 	podman build -t localhost/coreos_overlay --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -f /home/wavelet/containerfiles/Containerfile.coreos.overlay
 	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay:latest
-	if rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay; then
-		touch /var/rpm-ostree-overlay.complete
-		touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
-		touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
-		touch /var/rpm-ostree-overlay.dev.pkgs.complete
-		#podman push localhost:5000/coreos_overlay:latest --tls-verify=false
-		#podman rmi localhost:5000/coreos_overlay -f
-		echo -e "\n\nRPM package updates completed, pushing container to registry for client availability, and finishing installer task..\n\n"
-	# Push the image to the registry and ensure it's tagged, then remove local image to save storage.
-	else
-		echo -e "RPM Ostree overlay failed!  Reverting to old method..\n"
-		rpm_ostree_install_git
-		rpm_ostree_install
-	fi
+	touch /var/rpm-ostree-overlay.complete
+	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
+	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
+	touch /var/rpm-ostree-overlay.dev.pkgs.complete
+	podman push 192.168.1.32:5000/coreos_overlay:latest --tls-verify=false
+	podman rmi localhost/coreos_overlay -f
+	rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:192.168.1.32:5000/coreos_overlay
+	echo -e "\n\nRPM package updates completed, pushing container to registry for client availability, and finishing installer task..\n\n"
 }
 
 rpm_overlay_install_decoder(){
@@ -148,18 +144,15 @@ rpm_overlay_install_decoder(){
 	# and we pull the already generated overlay from the server registry
 	echo -e "Installing via container and applying as Ostree overlay..\n"
 	DKMS_KERNEL_VERSION=$(uname -r)
-	if rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:192.168.1.32:5000/coreos_overlay; then
-		touch /var/rpm-ostree-overlay.complete
-		touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
-		touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
-		touch /var/rpm-ostree-overlay.dev.pkgs.complete
-		echo -e "RPM package updates completed, finishing installer task..\n"
-	else
-		echo -e "RPM Ostree overlay failed!  Reverting to old method..\n"
-		rpm_ostree_install_git
-		rpm_ostree_install
-	fi
+	rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:192.168.1.32:5000/coreos_overlay
+	touch /var/rpm-ostree-overlay.complete
+	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
+	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
+	touch /var/rpm-ostree-overlay.dev.pkgs.complete
+	echo -e "RPM package updates completed, finishing installer task..\n"
 }
+
+curl https://localhost:5000/v2/_catalog
 
 generate_decoder_iso(){
 	echo -e "\n\nCreating PXE functionality..\n\n"
