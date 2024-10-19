@@ -212,7 +212,7 @@ event_server(){
 server_bootstrap(){
 # Bootstraps the server processes including Apache HTTP server for repo and distribution files, and the web interface NGINX/PHP pod
 	# Disabled, because we will call with the installer script
-	until [ -f /home/wavelet/local_rpm_setup.complete ]
+	until [ -f /var/ug_depends.complete ]
 	do
 		sleep 2
 	done

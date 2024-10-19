@@ -128,16 +128,16 @@ rpm_overlay_install(){
 	echo -e "Installing via container and applying as Ostree overlay..\n"
 	DKMS_KERNEL_VERSION=$(uname -r)
 	podman build -t localhost/coreos_overlay --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -f /home/wavelet/containerfiles/Containerfile.coreos.overlay
+	# Push the image to the registry and ensure it's tagged, then remove local image to save storage.
+	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay:latest
+	podman push localhost:5000/coreos_overlay:latest --tls-verify=false 
+	podman rmi localhost:5000/coreos_overlay -f
 	if rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:localhost/coreos_overlay; then
 		touch /var/rpm-ostree-overlay.complete
 		touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
 		touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
 		touch /var/rpm-ostree-overlay.dev.pkgs.complete
 		echo -e "\n\nRPM package updates completed, pushing container to registry for client availability, and finishing installer task..\n\n"
-		# Push the image to the registry and ensure it's tagged, then remove local image to save storage.
-		podman tag localhost/coreos_overlay localhost:5000/coreos_overlay:latest
-		podman push localhost:5000/coreos_overlay:latest --tls-verify=false 
-		podman rmi localhost:5000/coreos_overlay -f
 	else
 		echo -e "RPM Ostree overlay failed!  Reverting to old method..\n"
 		rpm_ostree_install_git
@@ -203,73 +203,6 @@ extract_usrlocalbin(){
 	chmod +x /usr/local/bin
 	chmod 0755 /usr/local/bin/*
 	echo -e "Wavelet application modules setup successfully..\n"
-}
-
-install_ug_depends(){
-	# This is lifted from the UltraGrid project with a couple of tweaks for CoreOS/my purposes
-	# It builds dependencies for;
-	#   Cineform
-	#   libAJA to support AJA capture cards
-	#   Live555 for rtmp
-	#   LibNDI for Magewell devices
-	pip install zfec
-	cd /home/wavelet
-	install_cineform(){
-		# CineForm SDK
-		git clone https://github.com/gopro/cineform-sdk
-		cd cineform-sdk
-		# Broken command: git apply "$curdir/0001-CMakeList.txt-remove-output-lib-name-force-UNIX.patch"
-		# removed mkdir build && cd build too
-		cmake -DBUILD_TOOLS=OFF
-		cmake --build . --parallel "$(nproc)"
-		sudo cmake --install .
-		cd /home/wavelet
-	}
-	install_libaja(){
-		#Install libAJA Library
-		git clone https://github.com/aja-video/libajantv2.git
-		# export MACOSX_DEPLOYMENT_TARGET=10.13 # needed for arm64 mac
-		cmake -DAJANTV2_DISABLE_DEMOS=ON  -DAJANTV2_DISABLE_DRIVER=OFF \
-		-DAJANTV2_DISABLE_TOOLS=OFF  -DAJANTV2_DISABLE_TESTS=ON \
-		-DAJANTV2_BUILD_SHARED=ON \
-		-DCMAKE_BUILD_TYPE=Release -Blibajantv2/build -Slibajantv2
-		cmake --build libajantv2/build --config Release -j "$(nproc)"
-		sudo cmake --install libajantv2/build
-	}
-	install_live555(){
-		# Live555
-		git clone https://github.com/xanview/live555/
-		cd live555
-		./genMakefiles linux-with-shared-libraries
-		make -j "$(nproc)"
-		make install
-		cd /home/wavelet
-	}
-	install_libndi(){
-		# LibNDI
-		# Lifted from https://github.com/DistroAV/DistroAV/blob/master/CI/libndi-get.sh
-		mkdir -p /home/wavelet/libNDI
-		cd /home/wavelet/libNDI   
-		LIBNDI_INSTALLER_NAME="Install_NDI_SDK_v6_Linux"
-		LIBNDI_INSTALLER="$LIBNDI_INSTALLER_NAME.tar.gz"
-		LIBNDI_INSTALLER_URL=https://downloads.ndi.tv/SDK/NDI_SDK_Linux/$LIBNDI_INSTALLER
-		download_libndi(){
-			curl -L $LIBNDI_INSTALLER_URL -f --retry 5 > "/home/wavelet/libNDI/$LIBNDI_INSTALLER"
-			# Check if download was successful
-			if [ $? -ne 0 ]; then
-				echo "Download failed."
-			fi
-			echo "Download complete."
-		}
-		yes | PAGER="cat" sh $LIBNDI_INSTALLER_NAME.sh
-		cp -P /home/wavelet/libNDI/NDI\ SDK\ for\ Linux/lib/x86_64-linux-gnu/* /usr/local/lib/
-		ldconfig
-		chown -R wavelet:wavelet /home/wavelet/libNDI
-		echo -e "\nLibNDI Installed..\n"
-	}
-	install_libaja
-	install_cineform
-	install_live555
 }
 
 ####
