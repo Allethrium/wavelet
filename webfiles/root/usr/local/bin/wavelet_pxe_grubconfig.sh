@@ -185,30 +185,6 @@ generate_bootc_image() {
 }
 
 
-mess() {
-# Download Coreos files
-# Do we need to do this or can we just generate the iso from the ignition file using coreos-installer?
-mkdir -p /var/lib/tftpboot/coreos
-
-#podman run --privileged --security-opt label=disable --pull=always \
---rm -v /var/lib/tftpboot/coreos/:/data \
--w /data quay.io/coreos/coreos-installer:release download -f pxe
-
-# Get version 
-coreosVersion=$(ls /var/lib/tftpboot/coreos/*.img | head -n 2)
-coreosVersion=$(echo ${coreosVersion##*coreos-})
-coreosVersion=$(echo ${coreosVersion%%-live*})
-
-# populate vars
-rootfs=$(ls /var/lib/tftpboot/coreos/*.img | grep rootfs)
-initramfs=$(ls /var/lib/tftpboot/coreos/*.img | grep initramfs)
-kernel=$(ls /var/lib/tftpboot/coreos/*-x86-64 | grep kernel)
-kernel=$(echo ${kernel##*coreos/})
-
-#linux fedora-x86_64/vmlinuz inst.repo=http://dl.fedoraproject.org/pub/fedora/linux/releases/40/Everything/x86_64/os inst.stage2=http://dl.fedoraproject.org/pub/fedora/linux/releases/40/Everything/x86_64/os ip=dhcp initrd fedora-x86_64/initrd.img
-}
-
-
 ###
 #
 # Main
@@ -225,3 +201,5 @@ generate_tftpboot
 chmod -R 0755 /home/wavelet/http
 echo -e "PXE bootable images completed and populated in http serverdir, client provisioning should now be available..\n"
 echo -e "Rebooting system to continue to userland setup..\n"
+sleep 10
+#systemctl reboot
