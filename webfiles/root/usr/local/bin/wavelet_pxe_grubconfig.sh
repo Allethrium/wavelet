@@ -52,7 +52,7 @@ generate_coreos_image() {
 	#
 	# OLD METHOD - CoreOS Spinup w/ Ignition resulting in multiple redundant downloads from RPM sources etc.
 	#	Advantages		-	Works reliably
-	#	Disadvantages	-	Very hard to get kernel mods in, layering container approach is painful.  old rpm-ostree inflexible
+	#	Disadvantages	-	requires multiple installation steps
 	#
 	###
 
@@ -72,6 +72,7 @@ generate_coreos_image() {
 	DESTINATION_DEVICE="/dev/disk/by-id/coreos-boot-disk"
 	IMAGEFILE=$(ls -t *.img | grep 'initramfs')
 	echo "Generating client machine ISO files..\n"
+
 	# Customize iso for PXE boot
 	# Ref https://coreos.github.io/coreos-installer/customizing-install/
 	# We seem to have an issue where the installer will fail fue to updating kernel arguments, but we have already customized them in the liveCD?
@@ -95,12 +96,16 @@ generate_coreos_image() {
 	initrd=$(find *initramfs.x86_64.img)
 	rootfs=$(find *rootfs.x86_64.img)
 	kernel=$(find *kernel-x86_64)
-	coreOSentry="menuentry  'Decoder FCOS V.${coreosVersion} TFTP' --class fedora --class gnu-linux --class gnu --class os {
+	installdev="/dev/nvme0n1"
+	configURL="http://192.168.1.32:8080/ignition/decoder.ign"
+	coreOSentry=" \
+	menuentry  'Decoder FCOS V.${coreosVersion} TFTP' --class fedora --class gnu-linux --class gnu --class os {
 	echo 'Loading CoreOS kernel...'   
 		linuxefi wavelet-coreos/${kernel} \
 			ignition.firstboot \
 			ignition.platform.id=metal \
-			ignition.config.url=http://192.168.1.32:8080/decoder.ign
+			coreos.inst.install_dev=${installDev} \
+			coreos.inst.ignition_url=${configURL}
 
 	echo 'Loading Fedora CoreOS initial ramdisk...'
 		initrdefi \
@@ -108,13 +113,16 @@ generate_coreos_image() {
     		wavelet-coreos/${rootfs}
 		echo 'Booting Fedora CoreOS...'
 	}"
-	coreOShttpEntry="menuentry  'Decoder FCOS V.${coreosVersion} HTTP' --class fedora --class gnu-linux --class gnu --class os {
+	coreOShttpEntry=" \
+	menuentry  'Decoder FCOS V.${coreosVersion} HTTP' --class fedora --class gnu-linux --class gnu --class os {
 	echo 'Loading CoreOS kernel...'   
 		linuxefi (http,192.168.1.32:8080)/pxe/${kernel} \
+			coreos.live.rootfs_url=http://192.168.1.32:8080/pxe/${rootfs} \
 			ignition.firstboot \
 			ignition.platform.id=metal \
-			coreos.live.rootfs_url=http://192.168.1.32:8080/pxe/${rootfs} \
-			ignition.config.url=http://192.168.1.32:8080/ignition/decoder.ign
+			coreos.inst.install_dev=${installDev} \
+			coreos.inst.ignition_url=${configURL}
+			
 
 	echo 'Loading Fedora CoreOS initial ramdisk...'
 		initrdefi \
@@ -127,10 +135,11 @@ generate_coreos_image() {
 
 
 generate_bootc_image() {
+	## WIP
 	###
 	#
 	# NEW METHOD - Generate a pre-provisioned ISO utilizing a bootc image (WIP)
-	#	Advantages		-	more flexibility for updates, kernel mod support etc.
+	#	Advantages		-	One pre-generated composeFS ISO file.
 	#	Disadvantages	-	have to dump ignition and find another way to config the client machine
 	#
 	###
@@ -164,6 +173,7 @@ generate_bootc_image() {
 			(http,192.168.1.32:8080)/pxe/${initrd}
 		echo 'Booting Fedora CoreOS...'
 	}"
+
 # ref https://docs.fedoraproject.org/en-US/fedora/f36/install-guide/advanced/Kickstart_Installations/
 #	menuentry 'Install Fedora 36 Server'  --class fedora --class gnu-linux --class gnu --class os {
 #	kernel f41/vmlinuz
@@ -213,4 +223,5 @@ generate_coreos_image
 generate_tftpboot
 # Set Apache +x and read perms on http folder
 chmod -R 0755 /home/wavelet/http
-echo -e "PXE bootable images completed and populated in http serverdir, now client provisioning available.."
+echo -e "PXE bootable images completed and populated in http serverdir, client provisioning should now be available..\n"
+echo -e "Rebooting system to continue to userland setup..\n"
