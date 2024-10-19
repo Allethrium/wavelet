@@ -201,6 +201,6 @@ generate_tftpboot
 chmod -R 0755 /home/wavelet/http
 echo -e "PXE bootable images completed and populated in http serverdir, client provisioning should now be available..\n"
 echo -e "Rebooting system to continue to userland setup..\n"
-sleep 10
+sleep 2
 touch /var/secondboot.active
 systemctl reboot
