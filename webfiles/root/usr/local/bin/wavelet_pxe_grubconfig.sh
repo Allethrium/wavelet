@@ -201,4 +201,4 @@ generate_tftpboot
 chmod -R 0755 /home/wavelet/http
 chown -R wavelet /home/wavelet/http
 echo -e "PXE bootable images completed and populated in http serverdir, client provisioning should now be available..\n"
-return 0
+touch /var/pxe.complete
