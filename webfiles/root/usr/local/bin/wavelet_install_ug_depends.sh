@@ -11,7 +11,6 @@ install_ug_depends(){
 	#   Live555 for rtmp
 	#   LibNDI for Magewell devices
 	# Needs to run as root after the second reboot, since it requires some of the coreos overlay features to be available.
-	pip install zfec
 	cd /home/wavelet
 	install_cineform(){
 		# CineForm SDK
