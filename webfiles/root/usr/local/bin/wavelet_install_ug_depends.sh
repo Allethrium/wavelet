@@ -71,7 +71,7 @@ install_ug_depends(){
 		echo -e "\nLibNDI Installed..\n"
 		cd /home/wavelet
 	}
-	install_libaja
+	#install_libaja
 	install_cineform
 	install_live555
 	install_libndi
@@ -202,5 +202,3 @@ install_wavelet_modules
 echo -e "Installation completed, issue systemctl reboot to continue..\n"
 rm -rf /var/secondboot.active
 touch /var/secondboot.complete
-sleep 5
-systemctl reboot
