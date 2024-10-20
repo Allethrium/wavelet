@@ -694,7 +694,6 @@ systemd:
         [Service]
         Type=oneshot
         ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_installer_xf.sh"
-        ExecStartPost=touch /var/secondboot.active
         ExecStartPost=-systemctl reboot
         [Install]
         WantedBy=multi-user.target
