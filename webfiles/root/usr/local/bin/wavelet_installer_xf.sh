@@ -92,11 +92,6 @@ rpm_overlay_install_decoder(){
 	echo -e "RPM package updates completed, finishing installer task..\n"
 }
 
-generate_decoder_iso(){
-	echo -e "\n\nCreating PXE functionality..\n\n"
-	wavelet_pxe_grubconfig.sh
-}
-
 ####
 #
 #
