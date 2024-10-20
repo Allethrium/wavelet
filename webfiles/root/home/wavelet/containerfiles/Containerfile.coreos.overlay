@@ -34,7 +34,6 @@ RUN	rpm-ostree cliwrap install-to-root / && rpm-ostree override replace \
 	kernel-modules-extra-${DKMS_KERNEL_VERSION}.rpm && \
 	rm -rf *.rpm && \
 	ostree container commit || true
-COPY wavelet_install_ug_depends.sh /wavelet_install_ug_depends.sh
 RUN	rpm-ostree install -y -A \
 	https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
     https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm && \
@@ -60,8 +59,12 @@ RUN	rpm-ostree install -y -A \
 	mokdir="/var/lib/blackmagic" && \
 	openssl req -nodes -new -x509 -days 3650 -subj '/CN=MOK_generated' -keyout "$mokdir/MOK.priv" -outform der -out "$mokdir/MOK.der" && \
 	curl -L https://www.andymelville.net/wavelet/desktopvideo-14.2.1a1.x86_64.rpm -f --retry 5 > "desktopvideo.rpm" && \
-	rpm-ostree install -y -A desktopvideo.rpm && \
-	/wavelet_install_ug_depends.sh && \
+	rpm-ostree install -y -A desktopvideo.rpm
+RUN	wget https://github.com/Allethrium/wavelet/raw/master/webfiles/root/usr/local/bin/wavelet_install_ug_depends.sh && \
+	chmod +x wavelet_install_ug_depends.sh
+	wavelet_install_ug_depends.sh
 	ostree container commit
-RUN /usr/local/bin/wavelet_pxe_grubconfig.sh && \
+RUN wget https://github.com/Allethrium/wavelet/raw/master/webfiles/root/usr/local/bin/wavelet_pxe_grubconfig.sh && \
+	chmod +x wavelet_pxe_grubconfig.sh && \
+	wavelet_pxe_grubconfig.sh && \
 	ostree container commit
