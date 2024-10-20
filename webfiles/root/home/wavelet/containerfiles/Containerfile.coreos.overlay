@@ -59,4 +59,6 @@ RUN	rpm-ostree install -y -A \
 RUN mkdir -p /var/lib/blackmagic && \
 	mokdir="/var/lib/blackmagic" && \
 	openssl req -nodes -new -x509 -days 3650 -subj '/CN=MOK_generated' -keyout "$mokdir/MOK.priv" -outform der -out "$mokdir/MOK.der"
+	# Hosted the desktopvideo driver (has MIT license) on my personal domain, since Blackmagic don't have a stable download link.
+	# Happy to remove, if this is an issue for them.
 RUN	curl -L https://www.andymelville.net/wavelet/desktopvideo-14.2.1a1.x86_64.rpm -f --retry 5 > "desktopvideo.rpm" && rpm-ostree install -y -A desktopvideo.rpm
