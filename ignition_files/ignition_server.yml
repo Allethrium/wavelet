@@ -697,33 +697,6 @@ systemd:
         ExecStartPost=-systemctl reboot
         [Install]
         WantedBy=multi-user.target
-    # Install necessary base files
-    - name: configure_svr_ip.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Configures desired server IP address
-        ConditionFirstBoot=yes
-        Wants=network-online.target
-        After=network-online.target
-        After=multi-user.target
-        [Service]
-        Type=oneshot
-        ExecStart=-/usr/local/bin/configure_ethernet.sh
-        [Install]
-        WantedBy=multi-user.target
-    # Generate wavelet Cgroup
-    - name: wavelet.cgroup.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Generate cgroup for wavelet user
-        ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-        [Service]
-        Type=oneshot
-        ExecStart=/bin/bash -c "/usr/local/bin/generate_cgroup.sh"
-        [Install]
-        WantedBy=multi-user.target
     # Container registry to host and serve containers to local clients
     # N.B needs dns resolution
     - name: registry.service
