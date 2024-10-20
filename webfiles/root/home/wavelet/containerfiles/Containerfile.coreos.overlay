@@ -64,5 +64,5 @@ RUN	rpm-ostree install -y -A \
 	openssl req -nodes -new -x509 -days 3650 -subj '/CN=MOK_generated' -keyout "$mokdir/MOK.priv" -outform der -out "$mokdir/MOK.der" && \
 	curl -L https://www.andymelville.net/wavelet/desktopvideo-14.2.1a1.x86_64.rpm -f --retry 5 > "desktopvideo.rpm" && \
 	rpm-ostree install -y -A desktopvideo.rpm
-RUN wavelet_pxe_grubconfig.sh
-RUN wavelet_install_ug_depends.sh
+RUN ./wavelet_pxe_grubconfig.sh
+RUN ./wavelet_install_ug_depends.sh
