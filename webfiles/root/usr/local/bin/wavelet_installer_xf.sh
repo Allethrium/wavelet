@@ -32,6 +32,7 @@ event_decoder(){
 }
 
 event_server(){
+	rpm-ostree install -y -A git
 	# create directories, install git, clone wavelet and setup modules
 	mkdir -p /home/wavelet/.config/containers/systemd/
 	chown -R wavelet:wavelet /home/wavelet
@@ -44,11 +45,8 @@ event_server(){
 		GH_USER="ALLETHRIUM"
 		GH_BRANCH="Master"
 	fi
-	GH_REPO="wavelet"
-	wget https://github.com/${GH_USER}/${GH_REPO}/archive/refs/tags/${GH_BRANCH}.tar.gz \
-	-O "${GH_REPO}-${GH_BRANCH}.tar.gz" && \
-	tar -xzvf ./"${GH_REPO}-${GH_BRANCH}.tar.gz" && \
-	rm ./"${GH_REPO}-${GH_BRANCH}.tar.gz"
+	GH_REPO="https://github.com/Allethrium/wavelet/"
+	git clone -b ${GH_BRANCH} ${GH_REPO}
 	generate_tarfiles
 	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
 	extract_base
