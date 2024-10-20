@@ -753,9 +753,7 @@ systemd:
         ConditionPathExists=/var/secondboot.active
         [Service]
         Type=oneshot
-        ExecStartPre=/bin/bash -c "rm -rf /var/secondboot.active"
         ExecStart=/bin/bash -c "/usr/local/bin/wavelet_install_ug_depends.sh"
-        ExecStartPost=systemctl reboot
         [Install]
         WantedBy=multi-user.target
     # Reboot service

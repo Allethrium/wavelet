@@ -22,40 +22,12 @@ UG_HOSTNAME=$(hostname)
 }
 
 event_decoder(){
-	extract_base
-	extract_home
-	extract_usrlocalbin
 	rpm_overlay_install_decoder
-	echo -e "Initial provisioning completed, attempting to connect to WiFi..\n"
-	connectwifi
 	exit 0
 }
 
 event_server(){
-	rpm-ostree install -y -A git
-	# create directories, install git, clone wavelet and setup modules
-	mkdir -p /home/wavelet/.config/containers/systemd/
-	chown -R wavelet:wavelet /home/wavelet
-	cd /home/wavelet
-	if [[ -f /var/developerMode.enabled ]]; then
-		echo -e "\n\n***WARNING***\n\nDeveloper Mode is ON\n\nCloning from development repository..\n"
-		GH_USER="armelvil"
-		GH_BRANCH="armelvil-working"
-	else
-		echo -e "\nDeveloper mode off, cloning main branch..\n"
-		GH_USER="ALLETHRIUM"
-		GH_BRANCH="Master"
-	fi
-	GH_REPO="https://github.com/Allethrium/wavelet/"
-	echo -e "\nCommand is; git clone -b ${GH_BRANCH} ${GH_REPO}\n"
-	git clone -b ${GH_BRANCH} ${GH_REPO}
-	generate_tarfiles
-	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
-	extract_base
-	extract_home
-	extract_usrlocalbin
-	# Install dependencies and base packages.  Could definitely be pared down.
-	# Attempt to install from overlay container, if fails, we will run old method on a second boot as apply-live.
+	# Generate RPM Container overlay
 	rpm_overlay_install
 	# generate a hostname file so that dnsmasq's dhcp-script call works properly
 	hostname=$(hostname)
@@ -65,8 +37,7 @@ event_server(){
 	get_ipValue
 	sed -i "s/SVR_IPADDR/${IPVALUE}/g" /etc/dnsmasq.conf
 	sleep 5
-	echo -e "Initial config completed, rebooting in five seconds..\n"
-	systemctl reboot
+	echo -e "\nInitial config completed, issue systemctl reboot to continue..\n"
 }
 
 get_ipValue(){
@@ -102,9 +73,10 @@ rpm_overlay_install(){
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
 	touch /var/rpm-ostree-overlay.dev.pkgs.complete
-	rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay
-	podman push localhost:5000/coreos_overlay:latest --tls-verify=false
-	echo -e "\n\nRPM package updates completed, pushing container to registry for client availability, and finishing installer task..\n\n"
+	rpm-ostree rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay
+	#rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay
+	#podman push localhost:5000/coreos_overlay:latest --tls-verify=false
+	echo -e "\nRPM package updates completed, finishing installer task..\n"
 }
 
 rpm_overlay_install_decoder(){
@@ -123,43 +95,6 @@ rpm_overlay_install_decoder(){
 generate_decoder_iso(){
 	echo -e "\n\nCreating PXE functionality..\n\n"
 	wavelet_pxe_grubconfig.sh
-}
-
-generate_tarfiles(){
-	echo -e "Generating tar.xz files for upload to distribution server..\n"
-	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /home/wavelet/wavelet/webfiles/root/usr/local/bin/ .
-	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /home/wavelet/wavelet/webfiles/root/home/wavelet/ .
-	echo -e "Packaging files together..\n"
-	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz}
-	echo -e "Done."
-	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz}
-}
-
-extract_base(){
-	tar xf /home/wavelet/wavelet-files.tar.xz -C /home/wavelet --no-same-owner
-	mv ./usrlocalbin.tar.xz /usr/local/bin/
-}
-
-extract_etc(){
-	umask 022
-	tar xf /etc/etc.tar.xz -C /etc --no-same-owner --no-same-permissions
-	echo -e "System config files setup successfully..\n"
-}
-
-extract_home(){
-	tar xf /home/wavelet/wavelethome.tar.xz -C /home/wavelet
-	chown -R wavelet:wavelet /home/wavelet
-	chmod 0755 /home/wavelet/http
-	chmod -R 0755 /home/wavelet/http-php
-	echo -e "Wavelet homedir setup successfully..\n"
-}
-
-extract_usrlocalbin(){
-	umask 022
-	tar xf /usr/local/bin/usrlocalbin.tar.xz -C /usr/local/bin --no-same-owner
-	chmod +x /usr/local/bin
-	chmod 0755 /usr/local/bin/*
-	echo -e "Wavelet application modules setup successfully..\n"
 }
 
 ####

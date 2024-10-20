@@ -116,6 +116,62 @@ generate_decoder_iso(){
 	wavelet_pxe_grubconfig.sh
 }
 
+install_wavelet_modules(){
+	if [[ -f /var/developerMode.enabled ]]; then
+		echo -e "\n\n***WARNING***\n\nDeveloper Mode is ON\n\nCloning from development repository..\n"
+		GH_USER="armelvil"
+		GH_BRANCH="armelvil-working"
+	else
+		echo -e "\nDeveloper mode off, cloning main branch..\n"
+		GH_USER="ALLETHRIUM"
+		GH_BRANCH="Master"
+	fi
+	GH_REPO="https://github.com/Allethrium/wavelet/"
+	echo -e "\nCommand is; git clone -b ${GH_BRANCH} ${GH_REPO}\n"
+	git clone -b ${GH_BRANCH} ${GH_REPO}
+	generate_tarfiles
+	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
+	extract_base
+	extract_home
+	extract_usrlocalbin
+}
+
+generate_tarfiles(){
+	echo -e "Generating tar.xz files for upload to distribution server..\n"
+	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /home/wavelet/wavelet/webfiles/root/usr/local/bin/ .
+	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /home/wavelet/wavelet/webfiles/root/home/wavelet/ .
+	echo -e "Packaging files together..\n"
+	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz}
+	echo -e "Done."
+	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz}
+}
+
+extract_base(){
+	tar xf /home/wavelet/wavelet-files.tar.xz -C /home/wavelet --no-same-owner
+	mv ./usrlocalbin.tar.xz /usr/local/bin/
+}
+
+extract_etc(){
+	umask 022
+	tar xf /etc/etc.tar.xz -C /etc --no-same-owner --no-same-permissions
+	echo -e "System config files setup successfully..\n"
+}
+
+extract_home(){
+	tar xf /home/wavelet/wavelethome.tar.xz -C /home/wavelet
+	chown -R wavelet:wavelet /home/wavelet
+	chmod 0755 /home/wavelet/http
+	chmod -R 0755 /home/wavelet/http-php
+	echo -e "Wavelet homedir setup successfully..\n"
+}
+
+extract_usrlocalbin(){
+	umask 022
+	tar xf /usr/local/bin/usrlocalbin.tar.xz -C /usr/local/bin --no-same-owner
+	chmod +x /usr/local/bin
+	chmod 0755 /usr/local/bin/*
+	echo -e "Wavelet application modules setup successfully..\n"
+}
 
 ####
 #
@@ -133,7 +189,9 @@ else
 	rpm_ostree_install
 fi
 install_ug_depends
+install_wavelet_modules
 generate_decoder_iso
-echo -e "Installation completed, rebooting..\n"
+echo -e "Installation completed, issue systemctl reboot to continue..\n"
+rm -rf /var/secondboot.active
 sleep 5
 return 0
