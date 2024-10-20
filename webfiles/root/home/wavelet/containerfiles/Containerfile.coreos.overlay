@@ -56,32 +56,7 @@ RUN	rpm-ostree install -y -A \
     ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 ImageMagick mplayer libndi libndi-devel ndi-sdk obs-ndi pipewire-utils && \
 	ln -s /usr/bin/ld.bfd /etc/alternatives/ld && ln -s /etc/alternatives/ld /usr/bin/ld && \
 	ostree container commit
-RUN git clone https://github.com/gopro/cineform-sdk
-WORKDIR /cineform-sdk
-RUN	cmake -DBUILD_TOOLS=OFF && \
-	cmake --build . --parallel "$(nproc)" && \
-	sudo cmake --install . && \
-	cd .. && \
-	ostree container commit
-RUN git clone https://github.com/xanview/live555/
-WORKDIR /live555
-RUN	./genMakefiles linux-with-shared-libraries && \
-	make -j "$(nproc)" && \
-	make install && \
-	ostree container commit
-RUN	mkdir -p /home/wavelet/libNDI && \
-	LIBNDI_INSTALLER_NAME="Install_NDI_SDK_v6_Linux" && \
-	LIBNDI_INSTALLER="$LIBNDI_INSTALLER_NAME.tar.gz" && \
-	LIBNDI_INSTALLER_URL=https://downloads.ndi.tv/SDK/NDI_SDK_Linux/$LIBNDI_INSTALLER && \
-	curl -L $LIBNDI_INSTALLER_URL -f --retry 5 > "/home/wavelet/libNDI/$LIBNDI_INSTALLER" && \
-	tar xvf ${LIBNDI_INSTALLER}
-WORKDIR /home/wavelet/libNDI
-RUN	yes | PAGER="cat" sh $LIBNDI_INSTALLER_NAME.sh && \
-	cp -P /home/wavelet/libNDI/NDI\ SDK\ for\ Linux/lib/x86_64-linux-gnu/* /usr/local/lib/ && \
-	ldconfig && \
-	touch /var/ug_depends.complete && \
-	ostree container commit
-RUN	mkdir -p /var/lib/blackmagic && \
+RUN mkdir -p /var/lib/blackmagic && \
 	mokdir="/var/lib/blackmagic" && \
 	openssl req -nodes -new -x509 -days 3650 -subj '/CN=MOK_generated' -keyout "$mokdir/MOK.priv" -outform der -out "$mokdir/MOK.der" && \
 	curl -L https://www.andymelville.net/wavelet/desktopvideo-14.2.1a1.x86_64.rpm -f --retry 5 > "desktopvideo.rpm" && \

@@ -38,7 +38,32 @@ event_server(){
 	sed -i "s/!!hostnamegoeshere!!/${hostname}/g" /usr/local/bin/wavelet_network_sense.sh
 	get_ipValue
 	sed -i "s/SVR_IPADDR/${IPVALUE}/g" /etc/dnsmasq.conf
-	sleep 1
+	echo -e "\
+		[Unit]
+		Description=Install Dependencies
+		ConditionFileExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+        After=multi-user.target
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_install_ug_depends.sh"
+        ExecStartPost=systemctl disable wavelet_install_depends.service
+        [Install]
+        WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_depends.service
+	echo -e "\
+		[Unit]
+		Description=Install PXE support
+		ConditionFileExists=/var/wavelet_depends.complete
+        After=multi-user.target
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_pxe_grubconfig.sh"
+        ExecStartPost=systemctl disable wavelet_install_pxe.service
+        ExecstartPort=systemctl reboot
+        [Install]
+        WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_pxe.service
+    systemctl daemon-reload
+    systemctl enable wavelet_install_depends.service
+    systemctl enable wavelet_install_pxe.service
 	echo -e "\nInitial config completed, issue systemctl reboot to continue..\n"
 }
 
@@ -72,9 +97,9 @@ rpm_overlay_install(){
 	podman build -t localhost/coreos_overlay --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -f /home/wavelet/containerfiles/Containerfile.coreos.overlay
 	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay:latest
 	touch /var/rpm-ostree-overlay.complete
-	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
+	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-	rpm-ostree --bypass-driver rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay
+	rpm-ostree rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay
 	#rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay
 	#podman push localhost:5000/coreos_overlay:latest --tls-verify=false
 	echo -e "\nRPM package updates completed, finishing installer task..\n"
