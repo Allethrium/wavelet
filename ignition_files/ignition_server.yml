@@ -118,18 +118,24 @@ storage:
       overwrite: true
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/containers/containers.conf
-    # Installer script to handle ostree overlay and git clone
+    # Installer script to handle ostree overlay
     - path: /usr/local/bin/wavelet-installer_xf.sh
       mode: 0755
       overwrite: true
       contents:
         source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/usr/local/bin/wavelet_installer_xf.sh
-    # Second boot handler
+    # UG Dependencies and Wavelet modules
     - path: /usr/local/bin/wavelet_install_ug_depends.sh
       mode: 0755
       overwrite: true
       contents:
         source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/usr/local/bin/wavelet_install_ug_depends.sh
+    # PXE generator
+    - path: /usr/local/bin/wavelet_pxe_grubconfig.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/usr/local/bin/wavelet_pxe_grubconfig.sh
     # Containerfile for Ostree overlay
     - path: /home/wavelet/containerfiles/Containerfile.coreos.overlay
       mode: 0644
