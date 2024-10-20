@@ -38,7 +38,6 @@ event_server(){
 	sed -i "s/SVR_IPADDR/${IPVALUE}/g" /etc/dnsmasq.conf
 	sleep 1
 	echo -e "\nInitial config completed, issue systemctl reboot to continue..\n"
-	systemctl reboot
 }
 
 get_ipValue(){
