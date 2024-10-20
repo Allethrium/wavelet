@@ -60,6 +60,7 @@ install_ug_depends(){
 			fi
 			echo "Download complete."
 		}
+		tar xvf ${LIBNDI_INSTALLER}
 		yes | PAGER="cat" sh $LIBNDI_INSTALLER_NAME.sh
 		cp -P /home/wavelet/libNDI/NDI\ SDK\ for\ Linux/lib/x86_64-linux-gnu/* /usr/local/lib/
 		ldconfig
@@ -124,11 +125,11 @@ generate_decoder_iso(){
 
 
 exec >/home/wavelet/ug_depends.log 2>&1
+rpm_ostree_install_git
 if vim --help; then 
 	echo "Packages are available, Container overlay succeeded, continuing to install dependencies..\n"
 else
 	echo "Packages are not available, attempting to install live from old rpm-ostree layering approach..\n"
-	rpm_ostree_install_git
 	rpm_ostree_install
 fi
 install_ug_depends

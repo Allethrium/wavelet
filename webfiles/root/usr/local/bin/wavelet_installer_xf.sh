@@ -36,14 +36,13 @@ event_server(){
 	mkdir -p /home/wavelet/.config/containers/systemd/
 	chown -R wavelet:wavelet /home/wavelet
 	cd /home/wavelet
-	if [[ ! -f /var/tmp/DEV_ON ]]; then
+	if [[ -f /var/developerMode.enabled ]]; then
 		echo -e "\n\n***WARNING***\n\nDeveloper Mode is ON\n\nCloning from development repository..\n"
 		GH_USER="armelvil"
 		GH_BRANCH="armelvil-working"
 	else
 		GH_USER="ALLETHRIUM"
 		GH_BRANCH="Master"
-		git clone https://github.com/ALLETHRIUM/wavelet
 	fi
 	GH_REPO="wavelet"
 	wget https://github.com/${GH_USER}/${GH_REPO}/archive/refs/tags/${GH_BRANCH}.tar.gz \
