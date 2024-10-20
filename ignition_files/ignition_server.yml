@@ -120,10 +120,16 @@ storage:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/containers/containers.conf
     # Installer script to handle ostree overlay and git clone
     - path: /usr/local/bin/wavelet-installer_xf.sh
-      mode: 0644
+      mode: 0755
       overwrite: true
       contents:
         source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/usr/local/bin/wavelet_installer_xf.sh
+    # Second boot handler
+    - path: /usr/local/bin/wavelet_install_ug_depends.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/usr/local/bin/wavelet_install_ug_depends.sh
     # Containerfile for Ostree overlay
     - path: /home/wavelet/containerfiles/Containerfile.coreos.overlay
       mode: 0644
@@ -682,6 +688,7 @@ systemd:
         [Service]
         Type=oneshot
         ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_installer_xf.sh"
+        ExecStartPost=touch /var/secondboot.active
         ExecStartPost=-systemctl reboot
         [Install]
         WantedBy=multi-user.target
