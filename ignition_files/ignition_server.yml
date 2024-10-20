@@ -67,10 +67,10 @@ storage:
       contents:
         inline: SEDwaveletwifipassword
     # Devloper Mode
-    - path: /var/tmp/DEV_OFF
+    - path: /var/developerMode.enabled
       overwrite: true
       contents:
-        inline: DeveloperModeEnableSwitch
+        inline: DeveloperModeEnabled - will pull from working branch (default behavior)
     # Detect NetworkManager name and set as static script
     - path: /usr/local/bin/configure_ethernet.sh
       mode: 0755
@@ -742,19 +742,20 @@ systemd:
         ExecStartPost=systemctl start systemd-resolved.service
         [Install]
         WantedBy=multi-user.target
-# Service to launch ug_depends after initial config  completed (this would be AFTER build_ug restarts the machine for the second time!)
-    - name: ug-depends.service
+# Run further system configuration tasks after the initial overlay has been installed
+    - name: secondboot-overlay.service
       enabled: true
       contents: |
         [Unit]
-        Description=Run UG Dependency installer
+        Description=Run second phase layering tasks
         After=network-online.target
         Wants=network-online.target
         ConditionPathExists=/var/secondboot.active
         [Service]
         Type=oneshot
-        ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_install_ug_depends.sh"
-        ExecStartPost=usr/bin/bash -c "rm -rf /var/secondboot.active"
+        ExecStartPre=/bin/bash -c "rm -rf /var/secondboot.active"
+        ExecStart=/bin/bash -c "/usr/local/bin/wavelet_install_ug_depends.sh"
+        ExecStartPost=systemctl reboot
         [Install]
         WantedBy=multi-user.target
     # Reboot service
