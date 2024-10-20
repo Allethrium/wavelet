@@ -32,7 +32,7 @@ install_ug_depends(){
 		-DAJANTV2_DISABLE_TOOLS=ON  -DAJANTV2_DISABLE_TESTS=ON \
 		-DAJANTV2_BUILD_SHARED=ON \
 		-DCMAKE_BUILD_TYPE=Release -Blibajantv2/build -Slibajantv2
-		cmake --build libajantv2/build --config Release -j "$(nproc)"
+		cmake --build libajantv2/build --config Release -j "$(nproc)" && \
 		sudo cmake --install libajantv2/build
 	}
 	install_live555(){
@@ -60,6 +60,7 @@ install_ug_depends(){
 			fi
 			echo "Download complete."
 		}
+		download_libndi
 		tar xvf ${LIBNDI_INSTALLER}
 		yes | PAGER="cat" sh $LIBNDI_INSTALLER_NAME.sh
 		cp -P /home/wavelet/libNDI/NDI\ SDK\ for\ Linux/lib/x86_64-linux-gnu/* /usr/local/lib/
