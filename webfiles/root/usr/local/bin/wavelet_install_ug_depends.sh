@@ -134,6 +134,7 @@ install_wavelet_modules(){
 	extract_base
 	extract_home
 	extract_usrlocalbin
+	touch /var/extract.target
 }
 
 generate_tarfiles(){
