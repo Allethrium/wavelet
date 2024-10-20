@@ -23,7 +23,8 @@ UG_HOSTNAME=$(hostname)
 
 event_decoder(){
 	extract_base
-	extract_home && extract_usrlocalbin
+	extract_home
+	extract_usrlocalbin
 	rpm_overlay_install_decoder
 	echo -e "Initial provisioning completed, attempting to connect to WiFi..\n"
 	connectwifi
@@ -35,23 +36,28 @@ event_server(){
 	mkdir -p /home/wavelet/.config/containers/systemd/
 	chown -R wavelet:wavelet /home/wavelet
 	cd /home/wavelet
-	rpm_ostree_install_git
 	if [[ ! -f /var/tmp/DEV_ON ]]; then
 		echo -e "\n\n***WARNING***\n\nDeveloper Mode is ON\n\nCloning from development repository..\n"
-		git clone -b armelvil-working --single-branch https://github.com/ALLETHRIUM/wavelet 
+		GH_USER="armelvil"
+		GH_BRANCH="armelvil-working"
 	else
-		echo -e "\nDeveloper Mode is off, cloning from main repository..\n"
+		GH_USER="ALLETHRIUM"
+		GH_BRANCH="Master"
 		git clone https://github.com/ALLETHRIUM/wavelet
 	fi
+	GH_REPO="wavelet"
+	wget https://github.com/${GH_USER}/${GH_REPO}/archive/refs/tags/${GH_BRANCH}.tar.gz \
+	-O "${GH_REPO}-${GH_BRANCH}.tar.gz" && \
+	tar -xzvf ./"${GH_REPO}-${GH_BRANCH}.tar.gz" && \
+	rm ./"${GH_REPO}-${GH_BRANCH}.tar.gz"
 	generate_tarfiles
 	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
 	extract_base
-	extract_home && extract_usrlocalbin
+	extract_home
+	extract_usrlocalbin
 	# Install dependencies and base packages.  Could definitely be pared down.
-	# Attempt to install from overlay container, if fails, we will run old method.
+	# Attempt to install from overlay container, if fails, we will run old method on a second boot as apply-live.
 	rpm_overlay_install
-	# Generating a local repository is no longer needed, because we are using an ostree overlay for the server and for future client machines.
-	#/usr/local/bin/local_rpm.sh
 	# generate a hostname file so that dnsmasq's dhcp-script call works properly
 	hostname=$(hostname)
 	echo -e "${hostname}" > /var/lib/dnsmasq/hostname.local
@@ -59,8 +65,9 @@ event_server(){
 	sed -i "s/!!hostnamegoeshere!!/${hostname}/g" /usr/local/bin/wavelet_network_sense.sh
 	get_ipValue
 	sed -i "s/SVR_IPADDR/${IPVALUE}/g" /etc/dnsmasq.conf
-	# Generate the wavelet decoder ISO
-	generate_decoder_iso
+	sleep 5
+	echo -e "Initial config completed, rebooting in five seconds..\n"
+	systemctl reboot
 }
 
 get_ipValue(){
@@ -85,43 +92,6 @@ get_ipValue(){
 			}
 			valid_ipv4 "${IPVALUE}"
 	fi
-}
-
-rpm_ostree_install_git(){
-	# Needed because otherwise sway launches the userspace setup before everything is ready
-	# Some other packages which do not install properly in the ostree container build are also included here
-	/usr/bin/rpm-ostree install -y -A git avahi
-}
-
-rpm_ostree_install(){
-	# Retained as failover encase the new procedure breaks
-	echo -e "Installing packages..\n"
-	rpm_ostree_install_step1(){
-	/usr/bin/rpm-ostree install \
-	-y -A \
-	alsa-firmware alsa-lib alsa-plugins-speex bemenu bluez-tools buildah busybox butane bzip2-devel \
-	cmake cockpit-bridge cockpit-networkmanager cockpit-ostree cockpit-podman cockpit-system createrepo \
-	dkms dnf etcd ffmpeg ffmpeg ffmpeg-libs firefox fontawesome-fonts foot gcc htop \
-	ImageMagick ImageMagick inotify-tools \
-	intel-compute-runtime intel-gmmlib intel-gpu-tools intel-level-zero intel-media-driver \
-	intel-media-driver intel-mediasdk intel-ocloc intel-opencl intel-opencl ipxe-bootimgs-x86.noarch iw iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch \
-	jo kernel-headers libdrm libdrm libffi-devel libheif-freeworld libndi libndi-devel libsrtp libsrtp libudev-devel libuuid-devel \
-	libv4l libv4l libva libva-intel-driver libva-utils libva-v4l2-request libva-v4l2-request libva-v4l2-request libva-vdpau-driver \
-	libvdpau libvdpau-devel libvdpau-va-gl libvpl lxsession \
-	make mako mesa-dri-drivers mesa-dri-drivers mesa-libEGL mesa-libgbm mesa-libGL mesa-libOpenCL mesa-libxatracker mesa-vdpau-drivers mesa-vdpau-drivers mesa-vulkan-drivers mplayer mpv \
-	ndi-sdk neofetch netcat NetworkManager-wifi nnn obs-ndi ocl-icd oneapi-level-zero oneVPL-intel-gpu opencl-headers openssl-devel \
-	pipewire-alsa pipewire-utils pipewire-v4l2 pipewire-v4l2 powerline powerline-fonts python3-pip \
-	rdma realtime-setup realtime-tests rofi-wayland rtkit sha srt srt srt-libs srt-libs sway sway-systemd syslinux syslinux-efi64 syslinux-nonlinux \
-	tftp-server tuned usbutils v4l-utils v4l-utils vim vim-powerline vlc waybar wget wireless-regdb wl-clipboard wpa_supplicant yum-utils zlib-devel
-	echo -e "\nRPMFusion Media Packages installed, waiting for 1 second..\n"
-	sleep 1
-	}
-	rpm_ostree_install_step1
-	touch /var/rpm-ostree-overlay.complete
-	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
-	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
-	touch /var/rpm-ostree-overlay.dev.pkgs.complete
-	echo -e "RPM package updates completed, finishing installer task..\n"
 }
 
 rpm_overlay_install(){
