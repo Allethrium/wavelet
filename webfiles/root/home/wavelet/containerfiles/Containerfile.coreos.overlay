@@ -61,8 +61,8 @@ RUN	rpm-ostree install -y -A \
 	curl -L https://www.andymelville.net/wavelet/desktopvideo-14.2.1a1.x86_64.rpm -f --retry 5 > "desktopvideo.rpm" && \
 	rpm-ostree install -y -A desktopvideo.rpm
 RUN	wget https://github.com/Allethrium/wavelet/raw/master/webfiles/root/usr/local/bin/wavelet_install_ug_depends.sh && \
-	chmod +x wavelet_install_ug_depends.sh
-	wavelet_install_ug_depends.sh
+	chmod +x wavelet_install_ug_depends.sh && \
+	wavelet_install_ug_depends.sh && \
 	ostree container commit
 RUN wget https://github.com/Allethrium/wavelet/raw/master/webfiles/root/usr/local/bin/wavelet_pxe_grubconfig.sh && \
 	chmod +x wavelet_pxe_grubconfig.sh && \
