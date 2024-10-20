@@ -73,9 +73,8 @@ rpm_overlay_install(){
 	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay:latest
 	touch /var/rpm-ostree-overlay.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
-	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
-	touch /var/rpm-ostree-overlay.dev.pkgs.complete
-	rpm-ostree rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay
+	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+	rpm-ostree --bypass-driver rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay
 	#rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay
 	#podman push localhost:5000/coreos_overlay:latest --tls-verify=false
 	echo -e "\nRPM package updates completed, finishing installer task..\n"

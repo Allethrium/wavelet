@@ -688,13 +688,26 @@ systemd:
       enabled: true
       contents: |
         [Unit]
-        Description=Decompress Wavelet files
+        Description=Install Overlay packages
         ConditionFirstBoot=yes
         After=multi-user.target
         [Service]
         Type=oneshot
         ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_installer_xf.sh"
         ExecStartPost=-systemctl reboot
+        [Install]
+        WantedBy=multi-user.target
+    - name: wavelet_dependencies.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Decompress Wavelet files
+        ConditionFistBoot=no
+        ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+        After=multi-user.target
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_install_ug_depends.sh"
         [Install]
         WantedBy=multi-user.target
     # Install necessary base files

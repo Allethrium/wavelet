@@ -174,17 +174,6 @@ generate_bootc_image() {
 		echo 'Booting Fedora CoreOS...'
 	}"
 
-# ref https://docs.fedoraproject.org/en-US/fedora/f36/install-guide/advanced/Kickstart_Installations/
-#	menuentry 'Install Fedora 36 Server'  --class fedora --class gnu-linux --class gnu --class os {
-#	kernel f41/vmlinuz
-#	append initrd=f41/initrd.img 
-#	inst.repo=https://download.fedoraproject.org/pub/fedora/linux/releases/41/Server/x86_64/os/ ip=dhcp 
-#	ks=https://git.fedorahosted.org/cgit/spin-kickstarts.git/plain/fedora-install-server.ks?h=f21
-#	}
-
-}
-
-
 ###
 #
 # Main

@@ -12,10 +12,6 @@
 
 FROM quay.io/fedora/fedora-coreos:stable
 ARG DKMS_KERNEL_VERSION
-	# Copy in script files and ls to show they're there
-COPY wavelet_pxe_grubconfig.sh wavelet_pxe_grubconfig.sh
-COPY wavelet_install_ug_depends.sh wavelet_install_ug_depends.sh
-RUN ls -lah
 	# Define, download, and install host kernel version from Koji build system
 RUN KERNEL_VERSION="$(rpm -qa kernel --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}')" && echo "\n\nContainer Kernel Version is: ${KERNEL_VERSION}\n\n" && \
 	echo -e "\nHost Kernel: ${DKMS_KERNEL_VERSION}\n" && echo -e "\nContainer Kernel: ${KERNEL_VERSION}\n" && if [[ ${DKMS_KERNEL_VERSION} = ${KERNEL_VERSION} ]] ; then echo -e '\nKernel matches!\n' && \
@@ -63,6 +59,5 @@ RUN	rpm-ostree install -y -A \
 	mokdir="/var/lib/blackmagic" && \
 	openssl req -nodes -new -x509 -days 3650 -subj '/CN=MOK_generated' -keyout "$mokdir/MOK.priv" -outform der -out "$mokdir/MOK.der" && \
 	curl -L https://www.andymelville.net/wavelet/desktopvideo-14.2.1a1.x86_64.rpm -f --retry 5 > "desktopvideo.rpm" && \
-	rpm-ostree install -y -A desktopvideo.rpm
-RUN ./wavelet_pxe_grubconfig.sh
-RUN ./wavelet_install_ug_depends.sh
+	rpm-ostree install -y -A desktopvideo.rpm && \
+	ostree container commit
