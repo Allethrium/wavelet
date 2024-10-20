@@ -36,7 +36,7 @@ event_server(){
 	sed -i "s/!!hostnamegoeshere!!/${hostname}/g" /usr/local/bin/wavelet_network_sense.sh
 	get_ipValue
 	sed -i "s/SVR_IPADDR/${IPVALUE}/g" /etc/dnsmasq.conf
-	sleep 5
+	sleep 1
 	echo -e "\nInitial config completed, issue systemctl reboot to continue..\n"
 	systemctl reboot
 }
