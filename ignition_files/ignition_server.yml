@@ -124,6 +124,12 @@ storage:
       overwrite: true
       contents:
         source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/usr/local/bin/wavelet_installer_xf.sh
+    # Containerfile for Ostree overlay
+    - path: /home/wavelet/containerfiles/Containerfile.coreos.overlay
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/home/wavelet/containerfiles/Containerfile.coreos.overlay
     # Enable proxy for dnf.conf for all the good it may do us..
     - path: /etc/dnf/dnf.conf
       mode: 0664
