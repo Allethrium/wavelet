@@ -200,5 +200,4 @@ install_ug_depends
 install_wavelet_modules
 #generate_decoder_iso
 echo -e "Installation completed, issue systemctl reboot to continue..\n"
-rm -rf /var/secondboot.active
-touch /var/secondboot.complete
+touch /var/wavelet_depends.complete
