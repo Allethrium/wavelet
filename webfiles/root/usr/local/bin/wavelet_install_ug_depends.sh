@@ -26,14 +26,16 @@ install_ug_depends(){
 	}
 	install_libaja(){
 		#Install libAJA Library
-		git clone https://github.com/aja-video/libajantv2.git
-		# export MACOSX_DEPLOYMENT_TARGET=10.13 # needed for arm64 mac
+		cd /home/wavelet
+		git clone https://github.com/aja-video/libajantv2.git && \
 		cmake -DAJANTV2_DISABLE_DEMOS=ON  -DAJANTV2_DISABLE_DRIVER=OFF \
 		-DAJANTV2_DISABLE_TOOLS=ON  -DAJANTV2_DISABLE_TESTS=ON \
 		-DAJANTV2_BUILD_SHARED=ON \
-		-DCMAKE_BUILD_TYPE=Release -Blibajantv2/build -Slibajantv2
+		-DCMAKE_BUILD_TYPE=Release -Blibajantv2/build -Slibajantv2 && \
 		cmake --build libajantv2/build --config Release -j "$(nproc)" && \
+		sleep 2 && \
 		sudo cmake --install libajantv2/build
+		cd /home/wavelet
 	}
 	install_live555(){
 		# Live555
@@ -67,6 +69,7 @@ install_ug_depends(){
 		ldconfig
 		chown -R wavelet:wavelet /home/wavelet/libNDI
 		echo -e "\nLibNDI Installed..\n"
+		cd /home/wavelet
 	}
 	install_libaja
 	install_cineform
@@ -118,6 +121,7 @@ generate_decoder_iso(){
 }
 
 install_wavelet_modules(){
+	cd /home/wavelet
 	if [[ -f /var/developerMode.enabled ]]; then
 		echo -e "\n\n***WARNING***\n\nDeveloper Mode is ON\n\nCloning from development repository..\n"
 		GH_USER="armelvil"
@@ -130,6 +134,8 @@ install_wavelet_modules(){
 	GH_REPO="https://github.com/Allethrium/wavelet/"
 	echo -e "\nCommand is; git clone -b ${GH_BRANCH} ${GH_REPO}\n"
 	git clone -b ${GH_BRANCH} ${GH_REPO}
+	echo -e "Clone completed..\n"
+	ls -lah /home/wavelet/wavelet
 	generate_tarfiles
 	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
 	extract_base
