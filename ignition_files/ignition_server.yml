@@ -767,6 +767,7 @@ systemd:
         [Service]
         Type=oneshot
         ExecStart=/bin/bash -c "/usr/local/bin/wavelet_install_ug_depends.sh"
+        ExecStartPost=systemctl reboot
         [Install]
         WantedBy=multi-user.target
     # Reboot service
