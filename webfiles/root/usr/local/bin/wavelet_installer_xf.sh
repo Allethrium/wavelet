@@ -133,7 +133,7 @@ rpm_overlay_install(){
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
 	touch /var/rpm-ostree-overlay.dev.pkgs.complete
-	podman push 192.168.1.32:5000/coreos_overlay:latest --tls-verify=false
+	podman push localhost:5000/coreos_overlay:latest --tls-verify=false
 	podman rmi localhost/coreos_overlay -f
 	rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay
 	echo -e "\n\nRPM package updates completed, pushing container to registry for client availability, and finishing installer task..\n\n"
@@ -151,8 +151,6 @@ rpm_overlay_install_decoder(){
 	touch /var/rpm-ostree-overlay.dev.pkgs.complete
 	echo -e "RPM package updates completed, finishing installer task..\n"
 }
-
-curl https://localhost:5000/v2/_catalog
 
 generate_decoder_iso(){
 	echo -e "\n\nCreating PXE functionality..\n\n"
