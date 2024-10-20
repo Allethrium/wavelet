@@ -42,10 +42,12 @@ event_server(){
 		GH_USER="armelvil"
 		GH_BRANCH="armelvil-working"
 	else
+		echo -e "\nDeveloper mode off, cloning main branch..\n"
 		GH_USER="ALLETHRIUM"
 		GH_BRANCH="Master"
 	fi
 	GH_REPO="https://github.com/Allethrium/wavelet/"
+	echo -e "\nCommand is; git clone -b ${GH_BRANCH} ${GH_REPO}\n"
 	git clone -b ${GH_BRANCH} ${GH_REPO}
 	generate_tarfiles
 	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
