@@ -55,7 +55,10 @@ RUN	rpm-ostree install -y -A \
     libva-intel-driver ffmpeg ffmpeg-libs libheif-freeworld neofetch htop mesa-libOpenCL python3-pip srt srt-libs firefox \
     ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 ImageMagick mplayer libndi libndi-devel ndi-sdk obs-ndi pipewire-utils && \
 	ln -s /usr/bin/ld.bfd /etc/alternatives/ld && ln -s /etc/alternatives/ld /usr/bin/ld && \
-	mkdir -p /var/lib/blackmagic && \
+	ostree container commit
+RUN /usr/local/bin/wavelet_ug_depends.sh && ostree container commit
+RUN /usr/local/bin/wavelet_grub_pxe_grubconfig.sh && ostree container commit
+RUN	mkdir -p /var/lib/blackmagic && \
 	mokdir="/var/lib/blackmagic" && \
 	openssl req -nodes -new -x509 -days 3650 -subj '/CN=MOK_generated' -keyout "$mokdir/MOK.priv" -outform der -out "$mokdir/MOK.der" && \
 	curl -L https://www.andymelville.net/wavelet/desktopvideo-14.2.1a1.x86_64.rpm -f --retry 5 > "desktopvideo.rpm" && \

@@ -173,6 +173,7 @@ generate_bootc_image() {
 			(http,192.168.1.32:8080)/pxe/${initrd}
 		echo 'Booting Fedora CoreOS...'
 	}"
+}
 
 ###
 #
@@ -180,10 +181,11 @@ generate_bootc_image() {
 #
 ###
 
+set -x
 exec >/home/wavelet/pxe_grubconfig.log 2>&1
 
 generate_coreos_image
-#generate_bootc_image
+# generate_bootc_image
 # Generate TFTPBOOT folder along with appropriate entries for our populated boot options
 generate_tftpboot
 # Set Apache +x and read perms on http folder
