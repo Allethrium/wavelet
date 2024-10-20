@@ -28,6 +28,8 @@ event_decoder(){
 
 event_server(){
 	# Generate RPM Container overlay
+	cp /usr/local/bin/wavelet_install_ug_depends.sh	/home/wavelet/containerfiles/
+	cp /usr/local/bin/wavelet_pxe_grubconfig.sh		/home/wavelet/containerfiles/
 	rpm_overlay_install
 	# generate a hostname file so that dnsmasq's dhcp-script call works properly
 	hostname=$(hostname)
