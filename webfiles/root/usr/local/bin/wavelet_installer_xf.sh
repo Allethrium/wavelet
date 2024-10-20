@@ -38,6 +38,9 @@ event_server(){
 	sed -i "s/!!hostnamegoeshere!!/${hostname}/g" /usr/local/bin/wavelet_network_sense.sh
 	get_ipValue
 	sed -i "s/SVR_IPADDR/${IPVALUE}/g" /etc/dnsmasq.conf
+	# Generate and enable systemd units which will be enabled
+	# Therefore, they will start on next boot, run, and disable themselves
+	# None of them should require a further reboot
 	echo -e "\
 		[Unit]
 		Description=Install Dependencies
@@ -64,6 +67,8 @@ event_server(){
     systemctl daemon-reload
     systemctl enable wavelet_install_depends.service
     systemctl enable wavelet_install_pxe.service
+    # Question - DO we want to perform an ostree encapsulation here to "save" the entire ostree to an OCI image?
+    # How is this going to interact with the decoder phase and what work will be required to hammer that out?
 	echo -e "\nInitial config completed, issue systemctl reboot to continue..\n"
 }
 
