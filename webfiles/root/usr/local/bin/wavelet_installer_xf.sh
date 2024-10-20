@@ -69,7 +69,7 @@ get_ipValue(){
 rpm_overlay_install(){
 	echo -e "Installing via container and applying as Ostree overlay..\n"
 	DKMS_KERNEL_VERSION=$(uname -r)
-	podman build -t localhost/coreos_overlay --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -v /usr/local/bin:/usr/local/bin -f /home/wavelet/containerfiles/Containerfile.coreos.overlay
+	podman build -t localhost/coreos_overlay --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -f /home/wavelet/containerfiles/Containerfile.coreos.overlay
 	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay:latest
 	touch /var/rpm-ostree-overlay.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
