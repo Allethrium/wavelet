@@ -1,4 +1,4 @@
-###Wavelet
+### Wavelet
 
 Wavelet is a local video appliance leveraging other projects such as UltraGrid.  It designed to provide a quick 'Pop-Up' solution for venues where running network or HDMI cables is undesirable, or impractical.
 
@@ -6,9 +6,11 @@ It does so by:
 
 * Avoiding unnecessary cabling by utilizing modern Wireless technologies
 * Leveraging the power of open source software, as free as humanly possible from proprietary vendor lock-ins.
-* Being platform agnostic and usable on different systems and architectures
+* Being platform agnostic and usable on different systems and architectures*
 * Having an easy to use web interface which can be used to quickly configure input options
 * Targeting low-cost and easily sourced hardware platforms
+
+<sub>* arm64 and RISC-V support is a stretch goal</sub>
 
 Wavelet at its most basic setup is composed of five components:
 
@@ -24,7 +26,7 @@ Wavelet is implemented over several open source applications, called by system o
 
 In its current form, It utilizes a set of bash modules combined with the distributed keystore system etcd to control systemd services on the encoders and decoders in response to input from a simple web server/PHP Script running on the server.   This control surface is accessible from any device connected via WiFi.
 
-##Disclaimer:
+## Disclaimer:
 
 Wavelet is designed as an APPLIANCE.   This means that software is not supposed to be updated after installation is completed, and that the system does not connect to any networks beyond the local Wavelet WiFi network.  If control channels for software updates or internet access for livestreaming are necessary, appropriate network segmentation should be carefully considered.   Under no circumstances should the system be deployed on a "flat" production network.   If you do this and something bad happens... well I warned you, and I'm not responsible for cleaning up the mess.
 
@@ -45,14 +47,14 @@ The system builds upon the following projects (Incomplete list - If your stuff w
 * PipeWire       -  https://github.com/PipeWire
 * ImageMagick    -  https://imagemagick.org/
 
-###INSTALLATION
+
+## INSTALLATION
 
 To install, simply git clone this repo to a linux machine with internet access.  This can be a full installation, a liveCD, etc.
 
 My test lab, for instance, has a machine running with a static IP address (above .200) well out of the server DHCP range.  This allows me to ssh into the server whilst it's installing and check logs for progress.
 
-run :
-```./install_wavelet_server.sh```
+run: ```./install_wavelet_server.sh```
 
 Please note it's a good idea to have your WiFi access point and switch infrastructure pre-configured.   A stretch goal is to leverage IaaS techniques to support provisioning of some target devices as part of the installation process, but that is for the future.
 
@@ -70,7 +72,6 @@ I would recommend Ruckus/CommScope APs as their unleashed software is easy to co
 
 This document will continue to change and evolve as further solutions are explored and verified.
 
-Wavelet can be spun up in a virtual test environment by running:
-```./provision_libvirt_testserver.sh```
+Wavelet can be spun up in a virtual test environment by running: ```./provision_libvirt_testserver.sh```
 
 For this to work, you'll need a properly configured QEMU/libvirt environment and be comfortable editing the script to set your appropriate networking parameters.  
