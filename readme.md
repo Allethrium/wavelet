@@ -30,15 +30,15 @@ In its current form, It utilizes a set of bash modules combined with the distrib
 
 Wavelet is designed as an APPLIANCE.   This means that software is not supposed to be updated after installation is completed, and that the system does not connect to any networks beyond the local Wavelet WiFi network.  If control channels for software updates or internet access for livestreaming are necessary, appropriate network segmentation should be carefully considered.   Under no circumstances should the system be deployed on a "flat" production network.   If you do this and something bad happens... well I warned you, and I'm not responsible for cleaning up the mess.
 
-Technical reasons for this include a necessity for speedy processing of incoming network packets, therefore host firewalls should be disabled on the encoders, decoder and servers.  Enabling firewall processing introduces a latency penalty which is undesirable in this system's use case.  Whilst the system has some security, it is so latency-focused in design that more common security mitigations were found to be an issue.
+Technical reasons for this include a necessity for speedy processing of incoming network packets, therefore host firewalls should be disabled on the encoders, decoder and servers.  I had observed that enabling firewall processing introduced a latency penalty which is undesirable in this system's use case.  Whilst the system has some security, it is so latency-focused in design that more common security mitigations were found to be an issue.
 
 Maintenance should be carried out on a dedicated laptop which can connect wirelessly to the system, by an individual familiar with common conventions used on this system.   It can also be performed by connecting a monitor and input devices to the server, as I've implemented a control console of sorts.
 
-Under no circumstances is the system designed to be connected to a secure production network, or to be managed remotely by enterprise patching or security applications.  Unauthorized modifications and hardening will almost certainly break the system or introduce unacceptable performance tradeoffs.
+Under no circumstances is the system designed to be connected to a secure production network, to be managed remotely by enterprise patching or security applications.  Unauthorized modifications and hardening will almost certainly break the system or introduce unacceptable performance tradeoffs.
 
-Should this get any traction with a large number of deployments, properly managing the system with an existing infrastructure is something I'll be interested in looking into.
+Should this get any traction with a large number of deployments, properly managing the system with an existing infrastructure is something I'll be interested in looking into, especially given that many components it's based on are utilized in several high-profile project such as Red Hat's OpenShift.
 
-The system builds upon the following projects (Incomplete list - If your stuff was used and we neglected to credit, feel free to let me know!):
+The system builds upon the following projects (Incomplete list - If your stuff was used and we neglected to credit you, feel free to let me know!):
 
 * UltraGrid      -  https://github.com/CESNET/UltraGrid
 * etcd           -  https://github.com/etcd-io/etcd
