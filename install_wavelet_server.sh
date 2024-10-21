@@ -137,7 +137,8 @@ customization(){
 		echo -e "Injecting dev branch into files..\n"
 		repl="https://raw.githubusercontent.com/Allethrium/wavelet/armelvil-working"
 		sed -i "s|https://github.com/Allethrium/wavelet/raw/master|${repl}|g" ${INPUTFILES}
-		sed -i "s|/var/developerMode.enabled|/var/developerMode.disabled|g" ${INPUTFILES}
+		# Yepm I set it enabled again here, if the devmode arg is on.
+		sed -i "s|/var/developerMode.disabled|/var/developerMode.enabled|g" ${INPUTFILES}
 		sed -i "s|DeveloperModeEnabled - will pull from working branch (default behavior)|DeveloperModeDisabled - pulling from master|g" ${INPUTFILES}
 		sed -i "s|https://raw.githubusercontent.com/Allethrium/wavelet/master|${repl}|g" ${INPUTFILES}
 	fi
