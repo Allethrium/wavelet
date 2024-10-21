@@ -56,6 +56,8 @@ My test lab, for instance, has a machine running with a static IP address (above
 
 run: ```./install_wavelet_server.sh```
 
+To configure wavelet to pull from my armelvil test branch, simply add a "d" argument like so: ```./install_wavelet_server.sh -d``` - given this is still under very active experimentation, if something's broken this will get new updates I haven't pushed to the main branch.
+
 Please note it's a good idea to have your WiFi access point and switch infrastructure pre-configured.   A stretch goal is to leverage IaaS techniques to support provisioning of some target devices as part of the installation process, but that is for the future.
 
 The installer will download appropriate install media, and customize the images appropriately after you have intelligently answered the prompts.
