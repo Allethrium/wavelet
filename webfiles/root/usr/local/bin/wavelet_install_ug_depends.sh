@@ -31,7 +31,7 @@ install_ug_depends(){
 		-DAJANTV2_DISABLE_TOOLS=ON  -DAJANTV2_DISABLE_TESTS=ON \
 		-DAJANTV2_BUILD_SHARED=ON \
 		-DCMAKE_BUILD_TYPE=Release -Blibajantv2/build -Slibajantv2 && \
-		cmake --build libajantv2/build --config Release -j "$(nproc)" && \
+		cmake --build libajantv2/build --config Release -j "1" && \
 		sleep 2 && \
 		sudo cmake --install libajantv2/build
 		cd /home/wavelet
@@ -198,5 +198,5 @@ fi
 install_ug_depends
 install_wavelet_modules
 #generate_decoder_iso
-echo -e "Installation completed, issue systemctl reboot to continue..\n"
+echo -e "Dependencies Installation completed..\n"
 touch /var/wavelet_depends.complete
