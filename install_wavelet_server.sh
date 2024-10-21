@@ -138,6 +138,7 @@ customization(){
 		sed -i "s|https://github.com/Allethrium/wavelet/raw/master|${repl}|g" ${INPUTFILES}
 		sed -i "s|/var/developerMode.enabled|/var/developerMode.disabled|g" ${INPUTFILES}
 		sed -i "s|DeveloperModeEnabled - will pull from working branch (default behavior)|DeveloperModeDisabled - pulling from master|g" ${INPUTFILES}
+		sed -i "s|https://raw.githubusercontent.com/Allethrium/wavelet/master|${repl}|g" ${INPUTFILES}
 	fi
 
 	# WiFi settings
