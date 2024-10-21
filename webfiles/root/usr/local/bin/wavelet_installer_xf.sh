@@ -22,36 +22,15 @@ UG_HOSTNAME=$(hostname)
 }
 
 event_decoder(){
-	extract_base
-	extract_home && extract_usrlocalbin
 	rpm_overlay_install_decoder
-	echo -e "Initial provisioning completed, attempting to connect to WiFi..\n"
-	connectwifi
 	exit 0
 }
 
 event_server(){
-	# create directories, install git, clone wavelet and setup modules
-	mkdir -p /home/wavelet/.config/containers/systemd/
-	chown -R wavelet:wavelet /home/wavelet
-	cd /home/wavelet
-	rpm_ostree_install_git
-	if [[ ! -f /var/tmp/DEV_ON ]]; then
-		echo -e "\n\n***WARNING***\n\nDeveloper Mode is ON\n\nCloning from development repository..\n"
-		git clone -b armelvil-working --single-branch https://github.com/ALLETHRIUM/wavelet 
-	else
-		echo -e "\nDeveloper Mode is off, cloning from main repository..\n"
-		git clone https://github.com/ALLETHRIUM/wavelet
-	fi
-	generate_tarfiles
-	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
-	extract_base
-	extract_home && extract_usrlocalbin
-	# Install dependencies and base packages.  Could definitely be pared down.
-	# Attempt to install from overlay container, if fails, we will run old method.
+	# Generate RPM Container overlay
+	cp /usr/local/bin/wavelet_install_ug_depends.sh	/home/wavelet/containerfiles/
+	cp /usr/local/bin/wavelet_pxe_grubconfig.sh		/home/wavelet/containerfiles/
 	rpm_overlay_install
-	# Generating a local repository is no longer needed, because we are using an ostree overlay for the server and for future client machines.
-	#/usr/local/bin/local_rpm.sh
 	# generate a hostname file so that dnsmasq's dhcp-script call works properly
 	hostname=$(hostname)
 	echo -e "${hostname}" > /var/lib/dnsmasq/hostname.local
@@ -59,8 +38,38 @@ event_server(){
 	sed -i "s/!!hostnamegoeshere!!/${hostname}/g" /usr/local/bin/wavelet_network_sense.sh
 	get_ipValue
 	sed -i "s/SVR_IPADDR/${IPVALUE}/g" /etc/dnsmasq.conf
-	# Generate the wavelet decoder ISO
-	generate_decoder_iso
+	# Generate and enable systemd units which will be enabled
+	# Therefore, they will start on next boot, run, and disable themselves
+	# None of them should require a further reboot
+	echo -e "\
+		[Unit]
+		Description=Install Dependencies
+		ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+        After=multi-user.target
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_install_ug_depends.sh"
+        ExecStartPost=systemctl disable wavelet_install_depends.service
+        [Install]
+        WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_depends.service
+	echo -e "\
+		[Unit]
+		Description=Install PXE support
+		ConditionPathExists=/var/wavelet_depends.complete
+        After=multi-user.target
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_pxe_grubconfig.sh"
+        ExecStartPost=systemctl disable wavelet_install_pxe.service
+        ExecstartPort=systemctl reboot
+        [Install]
+        WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_pxe.service
+    systemctl daemon-reload
+    systemctl enable wavelet_install_depends.service
+    systemctl enable wavelet_install_pxe.service
+    # Question - DO we want to perform an ostree encapsulation here to "save" the entire ostree to an OCI image?
+    # How is this going to interact with the decoder phase and what work will be required to hammer that out?
+	echo -e "\nInitial config completed, issue systemctl reboot to continue..\n"
 }
 
 get_ipValue(){
@@ -87,56 +96,18 @@ get_ipValue(){
 	fi
 }
 
-rpm_ostree_install_git(){
-	# Needed because otherwise sway launches the userspace setup before everything is ready
-	# Some other packages which do not install properly in the ostree container build are also included here
-	/usr/bin/rpm-ostree install -y -A git avahi
-}
-
-rpm_ostree_install(){
-	# Retained as failover encase the new procedure breaks
-	echo -e "Installing packages..\n"
-	rpm_ostree_install_step1(){
-	/usr/bin/rpm-ostree install \
-	-y -A \
-	alsa-firmware alsa-lib alsa-plugins-speex bemenu bluez-tools buildah busybox butane bzip2-devel \
-	cmake cockpit-bridge cockpit-networkmanager cockpit-ostree cockpit-podman cockpit-system createrepo \
-	dkms dnf etcd ffmpeg ffmpeg ffmpeg-libs firefox fontawesome-fonts foot gcc htop \
-	ImageMagick ImageMagick inotify-tools \
-	intel-compute-runtime intel-gmmlib intel-gpu-tools intel-level-zero intel-media-driver \
-	intel-media-driver intel-mediasdk intel-ocloc intel-opencl intel-opencl ipxe-bootimgs-x86.noarch iw iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch \
-	jo kernel-headers libdrm libdrm libffi-devel libheif-freeworld libndi libndi-devel libsrtp libsrtp libudev-devel libuuid-devel \
-	libv4l libv4l libva libva-intel-driver libva-utils libva-v4l2-request libva-v4l2-request libva-v4l2-request libva-vdpau-driver \
-	libvdpau libvdpau-devel libvdpau-va-gl libvpl lxsession \
-	make mako mesa-dri-drivers mesa-dri-drivers mesa-libEGL mesa-libgbm mesa-libGL mesa-libOpenCL mesa-libxatracker mesa-vdpau-drivers mesa-vdpau-drivers mesa-vulkan-drivers mplayer mpv \
-	ndi-sdk neofetch netcat NetworkManager-wifi nnn obs-ndi ocl-icd oneapi-level-zero oneVPL-intel-gpu opencl-headers openssl-devel \
-	pipewire-alsa pipewire-utils pipewire-v4l2 pipewire-v4l2 powerline powerline-fonts python3-pip \
-	rdma realtime-setup realtime-tests rofi-wayland rtkit sha srt srt srt-libs srt-libs sway sway-systemd syslinux syslinux-efi64 syslinux-nonlinux \
-	tftp-server tuned usbutils v4l-utils v4l-utils vim vim-powerline vlc waybar wget wireless-regdb wl-clipboard wpa_supplicant yum-utils zlib-devel
-	echo -e "\nRPMFusion Media Packages installed, waiting for 1 second..\n"
-	sleep 1
-	}
-	rpm_ostree_install_step1
-	touch /var/rpm-ostree-overlay.complete
-	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
-	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
-	touch /var/rpm-ostree-overlay.dev.pkgs.complete
-	echo -e "RPM package updates completed, finishing installer task..\n"
-}
-
 rpm_overlay_install(){
 	echo -e "Installing via container and applying as Ostree overlay..\n"
 	DKMS_KERNEL_VERSION=$(uname -r)
 	podman build -t localhost/coreos_overlay --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -f /home/wavelet/containerfiles/Containerfile.coreos.overlay
 	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay:latest
 	touch /var/rpm-ostree-overlay.complete
-	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
-	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
-	touch /var/rpm-ostree-overlay.dev.pkgs.complete
-	podman push 192.168.1.32:5000/coreos_overlay:latest --tls-verify=false
-	podman rmi localhost/coreos_overlay -f
-	rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay
-	echo -e "\n\nRPM package updates completed, pushing container to registry for client availability, and finishing installer task..\n\n"
+	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
+	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+	rpm-ostree rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay
+	#rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay
+	#podman push localhost:5000/coreos_overlay:latest --tls-verify=false
+	echo -e "\nRPM package updates completed, finishing installer task..\n"
 }
 
 rpm_overlay_install_decoder(){
@@ -150,50 +121,6 @@ rpm_overlay_install_decoder(){
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
 	touch /var/rpm-ostree-overlay.dev.pkgs.complete
 	echo -e "RPM package updates completed, finishing installer task..\n"
-}
-
-curl https://localhost:5000/v2/_catalog
-
-generate_decoder_iso(){
-	echo -e "\n\nCreating PXE functionality..\n\n"
-	wavelet_pxe_grubconfig.sh
-}
-
-generate_tarfiles(){
-	echo -e "Generating tar.xz files for upload to distribution server..\n"
-	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /home/wavelet/wavelet/webfiles/root/usr/local/bin/ .
-	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /home/wavelet/wavelet/webfiles/root/home/wavelet/ .
-	echo -e "Packaging files together..\n"
-	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz}
-	echo -e "Done."
-	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz}
-}
-
-extract_base(){
-	tar xf /home/wavelet/wavelet-files.tar.xz -C /home/wavelet --no-same-owner
-	mv ./usrlocalbin.tar.xz /usr/local/bin/
-}
-
-extract_etc(){
-	umask 022
-	tar xf /etc/etc.tar.xz -C /etc --no-same-owner --no-same-permissions
-	echo -e "System config files setup successfully..\n"
-}
-
-extract_home(){
-	tar xf /home/wavelet/wavelethome.tar.xz -C /home/wavelet
-	chown -R wavelet:wavelet /home/wavelet
-	chmod 0755 /home/wavelet/http
-	chmod -R 0755 /home/wavelet/http-php
-	echo -e "Wavelet homedir setup successfully..\n"
-}
-
-extract_usrlocalbin(){
-	umask 022
-	tar xf /usr/local/bin/usrlocalbin.tar.xz -C /usr/local/bin --no-same-owner
-	chmod +x /usr/local/bin
-	chmod 0755 /usr/local/bin/*
-	echo -e "Wavelet application modules setup successfully..\n"
 }
 
 ####

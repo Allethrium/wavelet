@@ -308,13 +308,13 @@ for_window [instance="file_progress"]  sticky enable
 for_window [class="info|Mate-color-select|gcolor2|timesup|QtPass|GtkFileChooserDialog"] sticky enable
 
 exec foot; 
-exec foot -e journalctl -f; exec systemctl --user start build_ug.service
+exec foot -e journalctl -f;
+exec systemctl --user enable build_ug.service --now;
 exec_always cat /proc/acpi/button/lid/LID/state | awk '{print $2}' | grep -q 'closed' && swaymsg output eDP-1 disable
 
 # Below are SED'd out by build_ug.sh for the server only
 
 #exec firefox http://localhost:8180 &
 #exec systemctl restart dnsmasq.service
-#exec /usr/local/bin/local_rpm.sh
 
 include /etc/sway/config.d/*

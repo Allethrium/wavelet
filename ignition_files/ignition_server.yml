@@ -41,7 +41,7 @@ storage:
       mode: 0755
       overwrite: true
       contents:
-        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.6/UltraGrid-1.9.6-x86_64.AppImage    
+        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.7/UltraGrid-1.9.7-x86_64.AppImage    
     # Inhibit systemd suspend
     - path: /etc/systemd/logind.conf.d/inhibit-suspend.conf
       mode: 0644
@@ -67,16 +67,28 @@ storage:
       contents:
         inline: SEDwaveletwifipassword
     # Devloper Mode
-    - path: /var/tmp/DEV_OFF
+    - path: /var/developerMode.enabled
       overwrite: true
       contents:
-        inline: DeveloperModeEnableSwitch
+        inline: DeveloperModeEnabled - will pull from working branch (default behavior)
     # Detect NetworkManager name and set as static script
     - path: /usr/local/bin/configure_ethernet.sh
       mode: 0755
       overwrite: true
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/usr/local/bin/configure_ethernet.sh
+    - path: /usr/local/bin/wavelet_check_dependencies.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        inline: |
+          #!/bin/bash
+          # Check if both dependency systemd units have completed their tasks
+          if [ -f "/var/pxe.complete" ] && [ -f "/var/wavelet_depends.complete" ]; then
+          exit 0
+          else
+          exit 1
+          fi
     # Set hostname
     - path: /etc/hostname
       mode: 0644
@@ -118,12 +130,30 @@ storage:
       overwrite: true
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/containers/containers.conf
-    # Installer script to handle ostree overlay and git clone
+    # Installer script to handle ostree overlay
     - path: /usr/local/bin/wavelet-installer_xf.sh
-      mode: 0644
+      mode: 0755
       overwrite: true
       contents:
         source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/usr/local/bin/wavelet_installer_xf.sh
+    # UG Dependencies and Wavelet modules
+    - path: /usr/local/bin/wavelet_install_ug_depends.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/usr/local/bin/wavelet_install_ug_depends.sh
+    # PXE generator
+    - path: /usr/local/bin/wavelet_pxe_grubconfig.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/usr/local/bin/wavelet_pxe_grubconfig.sh
+    # Containerfile for Ostree overlay
+    - path: /home/wavelet/containerfiles/Containerfile.coreos.overlay
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/home/wavelet/containerfiles/Containerfile.coreos.overlay
     # Enable proxy for dnf.conf for all the good it may do us..
     - path: /etc/dnf/dnf.conf
       mode: 0664
@@ -505,6 +535,7 @@ storage:
       group:
         name: wavelet
     # build_ug.sh determines system local functions and preconfigures the user systemd services appropriately for next boot
+    # Does not start until wavelet dependencies have completed
     - path: /home/wavelet/.config/systemd/user/build_ug.service
       mode: 0644
       overwrite: true
@@ -516,6 +547,9 @@ storage:
           Wants=network-online.target
           [Service]
           Type=oneshot
+          User=wavelet
+          Group=wavelet
+          ExecStartPre=/usr/local/bin/wavelet_check_dependencies.sh
           ExecStart=/usr/local/bin/build_ug.sh
           [Install]
           WantedBy=default.target
@@ -670,40 +704,13 @@ systemd:
       enabled: true
       contents: |
         [Unit]
-        Description=Decompress Wavelet files
+        Description=Install Overlay packages
         ConditionFirstBoot=yes
         After=multi-user.target
         [Service]
         Type=oneshot
         ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_installer_xf.sh"
-        ExecStartPost=-touch /var/extract.target
-        [Install]
-        WantedBy=multi-user.target
-    # Install necessary base files
-    - name: configure_svr_ip.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Configures desired server IP address
-        ConditionFirstBoot=yes
-        Wants=network-online.target
-        After=network-online.target
-        After=multi-user.target
-        [Service]
-        Type=oneshot
-        ExecStart=-/usr/local/bin/configure_ethernet.sh
-        [Install]
-        WantedBy=multi-user.target
-    # Generate wavelet Cgroup
-    - name: wavelet.cgroup.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Generate cgroup for wavelet user
-        ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-        [Service]
-        Type=oneshot
-        ExecStart=/bin/bash -c "/usr/local/bin/generate_cgroup.sh"
+        ExecStartPost=-systemctl reboot
         [Install]
         WantedBy=multi-user.target
     # Container registry to host and serve containers to local clients
@@ -740,21 +747,6 @@ systemd:
         ExecStartPre=systemctl stop systemd-resolved.service
         ExecStart=systemctl enable dnsmasq.service --now
         ExecStartPost=systemctl start systemd-resolved.service
-        [Install]
-        WantedBy=multi-user.target
-# Service to launch ug_depends after initial config  completed (this would be AFTER build_ug restarts the machine for the second time!)
-    - name: ug-depends.service
-      enabled: true
-      contents: |
-        [Unit]
-        Description=Run UG Dependency installer
-        After=network-online.target
-        Wants=network-online.target
-        ConditionPathExists=/var/secondboot.active
-        [Service]
-        Type=oneshot
-        ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_install_ug_depends.sh"
-        ExecStartPost=usr/bin/bash -c "rm -rf /var/secondboot.active"
         [Install]
         WantedBy=multi-user.target
     # Reboot service

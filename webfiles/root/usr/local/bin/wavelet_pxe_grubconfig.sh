@@ -16,8 +16,94 @@ generate_tftpboot() {
 	# The Containerfile will generate an output direct to /var/lib/tftpboot with a populated set of UEFI secure boot files.
 	sudo podman build --tag shim -f /home/wavelet/containerfiles/Containerfile.tftpboot
 	podman run --privileged --security-opt label=disable -v /var/lib:/tmp/ shim
+}
 
-	# Generate grub.cfg file
+generate_coreos_image() {
+	###
+	#
+	# OLD METHOD - CoreOS Spinup w/ Ignition resulting in multiple redundant downloads from RPM sources etc.
+	#	Advantages		-	Works reliably
+	#	Disadvantages	-	requires multiple installation steps
+	#
+	###
+
+	mkdir -p /home/wavelet/pxe && cd /home/wavelet/pxe
+
+	# Remove custom-initramfs if already exists
+	rm -rf /home/wavelet/pxe/custom-initramfs.img
+	# Pull coreOS PXE
+	podman run --security-opt label=disable --pull=always --rm -v .:/data -w /data \
+	quay.io/coreos/coreos-installer:release download -f pxe
+	echo -e "\nCoreOS Image files downloaded, continuing..\n"
+	# Set destination device and find downloaded initramfs file to customize
+	DESTINATION_DEVICE="/dev/disk/by-id/coreos-boot-disk"
+	IMAGEFILE=$(ls -t *.img | grep 'initramfs')
+	echo "Generating client machine ISO files..\n"
+
+	# Customize for PXE boot automation
+	# Ref https://coreos.github.io/coreos-installer/customizing-install/
+	# DustyMabe to the rescue! https://dustymabe.com/2020/04/04/automating-a-custom-install-of-fedora-coreos/
+	# The long and short of it is I need to generate two ignitions, one to install everything and then THAT calls the decoder ignition.
+	coreos-installer pxe customize \
+			--dest-device ${DESTINATION_DEVICE} \
+			--dest-ignition /home/wavelet/http/ignition/decoder.ign \
+			-o /home/wavelet/pxe/custom-initramfs ${IMAGEFILE}
+	FILES=$(find *img*)
+	KERNEL=$(find *kernel*)
+	# Copy boot images to both tftp and http server - NOTE /home/wavelet/pxe and /home/wavelet/http/pxe are NOT the same dirs!
+	mkdir -p /var/lib/tftpboot/wavelet-coreos
+	mkdir -p /home/wavelet/http/pxe
+	cp ${FILES} /var/lib/tftpboot/wavelet-coreos && cp ${KERNEL} /var/lib/tftpboot/wavelet-coreos
+	cp ${FILES} /home/wavelet/http/pxe && cp ${KERNEL} /home/wavelet/http/pxe && chown -R wavelet:wavelet /home/wavelet/http
+
+	# Generate filenames and Modify grub2.cfg menu option
+	coreosVersion=$(find *fedora* | head -n 1)
+	coreosVersion=$(echo ${coreosVersion##*coreos-})
+	coreosVersion=$(echo ${coreosVersion%%-live*})
+	initrd=$(find *initramfs.x86_64.img)
+	rootfs=$(find *rootfs.x86_64.img)
+	kernel=$(find *kernel-x86_64)
+	installdev="/dev/nvme0n1"
+	configURL="/home/wavelet/http/ignition/decoder.ign"
+	# Note - it might seem like a lot of work to do it this way rather than simply generate and boot an ISO.
+	# This is because grub2 needs certain information regarding the host machine which we can't easily generate.
+	# It also needs data on the internal arrangement of the ISO rather just just being able to "boot" it
+	# Since we already downloaded these components earlier in the process, we'll just keep doing it this way.
+	coreOSentry=" \
+	menuentry  'Decoder FCOS V.${coreosVersion} TFTP' --class fedora --class gnu-linux --class gnu --class os {
+	echo 'Loading CoreOS kernel...'   
+		linuxefi wavelet-coreos/${kernel} \
+			ignition.firstboot \
+			ignition.platform.id=metal \
+			coreos.inst.install_dev=${installDev} \
+			coreos.inst.ignition_url=${configURL}
+
+	echo 'Loading Fedora CoreOS initial ramdisk...'
+		initrdefi \
+			wavelet-coreos/${initrd} \
+    		wavelet-coreos/${rootfs}
+		echo 'Booting Fedora CoreOS...'
+	}"
+	coreOShttpEntry=" \
+	menuentry  'Decoder FCOS V.${coreosVersion} HTTP live boot' --class fedora --class gnu-linux --class gnu --class os {
+	echo 'Loading CoreOS kernel...'   
+		linuxefi (http,192.168.1.32:8080)/pxe/${kernel} \
+			coreos.live.rootfs_url=http://192.168.1.32:8080/pxe/${rootfs} \
+			ignition.firstboot \
+			ignition.platform.id=metal \
+			coreos.inst.install_dev=${installDev} \
+			coreos.inst.ignition_url=${configURL}
+			
+
+	echo 'Loading Fedora CoreOS initial ramdisk...'
+		initrdefi \
+			(http,192.168.1.32:8080)/pxe/${initrd}
+		echo 'Booting Fedora CoreOS...'
+	}"
+}
+
+configure_tftpboot(){
+	# Generate grub.cfg file in /var/lib/tftpboot root
 	mkdir -p /var/lib/tftpboot/efi
 	echo -e	"
 	function load_video {
@@ -40,102 +126,16 @@ generate_tftpboot() {
 	}
 	${coreOSentry}
 	${coreOShttpEntry}
+	${coreOShttpISOEntry}
 	${bootCentry}
-	}" > /var/lib/tftpboot/efi/grub.cfg
+	}" > /var/lib/tftpboot/grub.cfg
 	cp /var/lib/tftpboot/efi/grub.cfg /home/wavelet/http/pxe
 	chmod -R 0755 /home/wavelet/http
 	chown -R wavelet:wavelet /home/wavelet/http
 }
 
-generate_coreos_image() {
-	###
-	#
-	# OLD METHOD - CoreOS Spinup w/ Ignition resulting in multiple redundant downloads from RPM sources etc.
-	#	Advantages		-	Works reliably
-	#	Disadvantages	-	requires multiple installation steps
-	#
-	###
-
-	mkdir -p /home/wavelet/pxe && cd /home/wavelet/pxe
-	# Pull coreOS ISO
-	#podman run --security-opt label=disable --pull=always --rm -v .:/data -w /data \
-	#    quay.io/coreos/coreos-installer:release download -s stable -p metal -f iso
-	#mount -vvv /home/wavelet/pxe/wavelet-coreos-decoder.iso /var/mnt
-
-	# Remove custom-initramfs if already exists
-	rm -rf /home/wavelet/pxe/custom-initramfs.img
-	# Pull coreOS PXE
-	podman run --security-opt label=disable --pull=always --rm -v .:/data -w /data \
-	quay.io/coreos/coreos-installer:release download -f pxe
-	echo -e "\nCoreOS Image files downloaded, continuing..\n"
-	# Set destination device and find downloaded initramfs file to customize
-	DESTINATION_DEVICE="/dev/disk/by-id/coreos-boot-disk"
-	IMAGEFILE=$(ls -t *.img | grep 'initramfs')
-	echo "Generating client machine ISO files..\n"
-
-	# Customize iso for PXE boot
-	# Ref https://coreos.github.io/coreos-installer/customizing-install/
-	# We seem to have an issue where the installer will fail fue to updating kernel arguments, but we have already customized them in the liveCD?
-	# I appear to have misunderstood something about the pxe baremetal installation instructions here..
-	coreos-installer pxe customize \
-			--dest-device ${DESTINATION_DEVICE} \
-			--dest-ignition /home/wavelet/http/ignition/decoder.ign \
-			-o /home/wavelet/pxe/custom-initramfs ${IMAGEFILE}
-	FILES=$(find *img*)
-	KERNEL=$(find *kernel*)
-	# Copy boot images to both tftp and http server - NOTE /home/wavelet/pxe and /home/wavelet/http/pxe are NOT the same dirs!
-	mkdir -p /var/lib/tftpboot/wavelet-coreos
-	mkdir -p /home/wavelet/http/pxe
-	cp ${FILES} /var/lib/tftpboot/wavelet-coreos && cp ${KERNEL} /var/lib/tftpboot/wavelet-coreos
-	cp ${FILES} /home/wavelet/http/pxe && cp ${KERNEL} /home/wavelet/http/pxe && chown -R wavelet:wavelet /home/wavelet/http
-
-	# Generate filenames and Modify grub2.cfg menu option
-	coreosVersion=$(find *fedora* | head -n 1)
-	coreosVersion=$(echo ${coreosVersion##*coreos-})
-	coreosVersion=$(echo ${coreosVersion%%-live*})
-	initrd=$(find *initramfs.x86_64.img)
-	rootfs=$(find *rootfs.x86_64.img)
-	kernel=$(find *kernel-x86_64)
-	installdev="/dev/nvme0n1"
-	configURL="http://192.168.1.32:8080/ignition/decoder.ign"
-	coreOSentry=" \
-	menuentry  'Decoder FCOS V.${coreosVersion} TFTP' --class fedora --class gnu-linux --class gnu --class os {
-	echo 'Loading CoreOS kernel...'   
-		linuxefi wavelet-coreos/${kernel} \
-			ignition.firstboot \
-			ignition.platform.id=metal \
-			coreos.inst.install_dev=${installDev} \
-			coreos.inst.ignition_url=${configURL}
-
-	echo 'Loading Fedora CoreOS initial ramdisk...'
-		initrdefi \
-			wavelet-coreos/${initrd} \
-    		wavelet-coreos/${rootfs}
-		echo 'Booting Fedora CoreOS...'
-	}"
-	coreOShttpEntry=" \
-	menuentry  'Decoder FCOS V.${coreosVersion} HTTP' --class fedora --class gnu-linux --class gnu --class os {
-	echo 'Loading CoreOS kernel...'   
-		linuxefi (http,192.168.1.32:8080)/pxe/${kernel} \
-			coreos.live.rootfs_url=http://192.168.1.32:8080/pxe/${rootfs} \
-			ignition.firstboot \
-			ignition.platform.id=metal \
-			coreos.inst.install_dev=${installDev} \
-			coreos.inst.ignition_url=${configURL}
-			
-
-	echo 'Loading Fedora CoreOS initial ramdisk...'
-		initrdefi \
-			(http,192.168.1.32:8080)/pxe/${initrd}
-		echo 'Booting Fedora CoreOS...'
-	}"
-}
-
-#coreos.inst.install_dev=/dev/sda 
-
-
 generate_bootc_image() {
-	## WIP
+	## ********* Extremely early WIP ********* 
 	###
 	#
 	# NEW METHOD - Generate a pre-provisioned ISO utilizing a bootc image (WIP)
@@ -173,17 +173,7 @@ generate_bootc_image() {
 			(http,192.168.1.32:8080)/pxe/${initrd}
 		echo 'Booting Fedora CoreOS...'
 	}"
-
-# ref https://docs.fedoraproject.org/en-US/fedora/f36/install-guide/advanced/Kickstart_Installations/
-#	menuentry 'Install Fedora 36 Server'  --class fedora --class gnu-linux --class gnu --class os {
-#	kernel f41/vmlinuz
-#	append initrd=f41/initrd.img 
-#	inst.repo=https://download.fedoraproject.org/pub/fedora/linux/releases/41/Server/x86_64/os/ ip=dhcp 
-#	ks=https://git.fedorahosted.org/cgit/spin-kickstarts.git/plain/fedora-install-server.ks?h=f21
-#	}
-
 }
-
 
 ###
 #
@@ -191,16 +181,30 @@ generate_bootc_image() {
 #
 ###
 
+set -x
 exec >/home/wavelet/pxe_grubconfig.log 2>&1
 
-generate_coreos_image
-#generate_bootc_image
 # Generate TFTPBOOT folder along with appropriate entries for our populated boot options
 generate_tftpboot
+generate_coreos_image
+configure_tftpboot
+# generate_bootc_image
+
+# Mess around with permissions
+# dnsmasq is the tftpserver, therefore dnsmasq user requires rights to /var/lib/tftpboot for secure operation
+chown -R dnsmasq:root /var/lib/tftpboot
+find /var/lib/tftpboot -type f -print0 | xargs -0 chmod 644
+# Restore SElinux contexts or we will get AVC denial on folders.
+restorecon -Rv /var/lib/tftpboot
+# Copy EFI files to http pxe
+cp -R /var/lib/tftpboot/*.efi /home/wavelet/http/pxe
+cp -R /var/lib/tftpboot/boot /home/wavelet/http/pxe
+cp -R /var/lib/tftpboot/efi /home/wavelet/http/pxe
 # Set Apache +x and read perms on http folder
 chmod -R 0755 /home/wavelet/http
 chown -R wavelet /home/wavelet/http
+# Remove executable bit from all files in http
+find /home/wavelet/http -type f -print0 | xargs -0 chmod 644
 echo -e "PXE bootable images completed and populated in http serverdir, client provisioning should now be available..\n"
-echo -e "Rebooting system to continue to userland setup..\n"
-sleep 2
-systemctl reboot
+# We do not install Fedora's TFTP server package, because DNSMASQ has one built-in.
+touch /var/pxe.complete

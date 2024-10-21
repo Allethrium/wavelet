@@ -213,7 +213,7 @@ server_bootstrap(){
 # Bootstraps the server processes including Apache HTTP server for distribution files, and the web interface NGINX/PHP pod
 	until [ -f /var/ug_depends.complete ]
 	do
-		sleep 2
+		sleep 1
 	done
 	if test -f "/var/server_bootstrap_completed"; then
 		echo -e "\n server bootstrap has already been completed, exiting..\n"
@@ -223,18 +223,20 @@ server_bootstrap(){
 		# check for bootstrap_completed, verify services running
 		echo -e "Generating HTTPD server and copying/compressing wavelet files to server directory.."
 		/usr/local/bin/build_httpd.sh	
-		sleep 2
+		# Remove executable bit from all webserver files
+		find /home/wavelet/http -type f -print0 | xargs -0 chmod 644
+		sleep 1
 	}
 
 	bootstrap_nginx_php(){
 		# http PHP server for control interface	
 		/usr/local/bin/build_nginx_php.sh
-		sleep 2
+		sleep 1
 	}
 
 	bootstrap_nodejs(){
 		/usr/local/bin/build_nodejs.sh
-		sleep 2
+		sleep 1
 	}
 
 	bootstrap_dnsmasq_watcher_service(){
@@ -272,7 +274,7 @@ server_bootstrap(){
 	systemctl --user daemon-reload
 	echo -e "Attempting to start etcd container.."
 	systemctl --user enable container-etcd-member.service --now
-	sleep 2
+	sleep 1
 	bootstrap_http
 	bootstrap_nginx_php
 	bootstrap_nodejs
@@ -301,7 +303,7 @@ server_bootstrap(){
 	#same for dnsmasq because it inexplicably stops working.
 	sed -i '/exec systemctl restart dnsmasq.service/s/^# *//' config $HOME/.config/sway/config
 	#
-	sed -i '/exec \/usr\/local\/bin\/local_rpm.sh/s/^# *//' config $HOME/.config/sway/config
+	#sed -i '/exec \/usr\/local\/bin\/local_rpm.sh/s/^# *//' config $HOME/.config/sway/config
 	# Next, we build the reflector prune function.  This is necessary for removing streams for old decoders and maintaining the long term health of the system
 		# Get decoderIP list
 		# Ping each decoder on list
@@ -311,10 +313,8 @@ server_bootstrap(){
 	# Finally, add a service to prune dead FUSE mountpoints.  Every time the UltraGrid AppImage is restarted, it leaves stale mountpoints.  This timed task will help keep everything clean.
 		# Get "alive mountpoints"
 		# Prune anything !=alive
-	#  Reboot the server
-	touch /var/secondboot.active
-	echo -e "Server configuration is now complete, rebooting system fifteen seconds.."
-	sleep 15
+	echo -e "Server configuration is now complete, rebooting system.."
+	sleep 1
 	systemctl reboot -i
 }
 
