@@ -41,7 +41,7 @@ storage:
       mode: 0755
       overwrite: true
       contents:
-        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.6/UltraGrid-1.9.6-x86_64.AppImage    
+        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.7/UltraGrid-1.9.7-x86_64.AppImage    
     # Inhibit systemd suspend
     - path: /etc/systemd/logind.conf.d/inhibit-suspend.conf
       mode: 0644
@@ -77,6 +77,18 @@ storage:
       overwrite: true
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/usr/local/bin/configure_ethernet.sh
+    - path: /usr/local/bin/wavelet_check_dependencies.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        inline: |
+          #!/bin/bash
+          # Check if both dependency systemd units have completed their tasks
+          if [ -f "/var/pxe.complete" ] && [ -f "/var/wavelet_depends.complete" ]; then
+          exit 0
+          else
+          exit 1
+          fi
     # Set hostname
     - path: /etc/hostname
       mode: 0644
@@ -523,6 +535,7 @@ storage:
       group:
         name: wavelet
     # build_ug.sh determines system local functions and preconfigures the user systemd services appropriately for next boot
+    # Does not start until wavelet dependencies have completed
     - path: /home/wavelet/.config/systemd/user/build_ug.service
       mode: 0644
       overwrite: true
@@ -534,6 +547,9 @@ storage:
           Wants=network-online.target
           [Service]
           Type=oneshot
+          User=wavelet
+          Group=wavelet
+          ExecStartPre=/usr/local/bin/wavelet_check_dependencies.sh
           ExecStart=/usr/local/bin/build_ug.sh
           [Install]
           WantedBy=default.target
