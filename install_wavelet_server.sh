@@ -132,6 +132,7 @@ customization(){
 	echo -e "Ignition customization completed, and .ign files have been generated."
 	# We set DevMode disabled here, even though it's enabled by default in ignition
 	sed -i "s|/var/developerMode.enabled|/var/developerMode.disabled|g" ${INPUTFILES}
+	sed -i "s|DeveloperModeEnabled - will pull from working branch (default behavior)|DeveloperModeDisabled - pulling from master|g" ${INPUTFILES}
 	# Check for developermode flag so we pull from working branch rather than continually pushing messy and embarassing broken commits to the main branch..
 	if [[ "${developerMode}" -eq "1" ]]; then
 		echo -e "Injecting dev branch into files..\n"
@@ -139,7 +140,7 @@ customization(){
 		sed -i "s|https://github.com/Allethrium/wavelet/raw/master|${repl}|g" ${INPUTFILES}
 		# Yepm I set it enabled again here, if the devmode arg is on.
 		sed -i "s|/var/developerMode.disabled|/var/developerMode.enabled|g" ${INPUTFILES}
-		sed -i "s|DeveloperModeEnabled - will pull from working branch (default behavior)|DeveloperModeDisabled - pulling from master|g" ${INPUTFILES}
+		sed -i "s|DeveloperModeDisabled - pulling from master|DeveloperModeEnabled - will pull from working branch|g" ${INPUTFILES}
 		sed -i "s|https://raw.githubusercontent.com/Allethrium/wavelet/master|${repl}|g" ${INPUTFILES}
 	fi
 
