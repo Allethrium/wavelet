@@ -44,7 +44,7 @@ event_server(){
 	echo -e "\
 		[Unit]
 		Description=Install Dependencies
-		ConditionFileExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+		ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
         After=multi-user.target
         [Service]
         Type=oneshot
@@ -55,7 +55,7 @@ event_server(){
 	echo -e "\
 		[Unit]
 		Description=Install PXE support
-		ConditionFileExists=/var/wavelet_depends.complete
+		ConditionPathExists=/var/wavelet_depends.complete
         After=multi-user.target
         [Service]
         Type=oneshot
