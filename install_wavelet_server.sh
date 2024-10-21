@@ -130,7 +130,8 @@ customization(){
 	pubkey=$(cat wavelet.pub)
 	sed -i "s|PUBKEYGOESHERE|${pubkey}|g" ${INPUTFILES}
 	echo -e "Ignition customization completed, and .ign files have been generated."
-
+	# We set DevMode disabled here, even though it's enabled by default in ignition
+	sed -i "s|/var/developerMode.enabled|/var/developerMode.disabled|g" ${INPUTFILES}
 	# Check for developermode flag so we pull from working branch rather than continually pushing messy and embarassing broken commits to the main branch..
 	if [[ "${developerMode}" -eq "1" ]]; then
 		echo -e "Injecting dev branch into files..\n"
