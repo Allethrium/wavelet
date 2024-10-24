@@ -8,13 +8,13 @@ systemctl --user daemon-reload
 UG_HOSTNAME=$(hostname)
 	echo -e "Hostname is $UG_HOSTNAME \n"
 	case $UG_HOSTNAME in
-	enc*)                   echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."            ;   event_decoder
+	enc*)                   echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."							;	event_decoder
 	;;
-	decX.wavelet.local)     echo -e "I am a Decoder, but my hostname is generic.  Randomizing my hostname, and rebooting"   ;   event_decoder 
+	decX.wavelet.local)     echo -e "I am a Decoder, but my hostname is generic.  An additional reboot will occur after build_ug firstrun"	;	event_decoder 
 	;;
-	dec*)                   echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."              ;   event_decoder
+	dec*)                   echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."								;	event_decoder
 	;;
-	svr*)                   echo -e "I am a Server. Proceeding..."                                                          ;   event_server
+	svr*)                   echo -e "I am a Server. Proceeding..."																			;	event_server
 	;;
 	*)                      echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
 	;;
@@ -56,12 +56,12 @@ event_server(){
 		[Unit]
 		Description=Install PXE support
 		ConditionPathExists=/var/wavelet_depends.complete
-        After=multi-user.target
+		After=multi-user.target
         [Service]
         Type=oneshot
         ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_pxe_grubconfig.sh"
         ExecStartPost=systemctl disable wavelet_install_pxe.service
-        ExecstartPort=systemctl reboot
+        ExecstartPost=systemctl reboot
         [Install]
         WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_pxe.service
     systemctl daemon-reload
@@ -106,21 +106,41 @@ rpm_overlay_install(){
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
 	rpm-ostree rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay
 	#rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay
-	#podman push localhost:5000/coreos_overlay:latest --tls-verify=false
+	# Push image to container registry
+	# We use zstd for better compression and we have no need to encrypt the layers.  This might help on network traffic for the
+	podman push localhost:5000/coreos_overlay:latest 192.168.1.32:5000/coreos_overlay --tls-verify=false --compression-format=zstd:chunked --compression-level=16 --force-compression
 	echo -e "\nRPM package updates completed, finishing installer task..\n"
 }
 
 rpm_overlay_install_decoder(){
 	# This differs from the server in that we don't need to build the container,
+	# We pull the client installer module and run it to generate the wavelet files in /usr/local/bin
+	curl -o /usr/local/bin/wavelet_install_client.sh http://192.168.1.32:8080/ignition/wavelet_install_client.sh
+	chmod 0755 /usr/local/bin/wavelet_install_client.sh && /usr/local/bin/wavelet_install_client.sh
 	# and we pull the already generated overlay from the server registry
+	# This is the slowest part of the process, can we speed it up by compressing the overlay?
 	echo -e "Installing via container and applying as Ostree overlay..\n"
 	DKMS_KERNEL_VERSION=$(uname -r)
+	# We need to pull the container from the server registry first, apparently manually?  Probably https issue here.
+	podman pull 192.168.1.32:5000/coreos_overlay --tls-verify=false
 	rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:192.168.1.32:5000/coreos_overlay
 	touch /var/rpm-ostree-overlay.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
 	touch /var/rpm-ostree-overlay.dev.pkgs.complete
+	echo -e "\
+		[Unit]
+		Description=Install Client Dependencies
+		ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+        After=multi-user.target
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_install_client.sh"
+        ExecStartPost=systemctl disable wavelet_install_client.service
+        [Install]
+        WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
 	echo -e "RPM package updates completed, finishing installer task..\n"
+	systemctl enable wavelet_install_client.service
 }
 
 ####
