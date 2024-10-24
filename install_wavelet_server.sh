@@ -9,9 +9,9 @@ for i in "$@"
 		case $i in
 			*d*)	echo -e "\nDev mode enabled, switching git tree to working branch\n."	;	developerMode="1"
 			;;
-			h)	echo -e "\nSimple command line switches:\n D for developer mode, will clone git from ARMELVIL working branch for non-release features.\n";	exit 0
+			h)		echo -e "\nSimple command line switches:\n D for developer mode, will clone git from ARMELVIL working branch for non-release features.\n";	exit 0
 			;;
-			*)	echo -e "\nBad input argument, ignoring"
+			*)		echo -e "\nBad input argument, ignoring"
 			;;
 		esac
 done
@@ -27,8 +27,8 @@ rm -rf $HOME/Downloads/wavelet_server.iso
 rm -rf $HOME/Downloads/wavelet_decoder.iso
 
 client_networks(){
-	echo -e "System configured to be run on a larger network."
-		echo -e "Please input the system's gateway IP address, and subnet mask.."
+	echo -e "\nSystem configured to be run on a larger network.\n"
+		echo -e "Please input the system's gateway IP address, and subnet mask\n"
 		read -p "Gateway IPv4 Address: " GW
 		read -p "Subnet Mask CIDR I.E 24 for class C network: " SN
 		# Validate user input
@@ -68,6 +68,16 @@ client_networks(){
 	# FQDN would now be set from the DNS/DHCP server in the environment.  This also obviously disables network sense, TFTPBOOT and PXE.
 	# The assumption here is that an engineer would have already configured these services elsewhere, I can write some automation scripts later
 	# if this proves to be a need.
+	dnsmasq_no_dhcp
+}
+
+dnsmasq_no_dhcp(){
+	# This function should configure Server Ignition to pull a different dnsmasq.conf which provides PXEboot but disables DHCP functionality - if that is workable pending further testing.
+	sed -i 's/Allethrium/wavelet/master/webfiles/root/etc/dnsmasq.conf/Allethrium/wavelet/master/webfiles/root/etc/dnsmasq_nodhcp.conf/g' ${INPUTFILES}
+	echo -e "\n\n******** IMPORTANT ********\n\nYou must configure your pre-existing DHCP server to forward PXE boot requests to the wavelet server!\nPlease refer to the comment lines below for examples..\n"
+	echo -e "\nDHCPD:\nEdit dhcpd.conf and ensure these lines are present:\nnext-server 192.168.0.20;\nfilename 'pxelinux.0';\n"
+	echo -e "\nDNSMASQ:\n"
+	echo -e "\nFor other DHCP servers, please refer to their respective documentation."
 }
 
 hostname_domain(){
@@ -98,6 +108,93 @@ sed -i "s/192.168.1.32\/${FQDN}/g" ${INPUTFILES}
 customization
 }
 
+# user stuff
+
+init_users_yaml() {
+	cat <<EOF > users_yaml
+    - name: USERGOESHERE
+      password_hash: PASSWORDGOESHERE
+      ssh_authorized_keys:
+        - PUBKEYGOESHERE
+      home_dir: /home/USERNAMEGOESHERE
+EOF
+}
+
+generate_user_yaml(){
+	local name=$1
+	local password_hash="$(cat ${user}.pw.secure)"
+	local ssh_authorized_keys=$(cat ${name}-ssh.pub)
+	local user_yaml="${name}_yaml.yml"
+	if [[ "${name}" = "wavelet-root" ]]; then
+		uid="9337"
+	elif [[ "${name}" = "wavelet" ]]; then
+		uid="1337"
+	else 
+		echo -e "User ID not preset, system will assign them, bear in mind this might go away if we get to implementing IdM"
+	fi
+	if [[ -n ${uid} ]]; then
+		sed -i "s/USERGOESHERE/\n    uid: $uid/" ${user_yaml}
+	fi
+	sed -i "s/#ADD_USER_YAMLHERE/""/" ${user_yaml}
+	sed -i "s|USERGOESHERE|$name|" ${user_yaml}
+    sed -i "s|PASSWORDGOESHERE|$password_hash|" ${user_yaml}
+	sed -i "0,/ssh_authorized_keys:/{/\[/,/,/^\],/{s/, PUBKEYGOESHERE,/, &|$ssh_authorized_keys,/;};};" "${user_yaml}"
+    #sed -i "0,/ssh_authorized_keys:/,{/\[/,/,/^\],/,{s/, PUBKEYGOESHERE,/, &$ssh_authorized_keys,/;};};" "${user_yaml}"
+    sed -i "s/USERNAMEGOESHERE/$name/" ${user_yaml}
+    echo -e "\nGenerated user YML:\n"
+    cat ${user_yaml}
+}
+
+set_pw(){
+	local attempts=3
+	local success=0
+	local user=$1
+	local tmp_pw=""
+
+	while [[ ${success} -ne 1 ]] && [[ ${attempts} -gt 0 ]]; do
+		echo -e >&2 "Please input a password for ${user}:  "
+		echo -e >&2 "Remaining attempts: ${attempts}"
+		read -s tmp_pw
+		if [[ "${tmp_pw}" == "" ]]; then
+			echo -e >&2 "Password may not be empty."
+			if [[ ${attempts} -eq 0 ]]; then
+				echo -e "Maximum attempts exceeded, exiting."
+				success=0
+				break 1
+			fi
+			((attempts--))
+			continue
+		fi
+
+		local matchattempts=3
+		while [[ ${success} -ne 1 ]] && [[ ${matchattempts} -gt 0 ]]; do
+			echo -e >&2 "Please input the password again to verify for ${user}: "
+			read -s  tmp_pw2
+			if [[ "${tmp_pw}" == "${tmp_pw2}" ]]; then
+				echo -e >&2 "Passwords match!  Continuing.."
+				mkpasswd --method=yescrypt ${tmp_pw} > ${user}.pw.secure
+				success=1
+				break 2
+			else
+				echo -e >&2 "\nPasswords do not match! Trying again..\n"
+				((matchattempts--))
+				echo -e >&2 "Remaining attempts: ${matchattempts}"
+				if [[ ${success} -ne 1 ]] && [[ ${matchattempts} -eq 0 ]]; then
+					echo -e >&2 "Maximum attempts reached, exiting.."
+					success=0
+				fi
+			fi
+		done # Inner loop
+	done # Outer loop
+	if [[ $success == 1 ]]; then
+		echo "0"
+		exit 0
+	else
+		echo "1"
+		exit 1
+	fi
+}
+
 customization(){
 	echo -e "Generating ignition files with appropriate settings.."
 	INPUTFILES="server_custom.yml decoder_custom.yml"
@@ -106,29 +203,36 @@ customization(){
 	chmod 0600 *.secure
 	unset tmp_rootpw
 	unset tmp_waveletpw
-	echo -e 'Please input a password for the wavelet-root user: '
-	read -s  tmp_rootpw
-	echo -e 'Please input a password for the wavelet user: '
-	read -s  tmp_waveletpw
-	mkpasswd --method=yescrypt "${tmp_rootpw}" > rootpw.secure
-	mkpasswd --method=yescrypt "${tmp_waveletpw}" > waveletpw.secure
-	unset tmp_rootpw tmp_waveletpw
-	echo -e "Password hashes generated..\n"
-	
-	repl=$(cat rootpw.secure)
-	sed -i "s|waveletrootpassword|${repl}|g" ${INPUTFILES}
-	echo -e "Root password hash injected..\n" 
-	echo -e "root pw injected..\n"
-	
-	repl=$(cat waveletpw.secure)
-	sed -i "s|waveletuserpassword|${repl}|g" ${INPUTFILES}
-	
-	echo -e "user password hash injected..\n"
-	
-	echo -e "Generating SSH Public Key and injecting to Ignition file.."
-	ssh-keygen -t ed25519 -C "wavelet@wavelet.local" -f wavelet
-	pubkey=$(cat wavelet.pub)
-	sed -i "s|PUBKEYGOESHERE|${pubkey}|g" ${INPUTFILES}
+
+	# Define users, you can edit this to set more
+	users=("wavelet-root" "wavelet")
+	init_users_yaml
+
+	# Iterate over the array of users and set passwords for each
+	for user in ${users[@]}; do
+		if [[ $(set_pw "${user}") -ne 0 ]]; then
+			echo -e "Failed to set a password for ${user}."
+			exit 1
+		else
+			echo -e "Set password for ${user}"
+			echo -e "Generating SSH public key for ${user}..\n"
+			ssh-keygen -t ed25519 -C "${user}@wavelet.local" -f ${user}-ssh
+			echo -e "Generating YAML block for user..\n"
+			cp users_yaml ${user}_yaml.yml
+			generate_user_yaml "${user}"
+			# Now we add the user YAML block to the server ignition, preserving the tag as we go..
+			f2="$(<${user}_yaml.yml)"
+			input_files_arr=($INPUTFILES)
+			for file in "${input_files_arr[@]}"; do
+				if [ -f "$file" ]; then
+					awk -vf2="$f2" '/#ADD_USER_YAML_HERE/{print f2;print;next}1' "${file}" > tmp && mv tmp "${file}"
+				else
+					echo "Warning: ${file} does not exist or is inacessible!"
+				fi
+			done
+		fi
+	done
+
 	echo -e "Ignition customization completed, and .ign files have been generated."
 	# We set DevMode disabled here, even though it's enabled by default in ignition
 	sed -i "s|/var/developerMode.enabled|/var/developerMode.disabled|g" ${INPUTFILES}
@@ -169,7 +273,7 @@ customization(){
 # Main
 #
 ####
-
+#set -x
 echo -e "Will this system run on an isolated network?"
 read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || client_networks || echo -e "System configured for isolated, authoritative mode." && isoMode="mode=iso"
 customization
