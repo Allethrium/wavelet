@@ -7,7 +7,7 @@
 for i in "$@"
 	do
 		case $i in
-			*d*)	echo -e "\nDev mode enabled, switching git tree to working branch\n."	;	developerMode="1"
+			*d*)	echo -e "\nDev mode enabled, switching git tree to working branch\n"	;	developerMode="1"
 			;;
 			h)		echo -e "\nSimple command line switches:\n D for developer mode, will clone git from ARMELVIL working branch for non-release features.\n";	exit 0
 			;;
@@ -109,14 +109,15 @@ customization
 }
 
 # user stuff
-
 init_users_yaml() {
 	cat <<EOF > users_yaml
-    - name: USERGOESHERE
+    - name: USERNAMEGOESHERE
       password_hash: PASSWORDGOESHERE
+      groups:
+        #- GROUPGOESHERE
       ssh_authorized_keys:
         - PUBKEYGOESHERE
-      home_dir: /home/USERNAMEGOESHERE
+      home_dir: /home/USERHOMEDIR
 EOF
 }
 
@@ -126,23 +127,30 @@ generate_user_yaml(){
 	local ssh_authorized_keys=$(cat ${name}-ssh.pub)
 	local user_yaml="${name}_yaml.yml"
 	if [[ "${name}" = "wavelet-root" ]]; then
+		echo -e "wavelet-root user, setting UID to 9337"
 		uid="9337"
+		admin="wheel"
+		sed -i "s|#- GROUPGOESHERE|- $admin|" ${user_yaml}
 	elif [[ "${name}" = "wavelet" ]]; then
+		echo -e "wavelet user, setting UID to 1337"
 		uid="1337"
 	else 
 		echo -e "User ID not preset, system will assign them, bear in mind this might go away if we get to implementing IdM"
 	fi
 	if [[ -n ${uid} ]]; then
-		sed -i "s/USERGOESHERE/\n    uid: $uid/" ${user_yaml}
+		echo -e
+		sed -i "s|USERNAMEGOESHERE|USERNAMEGOESHERE\n      uid: $uid|" ${user_yaml}
 	fi
-	sed -i "s/#ADD_USER_YAMLHERE/""/" ${user_yaml}
-	sed -i "s|USERGOESHERE|$name|" ${user_yaml}
-    sed -i "s|PASSWORDGOESHERE|$password_hash|" ${user_yaml}
-	sed -i "0,/ssh_authorized_keys:/{/\[/,/,/^\],/{s/, PUBKEYGOESHERE,/, &|$ssh_authorized_keys,/;};};" "${user_yaml}"
-    #sed -i "0,/ssh_authorized_keys:/,{/\[/,/,/^\],/,{s/, PUBKEYGOESHERE,/, &$ssh_authorized_keys,/;};};" "${user_yaml}"
-    sed -i "s/USERNAMEGOESHERE/$name/" ${user_yaml}
-    echo -e "\nGenerated user YML:\n"
-    cat ${user_yaml}
+	# We use a pipe instead of a / here, because the pubkeys and passwords hashes may contain a / and therefore escape the rest of the data.
+	echo -e "Working on user ${name}\n"
+	sed -i "s|#ADD_USER_YAMLHERE|""|" ${user_yaml}
+  sed -i "s|PASSWORDGOESHERE|$password_hash|" ${user_yaml}
+	sed -i "s|PUBKEYGOESHERE|$ssh_authorized_keys|" "${user_yaml}"
+  sed -i "s|USERNAMEGOESHERE|$name|" ${user_yaml}
+  sed -i "s|USERHOMEDIR|$name|" ${user_yaml}
+  echo -e "\nGenerated user YML\n"
+  cat ${user_yaml}
+  echo -e "\n\n"
 }
 
 set_pw(){
@@ -204,9 +212,9 @@ customization(){
 	unset tmp_rootpw
 	unset tmp_waveletpw
 
+	init_users_yaml
 	# Define users, you can edit this to set more
 	users=("wavelet-root" "wavelet")
-	init_users_yaml
 
 	# Iterate over the array of users and set passwords for each
 	for user in ${users[@]}; do
@@ -219,13 +227,16 @@ customization(){
 			ssh-keygen -t ed25519 -C "${user}@wavelet.local" -f ${user}-ssh
 			echo -e "Generating YAML block for user..\n"
 			cp users_yaml ${user}_yaml.yml
-			generate_user_yaml "${user}"
+			generate_user_yaml ${user}
+
 			# Now we add the user YAML block to the server ignition, preserving the tag as we go..
+			echo -e "Adding generated YAML block to ignition file for ${user}..\n"
 			f2="$(<${user}_yaml.yml)"
 			input_files_arr=($INPUTFILES)
 			for file in "${input_files_arr[@]}"; do
 				if [ -f "$file" ]; then
 					awk -vf2="$f2" '/#ADD_USER_YAML_HERE/{print f2;print;next}1' "${file}" > tmp && mv tmp "${file}"
+					echo -e "YAML block for ${user} added to ignition file ${file}..\n"
 				else
 					echo "Warning: ${file} does not exist or is inacessible!"
 				fi
@@ -234,9 +245,11 @@ customization(){
 	done
 
 	echo -e "Ignition customization completed, and .ign files have been generated."
+
 	# We set DevMode disabled here, even though it's enabled by default in ignition
 	sed -i "s|/var/developerMode.enabled|/var/developerMode.disabled|g" ${INPUTFILES}
 	sed -i "s|DeveloperModeEnabled - will pull from working branch (default behavior)|DeveloperModeDisabled - pulling from master|g" ${INPUTFILES}
+
 	# Check for developermode flag so we pull from working branch rather than continually pushing messy and embarassing broken commits to the main branch..
 	if [[ "${developerMode}" -eq "1" ]]; then
 		echo -e "Injecting dev branch into files..\n"
