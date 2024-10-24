@@ -41,12 +41,12 @@ IMAGEFILE=$(ls -t *.iso | head -n1)
 	echo -e "Generating Ignition files with Butane..\n"
 	# Generate decoder.ign regardless of server provisioning argument
 	echo -e "Generating decoder.ign..\n"
-	butane --pretty --strict --files-dir ./ ./decoder_custom.yml --output decoder.ign
+	butane --pretty --strict --files-dir ./ ./decoder_custom.yml --output ./ignition_files/decoder.ign
 	if [[ "${serverMode}" = "1" ]]; then
 		# Generate butane setting files-dir to current path
-		# This is so that we can utilize the local files argument in server_custom.yml to inject decoder.ign file
+		# This is so that we can utilize the local files argument in server_custom.yml to inject the necessary files from /ignition subdir
 		echo -e "Generating server.ign..\n"
-		butane --pretty --strict --files-dir ./ ./server_custom.yml --output server.ign
+		butane --pretty --strict --files-dir ./ignition_files ./server_custom.yml --output ./ignition_files/server.ign
 	fi
 
 echo "Customizing ISO files with Ignition\n"
@@ -60,13 +60,13 @@ echo "Customizing ISO files with Ignition\n"
 		echo -e "Provision Server ISO..\n"
 		coreos-installer iso customize \
 		--dest-device ${DESTINATION_DEVICE} \
-		--dest-ignition server.ign ${liveKarg} \
+		--dest-ignition ./ignition_files/server.ign ${liveKarg} \
 		-o $HOME/Downloads/wavelet_server.iso ${IMAGEFILE}
 		# Generate Decoder ISO
 		echo -e "Provision Decoder ISO..\n"
 		coreos-installer iso customize \
 		--dest-device ${DESTINATION_DEVICE} \
-		--dest-ignition decoder.ign \
+		--dest-ignition ./ignition_files/decoder.ign \
 		-o $HOME/Downloads/wavelet_decoder.iso ${IMAGEFILE}
 	else
 		echo -e "\nProvisioning Decoder, .ISO files output to /var/wavelet/http/ignition/..\n"
