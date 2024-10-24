@@ -28,6 +28,8 @@ generate_coreos_image() {
 	###
 
 	mkdir -p /home/wavelet/pxe && cd /home/wavelet/pxe
+	mkdir -p /var/lib/tftpboot/wavelet-coreos
+	mkdir -p /home/wavelet/http/pxe
 
 	# Remove custom-initramfs if already exists
 	rm -rf /home/wavelet/pxe/custom-initramfs.img
@@ -36,22 +38,26 @@ generate_coreos_image() {
 	quay.io/coreos/coreos-installer:release download -f pxe
 	echo -e "\nCoreOS Image files downloaded, continuing..\n"
 	# Set destination device and find downloaded initramfs file to customize
-	DESTINATION_DEVICE="/dev/disk/by-id/coreos-boot-disk"
+	#DESTINATION_DEVICE="/dev/disk/by-id/coreos-boot-disk"
 	IMAGEFILE=$(ls -t *.img | grep 'initramfs')
 	echo "Generating client machine ISO files..\n"
+
+	# Move yml for automated installer and generate ignition file for initial client boot, then COPY it back as a compiled ignition file
+	if [[ -f automated_installer.yml ]]; then
+		echo -e "automated installer YAML already exists!\n"
+	fi
+	mv /home/wavelet/http/ignition/automated_installer.yml ./
+	butane --pretty --strict --files-dir ./ automated_installer.yml --output automated_installer.ign
+	cp ./automated_installer.ign /home/wavelet/http/ignition/automated_installer.ign
+	cp /usr/local/bin/wavelet_install_client.sh /home/wavelet/http/ignition
 
 	# Customize for PXE boot automation
 	# Ref https://coreos.github.io/coreos-installer/customizing-install/
 	# DustyMabe to the rescue! https://dustymabe.com/2020/04/04/automating-a-custom-install-of-fedora-coreos/
-	coreos-installer pxe customize \
-			--dest-device ${DESTINATION_DEVICE} \
-			--dest-ignition /home/wavelet/http/ignition/automated_installer.ign \
-			-o /home/wavelet/pxe/custom-initramfs ${IMAGEFILE}
+	# automated_installer.ign is preconfigured by the wavelet_installer during initial setup process
 	FILES=$(find *img*)
 	KERNEL=$(find *kernel*)
 	# Copy boot images to both tftp and http server - NOTE /home/wavelet/pxe and /home/wavelet/http/pxe are NOT the same dirs!
-	mkdir -p /var/lib/tftpboot/wavelet-coreos
-	mkdir -p /home/wavelet/http/pxe
 	cp ${FILES} /var/lib/tftpboot/wavelet-coreos && cp ${KERNEL} /var/lib/tftpboot/wavelet-coreos
 	cp ${FILES} /home/wavelet/http/pxe && cp ${KERNEL} /home/wavelet/http/pxe
 
@@ -68,25 +74,24 @@ generate_coreos_image() {
 	#		automated_installer.yml (FCCT/Butane YML config for initial boot)
 	#		automated_coreos_deployment.sh (HDD Detection script)
 	#		decoder.ign (should be pre-provisioned from initial setup script prior to installing the server)
-	butane --pretty --strict --files-dir /home/wavelet/http/ignition ./automated_installer.yml --output /home/wavelet/http/ignition/automated_installer.ign
 	configURL="http://192.168.1.32:8080/ignition/automated_installer.ign"
 	# The boot process now calls an initial coreOS Live image, which has an automation process burned in with a custom ignition file.
 	# It THEN installs the host OS after detecting available hard drives, configured with decoder.ign.  So this is a two-step bootstreap process.
-	coreOSentry=" \
-	menuentry  'Decoder FCOS V.${coreosVersion} TFTP' --class fedora --class gnu-linux --class gnu --class os {
-	echo 'Loading CoreOS kernel...'   
-		linuxefi wavelet-coreos/${kernel} \
-			ignition.firstboot \
-			ignition.platform.id=metal \
-			coreos.inst.install_dev=${installDev} \
-			coreos.inst.ignition_url=${configURL}
-
-	echo 'Loading Fedora CoreOS initial ramdisk...'
-		initrdefi \
-			wavelet-coreos/${initrd} \
-    		wavelet-coreos/${rootfs}
-		echo 'Booting Fedora CoreOS...'
-	}"
+#	coreOSentry=" \
+#	menuentry  'Decoder FCOS V.${coreosVersion} TFTP' --class fedora --class gnu-linux --class gnu --class os {
+#	echo 'Loading CoreOS kernel...'   
+#		linuxefi wavelet-coreos/${kernel} \
+#			ignition.firstboot \
+#			ignition.platform.id=metal \
+#			coreos.inst.install_dev=${installDev} \
+#			coreos.inst.ignition_url=${configURL}
+#
+#	echo 'Loading Fedora CoreOS initial ramdisk...'
+#		initrdefi \
+#			wavelet-coreos/${initrd} \
+ #   		wavelet-coreos/${rootfs}
+#		echo 'Booting Fedora CoreOS...'
+#	}"
 	coreOShttpEntry=" \
 	menuentry  'Decoder FCOS V.${coreosVersion} HTTP live boot' --class fedora --class gnu-linux --class gnu --class os {
 	echo 'Loading CoreOS kernel...'   
@@ -120,7 +125,7 @@ configure_tftpboot(){
 	insmod chain
 	insmod regexp
 	set default=3
-	set timeout=10
+	set timeout=3
 	menuentry 'EFI Firmware System Setup'  'uefi-firmware' {
 		fwsetup
 	}
@@ -205,8 +210,8 @@ cp -R /var/lib/tftpboot/efi /home/wavelet/http/pxe
 # Set Apache +x and read perms on http folder
 chmod -R 0755 /home/wavelet/http
 chown -R wavelet /home/wavelet/http
-# Remove executable bit from all FILES in http (folders need +x for apache to traverse them)
-find /home/wavelet/http -type f -print0 | xargs -0 chmod 644
+# Remove executable bit from all FILES in http (folders need +x for apache to traverse them) - apparently this breaks PXE though?
+find /home/wavelet/http/{ignition} -type f -print0 | xargs -0 chmod 644
 echo -e "\nPXE bootable images completed and populated in http serverdir, client provisioning should now be available..\n"
 # We do not install Fedora's TFTP server package, because DNSMASQ has one built-in.
 touch /var/pxe.complete
