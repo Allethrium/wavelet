@@ -37,6 +37,19 @@ storage:
       contents:
         inline: |
           enabled
+    # Client device storage detection script
+    - path: /home/wavelet/http/ignition/automated_coreos_deployment.sh
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/usr/local/bin/automated_coreos_deployment.sh
+    # Client automated installer ignition
+    - path: /home/wavelet/http/ignition/automated_installer.yml
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/ignition/automated_installer.yml
+    # UltraGrid executable - track latest stable release where possible
     - path: /usr/local/bin/UltraGrid.AppImage
       mode: 0755
       overwrite: true
@@ -671,30 +684,7 @@ storage:
 # user accounts, passwords and pubkeys
 passwd:
   users:
-      # Root account
-    - name: wavelet-root
-      uid: 9337
-      groups:
-        - wheel
-        - sudo
-      password_hash: waveletrootpassword
-      home_dir: /home/wavelet-root
-      # User account
-    - name: wavelet
-      uid: 1337
-      # N.B ignition can't yet create groups properly as of 1.5
-      # This might need to be done via postinstall.sh
-      groups:
-        # - wavelet
-        # - audio
-        # - video
-        # - render
-        # - rdma
-        # - kvm
-      password_hash: waveletuserpassword
-      ssh_authorized_keys:
-        - PUBKEYGOESHERE
-      home_dir: /home/wavelet
+      #ADD_USER_YAML_HERE
 # Configure SYSTEM systemd units
 systemd:
   units:
