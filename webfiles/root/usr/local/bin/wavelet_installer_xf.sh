@@ -60,7 +60,8 @@ event_server(){
         [Service]
         Type=oneshot
         ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_pxe_grubconfig.sh"
-        ExecStartPost=systemctl disable wavelet_install_pxe.service && systemctl reboot
+        ExecStartPost=systemctl disable wavelet_install_pxe.service
+        ExecStartPost=systemctl reboot
         [Install]
         WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_pxe.service
     systemctl daemon-reload
