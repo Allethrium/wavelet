@@ -214,4 +214,6 @@ chown -R wavelet /home/wavelet/http
 find /home/wavelet/http/{ignition} -type f -print0 | xargs -0 chmod 644
 echo -e "\nPXE bootable images completed and populated in http serverdir, client provisioning should now be available..\n"
 # We do not install Fedora's TFTP server package, because DNSMASQ has one built-in.
+# we need to issue a reboot here
 touch /var/pxe.complete
+systemctl reboot
