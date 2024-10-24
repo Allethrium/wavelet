@@ -1,5 +1,5 @@
 #!/bin/bash
-# This runs as a systemd unit on the SECOND boot.  
+# This runs as a systemd unit on the SECOND boot on the SERVER ONLY
 # Is ensures that the ostree overlay is available by falling back to an old method if container overlay failed.
 # It then proceeds to configure dependencies, then reboots
 
@@ -200,3 +200,5 @@ install_wavelet_modules
 #generate_decoder_iso
 echo -e "Dependencies Installation completed..\n"
 touch /var/wavelet_depends.complete
+# Apparently the pxe_grubconfig service might need some help to start..
+systemctl enable wavelet_install_pxe.service --now
