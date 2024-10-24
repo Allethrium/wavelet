@@ -43,10 +43,9 @@ generate_coreos_image() {
 	# Customize for PXE boot automation
 	# Ref https://coreos.github.io/coreos-installer/customizing-install/
 	# DustyMabe to the rescue! https://dustymabe.com/2020/04/04/automating-a-custom-install-of-fedora-coreos/
-	# The long and short of it is I need to generate two ignitions, one to install everything and then THAT calls the decoder ignition.
 	coreos-installer pxe customize \
 			--dest-device ${DESTINATION_DEVICE} \
-			--dest-ignition /home/wavelet/http/ignition/decoder.ign \
+			--dest-ignition /home/wavelet/http/ignition/automated_installer.ign \
 			-o /home/wavelet/pxe/custom-initramfs ${IMAGEFILE}
 	FILES=$(find *img*)
 	KERNEL=$(find *kernel*)
@@ -63,12 +62,16 @@ generate_coreos_image() {
 	initrd=$(find *initramfs.x86_64.img)
 	rootfs=$(find *rootfs.x86_64.img)
 	kernel=$(find *kernel-x86_64)
-	installdev="/dev/nvme0n1"
-	configURL="/home/wavelet/http/ignition/decoder.ign"
-	# Note - it might seem like a lot of work to do it this way rather than simply generate and boot an ISO.
-	# This is because grub2 needs certain information regarding the host machine which we can't easily generate.
-	# It also needs data on the internal arrangement of the ISO rather just just being able to "boot" it
-	# Since we already downloaded these components earlier in the process, we'll just keep doing it this way.
+
+	# Generate the ignition file for the automated Live Installer, then generate the initial ignition file
+	# Files required; 
+	#		automated_installer.yml (FCCT/Butane YML config for initial boot)
+	#		automated_coreos_deployment.sh (HDD Detection script)
+	#		decoder.ign (should be pre-provisioned from initial setup script prior to installing the server)
+	butane --pretty --strict --files-dir /home/wavelet/http/ignition ./automated_installer.yml --output /home/wavelet/http/ignition/automated_installer.ign
+	configURL="http://192.168.1.32:8080/ignition/automated_installer.ign"
+	# The boot process now calls an initial coreOS Live image, which has an automation process burned in with a custom ignition file.
+	# It THEN installs the host OS after detecting available hard drives, configured with decoder.ign.  So this is a two-step bootstreap process.
 	coreOSentry=" \
 	menuentry  'Decoder FCOS V.${coreosVersion} TFTP' --class fedora --class gnu-linux --class gnu --class os {
 	echo 'Loading CoreOS kernel...'   
