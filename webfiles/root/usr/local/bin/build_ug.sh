@@ -231,13 +231,14 @@ server_bootstrap(){
 		echo -e "Generating HTTPD server and copying/compressing wavelet files to server directory.."
 		/usr/local/bin/build_httpd.sh	
 		# Remove executable bit from all webserver files
-		find /home/wavelet/http -type f -print0 | xargs -0 chmod 644
-		sleep 1
+		find /var/home/wavelet/http -type f -print0 | xargs -0 chmod 644
 	}
 
 	bootstrap_nginx_php(){
 		# http PHP server for control interface	
 		/usr/local/bin/build_nginx_php.sh
+		# Remove executable bit from all webserver files
+		find /var/home/wavelet/http-php -type f -print0 | xargs -0 chmod 644
 		sleep 1
 	}
 
@@ -286,8 +287,6 @@ server_bootstrap(){
 	bootstrap_nginx_php
 	bootstrap_nodejs
 	bootstrap_dnsmasq_watcher_service
-	chown -R wavelet:wavelet /home/wavelet/http
-	chmod -R 0755 /home/wavelet/http
 	KEYNAME=SERVER_BOOTSTRAP_COMPLETED
 	KEYVALUE=1
 	touch /var/server_bootstrap_completed
