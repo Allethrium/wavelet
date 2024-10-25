@@ -109,32 +109,34 @@ rpm_overlay_install(){
 rpm_overlay_install_decoder(){
 	# This differs from the server in that we don't need to build the container,
 	# We pull the client installer module and run it to generate the wavelet files in /usr/local/bin
+	dmidecode | grep "Manufacturer" | cut -d ':' -f 2 | head -n 1
+	echo -e "\nDownloading client installer module..\n"
 	curl -o /usr/local/bin/wavelet_install_client.sh http://192.168.1.32:8080/ignition/wavelet_install_client.sh
 	chmod 0755 /usr/local/bin/wavelet_install_client.sh && /usr/local/bin/wavelet_install_client.sh
+	systemctl enable wavelet_install_client.service --now
 	# and we pull the already generated overlay from the server registry
 	# This is the slowest part of the process, can we speed it up by compressing the overlay?
 	echo -e "Installing via container and applying as Ostree overlay..\n"
-	DKMS_KERNEL_VERSION=$(uname -r)
 	# We need to pull the container from the server registry first, apparently manually?  Probably https issue here.
 	podman pull 192.168.1.32:5000/coreos_overlay --tls-verify=false
-	rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:192.168.1.32:5000/coreos_overlay
+	rpm-ostree rebase ostree-unverified-image:containers-storage:192.168.1.32:5000/coreos_overlay
 	touch /var/rpm-ostree-overlay.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
 	touch /var/rpm-ostree-overlay.dev.pkgs.complete
 	echo -e "\
-		[Unit]
-		Description=Install Client Dependencies
-		ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-        After=multi-user.target
-        [Service]
-        Type=oneshot
-        ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_install_client.sh"
-        ExecStartPost=systemctl disable wavelet_install_client.service
-        [Install]
-        WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
+[Unit]
+Description=Install Client Dependencies
+ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+After=multi-user.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_install_client.sh"
+[Install]
+WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
 	echo -e "RPM package updates completed, finishing installer task..\n"
-	systemctl enable wavelet_install_client.service
+	sleep 2
+	systemctl reboot
 }
 
 ####
