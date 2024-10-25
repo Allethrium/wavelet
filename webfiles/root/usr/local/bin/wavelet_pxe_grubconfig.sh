@@ -77,66 +77,41 @@ generate_coreos_image() {
 	configURL="http://192.168.1.32:8080/ignition/automated_installer.ign"
 	# The boot process now calls an initial coreOS Live image, which has an automation process burned in with a custom ignition file.
 	# It THEN installs the host OS after detecting available hard drives, configured with decoder.ign.  So this is a two-step bootstreap process.
-#	coreOSentry=" \
-#	menuentry  'Decoder FCOS V.${coreosVersion} TFTP' --class fedora --class gnu-linux --class gnu --class os {
-#	echo 'Loading CoreOS kernel...'   
-#		linuxefi wavelet-coreos/${kernel} \
-#			ignition.firstboot \
-#			ignition.platform.id=metal \
-#			coreos.inst.install_dev=${installDev} \
-#			coreos.inst.ignition_url=${configURL}
-#
-#	echo 'Loading Fedora CoreOS initial ramdisk...'
-#		initrdefi \
-#			wavelet-coreos/${initrd} \
- #   		wavelet-coreos/${rootfs}
-#		echo 'Booting Fedora CoreOS...'
-#	}"
-	coreOShttpEntry=" \
-	menuentry  'Decoder FCOS V.${coreosVersion} HTTP live boot' --class fedora --class gnu-linux --class gnu --class os {
-	echo 'Loading CoreOS kernel...'   
-		linuxefi (http,192.168.1.32:8080)/pxe/${kernel} \
-			coreos.live.rootfs_url=http://192.168.1.32:8080/pxe/${rootfs} \
-			ignition.firstboot \
-			ignition.platform.id=metal \
-			coreos.inst.install_dev=${installDev} \
-			coreos.inst.ignition_url=${configURL}
-			
-
-	echo 'Loading Fedora CoreOS initial ramdisk...'
-		initrdefi \
-			(http,192.168.1.32:8080)/pxe/${initrd}
-		echo 'Booting Fedora CoreOS...'
-	}"
+	coreOShttpEntry="menuentry  'Decoder FCOS V.${coreosVersion} HTTP live boot' --class fedora --class gnu-linux --class gnu --class os {
+echo -e '\nLoading CoreOS kernel...'   
+linuxefi (http,192.168.1.32:8080)/pxe/${kernel} coreos.live.rootfs_url=http://192.168.1.32:8080/pxe/${rootfs} ignition.firstboot ignition.platform.id=metal ignition.config.url=${configURL}		
+echo 'Loading Fedora CoreOS initial ramdisk...'
+initrdefi (http,192.168.1.32:8080)/pxe/${initrd}
+echo 'Booting Fedora CoreOS...'
+}"
 }
 
 configure_tftpboot(){
 	# Generate grub.cfg file in /var/lib/tftpboot root
 	mkdir -p /var/lib/tftpboot/efi
-	echo -e	"
-	function load_video {
-		insmod all_video
-	}
-	load_video
-	set gfxpayload=keep
-	insmod gzio
-	insmod part_gpt
-	insmod ext2
-	insmod chain
-	insmod regexp
-	set default=3
-	set timeout=3
-	menuentry 'EFI Firmware System Setup'  'uefi-firmware' {
-		fwsetup
-	}
-	menuentry 'Reboot' {
-		reboot
-	}
-	${coreOSentry}
-	${coreOShttpEntry}
-	${coreOShttpISOEntry}
-	${bootCentry}
-	}" > /var/lib/tftpboot/grub.cfg
+	echo -e	"\n
+function load_video {
+	insmod all_video
+}
+load_video
+set gfxpayload=keep
+insmod gzio
+insmod part_gpt
+insmod ext2
+insmod chain
+insmod regexp
+set default=2
+set timeout=3
+menuentry 'EFI Firmware System Setup'  'uefi-firmware' {
+	fwsetup
+}
+menuentry 'Reboot' {
+	reboot
+}
+${coreOShttpEntry}
+${coreOStftpEntry}
+${coreOSbootCEntry}
+}" > /var/lib/tftpboot/grub.cfg
 	cp /var/lib/tftpboot/efi/grub.cfg /home/wavelet/http/pxe
 }
 
@@ -170,7 +145,7 @@ generate_bootc_image() {
     mkdir -p /home/wavelet/http/pxe/fcos-bootc/
     mkdir -p /var/lib/tftpboot/fcos-bootc/
 	# Add grub2 menu option for bootc ISO
-	bootCentry="menuentry  'Decoder BootC V.${coreosVersion} HTTP' --class fedora --class gnu-linux --class gnu --class os {
+	coreOSbootCEntry="menuentry  'Decoder BootC V.${coreosVersion} HTTP' --class fedora --class gnu-linux --class gnu --class os {
 	echo 'Loading Fedora BootC Kernel...'   
 		linuxefi (http,192.168.1.32:8080)/pxe/${kernel} \
 
