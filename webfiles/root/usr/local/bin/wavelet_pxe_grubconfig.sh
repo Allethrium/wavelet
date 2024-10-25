@@ -30,6 +30,7 @@ generate_coreos_image() {
 	mkdir -p /home/wavelet/pxe && cd /home/wavelet/pxe
 	mkdir -p /var/lib/tftpboot/wavelet-coreos
 	mkdir -p /home/wavelet/http/pxe
+	chmod +x {/home/wavelet/pxe,/home/wavelet/http,/home/wavelet/http/pxe}
 
 	# Remove custom-initramfs if already exists
 	rm -rf /home/wavelet/pxe/custom-initramfs.img
@@ -146,14 +147,12 @@ generate_bootc_image() {
     mkdir -p /var/lib/tftpboot/fcos-bootc/
 	# Add grub2 menu option for bootc ISO
 	coreOSbootCEntry="menuentry  'Decoder BootC V.${coreosVersion} HTTP' --class fedora --class gnu-linux --class gnu --class os {
-	echo 'Loading Fedora BootC Kernel...'   
-		linuxefi (http,192.168.1.32:8080)/pxe/${kernel} \
-
-	echo 'Loading Fedora BootC initial ramdisk...'
-		initrdefi \
-			(http,192.168.1.32:8080)/pxe/${initrd}
-		echo 'Booting Fedora CoreOS...'
-	}"
+echo 'Loading Fedora BootC Kernel...'   
+linuxefi (http,192.168.1.32:8080)/pxe/${kernel} \
+echo 'Loading Fedora BootC initial ramdisk...'
+initrdefi (http,192.168.1.32:8080)/pxe/${initrd}
+echo 'Booting Fedora CoreOS...'
+}"
 }
 
 ###
