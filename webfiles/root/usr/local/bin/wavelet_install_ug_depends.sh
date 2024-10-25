@@ -140,6 +140,10 @@ install_wavelet_modules(){
 	extract_base
 	extract_home
 	extract_usrlocalbin
+	hostname=$(hostname)
+	echo -e "${hostname}" > /var/lib/dnsmasq/hostname.local
+	# Perform any further customization required in our scripts
+	sed -i "s/!!hostnamegoeshere!!/${hostname}/g" /usr/local/bin/wavelet_network_sense.sh
 	touch /var/extract.target
 }
 
