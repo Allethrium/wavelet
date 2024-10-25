@@ -131,10 +131,11 @@ install_wavelet_modules(){
 		GH_BRANCH="Master"
 	fi
 	GH_REPO="https://github.com/Allethrium/wavelet/"
-	echo -e "\nCommand is; git clone -b ${GH_BRANCH} ${GH_REPO}\n"
-	git clone -b ${GH_BRANCH} ${GH_REPO}
+	# Git complains about the directory already existing so we'll just work in a tmpdir for now..
+	echo -e "\nCommand is; git clone -b ${GH_BRANCH} ${GH_REPO} wavelet-git\n"
+	git clone -b ${GH_BRANCH} ${GH_REPO} wavelet-git
+
 	echo -e "Clone completed..\n"
-	ls -lah /home/wavelet/wavelet
 	generate_tarfiles
 	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
 	extract_base
@@ -142,15 +143,16 @@ install_wavelet_modules(){
 	extract_usrlocalbin
 	hostname=$(hostname)
 	echo -e "${hostname}" > /var/lib/dnsmasq/hostname.local
-	# Perform any further customization required in our scripts
+	# Perform any further customization required in our scripts, and clean up.
 	sed -i "s/!!hostnamegoeshere!!/${hostname}/g" /usr/local/bin/wavelet_network_sense.sh
+	rm -rf /home/wavelet/wavelet-git
 	touch /var/extract.target
 }
 
 generate_tarfiles(){
 	echo -e "Generating tar.xz files for upload to distribution server..\n"
-	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /home/wavelet/wavelet/webfiles/root/usr/local/bin/ .
-	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /home/wavelet/wavelet/webfiles/root/home/wavelet/ .
+	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /home/wavelet/wavelet-git/webfiles/root/usr/local/bin/ .
+	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /home/wavelet-git/wavelet/webfiles/root/home/wavelet/ .
 	echo -e "Packaging files together..\n"
 	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz}
 	echo -e "Done."
@@ -170,7 +172,7 @@ extract_etc(){
 
 extract_home(){
 	tar xf /home/wavelet/wavelethome.tar.xz -C /home/wavelet
-	chown -R wavelet:wavelet /home/wavelet
+	chown -R wavelet /home/wavelet
 	chmod 0755 /home/wavelet/http
 	chmod -R 0755 /home/wavelet/http-php
 	echo -e "Wavelet homedir setup successfully..\n"
