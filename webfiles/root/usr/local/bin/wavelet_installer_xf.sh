@@ -32,10 +32,6 @@ event_server(){
 	cp /usr/local/bin/wavelet_pxe_grubconfig.sh		/home/wavelet/containerfiles/
 	rpm_overlay_install
 	# generate a hostname file so that dnsmasq's dhcp-script call works properly
-	hostname=$(hostname)
-	echo -e "${hostname}" > /var/lib/dnsmasq/hostname.local
-	# Perform any further customization required in our scripts
-	sed -i "s/!!hostnamegoeshere!!/${hostname}/g" /usr/local/bin/wavelet_network_sense.sh
 	get_ipValue
 	sed -i "s/SVR_IPADDR/${IPVALUE}/g" /etc/dnsmasq.conf
 	# Generate and enable systemd units which will be enabled
@@ -61,15 +57,13 @@ event_server(){
         Type=oneshot
         ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_pxe_grubconfig.sh"
         ExecStartPost=systemctl disable wavelet_install_pxe.service
-        ExecStartPost=systemctl reboot
         [Install]
         WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_pxe.service
     systemctl daemon-reload
+    # From here, the system will reboot.
+    # wavelet_install_depends.service will then run, and force enable wavelet_install_pxe.service
+    # wavelet_pxe_install.service will complete the root portion of the server spinup, allowing build_ug.sh to run in userspace.
     systemctl enable wavelet_install_depends.service
-    systemctl enable wavelet_install_pxe.service
-    # Question - DO we want to perform an ostree encapsulation here to "save" the entire ostree to an OCI image?
-    # How is this going to interact with the decoder phase and what work will be required to hammer that out?
-	echo -e "\nInitial config completed, issue systemctl reboot to continue..\n"
 }
 
 get_ipValue(){
