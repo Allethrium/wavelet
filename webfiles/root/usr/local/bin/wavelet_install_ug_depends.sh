@@ -196,10 +196,10 @@ else
 	echo "Packages are not available, attempting to install live from old rpm-ostree layering approach..\n"
 	rpm_ostree_install
 fi
+setfacl -Rdm wavelet:wavelet:rwx /var/home/wavelet
 install_ug_depends
 install_wavelet_modules
 #generate_decoder_iso
-chown -R wavelet:wavelet /var/home/wavelet
 echo -e "Dependencies Installation completed..\n"
 touch /var/wavelet_depends.complete
 # Apparently the pxe_grubconfig service might need some help to start..
