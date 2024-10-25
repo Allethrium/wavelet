@@ -113,6 +113,17 @@ rpm_overlay_install_decoder(){
 	echo -e "\nDownloading client installer module..\n"
 	curl -o /usr/local/bin/wavelet_install_client.sh http://192.168.1.32:8080/ignition/wavelet_install_client.sh
 	chmod 0755 /usr/local/bin/wavelet_install_client.sh && /usr/local/bin/wavelet_install_client.sh
+	echo -e "\
+[Unit]
+Description=Install Client Dependencies
+ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+After=multi-user.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_install_client.sh"
+[Install]
+WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
+	systemctl daemon-reload
 	systemctl enable wavelet_install_client.service --now
 	# and we pull the already generated overlay from the server registry
 	# This is the slowest part of the process, can we speed it up by compressing the overlay?
@@ -124,18 +135,11 @@ rpm_overlay_install_decoder(){
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
 	touch /var/rpm-ostree-overlay.dev.pkgs.complete
-	echo -e "\
-[Unit]
-Description=Install Client Dependencies
-ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-After=multi-user.target
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_install_client.sh"
-[Install]
-WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
 	echo -e "RPM package updates completed, finishing installer task..\n"
-	sleep 2
+	while -f /var/client_install.complete; do
+		sleep 5
+		echo "waiting for client install to complete.."
+	done
 	systemctl reboot
 }
 
