@@ -188,7 +188,12 @@ generate_bootc_image() {
 ###
 
 set -x
-exec >/home/wavelet/pxe_grubconfig.log 2>&1
+exec >/home/wavelet/grubconfig.log 2>&1
+
+if [[ -f /var/pxe.complete ]]; then
+	echo -e "\nInstaller has already run, ending task!"
+	exit 1
+fi
 
 # Generate TFTPBOOT folder along with appropriate entries for our populated boot options
 generate_tftpboot
@@ -211,7 +216,10 @@ cp -R /var/lib/tftpboot/efi /home/wavelet/http/pxe
 chmod -R 0755 /home/wavelet/http
 chown -R wavelet /home/wavelet/http
 # Remove executable bit from all FILES in http (folders need +x for apache to traverse them) - apparently this breaks PXE though?
-find /home/wavelet/http/{ignition} -type f -print0 | xargs -0 chmod 644
+find /home/wavelet/http/ignition -type f -print0 | xargs -0 chmod 644
 echo -e "\nPXE bootable images completed and populated in http serverdir, client provisioning should now be available..\n"
 # We do not install Fedora's TFTP server package, because DNSMASQ has one built-in.
 touch /var/pxe.complete
+# we disable the service so it won't attempt to start on next boot
+systemctl disable wavelet_install_pxe.service 
+systemctl reboot
