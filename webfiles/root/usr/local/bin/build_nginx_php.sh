@@ -13,7 +13,7 @@ SCRHOME="/var/home/wavelet"
 # TLS certs would sure be nice..
 
 set -x
-exec >/home/wavelet/build_nginx_php.log 2>&1
+exec >/var/home/wavelet/build_nginx_php.log 2>&1
 cd ${SCRHOME}
 
 
@@ -34,7 +34,8 @@ mv pod-http-php.service ${SCRHOME}/.config/systemd/user
 
 chown -R wavelet:wavelet ${SCRHOME}/.config/systemd/user
 chown -R wavelet:wavelet ${SCRHOME}/http-php
-chmod -R 0755 ${SCRHOME}/http-php
+# Does nginx need +X on these files?
+chmod -R 0744 ${SCRHOME}/http-php
 
 systemctl --user daemon-reload
 systemctl --user enable pod-http-php.service --now
