@@ -5,6 +5,8 @@
 
 detect_self(){
 systemctl --user daemon-reload
+# This might be of use if we need some custom kernels or decide to start building addition ostree overlays
+platform=$(dmidecode | grep "Manufacturer" | cut -d ':' -f 2 | head -n 1)
 UG_HOSTNAME=$(hostname)
 	echo -e "Hostname is $UG_HOSTNAME \n"
 	case $UG_HOSTNAME in
@@ -90,7 +92,24 @@ get_ipValue(){
 	fi
 }
 
+determine_ifSurface(){
+	# Ref https://github.com/linux-surface/linux-surface
+	echo -e "\nThis is where we would attempt to build an ostree overlay using the surface kernel\n"
+	if [[ ${determination} == 1 ]]; then
+		echo "This device is a surface, proceeding to generate a CoreOS overlay based off the Surface Kernel..\n"
+	fi
+}
+
 rpm_overlay_install(){
+	echo -e "platform is ${platform} \n"
+	case ${platform} in
+	*Dell*)                 echo -e "platform is Dell, no special additions needed..\n";
+	;;
+	*icrosoft*)				echo -e "platform is Microsoft, probing for Surface specific devices..\n"	; determine_ifSurface
+	;;
+	*)                      echo -e "platform is generic and requires no special additions..\n" 
+	;;
+	esac
 	echo -e "Installing via container and applying as Ostree overlay..\n"
 	DKMS_KERNEL_VERSION=$(uname -r)
 	podman build -t localhost/coreos_overlay --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -f /home/wavelet/containerfiles/Containerfile.coreos.overlay
