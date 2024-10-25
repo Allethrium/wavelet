@@ -34,4 +34,5 @@ extract_base
 extract_home
 extract_usrlocalbin
 sleep 2
-systemctl reboot
+touch /var/client_install.complete
+systemctl disable wavelet_install_client.service
