@@ -11,7 +11,7 @@ install_ug_depends(){
 	#   Live555 for rtmp
 	#   LibNDI for Magewell devices
 	# Needs to run as root after the second reboot, since it requires some of the coreos overlay features to be available.
-	cd /home/wavelet
+	cd /var/home/wavelet
 	install_cineform(){
 		# CineForm SDK
 		git clone https://github.com/gopro/cineform-sdk
@@ -21,11 +21,10 @@ install_ug_depends(){
 		cmake -DBUILD_TOOLS=OFF
 		cmake --build . --parallel "$(nproc)"
 		sudo cmake --install .
-		cd /home/wavelet
+		cd /var/home/wavelet
 	}
 	install_libaja(){
 		#Install libAJA Library
-		cd /home/wavelet
 		git clone https://github.com/aja-video/libajantv2.git && \
 		cmake -DAJANTV2_DISABLE_DEMOS=ON  -DAJANTV2_DISABLE_DRIVER=OFF \
 		-DAJANTV2_DISABLE_TOOLS=ON  -DAJANTV2_DISABLE_TESTS=ON \
@@ -34,7 +33,7 @@ install_ug_depends(){
 		cmake --build libajantv2/build --config Release -j "1" && \
 		sleep 2 && \
 		sudo cmake --install libajantv2/build
-		cd /home/wavelet
+		cd /var/home/wavelet
 	}
 	install_live555(){
 		# Live555
@@ -43,7 +42,7 @@ install_ug_depends(){
 		./genMakefiles linux-with-shared-libraries
 		make -j "$(nproc)"
 		make install
-		cd /home/wavelet
+		cd /var/home/wavelet
 	}
 	install_libndi(){
 		# LibNDI
@@ -68,7 +67,7 @@ install_ug_depends(){
 		ldconfig
 		chown -R wavelet:wavelet /home/wavelet/libNDI
 		echo -e "\nLibNDI Installed..\n"
-		cd /home/wavelet
+		cd /var/home/wavelet
 	}
 	#install_libaja
 	install_cineform
@@ -120,7 +119,7 @@ generate_decoder_iso(){
 }
 
 install_wavelet_modules(){
-	cd /home/wavelet
+	cd /var/home/wavelet
 	if [[ -f /var/developerMode.enabled ]]; then
 		echo -e "\n\n***WARNING***\n\nDeveloper Mode is ON\n\nCloning from development repository..\n"
 		GH_USER="armelvil"
@@ -133,7 +132,7 @@ install_wavelet_modules(){
 	GH_REPO="https://github.com/Allethrium/wavelet/"
 	# Git complains about the directory already existing so we'll just work in a tmpdir for now..
 	echo -e "\nCommand is; git clone -b ${GH_BRANCH} ${GH_REPO} wavelet-git\n"
-	git clone -b ${GH_BRANCH} ${GH_REPO} wavelet-git
+	git clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/wavelet-git
 
 	echo -e "Clone completed..\n"
 	generate_tarfiles
@@ -145,14 +144,13 @@ install_wavelet_modules(){
 	echo -e "${hostname}" > /var/lib/dnsmasq/hostname.local
 	# Perform any further customization required in our scripts, and clean up.
 	sed -i "s/!!hostnamegoeshere!!/${hostname}/g" /usr/local/bin/wavelet_network_sense.sh
-	rm -rf /home/wavelet/wavelet-git
 	touch /var/extract.target
 }
 
 generate_tarfiles(){
 	echo -e "Generating tar.xz files for upload to distribution server..\n"
-	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /home/wavelet/wavelet-git/webfiles/root/usr/local/bin/ .
-	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /home/wavelet-git/wavelet/webfiles/root/home/wavelet/ .
+	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /var/home/wavelet/wavelet-git/webfiles/root/usr/local/bin/ .
+	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /var/home/wavelet/wavelet-git/webfiles/root/home/wavelet/ .
 	echo -e "Packaging files together..\n"
 	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz}
 	echo -e "Done."
@@ -171,10 +169,7 @@ extract_etc(){
 }
 
 extract_home(){
-	tar xf /home/wavelet/wavelethome.tar.xz -C /home/wavelet
-	chown -R wavelet /home/wavelet
-	chmod 0755 /home/wavelet/http
-	chmod -R 0755 /home/wavelet/http-php
+	tar xf /var/home/wavelet/wavelethome.tar.xz -C /var/home/wavelet
 	echo -e "Wavelet homedir setup successfully..\n"
 }
 
@@ -182,7 +177,7 @@ extract_usrlocalbin(){
 	umask 022
 	tar xf /usr/local/bin/usrlocalbin.tar.xz -C /usr/local/bin --no-same-owner
 	chmod +x /usr/local/bin
-	chmod 0755 /usr/local/bin/*
+	chmod -R 0755 /usr/local/bin/
 	echo -e "Wavelet application modules setup successfully..\n"
 }
 
@@ -204,6 +199,7 @@ fi
 install_ug_depends
 install_wavelet_modules
 #generate_decoder_iso
+chown -R wavelet:wavelet /var/home/wavelet
 echo -e "Dependencies Installation completed..\n"
 touch /var/wavelet_depends.complete
 # Apparently the pxe_grubconfig service might need some help to start..
