@@ -29,6 +29,7 @@ write_etcd_global(){
 		echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
 }
 detect_ug_version(){
+	# This is fairly redudant, as the provisioning process should not get this far without download UG during Ignition..
 	APPIMAGE=/usr/local/bin/UltraGrid.AppImage
 	if test -f "$APPIMAGE"; then
 		echo "UltraGrid AppImage detected, checking version.."
@@ -37,7 +38,7 @@ detect_ug_version(){
 		if [[ $versions = "$(sort -V <<< "versions")" ]]; then
 		echo "UltraGrid AppImage version too old, removing and downloading new version.."
 		rm -rf /usr/local/bin/UltraGrid.AppImage
-		#curl -O https://github.com/CESNET/UltraGrid/releases/download/continuous/UltraGrid.AppImage
+		# This would rebase on the continuous build which might have broken features...
 		wget https://github.com/CESNET/UltraGrid/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage -O /usr/local/bin/UltraGrid.AppImage
 		chmod +x $APPIMAGE
 		else
