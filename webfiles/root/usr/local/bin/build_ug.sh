@@ -183,6 +183,12 @@ event_encoder(){
 }
 
 event_server(){
+	if [[ -f /var/pxe.complete ]]; then
+		echo -e "\nPXE service up and running, continuing..\n"
+	else
+		echo -e "\nPXE service has not completed setup, exiting until the next reboot..\n"
+		exit 1
+	fi
 	systemctl --user start container-etcd-member.service
 	sleep 10	
 	if service_exists container-etcd-member; then
