@@ -230,15 +230,17 @@ server_bootstrap(){
 		# check for bootstrap_completed, verify services running
 		echo -e "Generating HTTPD server and copying/compressing wavelet files to server directory.."
 		/usr/local/bin/build_httpd.sh	
-		# Remove executable bit from all webserver files
+		# Remove executable bit from all webserver files and make sure to reset +x for the directory only
 		find /var/home/wavelet/http/ -type f -print0 | xargs -0 chmod 644
+		chmod +x /var/home/wavelet/http
 	}
 
 	bootstrap_nginx_php(){
 		# http PHP server for control interface	
 		/usr/local/bin/build_nginx_php.sh
-		# Remove executable bit from all webserver files
+		# Remove executable bit from all webserver files and make sure to reset +x for the directory only
 		find /var/home/wavelet/http-php/ -type f -print0 | xargs -0 chmod 644
+		chmod +x /var/home/wavelet/http
 	}
 
 	bootstrap_nodejs(){
