@@ -186,12 +186,12 @@ restorecon -Rv /var/lib/tftpboot
 cp -R /var/lib/tftpboot/*.efi /home/wavelet/http/pxe
 cp -R /var/lib/tftpboot/boot /home/wavelet/http/pxe
 cp -R /var/lib/tftpboot/efi /home/wavelet/http/pxe
-# Ensure the wavelet user owns the http folder, and set +x and read perms on http folder
+# Ensure the wavelet user owns the http folder, and set +x and read perms on http folder and subfolders
 chmod -R 0755 /home/wavelet/http
 chown -R wavelet /home/wavelet/
 # Remove executable bit from all FILES in http (folders need +x for apache to traverse them) - apparently this breaks PXE though?
-find /var/home/wavelet/http -type f -print0 | xargs -0 chmod 644
-find /var/home/wavelet/http-php -type f -print0 | xargs -0 chmod 644
+find /var/home/wavelet/http/ -type f -print0 | xargs -0 chmod 644
+find /var/home/wavelet/http-php/ -type f -print0 | xargs -0 chmod 644
 echo -e "\nPXE bootable images completed and populated in http serverdir, client provisioning should now be available..\n"
 touch /var/pxe.complete
 # we disable the service so it won't attempt to start on next boot
