@@ -34,8 +34,8 @@ mv pod-http-php.service ${SCRHOME}/.config/systemd/user
 
 chown -R wavelet:wavelet ${SCRHOME}/.config/systemd/user
 chown -R wavelet:wavelet ${SCRHOME}/http-php
-# Does nginx need +X on these files?
-chmod -R 0744 ${SCRHOME}/http-php
+# Does nginx need +X on these files? (yes, it does)
+chmod -R 0755 ${SCRHOME}/http-php
 
 systemctl --user daemon-reload
 systemctl --user enable pod-http-php.service --now
