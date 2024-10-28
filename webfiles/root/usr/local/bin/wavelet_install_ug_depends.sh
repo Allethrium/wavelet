@@ -119,6 +119,7 @@ generate_decoder_iso(){
 }
 
 install_wavelet_modules(){
+	gitcommand="/usr/bin/git"
 	cd /var/home/wavelet
 	if [[ -f /var/developerMode.enabled ]]; then
 		echo -e "\n\n***WARNING***\n\nDeveloper Mode is ON\n\nCloning from development repository..\n"
@@ -127,14 +128,13 @@ install_wavelet_modules(){
 	else
 		echo -e "\nDeveloper mode off, cloning main branch..\n"
 		GH_USER="ALLETHRIUM"
-		GH_BRANCH="Master"
 	fi
-	GH_REPO="https://github.com/Allethrium/wavelet/"
+	GH_REPO="https://github.com/Allethrium/wavelet"
 	# Git complains about the directory already existing so we'll just work in a tmpdir for now..
-	echo -e "\nCommand is; git clone -b ${GH_BRANCH} ${GH_REPO} wavelet-git\n"
-	git clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/wavelet-git
-
-	echo -e "Clone completed..\n"
+	rm -rf /var/home/wavelet/wavelet-git
+	mkdir -p /var/home/wavelet/wavelet-git
+	echo -e "\nCommand is; ${gitcommand} clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/wavelet-git\n"
+	git clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/wavelet-git && echo -e "Cloning git repository..\n"
 	generate_tarfiles
 	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
 	extract_base
@@ -196,7 +196,9 @@ else
 	echo "Packages are not available, attempting to install live from old rpm-ostree layering approach..\n"
 	rpm_ostree_install
 fi
-setfacl -Rdm wavelet:wavelet:rwx /var/home/wavelet
+chmod g+s /var/home/wavelet
+setfacl -dm g:wavelet:rwx /var/home/wavelet
+setfacl -dm o::rx /var/home/wavelet
 install_ug_depends
 install_wavelet_modules
 #generate_decoder_iso
