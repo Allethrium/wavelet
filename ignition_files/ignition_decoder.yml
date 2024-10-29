@@ -438,27 +438,7 @@ storage:
 # user accounts, passwords and pubkeys
 passwd:
   users:
-    - name: wavelet-root
-      uid: 9337
-      groups:
-        - wheel
-        - sudo
-      password_hash: waveletrootpassword
-      home_dir: /home/wavelet-root
-    - name: wavelet
-      uid: 1337
-      # N.B ignition can't yet create groups properly as of 1.5
-      groups:
-        # - wavelet
-        # - audio
-        # - video
-        # - render
-        # - rdma
-        # - kvm
-      password_hash: waveletuserpassword
-      ssh_authorized_keys:
-        - PUBKEYGOESHERE
-      home_dir: /home/wavelet
+      #ADD_USER_YAML_HERE
 # Configure SYSTEM systemd units
 systemd:
   units:
@@ -468,13 +448,13 @@ systemd:
       enabled: true
       contents: |
         [Unit]
-        Description=Decompress Wavelet files
+        Description=Install Overlay packages, and generate second-boot systemd units
         ConditionFirstBoot=yes
         After=multi-user.target
         [Service]
         Type=oneshot
         ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_installer_xf.sh"
-        ExecStartPost=-touch /var/extract.target
+        ExecStartPost=-systemctl reboot
         [Install]
         WantedBy=multi-user.target
     # service to call decoderhostname randomizer (interactive auth required so this is a TEST to make it work from root!)
@@ -482,7 +462,7 @@ systemd:
       enabled: true
       contents: |
           [Unit]
-          Description=Configures a four-char hostname
+          Description=Configures a four character hostname
           Wants=network-online.target
           After=network-online.target check_and_wait.target
           [Service]

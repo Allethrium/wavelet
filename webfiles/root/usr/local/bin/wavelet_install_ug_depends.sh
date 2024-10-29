@@ -1,5 +1,5 @@
 #!/bin/bash
-# This runs as a systemd unit on the SECOND boot.  
+# This runs as a systemd unit on the SECOND boot on the SERVER ONLY
 # Is ensures that the ostree overlay is available by falling back to an old method if container overlay failed.
 # It then proceeds to configure dependencies, then reboots
 
@@ -11,7 +11,7 @@ install_ug_depends(){
 	#   Live555 for rtmp
 	#   LibNDI for Magewell devices
 	# Needs to run as root after the second reboot, since it requires some of the coreos overlay features to be available.
-	cd /home/wavelet
+	cd /var/home/wavelet
 	install_cineform(){
 		# CineForm SDK
 		git clone https://github.com/gopro/cineform-sdk
@@ -21,11 +21,10 @@ install_ug_depends(){
 		cmake -DBUILD_TOOLS=OFF
 		cmake --build . --parallel "$(nproc)"
 		sudo cmake --install .
-		cd /home/wavelet
+		cd /var/home/wavelet
 	}
 	install_libaja(){
 		#Install libAJA Library
-		cd /home/wavelet
 		git clone https://github.com/aja-video/libajantv2.git && \
 		cmake -DAJANTV2_DISABLE_DEMOS=ON  -DAJANTV2_DISABLE_DRIVER=OFF \
 		-DAJANTV2_DISABLE_TOOLS=ON  -DAJANTV2_DISABLE_TESTS=ON \
@@ -34,7 +33,7 @@ install_ug_depends(){
 		cmake --build libajantv2/build --config Release -j "1" && \
 		sleep 2 && \
 		sudo cmake --install libajantv2/build
-		cd /home/wavelet
+		cd /var/home/wavelet
 	}
 	install_live555(){
 		# Live555
@@ -43,7 +42,7 @@ install_ug_depends(){
 		./genMakefiles linux-with-shared-libraries
 		make -j "$(nproc)"
 		make install
-		cd /home/wavelet
+		cd /var/home/wavelet
 	}
 	install_libndi(){
 		# LibNDI
@@ -68,7 +67,7 @@ install_ug_depends(){
 		ldconfig
 		chown -R wavelet:wavelet /home/wavelet/libNDI
 		echo -e "\nLibNDI Installed..\n"
-		cd /home/wavelet
+		cd /var/home/wavelet
 	}
 	#install_libaja
 	install_cineform
@@ -80,7 +79,9 @@ install_ug_depends(){
 rpm_ostree_install_git(){
 	# Needed because otherwise sway launches the userspace setup before everything is ready
 	# Some other packages which do not install properly in the ostree container build are also included here
-	/usr/bin/rpm-ostree install -y -A git avahi
+	/usr/bin/rpm-ostree install -y -A git
+	# We have to install avahi this way because the ostree overlay does NOT install dependencies correctly, and it's REQUIRED for NDI to function.
+	/usr/bin/rpm-ostree install -y avahi --allow-inactive
 }
 
 rpm_ostree_install(){
@@ -120,7 +121,8 @@ generate_decoder_iso(){
 }
 
 install_wavelet_modules(){
-	cd /home/wavelet
+	gitcommand="/usr/bin/git"
+	cd /var/home/wavelet
 	if [[ -f /var/developerMode.enabled ]]; then
 		echo -e "\n\n***WARNING***\n\nDeveloper Mode is ON\n\nCloning from development repository..\n"
 		GH_USER="armelvil"
@@ -128,25 +130,29 @@ install_wavelet_modules(){
 	else
 		echo -e "\nDeveloper mode off, cloning main branch..\n"
 		GH_USER="ALLETHRIUM"
-		GH_BRANCH="Master"
 	fi
-	GH_REPO="https://github.com/Allethrium/wavelet/"
-	echo -e "\nCommand is; git clone -b ${GH_BRANCH} ${GH_REPO}\n"
-	git clone -b ${GH_BRANCH} ${GH_REPO}
-	echo -e "Clone completed..\n"
-	ls -lah /home/wavelet/wavelet
+	GH_REPO="https://github.com/Allethrium/wavelet"
+	# Git complains about the directory already existing so we'll just work in a tmpdir for now..
+	rm -rf /var/home/wavelet/wavelet-git
+	mkdir -p /var/home/wavelet/wavelet-git
+	echo -e "\nCommand is; ${gitcommand} clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/wavelet-git\n"
+	git clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/wavelet-git && echo -e "Cloning git repository..\n"
 	generate_tarfiles
 	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
 	extract_base
 	extract_home
 	extract_usrlocalbin
+	hostname=$(hostname)
+	echo -e "${hostname}" > /var/lib/dnsmasq/hostname.local
+	# Perform any further customization required in our scripts, and clean up.
+	sed -i "s/!!hostnamegoeshere!!/${hostname}/g" /usr/local/bin/wavelet_network_sense.sh
 	touch /var/extract.target
 }
 
 generate_tarfiles(){
 	echo -e "Generating tar.xz files for upload to distribution server..\n"
-	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /home/wavelet/wavelet/webfiles/root/usr/local/bin/ .
-	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /home/wavelet/wavelet/webfiles/root/home/wavelet/ .
+	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /var/home/wavelet/wavelet-git/webfiles/root/usr/local/bin/ .
+	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /var/home/wavelet/wavelet-git/webfiles/root/home/wavelet/ .
 	echo -e "Packaging files together..\n"
 	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz}
 	echo -e "Done."
@@ -165,10 +171,7 @@ extract_etc(){
 }
 
 extract_home(){
-	tar xf /home/wavelet/wavelethome.tar.xz -C /home/wavelet
-	chown -R wavelet:wavelet /home/wavelet
-	chmod 0755 /home/wavelet/http
-	chmod -R 0755 /home/wavelet/http-php
+	tar xf /var/home/wavelet/wavelethome.tar.xz -C /var/home/wavelet
 	echo -e "Wavelet homedir setup successfully..\n"
 }
 
@@ -176,9 +179,31 @@ extract_usrlocalbin(){
 	umask 022
 	tar xf /usr/local/bin/usrlocalbin.tar.xz -C /usr/local/bin --no-same-owner
 	chmod +x /usr/local/bin
-	chmod 0755 /usr/local/bin/*
+	chmod -R 0755 /usr/local/bin/
 	echo -e "Wavelet application modules setup successfully..\n"
 }
+
+fun_with_dkms(){
+	# Perhaps there's something we can do here to build the DKMS kernel module or at minimum decompress it and sign it with a MOK..
+	mkdir -p /home/wavelet/signmodules
+	cd /home/wavelet/signmodules
+	efikeygen --dbdir /etc/pki/pesign --self-sign --module --common-name 'CN=ALLETHRIUM' --nickname 'Wavelet modules Secure Boot key'
+	certutil -d /etc/pki/pesign -n 'Custom Secure Boot key' -Lr > sb_cert.cer
+	openssl pkcs12 -in sb_cert.p12  -out sb_cert.priv  -nocerts -noenc
+	cp /usr/lib/modules/6.10.6-200.fc40.x86_64/extra/black*.ko.xz /home/wavelet/signmodules
+	# Decompress .xz file
+	for file in files; do
+		mv ${file} predecompress.${file}
+	done
+	for file in files; do
+		xz -d ${file}
+	# Sign the files, move them to kernel mods directory, then remove the key files we generated (!!)
+	/usr/src/kernels/$(uname -r)/scripts/sign-file sha256 sb_cert.priv sb_cert.cer *.ko
+	mv *.ko /lib/modules/$(uname -r)/extra
+	rm -rf {sb_cert.cer,sb_cert.priv}
+}
+
+
 
 ####
 #
@@ -195,8 +220,14 @@ else
 	echo "Packages are not available, attempting to install live from old rpm-ostree layering approach..\n"
 	rpm_ostree_install
 fi
+chmod g+s /var/home/wavelet
+setfacl -dm u:wavelet:rwx /var/home/wavelet
+setfacl -dm g:wavelet:rwx /var/home/wavelet
+setfacl -dm o::rx /var/home/wavelet
 install_ug_depends
 install_wavelet_modules
 #generate_decoder_iso
 echo -e "Dependencies Installation completed..\n"
 touch /var/wavelet_depends.complete
+# Apparently the pxe_grubconfig service might need some help to start..
+systemctl enable wavelet_install_pxe.service --now

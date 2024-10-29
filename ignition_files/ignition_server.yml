@@ -37,11 +37,23 @@ storage:
       contents:
         inline: |
           enabled
+    # Client device storage detection script
+    - path: /home/wavelet/http/ignition/automated_coreos_deployment.sh
+      mode: 0644
+      contents:
+        local: automated_coreos_deployment.sh
+    # Client automated installer ignition
+    - path: /home/wavelet/http/ignition/automated_installer.yml
+      mode: 0644
+      overwrite: true
+      contents:
+        local: automated_installer.yml
+    # UltraGrid executable - track latest stable release where possible
     - path: /usr/local/bin/UltraGrid.AppImage
       mode: 0755
       overwrite: true
       contents:
-        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.7/UltraGrid-1.9.7-x86_64.AppImage    
+        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.7/UltraGrid-1.9.7-x86_64.AppImage
     # Inhibit systemd suspend
     - path: /etc/systemd/logind.conf.d/inhibit-suspend.conf
       mode: 0644
@@ -547,8 +559,6 @@ storage:
           Wants=network-online.target
           [Service]
           Type=oneshot
-          User=wavelet
-          Group=wavelet
           ExecStartPre=/usr/local/bin/wavelet_check_dependencies.sh
           ExecStart=/usr/local/bin/build_ug.sh
           [Install]
@@ -671,30 +681,7 @@ storage:
 # user accounts, passwords and pubkeys
 passwd:
   users:
-      # Root account
-    - name: wavelet-root
-      uid: 9337
-      groups:
-        - wheel
-        - sudo
-      password_hash: waveletrootpassword
-      home_dir: /home/wavelet-root
-      # User account
-    - name: wavelet
-      uid: 1337
-      # N.B ignition can't yet create groups properly as of 1.5
-      # This might need to be done via postinstall.sh
-      groups:
-        # - wavelet
-        # - audio
-        # - video
-        # - render
-        # - rdma
-        # - kvm
-      password_hash: waveletuserpassword
-      ssh_authorized_keys:
-        - PUBKEYGOESHERE
-      home_dir: /home/wavelet
+      #ADD_USER_YAML_HERE
 # Configure SYSTEM systemd units
 systemd:
   units:
@@ -704,7 +691,7 @@ systemd:
       enabled: true
       contents: |
         [Unit]
-        Description=Install Overlay packages
+        Description=Install Overlay packages, and generate second-boot systemd units
         ConditionFirstBoot=yes
         After=multi-user.target
         [Service]

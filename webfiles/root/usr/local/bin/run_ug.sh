@@ -266,6 +266,7 @@ event_reflector(){
 
 get_ipValue(){
 	# Gets the current IP address for this host to register into server etcd.
+	# Identify Ethernet interfaces by checking for "eth" in their name
 	IPVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
 	# IP value MUST be populated or the decoder writes gibberish into the server
 	if [[ "${IPVALUE}" == "" ]] then
@@ -290,6 +291,57 @@ get_ipValue(){
 	fi
 }
 
+detect_disable_ethernet(){
+	# We disable ethernet preferentially if we have two active connections
+	# This prevents some of the IP detection automation from having issues.
+	for interface in $(ip link show | awk '{print $2}' | grep ":$" | cut -d ':' -f1); do
+		if [[ $(nmcli dev show "${interface}" | grep "connected") ]] && \
+		[[ $(nmcli dev show "${interface}" | grep "ethernet") ]] && \
+		[[ $(nmcli device status | grep -a 'wifi.*connect') ]]; then
+			echo -e "${interface} is an ethernet connection, active WiFi connection also detected..."
+			wifiFound="1"
+			ethernetFound="1"
+			ethernetInterface="${interface}"
+		fi
+	done
+	nmcli device down "${ethernetInterface}"
+	echo -e "Interface ${ethernetInterface} has been disabled.\n\nTo re-enable, you can use:\nnmcli device up ${ethernetInterface}\n\nor:\nnmtui\n"
+}
+
+set_ethernet_mtu(){
+	# Attempting to set an MTU of 9000 will break all wireless clients.  Leaving this in encase we can work around it.
+	for interface in $(ip link show | awk '{print $2}' | grep ":$" | cut -d ':' -f1); do
+		if [[ $(ip link show dev "${interface}" | grep "link/ether") ]]; then 
+			ip link set dev ${interface} mtu 1500
+		fi
+	done
+}
+
+wifi_connect_retry(){
+	if [[ -f /var/no.wifi ]]; then
+		echo "Device configured to ignore wifi!"
+		exit 0
+	fi
+	
+	if nmcli con show --active | grep -q 'wifi'; then
+		echo -e "WiFi device detected, proceeding.."
+		# Look for active wifi
+		if [[ $(nmcli device status | grep -a 'wifi.*connect') ]]; then
+			echo -e "Active WiFi connection available! return 0"
+			exit 0
+		else
+			echo -e "Attempting to connect to WiFi.  If this device is NOT planned to be on WiFi, run the command:\n"
+			echo -e "touch /var/no.wifi"
+			while ! connectwifi; do
+				sleep 2
+			done
+		fi
+	else
+		echo -e "This machine has no wifi connectivity, exiting..\n"
+		exit 0
+	fi
+}
+
 ###
 #
 #
@@ -297,9 +349,11 @@ get_ipValue(){
 #
 #
 ###
-set -x
+#set -x
 exec >/home/wavelet/run_ug.log 2>&1
 # Disable systemd-resolved, because it interferes with name resolution despite DNSSstublistener=no being set.  sigh.
 systemctl disable systemd-resolved.service --now
+detect_disable_ethernet
+#set_ethernet_mtu
 get_ipValue
 detect_self

@@ -37,10 +37,10 @@ RUN	rpm-ostree cliwrap install-to-root / && rpm-ostree override replace \
 RUN	rpm-ostree install -y -A \
 	https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
     https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm && \
-	rpm-ostree install -y \
+	rpm-ostree install -y -A \
 	wget fontawesome-fonts wl-clipboard nnn mako sway bemenu rofi-wayland lxsession sway-systemd waybar \
 	foot vim powerline powerline-fonts vim-powerline perl NetworkManager-wifi iw wireless-regdb wpa_supplicant \
-	cockpit-bridge cockpit-networkmanager buildah rdma \
+	cockpit-bridge cockpit-networkmanager buildah rdma butane \
 	iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd sha libsrtp libdrm python3-pip srt srt-libs \
 	libv4l v4l-utils libva-v4l2-request pipewire-v4l2 ImageMagick intel-opencl \
 	mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
@@ -56,9 +56,11 @@ RUN	rpm-ostree install -y -A \
     ffmpeg vlc libv4l v4l-utils libva-v4l2-request pipewire-v4l2 ImageMagick mplayer libndi libndi-devel ndi-sdk obs-ndi pipewire-utils && \
 	ln -s /usr/bin/ld.bfd /etc/alternatives/ld && ln -s /etc/alternatives/ld /usr/bin/ld && \
 	ostree container commit
+	# Module key signing needs much more understanding on my part to get working correctly..
 RUN mkdir -p /var/lib/blackmagic && \
 	mokdir="/var/lib/blackmagic" && \
-	openssl req -nodes -new -x509 -days 3650 -subj '/CN=MOK_generated' -keyout "$mokdir/MOK.priv" -outform der -out "$mokdir/MOK.der" && \
+	openssl req -nodes -new -x509 -days 3650 -subj '/CN=MOK_generated' -keyout "$mokdir/MOK.priv" -outform der -out "$mokdir/MOK.der"
+	mokutil --import /var/lib/blackmagic/MOK.der && \
 	curl -L https://www.andymelville.net/wavelet/desktopvideo-14.2.1a1.x86_64.rpm -f --retry 5 > "desktopvideo.rpm" && \
 	rpm-ostree install -y -A desktopvideo.rpm && \
 	ostree container commit

@@ -23757,3 +23757,14 @@ webfiles/root/home/wavelet/nodejs/angular-webui/tsconfig.json
 webfiles/root/home/wavelet/nodejs/angular-webui/tsconfig.spec.json
 webfiles/root/home/wavelet/pxe/.wavelet_pxe_grubconfig.sh.~6292df66
 .server_custom.yml.swp
+users.yaml
+users_yaml
+wavelet-root-ssh
+wavelet-root-ssh.pub
+wavelet-root.pw.secure
+wavelet-root_yaml.yml
+wavelet-ssh
+wavelet-ssh.pub
+wavelet.pw.secure
+wavelet_yaml.yml
+ignition_files/automated_installer.ign

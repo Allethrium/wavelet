@@ -8,7 +8,7 @@ KEYVALUE=1
 USER=wavelet
 SCRHOME="/var/home/wavelet"
 
-set -x
+#set -x
 exec >/home/wavelet/build_httpd.log 2>&1
 
 # Needs to be configured with proper TLS certs to be deployment ready.
