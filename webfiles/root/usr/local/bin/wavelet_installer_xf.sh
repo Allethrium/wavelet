@@ -1,7 +1,7 @@
 #!/bin/bash
 # Runs RPM-OStree overlay 
-# Then extracts the downloaded tar files to their appropriate directories.  Should be one of the first things to run on initial boot.
-# All wavelet modules, including the web server code, are deployed on all devices, however only the server has the web servers enabled.
+# Should be one of the first things to run on initial boot in place of a more commonly used direct systemd unit.
+# All wavelet modules, including the web server code, are deployed on all devices.
 
 detect_self(){
 systemctl --user daemon-reload
@@ -32,7 +32,7 @@ event_server(){
 	# Generate RPM Container overlay
 	cp /usr/local/bin/wavelet_install_ug_depends.sh	/home/wavelet/containerfiles/
 	cp /usr/local/bin/wavelet_pxe_grubconfig.sh		/home/wavelet/containerfiles/
-	rpm_overlay_install
+	detect_custom_requirements
 	# generate a hostname file so that dnsmasq's dhcp-script call works properly
 	get_ipValue
 	sed -i "s/SVR_IPADDR/${IPVALUE}/g" /etc/dnsmasq.conf
@@ -97,19 +97,25 @@ determine_ifSurface(){
 	echo -e "\nThis is where we would attempt to build an ostree overlay using the surface kernel\n"
 	if [[ ${determination} == 1 ]]; then
 		echo "This device is a surface, proceeding to generate a CoreOS overlay based off the Surface Kernel..\n"
-	fi
+		# Here we would build a surface ostree container then push it back to the server registry.
+	else
+		echo -e "This platform has some microsoft identifiers, but does not appear to be a Surface device, reverting to standard ostree overlay.."
+		rpm_overlay_install
+}
+
+detect_custom_requirements(){
+	echo -e "platform is ${platform} \n"
+	case ${platform} in
+	*Dell*)                 echo -e "platform is Dell, no special additions needed..\n"					;	touch /var/platform.dell && rpm_overlay_install
+	;;
+	*icrosoft*)				echo -e "platform is Microsoft, probing for Surface specific devices..\n"	;	determine_ifSurface
+	;;
+	*)                      echo -e "platform is generic and requires no special additions..\n" 		;	rpm_overlay_install
+	;;
+	esac
 }
 
 rpm_overlay_install(){
-	echo -e "platform is ${platform} \n"
-	case ${platform} in
-	*Dell*)                 echo -e "platform is Dell, no special additions needed..\n";
-	;;
-	*icrosoft*)				echo -e "platform is Microsoft, probing for Surface specific devices..\n"	; determine_ifSurface
-	;;
-	*)                      echo -e "platform is generic and requires no special additions..\n" 
-	;;
-	esac
 	echo -e "Installing via container and applying as Ostree overlay..\n"
 	DKMS_KERNEL_VERSION=$(uname -r)
 	podman build -t localhost/coreos_overlay --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -f /home/wavelet/containerfiles/Containerfile.coreos.overlay
