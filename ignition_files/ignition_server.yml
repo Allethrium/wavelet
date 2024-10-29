@@ -53,7 +53,7 @@ storage:
       mode: 0755
       overwrite: true
       contents:
-        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.7/UltraGrid-1.9.7-x86_64.AppImage    
+        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.7/UltraGrid-1.9.7-x86_64.AppImage
     # Inhibit systemd suspend
     - path: /etc/systemd/logind.conf.d/inhibit-suspend.conf
       mode: 0644
