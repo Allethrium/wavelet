@@ -481,7 +481,7 @@ function createDeleteButton(hostName, hostHash) {
 /* add delete button */
 	var $btn				=		$('<button/>', {
 		type:   'button',
-		text:   'Remove',
+		text:   'Remove Host',
 		title:  'Delete this host',
 		value:  'Remove'+hostHash,      
 		class:  'btn renameButton',
@@ -681,6 +681,7 @@ function createDecoderMenuSet(hostName, hostHash, type) {
 	$(activeMenuSelector).append(createRebootButton(hostName, hostHash));
 	$(activeMenuSelector).append(createIdentifyButton(hostName, hostHash));
 	$(activeMenuSelector).append(createCodecStateChangeButton(hostName, hostHash, type));
+	$(activeMenuSelector).append(createDeleteButton(hostName, hostHash));
 }
 
 function createEncoderMenuSet(hostName, hostHash, type) {
@@ -689,6 +690,7 @@ function createEncoderMenuSet(hostName, hostHash, type) {
 	$(activeMenuSelector).append(createRestartButton(hostName, hostHash));
 	$(activeMenuSelector).append(createRebootButton(hostName, hostHash));
 	$(activeMenuSelector).append(createCodecStateChangeButton(hostName, hostHash, type));
+	$(activeMenuSelector).append(createDeleteButton(hostName, hostHash));
 }
 
 function createServerMenuSet(hostName, hostHash, type) {
