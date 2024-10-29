@@ -4,28 +4,6 @@
 # The server can run in authoritative mode for an isolated network, or subordinate mode if you are placing it on a network with an active DHCP server for instance.
 # It's generally designed to be run isolated and handle its own DHCP/DNS.
 
-for i in "$@"
-	do
-		case $i in
-			*d*)	echo -e "\nDev mode enabled, switching git tree to working branch\n"	;	developerMode="1"
-			;;
-			h)		echo -e "\nSimple command line switches:\n D for developer mode, will clone git from ARMELVIL working branch for non-release features.\n";	exit 0
-			;;
-			*)		echo -e "\nBad input argument, ignoring"
-			;;
-		esac
-done
-
-echo -e "Is the target network configured with an active gateway, and are you prepared to deal with downloading approximately 4gb of initial files?"
-read -p "Continue? (Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit
-echo -e "Continuing, copying base ignition files for customization.."
-cp ./ignition_files/ignition_server.yml ./server_custom.yml
-cp ./ignition_files/ignition_decoder.yml ./decoder_custom.yml
-# IPv6 mode eventually? Just to be snazzy?
-# remove old iso files
-rm -rf $HOME/Downloads/wavelet_server.iso
-rm -rf $HOME/Downloads/wavelet_decoder.iso
-
 client_networks(){
 	echo -e "\nSystem configured to be run on a larger network.\n"
 		echo -e "Please input the system's gateway IP address, and subnet mask\n"
@@ -261,6 +239,11 @@ customization(){
 		sed -i "s|https://raw.githubusercontent.com/Allethrium/wavelet/master|${repl}|g" ${INPUTFILES}
 	fi
 
+	if [[ ${UGMode} == "DEV" ]]; then
+		echo -e "Targeting UltraGrid continouous build for initial startup.  Please bear in mind that although this comes with additional features, the continuous build might make logging errors harder!\n"
+		sed -i "s|CESNET/UltraGrid/releases/download/v1.9.7/UltraGrid-1.9.7-x86_64.AppImage|CESNET/UltraGrid/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage|g" ${INPUTFILES}
+	fi
+	
 	# WiFi settings
 	# changed to mod ignition files w/ inline data for the scripts to call, this way I don't publish wifi secrets to github.
 	INPUTFILES="server_custom.yml decoder_custom.yml"
@@ -287,8 +270,38 @@ customization(){
 #
 ####
 #set -x
+
+
+for i in "$@"
+	do
+		case $i in
+			*d*)	echo -e "\nDev mode enabled, switching git tree to working branch\n"	;	developerMode="1"
+			;;
+			h)		echo -e "\nSimple command line switches:\n D for developer mode, will clone git from ARMELVIL working branch for non-release features.\n";	exit 0
+			;;
+			*)		echo -e "\nBad input argument, ignoring"
+			;;
+		esac
+done
+
+echo -e "Is the target network configured with an active gateway, and are you prepared to deal with downloading approximately 4gb of initial files?"
+read -p "Continue? (Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit
+echo -e "Continuing, copying base ignition files for customization.."
+cp ./ignition_files/ignition_server.yml ./server_custom.yml
+cp ./ignition_files/ignition_decoder.yml ./decoder_custom.yml
+# IPv6 mode eventually? Just to be snazzy?
+# remove old iso files
+rm -rf $HOME/Downloads/wavelet_server.iso
+rm -rf $HOME/Downloads/wavelet_decoder.iso
+
+
 echo -e "Will this system run on an isolated network?"
 read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || client_networks || echo -e "System configured for isolated, authoritative mode." && isoMode="mode=iso"
+
+echo -e "Target UltraGrid Continuous build (best used with Developer Mode)?"
+read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || UGMode="DEV" || echo -e "System configured for isolated, authoritative mode."
+
 customization
+
 echo -e "Calling coreos_installer.sh to generate ISO images.  You will then need to burn them to USB/SD cards."
 ./coreos_installer.sh "${developerMode}" "${isoMode}"
