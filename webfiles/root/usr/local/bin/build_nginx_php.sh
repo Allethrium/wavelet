@@ -44,3 +44,43 @@ echo -e "The control service should be available via web browser on port 8180 I.
 pwd
 etcdctl --endpoints=${ETCDENDPOINT} put ${KEYNAME} -- ${KEYVALUE}
 exit 0
+
+
+# QUADLETS
+echo -e "\
+[Unit]
+Description=PHP + FPM
+[Container]
+Image=docker.io/library/php:fpm
+ContainerName=container-php-fpm
+AutoUpdate=registry
+Notify=true
+Pod=http-php
+[Service]
+Restart=always
+TimeoutStartSec=30
+[Install]
+WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/container.php-fpm
+echo -e "\
+[Unit]
+Description=NGINX
+[Container]
+Image=docker.io/library/nginx:alpine
+ContainerName=container-nginx
+AutoUpdate=registry
+Notify=true
+Pod=http-php
+[Service]
+Restart=always
+TimeoutStartSec=30
+[Install]
+WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/nginx.container
+echo -e "\
+[Install]
+WantedBy=default.target
+[Unit]
+Requires=nginx.service
+After=php-fpm.service
+[Kube]
+# Publish the envoy proxy data port
+PublishPort=80:80" > /var/home/wavelet/.config/containers/systemd/http-php.kube
