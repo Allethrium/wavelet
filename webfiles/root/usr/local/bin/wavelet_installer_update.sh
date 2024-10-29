@@ -1,5 +1,5 @@
 #!/bin/bash
-# Updates wavelet modules automatically from central source
+# Updates wavelet modules automatically from Git repo.
 
 detect_self(){
 systemctl --user daemon-reload
@@ -36,10 +36,7 @@ event_decoder(){
 }
 
 event_server(){
-	# retreives tar.xz from github for the newest versions
-	wget https://github.com/Allethrium/wavelet/raw/master/wavelet-files.tar.xz
-	mkdir -p /home/wavelet/.config/containers/systemd/
-	chown -R wavelet:wavelet /home/wavelet
+	install_wavelet_modules
 	extract_base
 	extract_home && extract_usrlocalbin
 }
@@ -72,22 +69,51 @@ extract_usrlocalbin(){
 	echo -e "Wavelet application modules setup successfully..\n"
 }
 
+install_wavelet_modules(){
+	gitcommand="/usr/bin/git"
+	cd /var/home/wavelet
+	if [[ -f /var/developerMode.enabled ]]; then
+		echo -e "\n\n***WARNING***\n\nDeveloper Mode is ON\n\nCloning from development repository..\n"
+		GH_BRANCH="armelvil-working"
+	fi
+	GH_REPO="https://github.com/Allethrium/wavelet"
+	# Git complains about the directory already existing so we'll just work in a tmpdir for now..
+	rm -rf /var/home/wavelet/wavelet-git
+	mkdir -p /var/home/wavelet/wavelet-git
+	echo -e "\nCommand is; ${gitcommand} clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/wavelet-git\n"
+	git clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/wavelet-git && echo -e "Cloning git repository..\n"
+	generate_tarfiles
+	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
+	extract_base
+	extract_home
+	extract_usrlocalbin
+	hostname=$(hostname)
+	echo -e "${hostname}" > /var/lib/dnsmasq/hostname.local
+	# Perform any further customization required in our scripts, and clean up.
+	sed -i "s/!!hostnamegoeshere!!/${hostname}/g" /usr/local/bin/wavelet_network_sense.sh
+	touch /var/extract.target
+}
 
-# Perhaps add a checksum to make sure nothing's been tampered with here..
-#github now generates checksum on push
+generate_tarfiles(){
+	echo -e "Generating tar.xz files for upload to distribution server..\n"
+	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /var/home/wavelet/wavelet-git/webfiles/root/usr/local/bin/ .
+	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /var/home/wavelet/wavelet-git/webfiles/root/home/wavelet/ .
+	echo -e "Packaging files together..\n"
+	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz}
+	echo -e "Done."
+	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz}
+	cp /usr/local/bin/wavelet_installer_xf.sh /home/wavelet/http/ignition && chmod 0644 /home/wavelet/http/ignition/wavelet_installer_xf.sh
+}
 
-# curl $checksum URL
-checksum=$(echo sha256sum file)
-filesum=$(shasum wavelet-files.tar.xz)
-if [[ "${checksum}" == "${filesum}" ]]; then
-	echo "Checksums match, the file is correct.."
-else
-	echo -e "\n\n ****Checksums do not match!  the file may be corrupted or tampered with!****\n\n"
-	exit 0
-fi
+
+#####
+#
+# Main
+#
+#####
 
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 systemctl disable zincati.service --now
-set -x
-exec >/home/wavelet/wavelet_installer.log 2>&1
+#set -x
+exec >/home/wavelet/update_wavelet_modules.log 2>&1
 detect_self
