@@ -57,9 +57,10 @@ RUN	rpm-ostree install -y -A \
 	ln -s /usr/bin/ld.bfd /etc/alternatives/ld && ln -s /etc/alternatives/ld /usr/bin/ld && \
 	ostree container commit
 	# Module key signing needs much more understanding on my part to get working correctly..
-RUN mkdir -p /usr/lib/blackmagic && \
+RUN mkdir -p /usr/lib/blackmagic && mkdir -p /var/lib/blackmagic
 	mokdir="/usr/lib/blackmagic" && \
 	openssl req -nodes -new -x509 -days 3650 -subj '/CN=MOK_generated' -keyout "$mokdir/MOK.priv" -outform der -out "$mokdir/MOK.der"
+	ln -s /usr/lib/blackmagic/MOK.priv /var/lib/blackmagic/MOK.priv && ln -s /usr/lib/blackmagic/MOK.der /var/lib/blackmagic/MOK.der && \
 	mokutil --import $mokdir/MOK.der && \
 	curl -L https://www.andymelville.net/wavelet/desktopvideo-14.2.1a1.x86_64.rpm -f --retry 5 > "desktopvideo.rpm" && \
 	rpm-ostree install -y -A desktopvideo.rpm && \
