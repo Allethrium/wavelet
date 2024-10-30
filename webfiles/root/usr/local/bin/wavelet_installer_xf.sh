@@ -101,6 +101,7 @@ determine_ifSurface(){
 	else
 		echo -e "This platform has some microsoft identifiers, but does not appear to be a Surface device, reverting to standard ostree overlay.."
 		rpm_overlay_install
+	fi
 }
 
 detect_custom_requirements(){
