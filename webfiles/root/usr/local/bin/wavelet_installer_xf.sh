@@ -119,7 +119,6 @@ detect_custom_requirements(){
 rpm_overlay_install(){
 	echo -e "Installing via container and applying as Ostree overlay..\n"
 	DKMS_KERNEL_VERSION=$(uname -r)
-generate_kmod_openssl(){
 	# Shamelessly stolen from;
 	# https://github.com/icedream/customizepkg-config/blob/main/decklink.patches/0001-Add-signing-key-generation-post-install-secure-boot-.patch
 	cat > "/home/wavelet/containerfiles/openssl.cnf" << EOF
@@ -147,7 +146,6 @@ basicConstraints  = critical,CA:FALSE
 #         only. See https://lkml.org/lkml/2015/8/26/741.
 #
 extendedKeyUsage  = codeSigning,1.3.6.1.4.1.2312.16.1.2
-
 nsComment         = "OpenSSL Generated Certificate"
 EOF
 	echo ':: A certificate to sign the driver has been created at /var/lib/blackmagic/MOK.der. This certificate needs to be enrolled if you run Secure Boot with validation (e.g. shim).'
