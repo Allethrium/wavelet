@@ -119,7 +119,46 @@ detect_custom_requirements(){
 rpm_overlay_install(){
 	echo -e "Installing via container and applying as Ostree overlay..\n"
 	DKMS_KERNEL_VERSION=$(uname -r)
-	podman build -t localhost/coreos_overlay --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -f /home/wavelet/containerfiles/Containerfile.coreos.overlay
+generate_kmod_openssl(){
+	# Shamelessly stolen from;
+	# https://github.com/icedream/customizepkg-config/blob/main/decklink.patches/0001-Add-signing-key-generation-post-install-secure-boot-.patch
+	cat > "/home/wavelet/containerfiles/openssl.cnf" << EOF
+HOME        = /var/lib/blackmagic
+RANDFILE    = /var/lib/blackmagic/.rnd
+
+[ req ]
+distinguished_name      = req_distinguished_name
+x509_extensions   = v3_ca
+string_mask       = utf8only
+
+[ req_distinguished_name ]
+
+[ v3_ca ]
+subjectKeyIdentifier    = hash
+authorityKeyIdentifier  = keyid:always,issuer
+basicConstraints  = critical,CA:FALSE
+
+# We use extended key usage information to limit what this auto-generated
+# key can be used for.
+#
+# codeSigning:  specifies that this key is used to sign code.
+#
+# 1.3.6.1.4.1.2312.16.1.2:  defines this key as used for module signing
+#         only. See https://lkml.org/lkml/2015/8/26/741.
+#
+extendedKeyUsage  = codeSigning,1.3.6.1.4.1.2312.16.1.2
+
+nsComment         = "OpenSSL Generated Certificate"
+EOF
+	echo ':: A certificate to sign the driver has been created at /var/lib/blackmagic/MOK.der. This certificate needs to be enrolled if you run Secure Boot with validation (e.g. shim).'
+	echo -e "\nPlease run:\nmokutil --import '/var/lib/blackmagic/MOK.der'\nIn order to enroll the MOK key!!"
+	# Podman build, tags the image, uses DKMS_KERNEL_VERSION to parse host OS kernel version into container
+	# needs to mount the pregenerated openssl.cnf file so we generate the correct certificates for module signing
+	# finally specifies the containerfile to build.
+	podman build -t localhost/coreos_overlay \
+	--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
+	-v=/home/wavelet/containerfiles:/mount:z \
+	-f /home/wavelet/containerfiles/Containerfile.coreos.overlay
 	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay:latest
 	touch /var/rpm-ostree-overlay.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
