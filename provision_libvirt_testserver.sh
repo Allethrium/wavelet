@@ -5,7 +5,7 @@
 
 STREAM="stable"
 mkdir -p $HOME/virt-wavelet
-podman run --pull=always --rm -v $HOME/virt-wavelet/:/data -w /data quay.io/coreos/coreos-installer:release download -s "${STREAM}" -p qemu -f qcow2.xz --decompress
+podman run --pull=always --rm -v $HOME/virt-wavelet/:/data:z -w /data quay.io/coreos/coreos-installer:release download -s "${STREAM}" -p qemu -f qcow2.xz --decompress
 cp ignition_wavelet_test.yml test.yml
 INPUTFILES="test.yml ignition_server_custom.yml"
         touch rootpw.secure
