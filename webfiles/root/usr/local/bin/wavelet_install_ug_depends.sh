@@ -198,10 +198,11 @@ fun_with_dkms(){
 	done
 	for file in files; do
 		xz -d ${file}
-	# Sign the files, move them to kernel mods directory, then remove the key files we generated (!!)
-	/usr/src/kernels/$(uname -r)/scripts/sign-file sha256 sb_cert.priv sb_cert.cer *.ko
-	mv *.ko /lib/modules/$(uname -r)/extra
-	rm -rf {sb_cert.cer,sb_cert.priv}
+		# Sign the files, move them to kernel mods directory, then remove the key files we generated (!!)
+		/usr/src/kernels/$(uname -r)/scripts/sign-file sha256 sb_cert.priv sb_cert.cer *.ko
+		mv *.ko /lib/modules/$(uname -r)/extra
+		rm -rf {sb_cert.cer,sb_cert.priv}
+	done
 }
 
 generate_kmod_openssl(){
