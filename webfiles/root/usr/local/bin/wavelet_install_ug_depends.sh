@@ -205,46 +205,6 @@ fun_with_dkms(){
 	done
 }
 
-generate_kmod_openssl(){
-	# Shamelessly stolen from https://github.com/icedream/customizepkg-config/blob/main/decklink.patches/0001-Add-signing-key-generation-post-install-secure-boot-.patch
-	cat > "/var/lib/blackmagic/openssl.cnf" << EOF
-HOME        = /var/lib/blackmagic
-RANDFILE    = /var/lib/blackmagic/.rnd
-
-[ req ]
-distinguished_name      = req_distinguished_name
-x509_extensions   = v3_ca
-string_mask       = utf8only
-
-[ req_distinguished_name ]
-
-[ v3_ca ]
-subjectKeyIdentifier    = hash
-authorityKeyIdentifier  = keyid:always,issuer
-basicConstraints  = critical,CA:FALSE
-
-# We use extended key usage information to limit what this auto-generated
-# key can be used for.
-#
-# codeSigning:  specifies that this key is used to sign code.
-#
-# 1.3.6.1.4.1.2312.16.1.2:  defines this key as used for module signing
-#         only. See https://lkml.org/lkml/2015/8/26/741.
-#
-extendedKeyUsage  = codeSigning,1.3.6.1.4.1.2312.16.1.2
-
-nsComment         = "OpenSSL Generated Certificate"
-EOF
-	openssl req -config "/var/lib/blackmagic/openssl.cnf" \
-	-subj "/CN=Desktop Video Installer Signing Key" \
-	-new -x509 -newkey rsa:2048 \
-	-nodes -days 36500 -outform DER \
-	-keyout "/var/lib/blackmagic/MOK.priv" \
-	-out "/var/lib/blackmagic/MOK.der"
-	rm "/var/lib/blackmagic/openssl.cnf"
-	echo ':: A certificate to sign the driver has been created at /var/lib/blackmagic/MOK.der. This certificate needs to be enrolled if you run Secure Boot with validation (e.g. shim).'
-	echo -e "\nPlease run:\nmokutil --import '/var/lib/blackmagic/MOK.der'\nIn order to enroll the MOK key."
-}
 
 ####
 #
