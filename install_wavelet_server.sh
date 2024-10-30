@@ -113,6 +113,7 @@ generate_user_yaml(){
 		uid="9337"
 		admin="wheel"
 		sed -i "s|#- GROUPGOESHERE|- $admin|" ${user_yaml}
+		
 	elif [[ "${name}" = "wavelet" ]]; then
 		echo -e "wavelet user, setting UID to 1337"
 		uid="1337"
