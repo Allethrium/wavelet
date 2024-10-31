@@ -81,7 +81,8 @@ rpm_ostree_install_git(){
 	# Some other packages which do not install properly in the ostree container build are also included here
 	/usr/bin/rpm-ostree install -y -A git
 	# We have to install avahi this way because the ostree overlay does NOT install dependencies correctly, and it's REQUIRED for NDI to function.
-	/usr/bin/rpm-ostree install -y avahi --allow-inactive
+	# --from repo='updates' necessary, otherwise rpm-ostree complains about non-local overrides not being implemented.
+	#/usr/bin/rpm-ostree override replace avahi --experimental --from repo='updates'
 }
 
 rpm_ostree_install(){
