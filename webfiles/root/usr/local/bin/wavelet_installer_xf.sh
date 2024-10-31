@@ -65,9 +65,6 @@ event_server(){
     # From here, the system will reboot.
     # wavelet_install_depends.service will then run, and force enable wavelet_install_pxe.service
     # wavelet_pxe_install.service will complete the root portion of the server spinup, allowing build_ug.sh to run in userspace.
-    # Fix AVAHI otherwise NDI won't function correctly, amongst other things;  https://www.linuxfromscratch.org/blfs/view/svn/basicnet/avahi.html
-    groupadd -fg 84 avahi && useradd -c "Avahi Daemon Owner" -d /run/avahi-daemon -u 84 -g avahi -s /bin/false avahi
-    groupadd -fg 86 netdev
     systemctl enable wavelet_install_depends.service
 }
 
@@ -223,4 +220,8 @@ systemctl disable zincati.service --now
 # Debug flag
 # set -x
 exec >/home/wavelet/installer.log 2>&1
+    # Fix AVAHI otherwise NDI won't function correctly, amongst other things;  https://www.linuxfromscratch.org/blfs/view/svn/basicnet/avahi.html
+    # Runs first because it doesn't matter what kind of server/client device, it'll need this.
+    groupadd -fg 84 avahi && useradd -c "Avahi Daemon Owner" -d /run/avahi-daemon -u 84 -g avahi -s /bin/false avahi
+    groupadd -fg 86 netdev
 detect_self
