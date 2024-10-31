@@ -111,9 +111,10 @@ generate_user_yaml(){
 	if [[ "${name}" = "wavelet-root" ]]; then
 		echo -e "wavelet-root user, setting UID to 9337"
 		uid="9337"
-		admin="wheel"
-		sed -i "s|#- GROUPGOESHERE|- $admin|" ${user_yaml}
-		
+		group1="wheel"
+		group2="sudo"
+		sed -i "s|#- GROUPGOESHERE|- $group1\n    #- GROUPGOESHERE|" ${user_yaml}
+		sed -i "s|#- GROUPGOESHERE|- $group2\n    #- GROUPGOESHERE|" ${user_yaml}
 	elif [[ "${name}" = "wavelet" ]]; then
 		echo -e "wavelet user, setting UID to 1337"
 		uid="1337"
