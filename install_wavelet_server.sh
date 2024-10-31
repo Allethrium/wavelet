@@ -113,8 +113,8 @@ generate_user_yaml(){
 		uid="9337"
 		group1="wheel"
 		group2="sudo"
-		sed -i "s|#- GROUPGOESHERE|- $group1\n    #- GROUPGOESHERE|" ${user_yaml}
-		sed -i "s|#- GROUPGOESHERE|- $group2\n    #- GROUPGOESHERE|" ${user_yaml}
+		sed -i "s|#- GROUPGOESHERE|- $group1\n        #- GROUPGOESHERE|" ${user_yaml}
+		sed -i "s|#- GROUPGOESHERE|- $group2\n        #- GROUPGOESHERE|" ${user_yaml}
 	elif [[ "${name}" = "wavelet" ]]; then
 		echo -e "wavelet user, setting UID to 1337"
 		uid="1337"
@@ -159,7 +159,7 @@ set_pw(){
 
 		local matchattempts=3
 		while [[ ${success} -ne 1 ]] && [[ ${matchattempts} -gt 0 ]]; do
-			read -srp "`echo $'\n-'`		Please input the password again to verify for ${user}:" tmp_pw2
+			read -srp "`echo $'\n-'`		Please input the password again to verify for ${user}:`echo $'\n-'`" tmp_pw2
 			if [[ "${tmp_pw}" == "${tmp_pw2}" ]]; then
 				echo -e >&2 "`echo $'\n---'`		${GREEN}Passwords match!  Continuing..${NC}"
 				mkpasswd --method=yescrypt ${tmp_pw} > ${user}.pw.secure
