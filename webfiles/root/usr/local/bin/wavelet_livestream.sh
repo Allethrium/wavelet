@@ -32,23 +32,38 @@ write_etcd_global(){
 event_livestream(){
 	KEYNAME=uv_islivestreaming
 	read_etcd
-	if [[ uv_islivestreaming -eq 0 ]]; then
-		echo -e "uv_islivestreaming is NOT enabled. Something is misbehaving!\n"
-		exit 1
+	if [[ ${printvalue} -eq 0 ]]; then
+		echo -e "uv_islivestreaming is NOT enabled, and yet the service was called. Exiting silently.\n"
+		exit 0
 	fi
-
 	KEYNAME=/livestream/url
 	read_etcd_global
-	liveStreamURL=${result}
-
+	liveStreamURL=${printvalue}
+	if [[ ${printvalue} = "" ]]; then
+		echo -e "There is no livestream URL populated.  Exiting.\n"
+		exit 0
+	fi
 	KEYNAME=/livestream/apikey
 	read_etcd_global
-	liveStreamAPIKey=${result}
+	if [[ ${printvalue} = "" ]]; then
+		echo -e "There is no livestream API key populated.  We can continue here if we know the service doesn't require an API key.\n"
+		# Something to determine if server needs apikey?  curl command?
+		# if [[ result = OK ]]; then
+		#	echo -e "Continuing to livestream without API key..\n"
+		#	call_ffmpeg
+		# fi
+		# echo -e "Server requires API key!\n"
+	fi	
+	liveStreamAPIKey=${printvalue}
 
-	KEYNAME=/hostHash/svr.wavelet.local/Hash
+	#KEYNAME=/hostHash/svr.wavelet.local/Hash
 	# UltraGrid now comes build in with live555 RTP server, so we can take a generated output from there with FFMPEG, and stream to our target URL.
 	# This could be expanded in future to stream to a proper forwarding cluster which would generate appropriate stream qualities as necessary.
 	# Run FFMPEG direct from server with appropriate settings;
+	call_ffmpeg
+}
+
+call_ffmpeg(){
 	ffmpeg -protocol_whitelist tcp,udp,http,rtp,file -i http://${serverIP}:8554/ug.sdp -c:v libx264 -g 25 -preset fast -b:v 4096k -c:a aac -ar 44100 -f flv rtmp://${liveStreamURL}/${liveStreamAPIKey}
 }
 
