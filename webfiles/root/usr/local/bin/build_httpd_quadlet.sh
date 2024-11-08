@@ -16,6 +16,7 @@ exec >/home/wavelet/build_httpd.log 2>&1
 echo -e "Generating Apache Podman container and systemd service file"
 
 # Generate Quadlet
+# ref https://hub.docker.com/_/httpd
 echo -e "[Unit]
 Description=HTTPD Quadlet
 After=local-fs.target
@@ -25,6 +26,9 @@ ContainerName=httpd
 Image=docker://docker.io/library/httpd
 PublishPort=8080:80
 Volume=/home/wavelet/http:/usr/local/apache2/htdocs:Z
+#conf
+#cert
+#key
 Tmpfs=/run
 Tmpfs=/tmp
 Exec=httpd-foreground
@@ -43,7 +47,6 @@ etcdctl --endpoints=${ETCDENDPOINT} put ${KEYNAME} -- ${KEYVALUE}
 # populate necessary files for decoder spinup
 cp /usr/local/bin/UltraGrid.AppImage /home/wavelet/http/
 cp /home/wavelet/wavelet-files.tar.xz /home/wavelet/http/ignition/
-cp /usr/local/bin/wavelet_installer_xf.sh /home/wavelet/http/ignition/
 cp /usr/local/bin/wavelet_installer_xf.sh /home/wavelet/http/ignition/
 cp /home/wavelet/.bashrc /home/wavelet/http/ignition/skel_bashrc.txt
 cp /home/wavelet/.bash_profile /home/wavelet/http/ignition/skel_profile.txt
