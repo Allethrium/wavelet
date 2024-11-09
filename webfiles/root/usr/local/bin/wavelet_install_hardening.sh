@@ -4,6 +4,8 @@
 #	Web server configs will need to be modified, as will client spinup modules
 #	This will take a lot of work and is adapted from several other online sources, then customized for Wavelet.
 
+#	Called during wavelet_installer setup, therefore with root privilege.  Dumps files in /var/home/wavelet-root
+
 
 # 	Wavelet's security model is pretty simple;
 #
@@ -16,9 +18,32 @@
 
 
 configure_idm(){
-	# This will require a lot of trial and error to get it to spin up correctly.
-	mkdir -p /var/home/wavelet/freeipa-data
-	chown wavelet:wavelet /var/home/wavelet/freeipa-data
+	# Generate necessary data from the server's existing DNS configuration
+	hostname=$(hostname)
+	domain=$(dnsdomainname)
+	# note - password must be at least 8 chars long
+	administratorPassword=$(cat /var/secrets/ipaadmpw.secure)
+	directoryManagerPassword=$(cat /var/secrets/ipadmpw.secure)
+	KRBDOMAIN=${domain^^}
+	echo -e "Generated variables:\n Hostname:       ${hostname}\n   Domain: ${domain}\n     Kerberos Domain:        ${KRBDOMAIN}\n"
+	dcArray=()
+	IFS="."
+	echo -e "Reading array from ${hostname}\n"
+	read -r -a dcArray <<< "${hostname}"
+	echo -e "Array data:"
+	for i in "${dcArray[@]}"; do
+			printf "%s\t%s\n" "$i"
+	done
+	dn=${dcArray[0]} && echo -e "\nHost: ${dn}\n"
+	tld=${dcArray[-1]} && echo -e "TLD is: .${tld}\n"
+	ldap_dn="DN=${dn}"
+	for ((i=1; i<${#dcArray[@]}; i++)); do
+		ldap_dn="${ldap_dn},CN=${dcArray[i]}"
+	done
+	echo -e "LDAP DN Structure:\n${ldap_dn}\n"
+
+	echo -e "Generating paths and quadlets..\n"
+	mkdir -p /var/freeipa-data
 	echo -e "
 [Container]
 Image=quay.io/freeipa/freeipa-server:almalinux-9
@@ -32,43 +57,44 @@ PublishPort=443:443
 PublishPort=464:464
 PublishPort=464:464/udp
 PublishPort=636:636
-EnvironmentFile=%h/.env.freeipa
-Volume=freeipa-data:/data
+EnvironmentFile=/var/freeipa-data/.env.freeipa
+Volume=/var/freeipa-data:/data:Z
+HostName=ipa.${domain}
 AutoUpdate=registry
 NoNewPrivileges=true
 
 [Service]
 Restart=always
 RestartSec=5
-TimeoutStartSec=300" > /home/users/wavelet/.config/systemd/users/freeipa.container
+TimeoutStartSec=600" > /etc/containers/systemd/freeipa.container
 	echo -e "
 # Remote: https://raw.githubusercontent.com/freeipa/freeipa-container/master/init-data
 # ipa-server-install(1)
-
-IPA_SERVER_IP=127.0.0.1
-IPA_SERVER_HOSTNAME=svr.wavelet.local
-IPA_SERVER_INSTALL_OPTS=--unattended --realm=WAVELET.LOCAL --ds-password=CHANGEME --admin-password=CHANGEME" > /var/home/wavelet/freeipa-data/.env.svr.wavelet.local
-	systemctl --user daemon-reload
-	systemctl --user enable freeipa.service --now
-	if systemctl is-active --quiet freeipa.service; then
- 		echo -e "FreeIPA configured!\n"
- 	else
- 		echo -e "FreeIPA provisioning failed!  Failing task..\n"
- 		exit 0
- 	fi
+IPA_SERVER_IP=$(hostname -I | cut -d " " -f 1)
+IPA_SERVER_HOSTNAME=${hostname}
+IPA_SERVER_INSTALL_OPTS=--unattended \
+--realm=${KRBDOMAIN} \
+--ds-password=${directoryManagerPassword} \
+--admin-password=${administratorPassword}" > /var/freeipa-data/.env.freeipa
+	systemctl daemon-reload
+#	if systemctl is-active --quiet freeipa.service; then
+#	echo -e "FreeIPA configured!\n"
+#	else
+#		echo -e "FreeIPA provisioning failed!  Failing task..\n"
+#		exit 0
+#	fi
 }
 
 configure_freeradius(){
-	# Pull RADIUS container as a quadlet, and utilize /etc/ confdir.  Conf files should be preconfigured from wavelet repo.
-	git clone --depth=1 https://github.com/FreeRADIUS/freeradius-server/tree/v3.2.x/raddb
-	cd radd
+	# Pull RADIUS container as a quadlet, and utilize /etc/ confdir.  Conf files should probably be preconfigured from wavelet repo.
+	mkdir -p /etc/raddb
 	# Note the service isn't enabled this time around.  It'll switch on next boot.
 		echo -e "
 [Container]
 Image=freeradius/freeradius-server:latest
 ContainerName=radius
-PublishPort=1812-1813:1812-1813
-PublishPort=1812-1813/udp:1812-1813/udp
+PublishPort=1812-1813:1812-1813/tcp
+PublishPort=1812-1813:1812-1813/udp
 Volume=/etc/raddb:/raddb
 AutoUpdate=registry
 NoNewPrivileges=true
@@ -76,8 +102,8 @@ NoNewPrivileges=true
 [Service]
 Restart=always
 RestartSec=5
-TimeoutStartSec=300" > /home/users/wavelet/.config/systemd/users/radius.container
-	systemctl enable radius.service
+TimeoutStartSec=300" > /etc/containers/systemd/radiusd.container
+	systemctl daemon-reload	
 }
 
 configure_etcd_certs(){
@@ -97,14 +123,14 @@ configure_etcd_certs(){
 	#	cat server.crt server.key > server.includesprivatekey.pem
 	#
 	#--client-cert-auth \
-  	#--trusted-ca-file /etc/ipa/ca/ipa.crt \
-  	#--cert-file /etc/pki/tls/certs/etcd.crt \
-  	#--key-file /etc/pki/tls/certs/etcd.key \
-  	#--peer-client-cert-auth \
-  	#--peer-trusted-ca-file /etc/ipa/ca/ipa.crt \
-  	#--peer-cert-file /etc/pki/tls/certs/etcd.crt \
-  	#--peer-key-file /etc/pki/tls/certs/etcd.key \
-  	#--auto-compaction-retention 1"
+	#--trusted-ca-file /etc/ipa/ca/ipa.crt \
+	#--cert-file /etc/pki/tls/certs/etcd.crt \
+	#--key-file /etc/pki/tls/certs/etcd.key \
+	#--peer-client-cert-auth \
+	#--peer-trusted-ca-file /etc/ipa/ca/ipa.crt \
+	#--peer-cert-file /etc/pki/tls/certs/etcd.crt \
+	#--peer-key-file /etc/pki/tls/certs/etcd.key \
+	#--auto-compaction-retention 1"
 }
 
 configure_httpd_sp(){
