@@ -81,7 +81,8 @@ rpm_ostree_install_git(){
 	# Some other packages which do not install properly in the ostree container build are also included here
 	/usr/bin/rpm-ostree install -y -A git
 	# We have to install avahi this way because the ostree overlay does NOT install dependencies correctly, and it's REQUIRED for NDI to function.
-	/usr/bin/rpm-ostree install -y avahi --allow-inactive
+	# --from repo='updates' necessary, otherwise rpm-ostree complains about non-local overrides not being implemented.
+	#/usr/bin/rpm-ostree override replace avahi --experimental --from repo='updates'
 }
 
 rpm_ostree_install(){
@@ -185,10 +186,11 @@ extract_usrlocalbin(){
 
 fun_with_dkms(){
 	# Perhaps there's something we can do here to build the DKMS kernel module or at minimum decompress it and sign it with a MOK..
-	mkdir -p /home/wavelet/signmodules
+	mkdir -p /home/wavelet/signmodules # These eventually go into /var/lib/${VENDOR}
 	cd /home/wavelet/signmodules
+	# This would normally be an openssl command, but it seems RedHat have some tools that are a bit smoother to utilize..
 	efikeygen --dbdir /etc/pki/pesign --self-sign --module --common-name 'CN=ALLETHRIUM' --nickname 'Wavelet modules Secure Boot key'
-	certutil -d /etc/pki/pesign -n 'Custom Secure Boot key' -Lr > sb_cert.cer
+	certutil -d /etc/pki/pesign -n 'Wavelet modules Secure Boot key' -Lr > sb_cert.cer
 	openssl pkcs12 -in sb_cert.p12  -out sb_cert.priv  -nocerts -noenc
 	cp /usr/lib/modules/6.10.6-200.fc40.x86_64/extra/black*.ko.xz /home/wavelet/signmodules
 	# Decompress .xz file
@@ -197,12 +199,12 @@ fun_with_dkms(){
 	done
 	for file in files; do
 		xz -d ${file}
-	# Sign the files, move them to kernel mods directory, then remove the key files we generated (!!)
-	/usr/src/kernels/$(uname -r)/scripts/sign-file sha256 sb_cert.priv sb_cert.cer *.ko
-	mv *.ko /lib/modules/$(uname -r)/extra
-	rm -rf {sb_cert.cer,sb_cert.priv}
+		# Sign the files, move them to kernel mods directory, then remove the key files we generated (!!)
+		/usr/src/kernels/$(uname -r)/scripts/sign-file sha256 sb_cert.priv sb_cert.cer *.ko
+		mv *.ko /lib/modules/$(uname -r)/extra
+		rm -rf {sb_cert.cer,sb_cert.priv}
+	done
 }
-
 
 
 ####

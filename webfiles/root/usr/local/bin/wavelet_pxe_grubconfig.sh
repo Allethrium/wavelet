@@ -88,7 +88,7 @@ echo 'Booting Fedora CoreOS...'
 }
 
 configure_tftpboot(){
-	# Generate grub.cfg file in /var/lib/tftpboot root
+	# Generate grub.cfg file in /var/lib/tftpboot root and copy to pxe folder
 	mkdir -p /var/lib/tftpboot/efi
 	echo -e	"\n
 function load_video {
@@ -113,7 +113,7 @@ ${coreOShttpEntry}
 ${coreOStftpEntry}
 ${coreOSbootCEntry}
 }" > /var/lib/tftpboot/grub.cfg
-	cp /var/lib/tftpboot/efi/grub.cfg /home/wavelet/http/pxe
+	cp /var/lib/tftpboot/grub.cfg /var/home/wavelet/http/pxe && chown wavelet:wavelet /var/home/wavelet/http/pxe/grub.cfg
 }
 
 generate_bootc_image() {

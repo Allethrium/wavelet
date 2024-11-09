@@ -95,21 +95,23 @@ wifi_connect_retry(){
 		exit 0
 	fi
 	
-	if nmcli con show --active | grep -q 'wifi'; then
+	if nmcli device status | grep -a 'wifi.*connect'; then
 		echo -e "WiFi device detected, proceeding.."
 		# Look for active wifi
-		if [[ $(nmcli device status | grep -a 'wifi.*connect') ]]; then
+		if [[ $(nmcli con show --active | grep -q 'wifi') ]]; then
 			echo -e "Active WiFi connection available! return 0"
-			exit 0
+			return 0
 		else
 			echo -e "Attempting to connect to WiFi.  If this device is NOT planned to be on WiFi, run the command:\n"
 			echo -e "touch /var/no.wifi"
-			while ! connectwifi; do
+			while ! /usr/local/bin/connectwifi.sh; do
 				sleep 2
 			done
 		fi
 	else
 		echo -e "This machine has no wifi connectivity, exiting..\n"
+		echo -e "If this device is NOT planned to be on WiFi, run the command:\n"
+		echo -e "touch /var/no.wifi"
 		exit 0
 	fi
 }

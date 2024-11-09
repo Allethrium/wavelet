@@ -4,6 +4,10 @@
 # The server can run in authoritative mode for an isolated network, or subordinate mode if you are placing it on a network with an active DHCP server for instance.
 # It's generally designed to be run isolated and handle its own DHCP/DNS.
 
+RED="\033[0;31m"
+GREEN="\033[0;32m"
+NC="\033[0m"
+
 client_networks(){
 	echo -e "\nSystem configured to be run on a larger network.\n"
 		echo -e "Please input the system's gateway IP address, and subnet mask\n"
@@ -52,7 +56,7 @@ client_networks(){
 dnsmasq_no_dhcp(){
 	# This function should configure Server Ignition to pull a different dnsmasq.conf which provides PXEboot but disables DHCP functionality - if that is workable pending further testing.
 	sed -i 's/Allethrium/wavelet/master/webfiles/root/etc/dnsmasq.conf/Allethrium/wavelet/master/webfiles/root/etc/dnsmasq_nodhcp.conf/g' ${INPUTFILES}
-	echo -e "\n\n******** IMPORTANT ********\n\nYou must configure your pre-existing DHCP server to forward PXE boot requests to the wavelet server!\nPlease refer to the comment lines below for examples..\n"
+	echo -e "\n\n${RED}******** IMPORTANT ********\n\nYou must configure your pre-existing DHCP server to forward PXE boot requests to the wavelet server!\nPlease refer to the comment lines below for examples..\n${NC}"
 	echo -e "\nDHCPD:\nEdit dhcpd.conf and ensure these lines are present:\nnext-server 192.168.0.20;\nfilename 'pxelinux.0';\n"
 	echo -e "\nDNSMASQ:\n"
 	echo -e "\nFor other DHCP servers, please refer to their respective documentation."
@@ -107,8 +111,10 @@ generate_user_yaml(){
 	if [[ "${name}" = "wavelet-root" ]]; then
 		echo -e "wavelet-root user, setting UID to 9337"
 		uid="9337"
-		admin="wheel"
-		sed -i "s|#- GROUPGOESHERE|- $admin|" ${user_yaml}
+		group1="wheel"
+		group2="sudo"
+		sed -i "s|#- GROUPGOESHERE|- $group1\n        #- GROUPGOESHERE|" ${user_yaml}
+		sed -i "s|#- GROUPGOESHERE|- $group2\n        #- GROUPGOESHERE|" ${user_yaml}
 	elif [[ "${name}" = "wavelet" ]]; then
 		echo -e "wavelet user, setting UID to 1337"
 		uid="1337"
@@ -138,13 +144,12 @@ set_pw(){
 	local tmp_pw=""
 
 	while [[ ${success} -ne 1 ]] && [[ ${attempts} -gt 0 ]]; do
-		echo -e >&2 "Please input a password for ${user}:  "
-		echo -e >&2 "Remaining attempts: ${attempts}"
-		read -s tmp_pw
+		echo -e >&2 "			${GREEN}Remaining attempts: ${attempts}${NC}"
+		read -srp "		Please input a password for ${user}:`echo $'\n-'`" tmp_pw
 		if [[ "${tmp_pw}" == "" ]]; then
-			echo -e >&2 "Password may not be empty."
+			echo -e >&2 "		Password may not be empty."
 			if [[ ${attempts} -eq 0 ]]; then
-				echo -e "Maximum attempts exceeded, exiting."
+				echo -e "		${RED}Maximum attempts exceeded, exiting.${NC}"
 				success=0
 				break 1
 			fi
@@ -154,19 +159,18 @@ set_pw(){
 
 		local matchattempts=3
 		while [[ ${success} -ne 1 ]] && [[ ${matchattempts} -gt 0 ]]; do
-			echo -e >&2 "Please input the password again to verify for ${user}: "
-			read -s  tmp_pw2
+			read -srp "`echo $'\n-'`		Please input the password again to verify for ${user}:`echo $'\n-'`" tmp_pw2
 			if [[ "${tmp_pw}" == "${tmp_pw2}" ]]; then
-				echo -e >&2 "Passwords match!  Continuing.."
+				echo -e >&2 "`echo $'\n---'`		${GREEN}Passwords match!  Continuing..${NC}"
 				mkpasswd --method=yescrypt ${tmp_pw} > ${user}.pw.secure
 				success=1
 				break 2
 			else
-				echo -e >&2 "\nPasswords do not match! Trying again..\n"
+				echo -e >&2 "\n		Passwords do not match! Trying again..\n"
 				((matchattempts--))
-				echo -e >&2 "Remaining attempts: ${matchattempts}"
+				echo -e >&2 "			Remaining attempts: ${matchattempts}"
 				if [[ ${success} -ne 1 ]] && [[ ${matchattempts} -eq 0 ]]; then
-					echo -e >&2 "Maximum attempts reached, exiting.."
+					echo -e >&2 "		${RED}Maximum attempts exceeded.  Please start again to set this user's password.${NC}"
 					success=0
 				fi
 			fi
@@ -206,7 +210,6 @@ customization(){
 			echo -e "Generating YAML block for user..\n"
 			cp users_yaml ${user}_yaml.yml
 			generate_user_yaml ${user}
-
 			# Now we add the user YAML block to the server ignition, preserving the tag as we go..
 			echo -e "Adding generated YAML block to ignition file for ${user}..\n"
 			f2="$(<${user}_yaml.yml)"
@@ -230,7 +233,7 @@ customization(){
 
 	# Check for developermode flag so we pull from working branch rather than continually pushing messy and embarassing broken commits to the main branch..
 	if [[ "${developerMode}" -eq "1" ]]; then
-		echo -e "Injecting dev branch into files..\n"
+		echo -e "${RED}Injecting dev branch into files..\n${NC}"
 		repl="https://raw.githubusercontent.com/Allethrium/wavelet/armelvil-working"
 		sed -i "s|https://github.com/Allethrium/wavelet/raw/master|${repl}|g" ${INPUTFILES}
 		# Yepm I set it enabled again here, if the devmode arg is on.
@@ -239,19 +242,21 @@ customization(){
 		sed -i "s|https://raw.githubusercontent.com/Allethrium/wavelet/master|${repl}|g" ${INPUTFILES}
 	fi
 
-	if [[ ${UGMode} == "DEV" ]]; then
-		echo -e "Targeting UltraGrid continouous build for initial startup.  Please bear in mind that although this comes with additional features, the continuous build might make logging errors harder!\n"
+	if [[ $(cat dev_flag) == "DEV" ]]; then
+		echo -e "\n${RED}   Targeting UltraGrid continuous build for initial startup.\n   Please bear in mind that although this comes with additional features.\n The continuous build might introduce experimental features, or less predictable behavior.\n${NC}"
 		sed -i "s|CESNET/UltraGrid/releases/download/v1.9.7/UltraGrid-1.9.7-x86_64.AppImage|CESNET/UltraGrid/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage|g" ${INPUTFILES}
+	else
+		echo -e "\n${GREEN}Tracking UltraGrid release build.\n${NC}"
 	fi
 	
 	# WiFi settings
 	# changed to mod ignition files w/ inline data for the scripts to call, this way I don't publish wifi secrets to github.
 	INPUTFILES="server_custom.yml decoder_custom.yml"
 	echo -e "Moving on to WiFi settings"
-	echo -e "If your Wifi AP hasn't yet been configured, please do so now, as the installer will wait for your input\n"
-	read -p "Please input the SSID of your configured wireless network:  " wifi_ssid
-	read -p "Please input the first three elements of the WiFi BSSID / MAC address, colon delimited like so AA:BB:CC:  " wifi_bssid
-	read -p "Please input the configured password for your WiFi SSID:  " wifi_password
+	echo -e "\nIf your Wifi AP hasn't yet been configured, please do so now, as the installer will wait for your input\n"
+	read -p "		Please input the SSID of your configured wireless network:  " wifi_ssid
+	read -p "		Please input the first three elements of the WiFi BSSID / MAC address, colon delimited like so AA:BB:CC:  " wifi_bssid
+	read -p "		Please input the configured password for your WiFi SSID:  " wifi_password
 
 		repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_ssid}")
 		sed -i "s/SEDwaveletssid/${repl}/g" ${INPUTFILES}
@@ -261,6 +266,8 @@ customization(){
 
 		repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_password}")
 		sed -i "s/SEDwaveletwifipassword/${repl}/g" ${INPUTFILES}
+
+		echo -e "\n\n ${GREEN} ***Customization complete, moving to injecting configurations to CoreOS images for initial installation..*** \n\n${NC}"
 }
 
 
@@ -275,7 +282,7 @@ customization(){
 for i in "$@"
 	do
 		case $i in
-			*d*)	echo -e "\nDev mode enabled, switching git tree to working branch\n"	;	developerMode="1"
+			*d*)	echo -e "\n${RED}Dev mode enabled, switching git tree to working branch\n${NC}"	;	developerMode="1"
 			;;
 			h)		echo -e "\nSimple command line switches:\n D for developer mode, will clone git from ARMELVIL working branch for non-release features.\n";	exit 0
 			;;
@@ -286,6 +293,7 @@ done
 
 echo -e "Is the target network configured with an active gateway, and are you prepared to deal with downloading approximately 4gb of initial files?"
 read -p "Continue? (Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit
+
 echo -e "Continuing, copying base ignition files for customization.."
 cp ./ignition_files/ignition_server.yml ./server_custom.yml
 cp ./ignition_files/ignition_decoder.yml ./decoder_custom.yml
@@ -296,10 +304,11 @@ rm -rf $HOME/Downloads/wavelet_decoder.iso
 
 
 echo -e "Will this system run on an isolated network?"
-read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || client_networks || echo -e "System configured for isolated, authoritative mode." && isoMode="mode=iso"
+read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || client_networks || echo -e "${GREEN}System configured for isolated, authoritative mode." && isoMode="mode=iso"
 
 echo -e "Target UltraGrid Continuous build (best used with Developer Mode)?"
-read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || UGMode="DEV" || echo -e "System configured for isolated, authoritative mode."
+read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] && echo "DEV" > dev_flag || echo "" > dev_flag
+#read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || UGMode="DEV" && echo -e "System configured for UG Continuous Build!" || echo -e "System targeting UltraGrid release.." && UGMode="STD"
 
 customization
 

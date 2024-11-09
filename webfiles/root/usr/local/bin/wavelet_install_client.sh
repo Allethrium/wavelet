@@ -36,8 +36,6 @@ extract_base
 extract_home
 extract_usrlocalbin
 sleep 2
-# Ensure Avahi is reinstalled so that it properly configures itself..
-/usr/bin/rpm-ostree install -y avahi --allow-inactive
 touch /var/client_install.complete
 systemctl disable wavelet_install_client.service
 connectwifi
