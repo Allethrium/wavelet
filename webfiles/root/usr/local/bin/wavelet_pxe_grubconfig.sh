@@ -196,4 +196,10 @@ echo -e "\nPXE bootable images completed and populated in http serverdir, client
 touch /var/pxe.complete
 # we disable the service so it won't attempt to start on next boot
 systemctl disable wavelet_install_pxe.service 
-systemctl reboot
+
+# Check to see if the security layer is enabled, if not, we are done and should reboot..
+if [[ -f /var/prod.security/enabled ]]; then
+	exit 0
+else
+	systemctl reboot
+fi
