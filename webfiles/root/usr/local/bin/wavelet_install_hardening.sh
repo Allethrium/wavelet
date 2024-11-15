@@ -44,65 +44,87 @@ configure_idm(){
 
 	echo -e "Generating paths and quadlets..\n"
 	mkdir -p /var/freeipa-data
+# This sets up the QUADLET to run freeipa, but it does not set the server itself up.
+# Note we are remapping port 80 to port 8180 and port 443 to port 843 to free up the HTTP ports for nginx/wavelet UI!
 	echo -e "
 [Container]
 Image=quay.io/freeipa/freeipa-server:almalinux-9
 ContainerName=freeipa
-PublishPort=80:80
+PublishPort=8180:80
 PublishPort=88:88
 PublishPort=88:88/udp
 PublishPort=123:123/udp
 PublishPort=389:389
-PublishPort=443:443
+PublishPort=8443:443
 PublishPort=464:464
 PublishPort=464:464/udp
 PublishPort=636:636
-EnvironmentFile=/var/freeipa-data/.env.freeipa
 Volume=/var/freeipa-data:/data:Z
-HostName=ipa.${domain}
+HostName=dc1.$(dnsdomainname)
 AutoUpdate=registry
 NoNewPrivileges=true
 
 [Service]
 Restart=always
 RestartSec=5
-TimeoutStartSec=600" > /etc/containers/systemd/freeipa.container
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target" > /etc/containers/systemd/freeipa.container
+
+	# Here, we CONFIGURE the freeIPA instance
+	podman run -h "dc1.$(dnsdomainname)" --read-only \
+		-v /var/freeipa-data:/data:Z \
+		-e PASSWORD=${administratorPassword} \
+		quay.io/freeipa/freeipa-server:almalinux-9 ipa-server-install -U -r ${KRBDOMAIN}
+
+	# Maybe not needed given we just did this with the command above?
+	# Set .env file for freeIPA configuration
+	# curl this # Remote: https://raw.githubusercontent.com/freeipa/freeipa-container/master/init-data /var/freeipa-data
 	echo -e "
 # Remote: https://raw.githubusercontent.com/freeipa/freeipa-container/master/init-data
-# ipa-server-install(1)
+ipa-server-install
 IPA_SERVER_IP=$(hostname -I | cut -d " " -f 1)
-IPA_SERVER_HOSTNAME=${hostname}
+IPA_SERVER_HOSTNAME="dc1.$(dnsdomainname)"
 IPA_SERVER_INSTALL_OPTS=--unattended \
 --realm=${KRBDOMAIN} \
 --ds-password=${directoryManagerPassword} \
 --admin-password=${administratorPassword}" > /var/freeipa-data/.env.freeipa
+	
+	# Reload systemctl and start the container
 	systemctl daemon-reload
-#	if systemctl is-active --quiet freeipa.service; then
-#	echo -e "FreeIPA configured!\n"
-#	else
-#		echo -e "FreeIPA provisioning failed!  Failing task..\n"
-#		exit 0
-#	fi
+	systemctl enable freeipa.service --now
+	if systemctl is-active --quiet freeipa.service; then
+		echo -e "FreeIPA configured and container is running!\n"
+		curl -v "ldap://${domain}:389/cn=john123,ou=users,o=merlin,dc=domain,dc=com"
+	else
+		echo -e "FreeIPA provisioning failed!  Failing task..\n"
+		exit 0
+	fi
 }
 
 configure_freeradius(){
-	# Pull RADIUS container as a quadlet, and utilize /etc/ confdir.  Conf files should probably be preconfigured from wavelet repo.
-	mkdir -p /etc/raddb
+	# Pull RADIUS container as a quadlet, Conf files should probably be preconfigured from wavelet repo.
 	# Note the service isn't enabled this time around.  It'll switch on next boot.
 		echo -e "
 [Container]
-Image=freeradius/freeradius-server:latest
+Image=docker.io/freeradius/freeradius-server:latest
 ContainerName=radius
 PublishPort=1812-1813:1812-1813/tcp
 PublishPort=1812-1813:1812-1813/udp
 Volume=/etc/raddb:/raddb
+Volume=/etc/ipa:/etc/ipa
+Volume=/etc/pki/tls/certs:/etc/pki/tls/certs
 AutoUpdate=registry
 NoNewPrivileges=true
 
 [Service]
 Restart=always
 RestartSec=5
-TimeoutStartSec=300" > /etc/containers/systemd/radiusd.container
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target" > /etc/containers/systemd/radiusd.container
 	systemctl daemon-reload	
 }
 
@@ -181,18 +203,18 @@ configure_registry_sp(){
 }
 
 configure_radius_sp(){
-	# Configure RADIUS service principal with some additional mods so it will auth utilizing the machine account using TTLS over EAP.
-	# Uses wavelet user + pw over PAM rather than IPA/LDAP, since we aren't provisioning domain users here.
+	#	Configure FreeRADIUS in /etc/raddb along with a domain service principal with some additional mods.
+	#	It will auth utilizing the machine account using EAP-TTLS.
 
-	#	check freeipa container has freeipa-server-trust-ad + ipa-adtrust-install
-	#	ipa permission-add 'ipaNTHash service read' --attrs=ipaNTHash --type=user  --right=read
+
+	# NOT NEEDED	ipa permission-add 'ipaNTHash service read' --attrs=ipaNTHash --type=user  --right=read
 	#	ipa privilege-add 'Radius services' --desc='Privileges needed to allow radiusd servers to operate'
-	#	ipa privilege-add-permission 'Radius services' --permissions='ipaNTHash service read' ?Don't need this, not doing user auth!
+	# NOT NEEDED	ipa privilege-add-permission 'Radius services' --permissions='ipaNTHash service read'
 	#	ipa role-add 'Radius server' --desc="Radius server role"
 	#	ipa role-add-privilege --privileges="Radius services" 'Radius server'
 	ipa service-add "radius/`hostname`"
-	ipa-getkeytab -p "radius/`hostname`" -s `hostname` -k /var/home/wavelet/radiusd.keytab
-	kinit -t /var/home/wavelet/radiusd.keytab -k "radius/`hostname`"
+	# PROBABLY NOT NEEDED ipa-getkeytab -p "radius/`hostname`" -s `hostname` -k /var/home/wavelet/radiusd.keytab
+	# PROBABLT NOT NEEDED kinit -t /var/home/wavelet/radiusd.keytab -k "radius/`hostname`"
 
 	# Here we need some logic to generate a valid radius password, get the hostname
 	# we need to generate an all uppercase domain from the hostname
@@ -219,8 +241,6 @@ memberUid: krbprincipalname=radius/`hostname`@${KRBDOMAIN},cn=services,cn=accoun
 " > adtrust.ldif
 	ldapmodify -f adtrust.ldif -D 'cn=Directory Manager' -W -H ldap://`hostname` -Z
 
-	# Here we should do something to generate /etc/raddb from the container files
-
 	# Get certificate for the IPA service principal.  This is all that's required, because radius should be configured to look here by default.
 	ipa-getcert request -r -f /var/tmp/radius.pem -k /var/tmp/radius.key --principal=radius/`hostname`
 	# Set SElinux contexts for these two files
@@ -228,14 +248,56 @@ memberUid: krbprincipalname=radius/`hostname`@${KRBDOMAIN},cn=services,cn=accoun
 	semanage fcontext -a -t cert_t --ftype -- "/etc/pki/tls/certs/radius.key"
 	restorecon -FvR /etc/pki/tls/certs/
 
-	# Remove snake oil certs!
-	rm -rf /etc/raddb/certs/*
+	# Generate the outer tunnel openSSL certificate CA
+	sed -i 's|input_password|${outerCAInputPassword}|g' /etc/raddb/certs/ca.cnf
+	sed -i 's|output_password|${outerCAOutputPassword}|g' /etc/raddb/certs/ca.cnf
+	sed -i 's|[certificate_authority]|${outerCACertificateAuthoritySection}|g' /etc/raddb/certs/ca.cnf
+	make ca.pem
+	# Same for server
+	sed -i 's|input_password|${outerCAInputPassword}|g' /etc/raddb/certs/server.cnf
+	sed -i 's|output_password|${outerCAOutputPassword}|g' /etc/raddb/certs/server.cnf
+	sed -i 's|[certificate_authority]|${outerCACertificateAuthoritySection}|g' /etc/raddb/certs/server.cnf
+	make server
+	# Finally for Clien*T* - the outer tunnel will use the client certificate as a PSK
+	sed -i 's|input_password|${outerCAInputPassword}|g' /etc/raddb/certs/client.cnf
+	sed -i 's|output_password|${outerCAOutputPassword}|g' /etc/raddb/certs/client.cnf
+	sed -i 's|[certificate_authority]|${outerCACertificateAuthoritySection}|g' /etc/raddb/certs/client.cnf
+	make client
 
 	# OK.  Here is where we would work through the generated radius configuration files and appropriately customize them.
 	# Process:
-	#	Outer Tunnel request via EAP-TLS
-	#	CA:	Domain CA
-	#	Require client Certificate for identity, which is provisioned during client setup through IPA.
+	#	Outer Tunnel request with pre-made certificates above stored in /etc/raddb/certs
+	#	Inner Tunnel request with domain certificates:
+	#		CA:	Domain CA
+	#		Client Cert:  Radius opens LDAP connection, reads machine certificate for the supplicant hostname and accepts/rejects
+
+	mkdir -p /etc/raddb/sites-enabled
+	mkdir -p /etc/raddb/mods-enabled
+
+	# We will need the following files configured appropriately for the wavelet installation:
+	#	Suggest creating appropriate template files and embedding with Ignition, then utilizing stream editor to populate
+	#	/etc/raddb/mods-enabled/eap
+	#	/etc/raddb/mods-enabled/inner-eap	
+	#	/etc/raddb/mods-enabled/ldap
+	#	/etc/raddb/mods-enabled/krb5 ?
+	#	/etc/raddb/mods-enabled/realm ?
+	#	/etc/raddb/mods-enabled/utf8 ?
+
+	#	/etc/raddb/sites-enabled/default
+	#	/etc/raddb/sites-enabled/inner_tunnel
+	#	/etc/raddb/sites-enabled/check-eap-tls
+	
+	#	/etc/raddb/clients.conf
+	#	/etc/raddb/panic.gdb
+	#	/etc/raddb/huntgroups
+	#	/etc/raddb/hints
+	#	/etc/raddb/dictionary
+	#	/etc/raddb/radiusd.conf
+
+	#	This would generate wavelet's dummy or outer-tunnel certificates for initial connection
+	#	/etc/raddb/certs/inner_server.cnf
+	#	/etc/raddb/certs/Makefile
+	#	/etc/raddb/certs/passwords.mk
 }
 
 configure_client_hbac(){
@@ -246,6 +308,19 @@ configure_additional_service(){
 	# Intermediate CA from other upstream systems?
 	# Any credentials-based services we might need logins for
 	# Stuff I haven't yet though of here
+
+	# rkhunter propupd set for system files and configure a daily cron job for scanning and upstream notification
+	echo -e "
+#!/bin/sh
+   (
+    #/usr/local/bin/rkhunter --versioncheck
+    #/usr/local/bin/rkhunter --update
+    /usr/local/bin/rkhunter --cronjob --report-warnings-only
+   ) #| /bin/mail -s 'rkhunter Daily Run (PutYourServerNameHere)' your@email.com" > /etc/cron.daily/rkhunter.sh
+	rkhunter --update
+	rkhunter --propupd
+
+	# Freshclam and ClamAV scans on off hours?
 }
 
 
@@ -257,5 +332,6 @@ configure_additional_service(){
 
 
 exec >/home/wavelet/hardening.log 2>&1
-systemctl enable --now certmonger
+#	Certmonger is in the container though?
+#systemctl enable --now certmonger
 detect_self
