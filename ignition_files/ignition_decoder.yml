@@ -36,6 +36,12 @@ storage:
       overwrite: true
       contents:
         inline: SEDwaveletwifipassword
+    # Flag to set security layer for production deployment - off by default!
+    - path: /var/prod.security.disabled
+      mode: 0644
+      contents:
+        inline: |
+          Flag tells wavelet to utilize security layer on setup.
     # UltraGrid AppImage
     - path: /usr/local/bin/UltraGrid.AppImage
       mode: 0755
