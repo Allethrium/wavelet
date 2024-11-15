@@ -36,6 +36,7 @@ event_server(){
 		echo -e "Domain enrollment is complete, testing for domain connectivity.."
 		if $(echo $(cat /var/secrets/ipaadmpw.secure) | kinit admin); then
 			echo "IPA Server is responding to kinit requests.. continuing.."
+			configure_freeipa_dns
 			configure_freeradius
 			configure_etcd_certs
 			configure_httpd_sp
@@ -57,7 +58,9 @@ event_server(){
 configure_idm(){
 	# Generate necessary data from the server's existing DNS configuration
 	hostname=$(hostname)
-	domain=$(dnsdomainname)
+	# Our domain here needs to be a subdomain of the nonsecure wavelet server.  This is because DNSmasq handles our DHCP, and the FreeIPA stuff needs to be setup as a forward zone for them both to work.
+	# If this does not function the way I'm hoping, then I'll have to disable DNSmasq and configure FreeIPA with full BIND, then do some work to refactor the pxe, dhcp and script hooks.
+	domain="secure.$(dnsdomainname)"
 	echo "${domain}" > /var/secrets/wavelet.domain
 	echo "dc1.${domain}" > /var/secrets/wavelet.server
 	ip=$(hostname -I | cut -d " " -f 1)
@@ -89,6 +92,7 @@ configure_idm(){
 	mkdir -p /var/freeipa-data
 # This sets up the QUADLET to run freeipa, but it does not set the server itself up.
 # Note we are remapping port 80 to port 8180 and port 443 to port 843 to free up the HTTP ports for nginx/wavelet UI!
+# Port 953 needed for dynamic DNS updates
 	echo -e "
 [Container]
 Image=quay.io/freeipa/freeipa-server:almalinux-9
@@ -102,6 +106,7 @@ PublishPort=8443:443
 PublishPort=464:464
 PublishPort=464:464/udp
 PublishPort=636:636
+PublishPort=953:953
 Volume=/var/freeipa-data:/data:Z
 HostName=dc1.${domain}
 AutoUpdate=registry
@@ -169,6 +174,17 @@ install_server_security_layer(){
 		# In order to further configure services, we will need to reboot the server.
 		touch /var/server.domain.enrollment.complete
 		systemctl reboot
+}
+
+configure_freeipa_dns(){
+	# This is where we need to do some work to allow FreeIPA to allow zone updates from Dnsmasq.  It... ought to work.
+	# ref https://www.freeipa.org/page/Howto/DNS_updates_and_zone_transfers_with_TSIG
+	# Note Dnsmasq doesn't support TSIG - it's not designed for this.  We might need to rebase onto ISC_DHCPD or FreeIPA's internal BIND...
+	ipa dnszone-mod "${domain}." --dynamic-update=True --update-policy="grant DDNS_UPDATE wildcard * ANY;"
+	# Or to use DHCPd with a TSIG file..
+	#podman exec freeipa "rndc-confgen -a -b 512"
+	#podman exec freeipa `echo -e 'include "/etc/rndc.key;" >> /etc/named/ipa-etc.conf`
+	#podman exec freeipa `ipa dnszone-mod ${domain} --dynamic-update=True --update-policy="grant ${domain^^} krb5-self * A; grant ${domain^^} krb5-self * AAAA; grant ${domain^^} krb5-self * SSHFP; grant "rndc-key" zonesub ANY;"`
 }
 
 configure_freeradius(){
