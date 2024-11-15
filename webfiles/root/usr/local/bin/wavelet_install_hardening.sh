@@ -16,13 +16,56 @@
 #	*	system should be properly segmented behind a proper security gateway allowing only control channels and/or http/https traffic for livestreaming
 #
 
+detect_self(){
+UG_HOSTNAME=$(hostname)
+	echo -e "Hostname is $UG_HOSTNAME\n"
+	case $UG_HOSTNAME in
+	enc*)                   echo -e "I am an Encoder, this module is not applicable.\n" && exit 0
+	;;
+	dec*)                   echo -e "I am a Decoder, this module is not applicable." && exit 0
+	;;
+	svr*)                   echo -e "I am a Server. Proceeding..."	;	event_server
+	;;
+	*)                      echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
+	;;
+	esac
+}
+
+event_server(){
+	if [[ -f /var/server.domain.enrollment.complete ]]; then
+		echo -e "Domain enrollment is complete, testing for domain connectivity.."
+		if $(echo $(cat /var/secrets/ipaadmpw.secure) | kinit admin); then
+			echo "IPA Server is responding to kinit requests.. continuing.."
+			configure_freeradius
+			configure_etcd_certs
+			configure_httpd_sp
+			configure_nginx_sp
+			configure_registry_sp
+			configure_radius_sp
+			configure_additional_service
+		else
+			echo -e "Domain controller is not responding to kerberos ticket requests, something may have gone wrong with installation!\n"
+			echo -e "Check /var/freeipa-data/var/log files for more information, but this is likely something for the developer to look into.\n"
+			exit 1
+		fi
+	else
+		echo -e "\nThe domain controller has not yet been configured, proceeding..\n"
+		configure_idm
+	fi
+}
 
 configure_idm(){
 	# Generate necessary data from the server's existing DNS configuration
 	hostname=$(hostname)
 	domain=$(dnsdomainname)
-	# note - password must be at least 8 chars long
+	echo "${domain}" > /var/secrets/wavelet.domain
+	echo "dc1.${domain}" > /var/secrets/wavelet.server
+	ip=$(hostname -I | cut -d " " -f 1)
+	# note - password must be at least 8 chars long and should be prepopulated via install_wavelet_server.sh
 	administratorPassword=$(cat /var/secrets/ipaadmpw.secure)
+	if [[ ${administratorPassword} == "DomainAdminPasswordGoesHere" ]]; then
+		echo -e "\nThe domain administrator password doesn't appear to be set.  We will continue, but this password is effectively public knowledge..\n"
+	fi
 	directoryManagerPassword=$(cat /var/secrets/ipadmpw.secure)
 	KRBDOMAIN=${domain^^}
 	echo -e "Generated variables:\n Hostname:       ${hostname}\n   Domain: ${domain}\n     Kerberos Domain:        ${KRBDOMAIN}\n"
@@ -60,7 +103,7 @@ PublishPort=464:464
 PublishPort=464:464/udp
 PublishPort=636:636
 Volume=/var/freeipa-data:/data:Z
-HostName=dc1.$(dnsdomainname)
+HostName=dc1.${domain}
 AutoUpdate=registry
 NoNewPrivileges=true
 
@@ -73,7 +116,7 @@ TimeoutStartSec=600
 WantedBy=multi-user.target" > /etc/containers/systemd/freeipa.container
 
 	# Here, we CONFIGURE the freeIPA instance
-	podman run -h "dc1.$(dnsdomainname)" --read-only \
+	podman run -h "dc1.${domain}" --read-only \
 		-v /var/freeipa-data:/data:Z \
 		-e PASSWORD=${administratorPassword} \
 		quay.io/freeipa/freeipa-server:almalinux-9 ipa-server-install -U -r ${KRBDOMAIN}
@@ -84,8 +127,8 @@ WantedBy=multi-user.target" > /etc/containers/systemd/freeipa.container
 	echo -e "
 # Remote: https://raw.githubusercontent.com/freeipa/freeipa-container/master/init-data
 ipa-server-install
-IPA_SERVER_IP=$(hostname -I | cut -d " " -f 1)
-IPA_SERVER_HOSTNAME="dc1.$(dnsdomainname)"
+IPA_SERVER_IP=${ipAddress}
+IPA_SERVER_HOSTNAME="dc1.${domain}"
 IPA_SERVER_INSTALL_OPTS=--unattended \
 --realm=${KRBDOMAIN} \
 --ds-password=${directoryManagerPassword} \
@@ -94,13 +137,38 @@ IPA_SERVER_INSTALL_OPTS=--unattended \
 	# Reload systemctl and start the container
 	systemctl daemon-reload
 	systemctl enable freeipa.service --now
+
 	if systemctl is-active --quiet freeipa.service; then
 		echo -e "FreeIPA configured and container is running!\n"
-		curl -v "ldap://${domain}:389/cn=john123,ou=users,o=merlin,dc=domain,dc=com"
+		echo -e "Performing initial host enrollment..\n"
+		# We are doing the following;  creating an initial user who has domain join privileges
+		# These credentials will be distributed during the initialization process on PXE boot and subsequently removed.
+		podman exec freeipa "echo ${administratorPassword} | kinit admin"
+		podman exec freeipa "ipa user-add domain_join --random --first=domain --last=join > data/output.txt"
+		echo -e "$(cat /var/freeipa-data/output.txt | grep "Random password:" | cut -d ' ' -f 5)" > /var/secrets/domainEnrollment.password
+		rm -rf /var/freeipa-data/output.txt
+		echo -e "Enrolling server to freeIPA..\n"
+		install_server_security_layer
 	else
 		echo -e "FreeIPA provisioning failed!  Failing task..\n"
 		exit 0
 	fi
+
+	# Provision Dnsmasq DHCP server with a forward zone to FreeIPA
+	sed -i "s|#IPA_ENTRY|server=/dc1.${domain}/${ip}|" /etc/dnsmasq.conf
+	systemctl restart dnsmasq
+}
+
+install_server_security_layer(){
+		password=$(cat /var/secrets/domainEnrollment.password)
+		user="domain_join"
+		waveletDomain=$(cat /var/secrets/wavelet.domain)
+		waveletServer=$(cat /var/secrets/wavelet.server)
+		rm -rf /var/secrets/domainEnrollment.password
+		ipa-client-install --principal ${user} --password "${domainJoinPassword}" --domain ${waveletDomain} --server ${waveletServer} --unattended
+		# In order to further configure services, we will need to reboot the server.
+		touch /var/server.domain.enrollment.complete
+		systemctl reboot
 }
 
 configure_freeradius(){
