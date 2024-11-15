@@ -37,6 +37,12 @@ storage:
       contents:
         inline: |
           enabled
+    # Flag to set security layer for production deployment - off by default!
+    - path: /var/prod.security.disabled
+      mode: 0644
+      contents:
+        inline: |
+          Flag tells wavelet to utilize security layer on setup.
     # Client device storage detection script
     - path: /home/wavelet/http/ignition/automated_coreos_deployment.sh
       mode: 0644
@@ -61,12 +67,17 @@ storage:
         inline: |
           [Login]
           HandleLidSwitch=ignore
-    # WiFi WiFi Name
+    # Domain administrator password
+    - path: /var/secrets/ipaadmpw.secure
+      overwrite: true
+      contents:
+        inline: DomainAdminPasswordGoesHere
+    # WiFi Name
     - path: /var/home/wavelet/wifi_ssid
       overwrite: true
       contents:
         inline: SEDwaveletssid
-    # WiFi WiFi Name
+    # WiFi BSSID
     - path: /var/home/wavelet/wifi_bssid
       mode: 0600
       overwrite: true
