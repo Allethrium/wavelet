@@ -254,7 +254,7 @@ customization(){
 	fi
 
 	if [[ $(cat dev_flag) == "DEV" ]]; then
-		echo -e "\n${RED}   Targeting UltraGrid continuous build for initial startup.\n   Please bear in mind that although this comes with additional features.\n The continuous build might introduce experimental features, or less predictable behavior.\n${NC}"
+		echo -e "\n${RED}	Targeting UltraGrid continuous build for initial startup.\n	Please bear in mind that although this comes with additional features.\n	The continuous build might introduce experimental features, or less predictable behavior.\n${NC}"
 		sed -i "s|CESNET/UltraGrid/releases/download/v1.9.7/UltraGrid-1.9.7-x86_64.AppImage|CESNET/UltraGrid/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage|g" ${INPUTFILES}
 	else
 		echo -e "\n${GREEN}Tracking UltraGrid release build.\n${NC}"
@@ -263,14 +263,19 @@ customization(){
 	# WiFi settings
 	# changed to mod ignition files w/ inline data for the scripts to call, this way I don't publish wifi secrets to github.
 	INPUTFILES="server_custom.yml decoder_custom.yml"
+	# Include flag to enable security layer
+	echo -e "\n${RED}Enable security layer?${NC}"
+	read -p "(Y/N)" confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || echo -e "\nSecurity layer not active.  This is NOT recommended for a production deployment!" || enable_security && secActive="1"
 	echo -e "Moving on to WiFi settings"
 	echo -e "\nIf your Wifi AP hasn't yet been configured, please do so now, as the installer will wait for your input\n"
 	read -p "		Please input the SSID of your configured wireless network:  " wifi_ssid
 	read -p "		Please input the first three elements of the WiFi BSSID / MAC address, colon delimited like so AA:BB:CC:  " wifi_bssid
+	# We won't want to set a wifi PSK if we are using enterprise security on our devices.
+	if [[ ${secActive} == "0" ]]; then
 	read -p "		Please input the configured password for your WiFi SSID:  " wifi_password
-
-	# Include flag to enable security layer
-	read -p "\n${RED}Enable additional security measures?${NC}" confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || echo -e "\nSecurity layer not active.  This is NOT recommended for a production deployment!" || enable_security
+	else
+		wifi_password="Not used, security handled via RADIUS."
+	fi
 
 		repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_ssid}")
 		sed -i "s/SEDwaveletssid/${repl}/g" ${INPUTFILES}
@@ -281,7 +286,7 @@ customization(){
 		repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_password}")
 		sed -i "s/SEDwaveletwifipassword/${repl}/g" ${INPUTFILES}
 
-		echo -e "\n\n ${GREEN} ***Customization complete, moving to injecting configurations to CoreOS images for initial installation..*** \n\n${NC}"
+		echo -e "\n${GREEN} ***Customization complete, moving to injecting configurations to CoreOS images for initial installation..*** \n${NC}"
 }
 
 
