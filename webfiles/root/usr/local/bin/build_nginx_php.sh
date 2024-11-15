@@ -49,6 +49,8 @@ podman_systemd_generate(){
 podman_quadlet(){
 	# New Method - quadlets
 	# We also now know we don't have any other services running on port 80 so we can put nginx on standard HTTP(S) ports.
+	# The .kube file at the end basically allows us to link these two services into a podman pod.   
+	# The install wantedBy= section is how we do systemctl enable --now, basically.
 	echo -e "\
 [Unit]
 Description=PHP + FPM
@@ -63,6 +65,7 @@ Restart=always
 TimeoutStartSec=30
 [Install]
 WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/container.php-fpm
+# For Nginx, we moved the port mapping to standard ports, so that we will no longer need to include additional steps or documentation at the user end.
 	echo -e "\
 [Unit]
 Description=NGINX
@@ -72,6 +75,8 @@ ContainerName=container-nginx
 AutoUpdate=registry
 Notify=true
 Pod=http-php
+Volume=/etc/pki/tls/certs/httpd.cert:z
+Volume=/etc/pki/tls/certs/httpd.key:z
 [Service]
 Restart=always
 TimeoutStartSec=30
