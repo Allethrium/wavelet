@@ -47,11 +47,17 @@ install_security_layer(){
 		echo -e "Reconfiguring WiFi supplicant..\n"
 }
 
+
+
+
 ####
 #
 # Main
 #
 ####
+
+
+
 
 nmcli dev wifi rescan
 sleep 5
