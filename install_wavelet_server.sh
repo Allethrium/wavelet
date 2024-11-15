@@ -185,6 +185,17 @@ set_pw(){
 	fi
 }
 
+enable_security(){
+	echo -e "\nEnabling security layer flag in server ignition..\n"
+	echo -e "Note: Security layer implies the following:\nLocal Domain Controller to handle authentication and certificates\nEAP-TTLS for WiFi\nTLS certificates on web server issued from Domain Controller\nEtcd secured with domain certificates\n"
+	echo -e "These additional features may complicate troubleshooting and should only be used in a stable production build.  If you're running Wavelet in a lab, you may wish to disable them during your testing."
+	repl="prod.security.enabled"
+	sed -i "s|/var/prod.security.disabled|${repl}|g" ${INPUTFILES}
+	echo -e "\nThe FreeIPA domain will control services and certificates.  Please ensure you store the password for the domain controller in a safe place, and in an organized fashion.\n"
+	read -p "\nSet a password for the freeIPA Administrator account.  If you set less than 8 characters, the domain controller process will fail!!!" domain_pw
+	sed -i "s|DomainAdminPasswordGoesHere|${domain_pw}|g" ${INPUTFILES}
+}
+
 customization(){
 	echo -e "Generating ignition files with appropriate settings.."
 	INPUTFILES="server_custom.yml decoder_custom.yml"
@@ -257,6 +268,9 @@ customization(){
 	read -p "		Please input the SSID of your configured wireless network:  " wifi_ssid
 	read -p "		Please input the first three elements of the WiFi BSSID / MAC address, colon delimited like so AA:BB:CC:  " wifi_bssid
 	read -p "		Please input the configured password for your WiFi SSID:  " wifi_password
+
+	# Include flag to enable security layer
+	read -p "\n${RED}Enable additional security measures?${NC}" confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || echo -e "\nSecurity layer not active.  This is NOT recommended for a production deployment!" || enable_security
 
 		repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_ssid}")
 		sed -i "s/SEDwaveletssid/${repl}/g" ${INPUTFILES}
