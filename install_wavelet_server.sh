@@ -254,7 +254,7 @@ customization(){
 	fi
 
 	if [[ $(cat dev_flag) == "DEV" ]]; then
-		echo -e "\n${RED}	Targeting UltraGrid continuous build for initial startup.\n	Please bear in mind that although this comes with additional features.\n	The continuous build might introduce experimental features, or less predictable behavior.\n${NC}"
+		echo -e "\n${RED}	Targeting UltraGrid continuous build for initial startup.\n	Please bear            in mind that although this comes with additional features.\n	The continuous build might introduce experimental features, or less predictable behavior.\n${NC}"
 		sed -i "s|CESNET/UltraGrid/releases/download/v1.9.7/UltraGrid-1.9.7-x86_64.AppImage|CESNET/UltraGrid/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage|g" ${INPUTFILES}
 	else
 		echo -e "\n${GREEN}Tracking UltraGrid release build.\n${NC}"
