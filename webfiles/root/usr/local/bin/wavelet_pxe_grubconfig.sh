@@ -199,6 +199,7 @@ systemctl disable wavelet_install_pxe.service
 
 # Check to see if the security layer is enabled, if not, we are done and should reboot..
 if [[ -f /var/prod.security/enabled ]]; then
+	systemctl start wavelet_install_hardening.service
 	exit 0
 else
 	systemctl reboot
