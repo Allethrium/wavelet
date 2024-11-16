@@ -265,13 +265,14 @@ customization(){
 	INPUTFILES="server_custom.yml decoder_custom.yml"
 	# Include flag to enable security layer
 	echo -e "\n${RED}Enable security layer?${NC}"
-	read -p "(Y/N)" confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || echo -e "\nSecurity layer not active.  This is NOT recommended for a production deployment!" || enable_security && secActive="1"
+	read -p "(Y/N)" confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || secActive=0; echo -e "\nSecurity layer not active.  This is NOT recommended for a production deployment!" || enable_security
 	echo -e "Moving on to WiFi settings"
+	echo -e "Security layer bit set to: ${secActive}"
 	echo -e "\nIf your Wifi AP hasn't yet been configured, please do so now, as the installer will wait for your input\n"
 	read -p "		Please input the SSID of your configured wireless network:  " wifi_ssid
 	read -p "		Please input the first three elements of the WiFi BSSID / MAC address, colon delimited like so AA:BB:CC:  " wifi_bssid
 	# We won't want to set a wifi PSK if we are using enterprise security on our devices.
-	if [[ ${secActive} == "0" ]]; then
+	if [[ ${secActive} = 0 ]]; then
 	read -p "		Please input the configured password for your WiFi SSID:  " wifi_password
 	else
 		wifi_password="Not used, security handled via RADIUS."
