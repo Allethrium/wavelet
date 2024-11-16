@@ -124,20 +124,20 @@ generate_decoder_iso(){
 install_wavelet_modules(){
 	gitcommand="/usr/bin/git"
 	cd /var/home/wavelet
+	GH_REPO="https://github.com/Allethrium/wavelet"
 	if [[ -f /var/developerMode.enabled ]]; then
 		echo -e "\n\n***WARNING***\n\nDeveloper Mode is ON\n\nCloning from development repository..\n"
 		GH_USER="armelvil"
 		GH_BRANCH="armelvil-working"
+		git clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/wavelet-git && echo -e "Cloning git Dev repository..\n"
 	else
 		echo -e "\nDeveloper mode off, cloning main branch..\n"
-		GH_USER="ALLETHRIUM"
+		git clone https://github.com/ALLETHRIUM/wavelet /var/home/wavelet/wavelet-git && echo -e "Cloning git Master repository..\n"
 	fi
-	GH_REPO="https://github.com/Allethrium/wavelet"
 	# Git complains about the directory already existing so we'll just work in a tmpdir for now..
 	rm -rf /var/home/wavelet/wavelet-git
 	mkdir -p /var/home/wavelet/wavelet-git
-	echo -e "\nCommand is; ${gitcommand} clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/wavelet-git\n"
-	git clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/wavelet-git && echo -e "Cloning git repository..\n"
+
 	generate_tarfiles
 	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
 	extract_base
