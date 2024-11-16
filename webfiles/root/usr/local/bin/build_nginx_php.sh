@@ -74,18 +74,17 @@ Pod=http-php
 Restart=always
 TimeoutStartSec=30
 [Install]
-WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/nginx.container
+WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/container.nginx
 	if [[ ! -f /etc/pki/tls/certs/httpd.cert ]]; then
-		touch /etc/pki/tls/certs/httpd.cert 
-		touch /etc/pki/tls/certs/httpd.key
+		# we generate a crappy certificate so things work, at the very least..
+		openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/pki/tls/certs/httpd.key -out /etc/pki/tls/certs/httpd.crt -subj "/C=XX/ST=StateName/L=CityName/O=CompanyName/OU=CompanySectionName/CN=CommonNameOrHostname"
+		openssl dhparam -out /etc/pki/certs/dhparam.pem 4096
 	fi
 	echo -e "[Pod]
-# Publish the envoy proxy data port
 PublishPort=80:80
 PublishPort=443:443
-PodName=http-php
-Volume=/etc/pki/tls/certs/httpd.cert:/etc/pki/tls/certs/httpd.cert:z
-Volume=/etc/pki/tls/certs/httpd.key:/etc/pki/tls/certs/httpd.key:z
+PodName=http-php.pod
+Volume=/etc/pki/tls/certs/:/etc/pki/tls/certs/
 Volume=${SCRHOME}/http-php/html:/var/www/html:Z
 Volume=${SCRHOME}/http-php/nginx:/etc/nginx/conf.d/:z" > /var/home/wavelet/.config/containers/systemd/http-php.pod
 	echo -e "Podman pod and containers, generated, service has been enabled in systemd, and will start on next reboot."
