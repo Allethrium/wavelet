@@ -255,7 +255,7 @@ EOF
 
 rpm_ostree_ARM(){
 	# We are building ARM version here, so the containerfile would specify arm-specific libraries.  This would need A LOT of work...
-	if [[ -f /var/arm_support.flag ]];; then
+	if [[ -f /var/arm_support.flag ]]; then
 		echo -e "ARM support is enabled, building ARM OCI overlay and downloading additional UltraGrid build..\n"
 	else
 		echo -e "ARM support is NOT enabled, and we are running on an ARM device.  Exiting.\n"; exit 1
