@@ -54,7 +54,7 @@ RUN	rpm-ostree install -y -A \
     ocl-icd opencl-headers mpv libsrtp mesa-dri-drivers intel-opencl libvdpau-va-gl mesa-vdpau-drivers libvdpau libvdpau-devel \
     libva-intel-driver ffmpeg ffmpeg-libs libheif-freeworld fastfetch htop mesa-libOpenCL python3-pip srt srt-libs firefox \
     ffmpeg vlc mplayer libndi-sdk ndi-sdk ndi-sdk-devel ndi-sdk-documentation pipewire-utils \
-    freeipa-client rkhunter clamav clamav-freshclam && \
+    rkhunter clamav clamav-freshclam && \
 	ln -s /usr/bin/ld.bfd /etc/alternatives/ld && ln -s /etc/alternatives/ld /usr/bin/ld && \
 	ostree container commit
 	# Module key signing needs much more understanding on my part to get working correctly..
