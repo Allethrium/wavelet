@@ -35,15 +35,6 @@ event_decoder(){
 		;;
 		*) echo -e "Architecture obsolete or unsupported, exiting..\n"
 	esac
-
-
-	elif [[ -f /var/riscV_support.flag ]];; then
-		# This is more like a stub for completeness' sake,
-		# as I don't see this being useful until a RISC V platform with a real hardware video acceleration core becomes mainstream..
-		echo -e "RISC V support is enabled, building RISC V OCI overlay and downloading and building UG From source..\n"
-		rpm_ostree_RISCV
-	fi
-	exit 0
 }
 
 event_server(){
