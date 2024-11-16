@@ -55,7 +55,9 @@ RUN	rpm-ostree install -y -A \
     libva-intel-driver ffmpeg ffmpeg-libs libheif-freeworld fastfetch htop mesa-libOpenCL python3-pip srt srt-libs firefox \
     ffmpeg vlc mplayer libndi-sdk ndi-sdk ndi-sdk-devel ndi-sdk-documentation pipewire-utils \
     rkhunter clamav clamav-freshclam && \
-	ln -s /usr/bin/ld.bfd /etc/alternatives/ld && ln -s /etc/alternatives/ld /usr/bin/ld && \
+    # don't need to peform manually linking now
+	#ln -s /usr/bin/ld.bfd /etc/alternatives/ld && \
+	#ln -s /etc/alternatives/ld /usr/bin/ld && \
 	ostree container commit
 	# Module key signing needs much more understanding on my part to get working correctly..
 RUN mkdir -p /usr/lib/blackmagic && mkdir -p /var/lib/blackmagic && \
