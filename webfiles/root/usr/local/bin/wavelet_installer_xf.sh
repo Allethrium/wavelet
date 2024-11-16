@@ -26,14 +26,14 @@ UG_HOSTNAME=$(hostname)
 event_decoder(){
 	# First we'd need to determine our architecture.
 	arch=$(uname -m)
-	case ${arch} in;
-		"x86_64") determine_ifSurface
+	case ${arch} in
+		"x86_64") echo -e "AMD64 architecture, checking if we are a Microsoft Surface for custom kernel..\n";	determine_ifSurface
 		;;
-		"arm") rpm_ostree_ARM
+		"arm") echo -e "aarch64 architecture, switching to ARM ostree..";	rpm_ostree_ARM
 		;;
-		"riscV") rpm_ostree_RISCV
+		"riscV") echo -e "RISC-V architecture, switching to RISCV ostree..";	rpm_ostree_RISCV
 		;;
-		*) echo -e "Architecture obsolete or not supported, exiting..\n"
+		*) echo -e "Architecture obsolete or unsupported, exiting..\n"
 	esac
 
 
