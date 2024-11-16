@@ -75,20 +75,24 @@ Restart=always
 TimeoutStartSec=30
 [Install]
 WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/nginx.container
+	if [[ ! -f /etc/pki/tls/certs/httpd.cert ]]; then
+		touch /etc/pki/tls/certs/httpd.cert 
+		touch /etc/pki/tls/certs/httpd.key
+	fi
 	echo -e "[Pod]
 # Publish the envoy proxy data port
 PublishPort=80:80
 PublishPort=443:443
 PodName=http-php
-Volume=/etc/pki/tls/certs/httpd.cert:z
-Volume=/etc/pki/tls/certs/httpd.key:z
+Volume=/etc/pki/tls/certs/httpd.cert:/etc/pki/tls/certs/httpd.cert:z
+Volume=/etc/pki/tls/certs/httpd.key:/etc/pki/tls/certs/httpd.key:z
 Volume=${SCRHOME}/http-php/html:/var/www/html:Z
 Volume=${SCRHOME}/http-php/nginx:/etc/nginx/conf.d/:z" > /var/home/wavelet/.config/containers/systemd/http-php.pod
 	echo -e "Podman pod and containers, generated, service has been enabled in systemd, and will start on next reboot."
 	echo -e "The control service should be available via web browser I.E \nhttp://svr.wavelet.local\n"
 	etcdctl --endpoints=${ETCDENDPOINT} put ${KEYNAME} -- ${KEYVALUE}
 	systemctl --user daemon-reload
-	systemctl --user enable http-php.service
+	systemctl --user start http-php-pod.service
 	exit 0
 }
 
