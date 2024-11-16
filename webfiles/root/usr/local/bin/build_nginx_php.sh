@@ -9,9 +9,6 @@ KEYVALUE=1
 USER=wavelet
 SCRHOME="/var/home/wavelet"
 
-set -x
-exec >/var/home/wavelet/build_nginx_php.log 2>&1
-cd ${SCRHOME}
 detect_self(){
 	systemctl --user daemon-reload
 	UG_HOSTNAME=$(hostname)
@@ -27,7 +24,6 @@ detect_self(){
 podman_systemd_generate(){
 	# Old method
 	podman pod create --infra=true --name http-php --publish 8180:80 \
-		-v ${SCRHOME}/http-php/html:/var/www/html:Z \
 		-v ${SCRHOME}/http-php/nginx:/etc/nginx/conf.d/:Z \
 		-v ${SCRHOME}/http-php/html:/var/www/html:Z
 	echo -e "Generating nginx simple configuration, and systemd service files.."
@@ -51,8 +47,8 @@ podman_quadlet(){
 	# We also now know we don't have any other services running on port 80 so we can put nginx on standard HTTP(S) ports.
 	# The .kube file at the end basically allows us to link these two services into a podman pod.   
 	# The install wantedBy= section is how we do systemctl enable --now, basically.
-	echo -e "\
-[Unit]
+	mkdir -p /var/home/wavelet/.config/containers/systemd/
+	echo -e "[Unit]
 Description=PHP + FPM
 [Container]
 Image=docker.io/library/php:fpm
@@ -66,8 +62,7 @@ TimeoutStartSec=30
 [Install]
 WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/container.php-fpm
 # For Nginx, we moved the port mapping to standard ports, so that we will no longer need to include additional steps or documentation at the user end.
-	echo -e "\
-[Unit]
+	echo -e "[Unit]
 Description=NGINX
 [Container]
 Image=docker.io/library/nginx:alpine
@@ -75,25 +70,22 @@ ContainerName=container-nginx
 AutoUpdate=registry
 Notify=true
 Pod=http-php
-Volume=/etc/pki/tls/certs/httpd.cert:z
-Volume=/etc/pki/tls/certs/httpd.key:z
 [Service]
 Restart=always
 TimeoutStartSec=30
 [Install]
 WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/nginx.container
-	echo -e "\
-[Install]
-WantedBy=default.target
-[Unit]
-Requires=nginx.service
-After=php-fpm.service
-[Kube]
+	echo -e "[Pod]
 # Publish the envoy proxy data port
 PublishPort=80:80
-PublishPort=443:443" > /var/home/wavelet/.config/containers/systemd/http-php.kube
+PublishPort=443:443
+PodName=http-php
+Volume=/etc/pki/tls/certs/httpd.cert:z
+Volume=/etc/pki/tls/certs/httpd.key:z
+Volume=${SCRHOME}/http-php/html:/var/www/html:Z
+Volume=${SCRHOME}/http-php/nginx:/etc/nginx/conf.d/:z" > /var/home/wavelet/.config/containers/systemd/http-php.pod
 	echo -e "Podman pod and containers, generated, service has been enabled in systemd, and will start on next reboot."
-	echo -e "The control service should be available via web browser I.E \nhttp://svr.wavelet.local:8180\n"
+	echo -e "The control service should be available via web browser I.E \nhttp://svr.wavelet.local\n"
 	etcdctl --endpoints=${ETCDENDPOINT} put ${KEYNAME} -- ${KEYVALUE}
 	systemctl --user daemon-reload
 	systemctl --user enable http-php.service
@@ -109,3 +101,15 @@ event_server(){
 		podman_systemd_generate
 	fi
 }
+
+
+#####
+#
+# Main
+#
+#####
+
+set -x
+exec >/var/home/wavelet/build_nginx_php.log 2>&1
+cd ${SCRHOME}
+detect_self
