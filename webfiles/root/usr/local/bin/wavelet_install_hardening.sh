@@ -20,9 +20,9 @@ detect_self(){
 UG_HOSTNAME=$(hostname)
 	echo -e "Hostname is $UG_HOSTNAME\n"
 	case $UG_HOSTNAME in
-	enc*)                   echo -e "I am an Encoder, this module is not applicable.\n" && exit 0
+	enc*)                   echo -e "I am an Encoder, this module should not be applicable at this stage in configuration!\n" && exit 0
 	;;
-	dec*)                   echo -e "I am a Decoder, this module is not applicable." && exit 0
+	dec*)                   echo -e "I am a Decoder, this should be handled in wavelet_install_client.sh!" ; exit 0
 	;;
 	svr*)                   echo -e "I am a Server. Proceeding..."	;	event_server
 	;;
@@ -170,10 +170,11 @@ install_server_security_layer(){
 		waveletDomain=$(cat /var/secrets/wavelet.domain)
 		waveletServer=$(cat /var/secrets/wavelet.server)
 		rm -rf /var/secrets/domainEnrollment.password
-		ipa-client-install --principal ${user} --password "${domainJoinPassword}" --domain ${waveletDomain} --server ${waveletServer} --unattended
-		# In order to further configure services, we will need to reboot the server.
-		touch /var/server.domain.enrollment.complete
-		systemctl reboot
+		# Here we need to spin up a freeipa client container, as the client can't install on the base OS layer.
+		# Pull and then push the container to the local registry for clients
+		git clone https://github.com/freeipa/freeipa-container.git
+		podman run -h ${waveletDomain} -e PASSWORD=${password} -ti freeipa-client /var/home/wavelet/containerfiles/Containerfile.freeipa-client
+		# Now that we have a functional IPA client in the container, we need to ensure that everything is run through that container which pertains to domain functionality.  oof.
 }
 
 configure_freeipa_dns(){
