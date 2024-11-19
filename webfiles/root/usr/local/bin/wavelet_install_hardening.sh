@@ -4,7 +4,7 @@
 #	Web server configs will need to be modified, as will client spinup modules
 #	This will take a lot of work and is adapted from several other online sources, then customized for Wavelet.
 
-#	Called during wavelet_installer setup, therefore with root privilege.  Dumps files in /var/home/wavelet-root
+#	Called during wavelet_installer setup, therefore with root privilege.  Dumps files in /var/ and /home/
 
 
 # 	Wavelet's security model is pretty simple;
@@ -36,7 +36,6 @@ event_server(){
 		echo -e "Domain enrollment is complete, testing for domain connectivity.."
 		if $(echo $(cat /var/secrets/ipaadmpw.secure) | kinit admin); then
 			echo "IPA Server is responding to kinit requests.. continuing.."
-			configure_freeipa_dns
 			configure_freeradius
 			configure_etcd_certs
 			configure_httpd_sp
@@ -62,14 +61,15 @@ configure_idm(){
 	echo "${domain}" > /var/secrets/wavelet.domain
 	echo "dc1.${domain}" > /var/secrets/wavelet.server
 	ip=$(hostname -I | cut -d " " -f 1)
+	directoryManagerPassword=$(cat /var/secrets/ipadmpw.secure)
+	KRBDOMAIN=${domain^^}
+
 	# note - password must be at least 8 chars long and should be prepopulated via install_wavelet_server.sh
 	local administratorPassword=$(cat /var/secrets/ipaadmpw.secure)
 	if [[ ${administratorPassword} == "DomainAdminPasswordGoesHere" ]]; then
 		echo -e "\nThe domain administrator password doesn't appear to be set."
 		echo -e "We will continue with a default password, but this default password is effectively public knowledge!\n"
 	fi
-	directoryManagerPassword=$(cat /var/secrets/ipadmpw.secure)
-	KRBDOMAIN=${domain^^}
 	echo -e "Generated variables:\n Hostname:	${hostname}\n	Domain: ${domain}\n	Kerberos Domain:	${domain^^}\n"
 	dcArray=()
 	IFS="."
@@ -90,12 +90,13 @@ configure_idm(){
 	echo -e "Generating paths and quadlets..\n"
 	mkdir -p /var/freeipa-data
 	# This sets up the QUADLET to run freeipa, but it does not set the server itself up.
-	# Note we are remapping port 80 to port 8180 and port 443 to port 843 to free up the HTTP ports for nginx/wavelet UI!
 	# Port 953 needed for dynamic DNS updates
 	echo -e "
 [Container]
 Image=quay.io/freeipa/freeipa-server:almalinux-9
 ContainerName=freeipa
+PublishPort=53:53
+PublishPort=53:53/udp
 PublishPort=80:80
 PublishPort=88:88
 PublishPort=88:88/udp
@@ -108,6 +109,7 @@ PublishPort=636:636
 PublishPort=953:953
 Volume=/var/freeipa-data:/data:z
 HostName=dc1.${domain}
+ReadOnly=true
 AutoUpdate=registry
 NoNewPrivileges=true
 
@@ -119,16 +121,26 @@ TimeoutStartSec=600
 [Install]
 WantedBy=multi-user.target" > /etc/containers/systemd/freeipa.container
 
+	# First, we need to stop systemd-resolved, because it binds on port 53 and breaks the freeIPA container, despite configurations to not do so.  sigh.
+	systemctl disable systemd-resolved --now
+	systemctl disable dnsmasq.service --now
+	# Switch dnsmasq DNS off and re-enable dnsmasq so that it now does NOT handle DNS at all.
+	sed -i 's|#port=0|port=0|g' /etc/dnsmasq.conf
+	systemctl enable dnsmasq.service --now
 	# Here, we CONFIGURE the freeIPA instance
 	podman run -h "dc1.${domain}" \
+		--read-only \
 		-v /var/freeipa-data:/data:Z \
 		-e PASSWORD=${administratorPassword} \
 		quay.io/freeipa/freeipa-server:almalinux-9 ipa-server-install -U --hostname=dc1.${domain} -r ${domain^^} \
-		--ntp-pool=3.us.pool.ntp.org --setup-dns --auto-reverse --no-hbac-allow --no-forwarders
+		--ntp-pool=3.us.pool.ntp.org --setup-dns --no-hbac-allow --auto-forwarders --auto-reverse
 
 	# Reload systemctl and start the container, we should now have a functional domain controller
+	# Generate host record for dc1 in /etc/hosts, because until FreeIPA is up, we don't have any dns right now!
+	echo -e "192.168.1.32 dc1.${domain} dc1" >> /etc/hosts
 	systemctl daemon-reload
-	systemctl start freeipa.service --now
+	systemctl start freeipa.service
+
 
 	if systemctl is-active --quiet freeipa.service; then
 		echo -e "FreeIPA configured and container is running!\n"
@@ -147,7 +159,8 @@ WantedBy=multi-user.target" > /etc/containers/systemd/freeipa.container
 install_server_security_layer(){
 	user="domain_join"
 	waveletDomain=$(dnsdomainname)
-	waveletServer=dc1.$(dnsdomainname)
+	waveletDCServer=dc1.$(dnsdomainname)
+	waveletServer=$(hostname)
 	directoryManagerPassword=$(cat /var/secrets/ipadmpw.secure)
 	KRBDOMAIN=${domain^^}
 	local administratorPassword=$(cat /var/secrets/ipaadmpw.secure)
@@ -157,48 +170,27 @@ install_server_security_layer(){
 
 	# We are doing the following;  creating an initial user who has domain join privileges
 	# These credentials will be distributed during the initialization process on PXE boot and subsequently removed.
-	ipa-client-install --unattended --principal=admin --password=${administratorPassword} --server ${waveletServer} --domain ${waveletDomain} --realm ${waveletDomain^^} --enable-dns-updates
+	ipa-client-install --unattended --principal=admin --password=${administratorPassword} --enable-dns-updates
+		# These additional options might be needed but it would mean that DNS was broken on the system, we probably don't want them here.
+		# --server ${waveletServer} --domain ${waveletDomain} --realm ${waveletDomain^^}
 	echo ${administratorPassword} | kinit admin
 	ipa user-add domain_join --random --first=domain --last=join > /var/secrets/domainEnrollment.password
 
 	# Generate a tsig file for zone transfer from the DHCPD server to IPA's internal BIND.
 	# or https://hub.docker.com/r/technitium/dns-server ? 
-	# tsig-keygen -a hmac-sha512 svr.wavelet.local > /var/secrets/svr.tsig.key && echo $(cat /var/secrets/svr.tsig.key) >> /var/freeipa-data/etc/named.conf
+	# Ref https://www.freeipa.org/page/DHCP_Integration_Design
+	#ddns-confgen -a hmac-sha512 \
+	#-k ${waveletServer}. \
+	#-s ${waveletDomain}. > /var/secrets/svr.tsig.key && \
+	#echo $(cat /var/secrets/svr.tsig.key) >> /var/freeipa-data/etc/named.conf
+	tsig-keygen -a hmac-sha512 svr.wavelet.local > /var/secrets/svr.tsig.key && echo $(cat /var/secrets/svr.tsig.key) >> /var/freeipa-data/etc/named.conf
 	# Customize this for the domain in question
-	ipa dnszone-mod ${waveletDomain}. --update-policy="grant dc1 name ${waveletDomain} A;"
+	ipa dnszone-mod ${waveletDomain}. --update-policy="grant ${waveletServer}. name ${waveletDomain}. ANY;"
 	ipa dnszone-mod ${waveletDomain}. --dynamic-update=1
-}
-
-configure_freeipa_dns(){
-	# This area is a mess, we might not need this at all but I'm leaving it here for now just encase..
-	# This is where we need to do some work to allow FreeIPA to allow zone updates from Dnsmasq.  It... ought to work.
-	# ref https://www.freeipa.org/page/Howto/DNS_updates_and_zone_transfers_with_TSIG
-	waveletServer=dc1.$(dnsdomainname)
-	waveletDomain=$(dnsdomainname)
-	#cat << EOF >> /etc/dnsmasq.conf
-# Add FreeIPA srv records
-#srv-host =_kerberos._udp.${waveletDomain},${waveletServer},88
-#srv-host =_kerberos._tcp.${waveletDomain},${waveletServer},88
-#srv-host =_kerberos-master._tcp.${waveletDomain},${waveletServer},88
-#srv-host =_kerberos-master._udp.${waveletDomain},${waveletServer},88
-#srv-host =_kpasswd._tcp.${waveletDomain},${waveletServer},88
-#srv-host =_kpasswd._udp.${waveletDomain},${waveletServer},88
-#srv-host =_ldap._tcp.${waveletDomain},${waveletServer},389
-#txt-record=_kerberos.example.com,"${waveletDomain^^}"
-#EOF
-	# Note Dnsmasq doesn't support TSIG - it's not designed for this.  We might need to rebase onto ISC_DHCPD or FreeIPA's internal BIND...
-#	ipa dnszone-mod "${domain}." --dynamic-update=True --update-policy="grant DDNS_UPDATE wildcard * ANY;"
-	# Or to use DHCPd with a TSIG file..
-	#podman exec freeipa "rndc-confgen -a -b 512"
-	#podman exec freeipa `echo -e 'include "/etc/rndc.key;" >> /etc/named/ipa-etc.conf`
-	#podman exec freeipa `ipa dnszone-mod ${domain} --dynamic-update=True --update-policy="grant ${domain^^} krb5-self * A; grant ${domain^^} krb5-self * AAAA; grant ${domain^^} krb5-self * SSHFP; grant "rndc-key" zonesub ANY;"`
-
-	# Tell Kea / DHCPD to use the tsig;
-	#local tsigKey=$(cat /var/secrets/tsig.key | sed -n -e 's|^.*secret "||p' | cut -f1 -d '"')
-	#sed -i '/tsig-keys/c\KEYINPUT' kea-dhcp-ddns.conf
-	#cat kea-dhcp-ddns.conf | sed -e 's/^{/'$(printf "\x1e")'{/' | jq --seq .
-	#sed -i 's|"tsig-keys":\ [],|"tsig-keys":\ [ { "name": "svr.wavelet.local",\ "algorithm":\ "hmac-sha512",\ "secret":\ "'"${tsigKey}"'" }],|g' input.txt
-	#sed -i 's|"tsig-keys":\ [],|"tsig-keys":\ [ { "name": "svr.wavelet.local",\ "algorithm":\ "hmac-sha512",\ "secret":\ "SECRET"\ }],|g' /etc/kea/kea-dhcp-ddns.conf
+	# now DNS may be updated by executing nsupdate -k /var/secrets/svr.tsig.key from the dnsmasq script.
+	touch /var/server.domain.enrollment.complete
+	# Need this file in /var/tmp so dnsmasq knows to update BIND instead of itself!
+	cp /var/tmp/prod.security.enabled /var/tmp
 }
 
 configure_freeradius(){
@@ -238,11 +230,11 @@ WantedBy=multi-user.target" > /etc/containers/systemd/radiusd.container
 configure_etcd_certs(){
 	# Configure ETCD service principal within freeIPA and tell ETCD to monitor for the appropriate certificate
 	ipa service-add etcd/`hostname`
+	ipa service-add-host --hosts=dc1.$(dnsdomainname) etcd/`hostname`
 	ipa-getcert request \
 		-f /etc/pki/tls/certs/etcd.crt \
 		-k /etc/pki/tls/private/etcd.key \
-		-K ETCD/svr.wavelet.local
-		-D svr.wavelet.local
+		-K etcd/svr.wavelet.local
 	echo -e "TLS Certificate for Etcd generated.\n"
 	echo -e "Reconfiguring Etcd to utilize certificate...\n"
 	# sed the systemd file and add appropriate TLS settings here
@@ -266,30 +258,25 @@ configure_httpd_sp(){
 	# Configure Apache service principal
 	# we might need to do something with cred files for the passwords etc. here, needs testing.
 	ipa service-add http/`hostname`
+	ipa service-add-host --hosts=dc1.$(dnsdomainname) http/`hostname`
 	ipa-getcert request \
 		-f /etc/pki/tls/certs/httpd.crt \
 		-k /etc/pki/tls/private/httpd.key \
-		-K HTTP/`hostname`
-		-D `hostname`
+		-K http/`hostname`
 	echo -e "TLS Certificate for web services generated.\n"
 	echo -e "Reconfiguring httpd to utilize certificate...\n"
 	# Configure Apache service principal within freeIPA and tell Apache to monitor for the appropriate certificate
 	# Pull httpd.conf out of the container
 	podman run --rm httpd:2.4 cat /usr/local/apache2/conf/httpd.conf > custom-httpd.conf
-	# modify the conf file to enable SSL/TLS
-	sed -i \
-		-e 's/^#\(Include .*httpd-ssl.conf\)/\1/' \
-		-e 's/^#\(LoadModule .*mod_ssl.so\)/\1/' \
-		-e 's/^#\(LoadModule .*mod_socache_shmcb.so\)/\1/' \
-		/var/home/wavelet/custom-httpd.conf
+	# Put the secure conf file in place
+		cp /var/home/wavelet/config/httpd.secure.conf  /var/home/wavelet/config/httpd.conf
 	# Add httpd.conf volume to the httpd quadlet, this file will now be mounted from the host to the container directly.
 	# Add the certificates to the httpd quadlet.  This will almost certainly require doing something nasty with SElinux..
 	sed -i \
-		-e 's|#conf|Volume=/home/wavelet/custom-httpd.conf:/usr/local/apache2/conf/httpd.conf:z' \
 		-e 's|#cert|Volume=/etc/pki/tls/certs/httpd.crt:/usr/local/apache2/conf/httpd.crt:z' \
 		-e 's|#key|Volume=/etc/pki/tls/certs/httpd.key:/usr/local/apache2/conf/httpd.key:z' \
 		/var/home/wavelet/.config/systemd/users/httpd.container
-	# And here's the something nasty.  I can't say I'm much of a fan of allowing access to the private keys.  Is there a better way to do this?
+	# And here's the something nasty.  I can't say I'm much of a fan of allowing container access to the private keys.  Is there a better way to do this?
 	semanage fcontext -a -t cert_t --ftype -- "/etc/pki/tls/certs/httpd.crt"
 	semanage fcontext -a -t cert_t --ftype -- "/etc/pki/tls/certs/httpd.key"
 	restorecon -FvR /etc/pki/tls/certs/
@@ -314,31 +301,33 @@ configure_radius_sp(){
 	#	It will auth utilizing the machine account using EAP-TTLS.
 
 	ipa service-add radius/`hostname`
+	ipa service-add-host --hosts=dc1.$(dnsdomainname) radius/`hostname`
 	ipa-getcert request \
-		-f /etc/pki/tls/certs/httpd.crt \
-		-k /etc/pki/tls/private/httpd.key \
-		-K HTTP/`hostname`
-		-D `hostname`
+		-f /etc/pki/tls/certs/radius.crt \
+		-k /etc/pki/tls/private/radius.key \
+		-K radius/`hostname`
+
 	# Set SElinux contexts for these two files
-	semanage fcontext -a -t cert_t --ftype -- "/etc/pki/tls/certs/radius.crt"
-	semanage fcontext -a -t cert_t --ftype -- "/etc/pki/tls/certs/radius.key"
+	semanage fcontext -a -t cert_t --ftype "/etc/pki/tls/certs/radius.crt"
+	semanage fcontext -a -t cert_t --ftype "/etc/pki/tls/certs/radius.key"
 	restorecon -FvR /etc/pki/tls/certs/
 
+	# Might need this for EAP-TTLS
 	# Generate the outer tunnel openSSL certificate CA
-	sed -i 's|input_password|${outerCAInputPassword}|g' /etc/raddb/certs/ca.cnf
-	sed -i 's|output_password|${outerCAOutputPassword}|g' /etc/raddb/certs/ca.cnf
-	sed -i 's|[certificate_authority]|${outerCACertificateAuthoritySection}|g' /etc/raddb/certs/ca.cnf
-	make ca.pem
+	#sed -i 's|input_password|${outerCAInputPassword}|g' /etc/raddb/certs/ca.cnf
+	#sed -i 's|output_password|${outerCAOutputPassword}|g' /etc/raddb/certs/ca.cnf
+	#sed -i 's|[certificate_authority]|${outerCACertificateAuthoritySection}|g' /etc/raddb/certs/ca.cnf
+	#make ca.pem
 	# Same for server
-	sed -i 's|input_password|${outerCAInputPassword}|g' /etc/raddb/certs/server.cnf
-	sed -i 's|output_password|${outerCAOutputPassword}|g' /etc/raddb/certs/server.cnf
-	sed -i 's|[certificate_authority]|${outerCACertificateAuthoritySection}|g' /etc/raddb/certs/server.cnf
-	make server
+	#sed -i 's|input_password|${outerCAInputPassword}|g' /etc/raddb/certs/server.cnf
+	#sed -i 's|output_password|${outerCAOutputPassword}|g' /etc/raddb/certs/server.cnf
+	#sed -i 's|[certificate_authority]|${outerCACertificateAuthoritySection}|g' /etc/raddb/certs/server.cnf
+	#make server
 	# Finally for Clien*T* - the outer tunnel will use the client certificate as a PSK
-	sed -i 's|input_password|${outerCAInputPassword}|g' /etc/raddb/certs/client.cnf
-	sed -i 's|output_password|${outerCAOutputPassword}|g' /etc/raddb/certs/client.cnf
-	sed -i 's|[certificate_authority]|${outerCACertificateAuthoritySection}|g' /etc/raddb/certs/client.cnf
-	make client
+	#sed -i 's|input_password|${outerCAInputPassword}|g' /etc/raddb/certs/client.cnf
+	#sed -i 's|output_password|${outerCAOutputPassword}|g' /etc/raddb/certs/client.cnf
+	#sed -i 's|[certificate_authority]|${outerCACertificateAuthoritySection}|g' /etc/raddb/certs/client.cnf
+	#make client
 
 	# OK.  Here is where we would work through the generated radius configuration files and appropriately customize them.
 	# Process:
