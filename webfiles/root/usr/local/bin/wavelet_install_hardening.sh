@@ -58,20 +58,19 @@ event_server(){
 configure_idm(){
 	# Generate necessary data from the server's existing DNS configuration
 	hostname=$(hostname)
-	# Our domain here needs to be a subdomain of the nonsecure wavelet server.  This is because DNSmasq handles our DHCP, and the FreeIPA stuff needs to be setup as a forward zone for them both to work.
-	# If this does not function the way I'm hoping, then I'll have to disable DNSmasq and configure FreeIPA with full BIND, then do some work to refactor the pxe, dhcp and script hooks.
-	domain="secure.$(dnsdomainname)"
+	domain="$(dnsdomainname)"
 	echo "${domain}" > /var/secrets/wavelet.domain
 	echo "dc1.${domain}" > /var/secrets/wavelet.server
 	ip=$(hostname -I | cut -d " " -f 1)
 	# note - password must be at least 8 chars long and should be prepopulated via install_wavelet_server.sh
-	administratorPassword=$(cat /var/secrets/ipaadmpw.secure)
+	local administratorPassword=$(cat /var/secrets/ipaadmpw.secure)
 	if [[ ${administratorPassword} == "DomainAdminPasswordGoesHere" ]]; then
-		echo -e "\nThe domain administrator password doesn't appear to be set.  We will continue, but this password is effectively public knowledge..\n"
+		echo -e "\nThe domain administrator password doesn't appear to be set."
+		echo -e "We will continue with a default password, but this default password is effectively public knowledge!\n"
 	fi
 	directoryManagerPassword=$(cat /var/secrets/ipadmpw.secure)
 	KRBDOMAIN=${domain^^}
-	echo -e "Generated variables:\n Hostname:       ${hostname}\n   Domain: ${domain}\n     Kerberos Domain:        ${KRBDOMAIN}\n"
+	echo -e "Generated variables:\n Hostname:	${hostname}\n	Domain: ${domain}\n	Kerberos Domain:	${domain^^}\n"
 	dcArray=()
 	IFS="."
 	echo -e "Reading array from ${hostname}\n"
@@ -90,24 +89,24 @@ configure_idm(){
 
 	echo -e "Generating paths and quadlets..\n"
 	mkdir -p /var/freeipa-data
-# This sets up the QUADLET to run freeipa, but it does not set the server itself up.
-# Note we are remapping port 80 to port 8180 and port 443 to port 843 to free up the HTTP ports for nginx/wavelet UI!
-# Port 953 needed for dynamic DNS updates
+	# This sets up the QUADLET to run freeipa, but it does not set the server itself up.
+	# Note we are remapping port 80 to port 8180 and port 443 to port 843 to free up the HTTP ports for nginx/wavelet UI!
+	# Port 953 needed for dynamic DNS updates
 	echo -e "
 [Container]
 Image=quay.io/freeipa/freeipa-server:almalinux-9
 ContainerName=freeipa
-PublishPort=8180:80
+PublishPort=80:80
 PublishPort=88:88
 PublishPort=88:88/udp
 PublishPort=123:123/udp
 PublishPort=389:389
-PublishPort=8443:443
+PublishPort=443:443
 PublishPort=464:464
 PublishPort=464:464/udp
 PublishPort=636:636
 PublishPort=953:953
-Volume=/var/freeipa-data:/data:Z
+Volume=/var/freeipa-data:/data:z
 HostName=dc1.${domain}
 AutoUpdate=registry
 NoNewPrivileges=true
@@ -121,37 +120,18 @@ TimeoutStartSec=600
 WantedBy=multi-user.target" > /etc/containers/systemd/freeipa.container
 
 	# Here, we CONFIGURE the freeIPA instance
-	podman run -h "dc1.${domain}" --read-only \
+	podman run -h "dc1.${domain}" \
 		-v /var/freeipa-data:/data:Z \
 		-e PASSWORD=${administratorPassword} \
-		quay.io/freeipa/freeipa-server:almalinux-9 ipa-server-install -U -r ${KRBDOMAIN}
+		quay.io/freeipa/freeipa-server:almalinux-9 ipa-server-install -U --hostname=dc1.${domain} -r ${domain^^} \
+		--ntp-pool=3.us.pool.ntp.org --setup-dns --auto-reverse --no-hbac-allow --no-forwarders
 
-	# Maybe not needed given we just did this with the command above?
-	# Set .env file for freeIPA configuration
-	# curl this # Remote: https://raw.githubusercontent.com/freeipa/freeipa-container/master/init-data /var/freeipa-data
-	echo -e "
-# Remote: https://raw.githubusercontent.com/freeipa/freeipa-container/master/init-data
-ipa-server-install
-IPA_SERVER_IP=${ipAddress}
-IPA_SERVER_HOSTNAME="dc1.${domain}"
-IPA_SERVER_INSTALL_OPTS=--unattended \
---realm=${KRBDOMAIN} \
---ds-password=${directoryManagerPassword} \
---admin-password=${administratorPassword}" > /var/freeipa-data/.env.freeipa
-	
-	# Reload systemctl and start the container
+	# Reload systemctl and start the container, we should now have a functional domain controller
 	systemctl daemon-reload
-	systemctl enable freeipa.service --now
+	systemctl start freeipa.service --now
 
 	if systemctl is-active --quiet freeipa.service; then
 		echo -e "FreeIPA configured and container is running!\n"
-		echo -e "Performing initial host enrollment..\n"
-		# We are doing the following;  creating an initial user who has domain join privileges
-		# These credentials will be distributed during the initialization process on PXE boot and subsequently removed.
-		podman exec freeipa "echo ${administratorPassword} | kinit admin"
-		podman exec freeipa "ipa user-add domain_join --random --first=domain --last=join > data/output.txt"
-		echo -e "$(cat /var/freeipa-data/output.txt | grep "Random password:" | cut -d ' ' -f 5)" > /var/secrets/domainEnrollment.password
-		rm -rf /var/freeipa-data/output.txt
 		echo -e "Enrolling server to freeIPA..\n"
 		install_server_security_layer
 	else
@@ -165,39 +145,81 @@ IPA_SERVER_INSTALL_OPTS=--unattended \
 }
 
 install_server_security_layer(){
-		password=$(cat /var/secrets/domainEnrollment.password)
-		user="domain_join"
-		waveletDomain=$(cat /var/secrets/wavelet.domain)
-		waveletServer=$(cat /var/secrets/wavelet.server)
-		rm -rf /var/secrets/domainEnrollment.password
-		# Here we need to spin up a freeipa client container, as the client can't install on the base OS layer.
-		# Pull and then push the container to the local registry for clients
-		git clone https://github.com/freeipa/freeipa-container.git
-		podman run -h ${waveletDomain} -e PASSWORD=${password} -ti freeipa-client /var/home/wavelet/containerfiles/Containerfile.freeipa-client
-		# Now that we have a functional IPA client in the container, we need to ensure that everything is run through that container which pertains to domain functionality.  oof.
+	user="domain_join"
+	waveletDomain=$(dnsdomainname)
+	waveletServer=dc1.$(dnsdomainname)
+	directoryManagerPassword=$(cat /var/secrets/ipadmpw.secure)
+	KRBDOMAIN=${domain^^}
+	local administratorPassword=$(cat /var/secrets/ipaadmpw.secure)
+	# The preferred mthod would be to run the ipa-client in a container, however there's no good (recent) documentation on this.
+	# I opted to replace the nfs-utils-coreos package that was blocking freeipa-client installation so we are running this in the package overlay
+	# Might break at some point..
+
+	# We are doing the following;  creating an initial user who has domain join privileges
+	# These credentials will be distributed during the initialization process on PXE boot and subsequently removed.
+	ipa-client-install --unattended --principal=admin --password=${administratorPassword} --server ${waveletServer} --domain ${waveletDomain} --realm ${waveletDomain^^} --enable-dns-updates
+	echo ${administratorPassword} | kinit admin
+	ipa user-add domain_join --random --first=domain --last=join > /var/secrets/domainEnrollment.password
+
+	# Generate a tsig file for zone transfer from the DHCPD server to IPA's internal BIND.
+	# or https://hub.docker.com/r/technitium/dns-server ? 
+	# tsig-keygen -a hmac-sha512 svr.wavelet.local > /var/secrets/svr.tsig.key && echo $(cat /var/secrets/svr.tsig.key) >> /var/freeipa-data/etc/named.conf
+	# Customize this for the domain in question
+	ipa dnszone-mod ${waveletDomain}. --update-policy="grant dc1 name ${waveletDomain} A;"
+	ipa dnszone-mod ${waveletDomain}. --dynamic-update=1
 }
 
 configure_freeipa_dns(){
+	# This area is a mess, we might not need this at all but I'm leaving it here for now just encase..
 	# This is where we need to do some work to allow FreeIPA to allow zone updates from Dnsmasq.  It... ought to work.
 	# ref https://www.freeipa.org/page/Howto/DNS_updates_and_zone_transfers_with_TSIG
+	waveletServer=dc1.$(dnsdomainname)
+	waveletDomain=$(dnsdomainname)
+	#cat << EOF >> /etc/dnsmasq.conf
+# Add FreeIPA srv records
+#srv-host =_kerberos._udp.${waveletDomain},${waveletServer},88
+#srv-host =_kerberos._tcp.${waveletDomain},${waveletServer},88
+#srv-host =_kerberos-master._tcp.${waveletDomain},${waveletServer},88
+#srv-host =_kerberos-master._udp.${waveletDomain},${waveletServer},88
+#srv-host =_kpasswd._tcp.${waveletDomain},${waveletServer},88
+#srv-host =_kpasswd._udp.${waveletDomain},${waveletServer},88
+#srv-host =_ldap._tcp.${waveletDomain},${waveletServer},389
+#txt-record=_kerberos.example.com,"${waveletDomain^^}"
+#EOF
 	# Note Dnsmasq doesn't support TSIG - it's not designed for this.  We might need to rebase onto ISC_DHCPD or FreeIPA's internal BIND...
-	ipa dnszone-mod "${domain}." --dynamic-update=True --update-policy="grant DDNS_UPDATE wildcard * ANY;"
+#	ipa dnszone-mod "${domain}." --dynamic-update=True --update-policy="grant DDNS_UPDATE wildcard * ANY;"
 	# Or to use DHCPd with a TSIG file..
 	#podman exec freeipa "rndc-confgen -a -b 512"
 	#podman exec freeipa `echo -e 'include "/etc/rndc.key;" >> /etc/named/ipa-etc.conf`
 	#podman exec freeipa `ipa dnszone-mod ${domain} --dynamic-update=True --update-policy="grant ${domain^^} krb5-self * A; grant ${domain^^} krb5-self * AAAA; grant ${domain^^} krb5-self * SSHFP; grant "rndc-key" zonesub ANY;"`
+
+	# Tell Kea / DHCPD to use the tsig;
+	#local tsigKey=$(cat /var/secrets/tsig.key | sed -n -e 's|^.*secret "||p' | cut -f1 -d '"')
+	#sed -i '/tsig-keys/c\KEYINPUT' kea-dhcp-ddns.conf
+	#cat kea-dhcp-ddns.conf | sed -e 's/^{/'$(printf "\x1e")'{/' | jq --seq .
+	#sed -i 's|"tsig-keys":\ [],|"tsig-keys":\ [ { "name": "svr.wavelet.local",\ "algorithm":\ "hmac-sha512",\ "secret":\ "'"${tsigKey}"'" }],|g' input.txt
+	#sed -i 's|"tsig-keys":\ [],|"tsig-keys":\ [ { "name": "svr.wavelet.local",\ "algorithm":\ "hmac-sha512",\ "secret":\ "SECRET"\ }],|g' /etc/kea/kea-dhcp-ddns.conf
 }
 
 configure_freeradius(){
 	# Pull RADIUS container as a quadlet, Conf files should probably be preconfigured from wavelet repo.
 	# Note the service isn't enabled this time around.  It'll switch on next boot.
+	mkdir -p /etc/raddb
+	# This dockerfile is adapted from the freeradius official git, and contains an additional step
+	# The step copies the config files onto the host.  We will then modify them.  
+	# This takes a while, but I noted the FreeRADIUS conf files have an ID field and probably other data which we might want to preserve.
+	podman build -t localhost/freeradius \
+	-v=/etc/raddb/:/mount:z \
+	-f /var/home/wavelet/containerfiles/Containerfile.freeradius-build
+	# Now we pull an official freeRADIUS container from docker hub and push it to the local registry
+	podman push docker.io/freeradius/freeradius-server 192.168.1.32:5000/freeradius --tls-verify=false
 		echo -e "
 [Container]
-Image=docker.io/freeradius/freeradius-server:latest
+Image=${ip}:5000/freeradius
 ContainerName=radius
 PublishPort=1812-1813:1812-1813/tcp
 PublishPort=1812-1813:1812-1813/udp
-Volume=/etc/raddb:/raddb
+Volume=/etc/raddb:/etc/raddb
 Volume=/etc/ipa:/etc/ipa
 Volume=/etc/pki/tls/certs:/etc/pki/tls/certs
 AutoUpdate=registry
@@ -291,43 +313,12 @@ configure_radius_sp(){
 	#	Configure FreeRADIUS in /etc/raddb along with a domain service principal with some additional mods.
 	#	It will auth utilizing the machine account using EAP-TTLS.
 
-
-	# NOT NEEDED	ipa permission-add 'ipaNTHash service read' --attrs=ipaNTHash --type=user  --right=read
-	#	ipa privilege-add 'Radius services' --desc='Privileges needed to allow radiusd servers to operate'
-	# NOT NEEDED	ipa privilege-add-permission 'Radius services' --permissions='ipaNTHash service read'
-	#	ipa role-add 'Radius server' --desc="Radius server role"
-	#	ipa role-add-privilege --privileges="Radius services" 'Radius server'
-	ipa service-add "radius/`hostname`"
-	# PROBABLY NOT NEEDED ipa-getkeytab -p "radius/`hostname`" -s `hostname` -k /var/home/wavelet/radiusd.keytab
-	# PROBABLT NOT NEEDED kinit -t /var/home/wavelet/radiusd.keytab -k "radius/`hostname`"
-
-	# Here we need some logic to generate a valid radius password, get the hostname
-	# we need to generate an all uppercase domain from the hostname
-	# we need to generate foreach DC= entries appropriately for the DN.. probably a while read . delimited foreach thing?
-
-	echo -e "
-# LDIF example from https://firstyear.id.au/blog/html/2015/07/06/FreeIPA:_Giving_permissions_to_service_accounts..html
-
-dn: krbprincipalname=radius/`hostname`@${KRBDOMAIN},cn=services,cn=accounts,dc=${dc1},dc=${dc2},dc=${dc3}
-changetype: modify
-add: objectClass
-objectClass: simpleSecurityObject
--
-add: userPassword
-userPassword: ${radiusPassword}
-" > radius.ldif
-	# probably need to page in DM password here?
-	ldapmodify -f radius.ldif -D 'cn=Directory Manager' -W -H ldap://`hostname` -Z
-	echo -e "
-dn: cn=adtrust agents,cn=sysaccounts,cn=etc,dc=${dc1},dc=${dc2},dc=${dc3}
-changetype: modify
-add: memberUid
-memberUid: krbprincipalname=radius/`hostname`@${KRBDOMAIN},cn=services,cn=accounts,dc=${dc1},dc=${dc2},dc=${dc3}
-" > adtrust.ldif
-	ldapmodify -f adtrust.ldif -D 'cn=Directory Manager' -W -H ldap://`hostname` -Z
-
-	# Get certificate for the IPA service principal.  This is all that's required, because radius should be configured to look here by default.
-	ipa-getcert request -r -f /var/tmp/radius.pem -k /var/tmp/radius.key --principal=radius/`hostname`
+	ipa service-add radius/`hostname`
+	ipa-getcert request \
+		-f /etc/pki/tls/certs/httpd.crt \
+		-k /etc/pki/tls/private/httpd.key \
+		-K HTTP/`hostname`
+		-D `hostname`
 	# Set SElinux contexts for these two files
 	semanage fcontext -a -t cert_t --ftype -- "/etc/pki/tls/certs/radius.crt"
 	semanage fcontext -a -t cert_t --ftype -- "/etc/pki/tls/certs/radius.key"
@@ -356,8 +347,15 @@ memberUid: krbprincipalname=radius/`hostname`@${KRBDOMAIN},cn=services,cn=accoun
 	#		CA:	Domain CA
 	#		Client Cert:  Radius opens LDAP connection, reads machine certificate for the supplicant hostname and accepts/rejects
 
-	mkdir -p /etc/raddb/sites-enabled
-	mkdir -p /etc/raddb/mods-enabled
+	echo -e "
+# Wavelet NAS
+client AP_$(dnsdomainname) {
+	ipaddr							=	${AccessPointIPAddress}
+	proto							=	*
+	secret							=	${AccessPointSecret}
+	require_message_authenticator 	=	no
+	nas_type						=	other" >> /etc/raddb/clients.conf
+
 
 	# We will need the following files configured appropriately for the wavelet installation:
 	#	Suggest creating appropriate template files and embedding with Ignition, then utilizing stream editor to populate
