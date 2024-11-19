@@ -23,8 +23,12 @@ detect_self(){
 
 podman_systemd_generate(){
 	# Old method
-	podman pod create --infra=true --name http-php --publish 8180:80 \
-		-v ${SCRHOME}/http-php/nginx:/etc/nginx/conf.d/:Z \
+	if [[ -f /var/prod.security.enabled ]]; then
+		echo -e "Security layer is enabled, copying SSL nginx.conf "
+		cp /var/home/wavelet/config/nginx.secure.conf /var/home/wavelet/http-php/nginx/nginx.conf
+	fi
+	podman pod create --infra=true --name http-php --hostname interface --publish 9080:80 --publish 9443:443 \
+		-v ${SCRHOME}/http-php/nginx/:/etc/nginx/conf.d/:Z \
 		-v ${SCRHOME}/http-php/html:/var/www/html:Z
 	echo -e "Generating nginx simple configuration, and systemd service files.."
 	podman create --name nginx --pod http-php docker://docker.io/library/nginx:alpine
@@ -61,7 +65,8 @@ Restart=always
 TimeoutStartSec=30
 [Install]
 WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/container.php-fpm
-# For Nginx, we moved the port mapping to standard ports, so that we will no longer need to include additional steps or documentation at the user end.
+
+# For Nginx, ports are mapped to 9180 and 9443 respectively..
 	echo -e "[Unit]
 Description=NGINX
 [Container]
@@ -75,14 +80,23 @@ Restart=always
 TimeoutStartSec=30
 [Install]
 WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/container.nginx
-	if [[ ! -f /etc/pki/tls/certs/httpd.cert ]]; then
-		# we generate a crappy certificate so things work, at the very least..
-		openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/pki/tls/certs/httpd.key -out /etc/pki/tls/certs/httpd.crt -subj "/C=XX/ST=StateName/L=CityName/O=CompanyName/OU=CompanySectionName/CN=CommonNameOrHostname"
-		openssl dhparam -out /etc/pki/certs/dhparam.pem 4096
+
+	if [[ -f /var/prod.security.enabled ]]; then
+	echo -e "Security layer enabled, adding mounts for certificates..\n"
+		if [[ ! -f /etc/pki/tls/certs/http.crt ]]; then
+			# we generate a crappy certificate so things work, at the very least..
+			echo -e "Certificate has not been generated on server, generating a snake oil certificate for testing..\n"
+			openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/pki/tls/certs/httpd.key -out /etc/pki/tls/certs/httpd.crt -subj "/C=US/ST=NewYork/L=NewYork/O=ALLETHRIUM/OU=DevOps/CN=WaveletInterface"
+			openssl dhparam -out /etc/pki/certs/dhparam.pem 4096
+		fi
+	# Note we're mapping 9080 to port 80 and 9443 to port 443, 8080 and 8443 is used for the apache/ignition server.
+	# Cert directory mounted regardless, the conf file will determine if we bother looking for them.
+	cp /var/home/wavelet/config/nginx.secure.conf /var/home/wavelet/http-php/nginx/nginx.conf
 	fi
+
 	echo -e "[Pod]
-PublishPort=80:80
-PublishPort=443:443
+PublishPort=9080:80
+PublishPort=9443:443
 PodName=http-php.pod
 Volume=/etc/pki/tls/certs/:/etc/pki/tls/certs/
 Volume=${SCRHOME}/http-php/html:/var/www/html:Z
