@@ -270,6 +270,16 @@ storage:
         inline: |
           [Resolve]
           DNSStubListener=no
+    # Same will affect freeIPA.. so we want to create that file too.
+    - path: /etc/systemd/resolved.conf.d/20-freeipa.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          [Resolve]
+          DNSStubListener=no
+          DNS={nameservers}
+          Domains=~. {searchdomains}
     # dnsmasq.conf to define local DNS server environment
     - path: /etc/dnsmasq.conf
       mode: 0644
