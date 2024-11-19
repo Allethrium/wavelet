@@ -13,9 +13,10 @@ dnsmasq_hostName=$4
 
 detect_self(){
 	# hostname.local populated by run_ug.sh on system boot
-	# necessary because this script is spawned with restricted privileges, if already set SED won't do anything.
+	# necessary because this script is spawned with restricted privileges, it can't call hostname or dnsdomainname
 	# This isn't a problem because once set the hostname of the server is static.
 	UG_HOSTNAME=!!hostnamegoeshere!!
+	UG_DOMAINNAME=!!domaingoeshere!!
 	echo -e "Hostname is ${UG_HOSTNAME} \n"
 	case ${UG_HOSTNAME} in
 	svr*)			echo -e "I am a Server."; event_server
@@ -34,13 +35,13 @@ parse_input_opts(){
 	# Scan for injection attacks
 	# ignore if null
 	case ${dnsmasq_operation_type} in
-	add)		echo -e "Dnsmasq argument indicates a new lease for a new MAC, proceeding to detection"		;	event_detect_networkDevice
+	add)		echo -e "Dnsmasq argument indicates a new lease for a new MAC, proceeding to detection"			;	event_detect_networkDevice
 	;;
 	old)		echo -e "Dnsmasq has noted a change in the hostname or MAC of an existing lease, redetecting"	;	event_detect_networkDevice
 	;;
-	del)		echo -e "Dnsmasq has noted that a lease has been deleted, setting device as inactive"		;	event_inactive_networkDevice
+	del)		echo -e "Dnsmasq has noted that a lease has been deleted, setting device as inactive"			;	event_inactive_networkDevice
 	;;
-	*)		echo -e "Input doesn't seem to be valid, doing nothing"						;	exit 0
+	*)			echo -e "Input doesn't seem to be valid, doing nothing"											;	exit 0
 	esac
 }
 
@@ -51,6 +52,29 @@ event_detect_networkDevice(){
 	sleep .5
 	# we remove the file .5 seconds later so that the device can be re-detected once dnsmasq hands out a new lease I.E on system reboot
 	rm -rf /var/tmp/${dnsmasq_ipAddr}_${dnsmasq_mac}.lease
+	# If security layer is enabled, dnsmasq won't handle DNS and we must update FreeIPA's BIND server manually;
+	if [[ -f /var/tmp/prod.security.enabled ]]; then
+		echo -e "security layer enabled, FreeIPA/BIND are handling DNS on this system!\n"
+		if [[ ${4} == "" ]]; then
+			echo "hostname field is empty, using MAC address instead..\n"
+			deviceHostName="noHostName_${dnsmasq_mac}"
+		else
+			deviceHostName="${4}"
+		fi
+		echo -e "Generating nsupdate data..\n"
+		payload="server dc1.${UG_DOMAINNAME} \
+		update delete ${deviceHostName} A \
+		update add ${deviceHostName} 86400 A ${dnsmasq_ipAddr} \
+		send"
+		echo -e "nsupdate -k /var/secrets/svr.tsig.key ${payload}" > /var/tmp/nsupdate.command
+		echo -e "\nData generated in /var/tmp/nsupdate.command, this will be handled in network_device.sh\n"
+	fi
+}
+
+event_inactive_networkDevice(){
+	# If security layer is enabled, dnsmasq won't handle DNS and we must update FreeIPA's BIND server manually;
+	echo -e "WIP.."
+	exit 0
 }
 
 ###
@@ -59,9 +83,9 @@ event_detect_networkDevice(){
 #
 ###
 
-set -x
+#set -x
 exec >/var/tmp/network_sense.log 2>&1
 # check to see if I'm a server or an encoder
 
-echo -e "\n \n \n ********Begin network detection and registration process...******** \n \n \n"
+echo -e "\n\n\n********Begin network detection and registration process...********\n\n\n"
 detect_self
