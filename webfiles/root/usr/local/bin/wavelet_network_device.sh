@@ -176,6 +176,10 @@ generate_device_info() {
 	fi
 }
 
+read_commandfile(){
+	# Commandfile generated from dnsmasq to update NS records.
+	cat $(basename $(ls -t /var/tmp/*.command | head -n1)) | `xargs`
+}
 
 read_leasefile(){
 	# Here we read in the leasefile and generate a devicehash from the IP:MAC combination.
@@ -241,6 +245,7 @@ populate_to_etcd(){
 #
 ####
 
-set -x
+#set -x
 exec >/var/tmp/network_device.log 2>&1
+read_commandfile
 read_leasefile
