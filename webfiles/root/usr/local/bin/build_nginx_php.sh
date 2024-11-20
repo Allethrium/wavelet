@@ -66,7 +66,7 @@ TimeoutStartSec=30
 [Install]
 WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/container.php-fpm
 
-# For Nginx, ports are mapped to 9180 and 9443 respectively..
+# For Nginx, ports are mapped to 9080 and 9443 respectively..
 	echo -e "[Unit]
 Description=NGINX
 [Container]
@@ -89,16 +89,20 @@ WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/container
 			openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/pki/tls/certs/httpd.key -out /etc/pki/tls/certs/httpd.crt -subj "/C=US/ST=NewYork/L=NewYork/O=ALLETHRIUM/OU=DevOps/CN=WaveletInterface"
 			openssl dhparam -out /etc/pki/certs/dhparam.pem 4096
 		fi
-	# Note we're mapping 9080 to port 80 and 9443 to port 443, 8080 and 8443 is used for the apache/ignition server.
-	# Cert directory mounted regardless, the conf file will determine if we bother looking for them.
-	cp /var/home/wavelet/config/nginx.secure.conf /var/home/wavelet/http-php/nginx/nginx.conf
+		# Note we're mapping 9080 to port 80 and 9443 to port 443, 8080 and 8443 is used for the apache/ignition server.
+		# Cert directory mounted regardless, the conf file will determine if we bother looking for them.
+		cp /var/home/wavelet/config/nginx.secure.conf /var/home/wavelet/http-php/nginx/nginx.conf
+	else
+		# Default nginx config file is set for nonsecure.
+		#cp /var/home/wavelet/config/nginx.nonsecure.conf /var/home/wavelet/http-php/nginx/nginx.conf
 	fi
-
+	mkdir -p /var/log/nginx
 	echo -e "[Pod]
 PublishPort=9080:80
 PublishPort=9443:443
 PodName=http-php.pod
 Volume=/etc/pki/tls/certs/:/etc/pki/tls/certs/
+Volume=/var/log/nginx:/var/log/nginx:Z
 Volume=${SCRHOME}/http-php/html:/var/www/html:Z
 Volume=${SCRHOME}/http-php/nginx:/etc/nginx/conf.d/:z" > /var/home/wavelet/.config/containers/systemd/http-php.pod
 	echo -e "Podman pod and containers, generated, service has been enabled in systemd, and will start on next reboot."
