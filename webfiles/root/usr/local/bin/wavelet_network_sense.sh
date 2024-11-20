@@ -16,7 +16,6 @@ detect_self(){
 	# necessary because this script is spawned with restricted privileges, it can't call hostname or dnsdomainname
 	# This isn't a problem because once set the hostname of the server is static.
 	UG_HOSTNAME=!!hostnamegoeshere!!
-	UG_DOMAINNAME=!!domaingoeshere!!
 	echo -e "Hostname is ${UG_HOSTNAME} \n"
 	case ${UG_HOSTNAME} in
 	svr*)			echo -e "I am a Server."; event_server
@@ -53,22 +52,6 @@ event_detect_networkDevice(){
 	# we remove the file .5 seconds later so that the device can be re-detected once dnsmasq hands out a new lease I.E on system reboot
 	rm -rf /var/tmp/${dnsmasq_ipAddr}_${dnsmasq_mac}.lease
 	# If security layer is enabled, dnsmasq won't handle DNS and we must update FreeIPA's BIND server manually;
-	if [[ -f /var/tmp/prod.security.enabled ]]; then
-		echo -e "security layer enabled, FreeIPA/BIND are handling DNS on this system!\n"
-		if [[ ${4} == "" ]]; then
-			echo "hostname field is empty, using MAC address instead..\n"
-			deviceHostName="noHostName_${dnsmasq_mac}"
-		else
-			deviceHostName="${4}"
-		fi
-		echo -e "Generating nsupdate data..\n"
-		payload="server dc1.${UG_DOMAINNAME} \
-		update delete ${deviceHostName} A \
-		update add ${deviceHostName} 86400 A ${dnsmasq_ipAddr} \
-		send"
-		echo -e "nsupdate -k /var/secrets/svr.tsig.key ${payload}" > /var/tmp/nsupdate.command
-		echo -e "\nData generated in /var/tmp/nsupdate.command, this will be handled in network_device.sh\n"
-	fi
 }
 
 event_inactive_networkDevice(){
