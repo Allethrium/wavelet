@@ -110,6 +110,8 @@ event_magewell_ndi(){
 	deviceHostName="Magewell Proconvert HDMI $(curl --cookie /var/tmp/wavelet_sid.txt 'http://192.168.1.27/mwapi?method=get-summary-info' | jq '.ndi.name' | tr -d '"')"
 	UGdeviceStreamCommand="ndi:url=${ndiIPAddr}"
 	populate_to_etcd
+	# Call a new module to populate the DHCP lease into FreeIPA BIND (does nothing if security layer is off)
+	/usr/local/bin/wavelet_ddns_update.sh ${deviceHostName} ${ipAddr}
 }
 
 event_ptz_ndiHX(){
@@ -142,15 +144,14 @@ event_ptz_ndiHX(){
 			UGdeviceStreamCommand="rtsp://${ipAddr}:554/1:decompress"
 			populate_to_etcd
 			echo -e "Device successfully configured, finishing up..\n"
+			# Call a new module to populate the DHCP lease into FreeIPA BIND (does nothing if security layer is off)
+			/usr/local/bin/wavelet_ddns_update.sh ${deviceHostName} ${ipAddr}
 			exit 0
 		else
 			echo -e "\nNDI is available for this device, defaulting to NDI..\n"
 			UGdeviceStreamCommand="ndi:url=${ndiIPAddr}"
 		fi
 }
-
-
-
 
 event_vendorDevice3(){
 	# Interrogates Example device, attempts preconfigured username and password, then tries to set appropriate settings for streaming into UltraGrid.
@@ -161,6 +162,8 @@ event_vendorDevice3(){
 		# stuff to generate the webUI interface components, stream will only be enabled when device is selected!!
 		# NDI cameras may have focus data in addition to other stuff, we may want to eventually add a config box on the webUI to input useful settings and store them!
 	echo -e "Device successfully configured, finishing up..\n"
+	# Call a new module to populate the DHCP lease into FreeIPA BIND (does nothing if security layer is off)
+	/usr/local/bin/wavelet_ddns_update.sh ${deviceHostName} ${ipAddr}
 	exit 0
 }
 
