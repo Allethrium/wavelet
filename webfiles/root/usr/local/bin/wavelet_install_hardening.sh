@@ -63,7 +63,7 @@ configure_idm(){
 	ip=$(hostname -I | cut -d " " -f 1)
 	directoryManagerPassword=$(cat /var/secrets/ipadmpw.secure)
 	KRBDOMAIN=${domain^^}
-
+	gateway=$(read _ _ gateway _ < <(ip route list match 0/0); echo "$gateway")
 	# note - password must be at least 8 chars long and should be prepopulated via install_wavelet_server.sh
 	local administratorPassword=$(cat /var/secrets/ipaadmpw.secure)
 	if [[ ${administratorPassword} == "DomainAdminPasswordGoesHere" ]]; then
@@ -121,26 +121,42 @@ TimeoutStartSec=600
 [Install]
 WantedBy=multi-user.target" > /etc/containers/systemd/freeipa.container
 
-	# First, we need to stop systemd-resolved, because it binds on port 53 and breaks the freeIPA container, despite configurations to not do so.  sigh.
-	systemctl disable systemd-resolved --now
+	# Here, we CONFIGURE the freeIPA instance
+	# Note that no forwarders are configured.  We can add one later if we need that functionality but for now this is an isolated DNS zone.
+	# We will force populate appropriate zones later on in setup after the svr.wavelet client is configured.
+	# There is a ridiculously long delay after installation whilst it does a bunch of DNS nonsense...
+
+	# we are going to do horrible things with dns.
+	echo -e "
+192.168.1.32 svr.wavelet.local svr" > /etc/hosts
+	podman run -h "dc1.${domain}" \
+		--read-only \
+		--dns=127.0.0.1 \
+		-h=dc1.${domain} \
+		-v /var/freeipa-data:/data:Z \
+		-e PASSWORD=**HIDDEN** \
+		quay.io/freeipa/freeipa-server:almalinux-9 ipa-server-install -U --domain=${domain} -r ${domain^^} \
+		--ntp-pool=3.us.pool.ntp.org --setup-dns --no-hbac-allow --forwarder=${gateway} #--no-forwarders
+
+	# Generate host record for dc1 in /etc/hosts, because until FreeIPA is up, we don't have any dns right now!
+	echo -e "192.168.1.32 dc1.${domain} dc1" >> /etc/hosts
+
+	# Even though the files in /etc/systemd/resolved.conf.d SHOULD override systemd's behavior... it ignores them.
+	# We do this to stop systemd-resolved binding on port 53, which will prevent freeipa.service from coming up.
 	systemctl disable dnsmasq.service --now
 	# Switch dnsmasq DNS off and re-enable dnsmasq so that it now does NOT handle DNS at all.
 	sed -i 's|#port=0|port=0|g' /etc/dnsmasq.conf
 	systemctl enable dnsmasq.service --now
-	# Here, we CONFIGURE the freeIPA instance
-	podman run -h "dc1.${domain}" \
-		--read-only \
-		-v /var/freeipa-data:/data:Z \
-		-e PASSWORD=${administratorPassword} \
-		quay.io/freeipa/freeipa-server:almalinux-9 ipa-server-install -U --hostname=dc1.${domain} -r ${domain^^} \
-		--ntp-pool=3.us.pool.ntp.org --setup-dns --no-hbac-allow --auto-forwarders --auto-reverse
-
-	# Reload systemctl and start the container, we should now have a functional domain controller
-	# Generate host record for dc1 in /etc/hosts, because until FreeIPA is up, we don't have any dns right now!
-	echo -e "192.168.1.32 dc1.${domain} dc1" >> /etc/hosts
 	systemctl daemon-reload
-	systemctl start freeipa.service
 
+	echo -e "
+acl "wavelet_network" {
+  127.0.0.1;
+  192.168.1.0/24;
+};" >> /var/freeipa-data/etc/named/ipa-ext.conf
+	echo -e "
+allow-recursion { wavelet_network; };" >> /var/freeipa-data/etc/named/ipa-options-ext.conf
+	systemctl start freeipa.service
 
 	if systemctl is-active --quiet freeipa.service; then
 		echo -e "FreeIPA configured and container is running!\n"
@@ -150,9 +166,6 @@ WantedBy=multi-user.target" > /etc/containers/systemd/freeipa.container
 		echo -e "FreeIPA provisioning failed!  Failing task..\n"
 		exit 0
 	fi
-
-	# Provision Dnsmasq DHCP server with a forward zone to FreeIPA
-	sed -i "s|#IPA_ENTRY|server=/dc1.${domain}/${ip}|" /etc/dnsmasq.conf
 	systemctl restart dnsmasq
 }
 
@@ -164,20 +177,29 @@ install_server_security_layer(){
 	directoryManagerPassword=$(cat /var/secrets/ipadmpw.secure)
 	KRBDOMAIN=${domain^^}
 	local administratorPassword=$(cat /var/secrets/ipaadmpw.secure)
-	# The preferred mthod would be to run the ipa-client in a container, however there's no good (recent) documentation on this.
+	# Here we will need to reconfigure systemd-resolved or it will break the container and prevent freeIPA from resolving hostnames because port53.
+	echo -e "
+[Resolve]
+DNSStubListener=no" > /etc/systemd/resolved.conf
+	systemctl restart systemd-resolved.service
+	echo -e "
+192.168.1.32 ${waveletDCServer} dc1" > /etc/hosts
+	echo -e "
+[Resolve]
+DNSStubListener=no
+DNS=${ip}, ${gateway}
+Domains=~. {searchdomains}" > /etc/systemd/resolved.conf.d/10-ipa.conf
+	# The preferred method would be to run the ipa-client in a container, however there's no good (recent) documentation on this.
 	# I opted to replace the nfs-utils-coreos package that was blocking freeipa-client installation so we are running this in the package overlay
-	# Might break at some point..
-
+	ipa-client-install --unattended --principal=admin --password=${administratorPassword} --enable-dns-updates
+	# These additional options might be needed but it would mean that DNS was broken on the system, we probably don't want them here.
+	# --server ${waveletServer} --domain ${waveletDomain} --realm ${waveletDomain^^}
 	# We are doing the following;  creating an initial user who has domain join privileges
 	# These credentials will be distributed during the initialization process on PXE boot and subsequently removed.
-	ipa-client-install --unattended --principal=admin --password=${administratorPassword} --enable-dns-updates
-		# These additional options might be needed but it would mean that DNS was broken on the system, we probably don't want them here.
-		# --server ${waveletServer} --domain ${waveletDomain} --realm ${waveletDomain^^}
 	echo ${administratorPassword} | kinit admin
 	ipa user-add domain_join --random --first=domain --last=join > /var/secrets/domainEnrollment.password
 
-	# Generate a tsig file for zone transfer from the DHCPD server to IPA's internal BIND.
-	# or https://hub.docker.com/r/technitium/dns-server ? 
+	# Generate a tsig file for zone transfer from the dnsmasq/DHCPD server to IPA's internal BIND.
 	# Ref https://www.freeipa.org/page/DHCP_Integration_Design
 	#ddns-confgen -a hmac-sha512 \
 	#-k ${waveletServer}. \
@@ -189,8 +211,6 @@ install_server_security_layer(){
 	ipa dnszone-mod ${waveletDomain}. --dynamic-update=1
 	# now DNS may be updated by executing nsupdate -k /var/secrets/svr.tsig.key from the dnsmasq script.
 	touch /var/server.domain.enrollment.complete
-	# Need this file in /var/tmp so dnsmasq knows to update BIND instead of itself!
-	cp /var/tmp/prod.security.enabled /var/tmp
 }
 
 configure_freeradius(){
@@ -234,24 +254,14 @@ configure_etcd_certs(){
 	ipa-getcert request \
 		-f /etc/pki/tls/certs/etcd.crt \
 		-k /etc/pki/tls/private/etcd.key \
-		-K etcd/svr.wavelet.local
+		-K etcd/svr.wavelet.local \
+		-D wavelet.local
 	echo -e "TLS Certificate for Etcd generated.\n"
 	echo -e "Reconfiguring Etcd to utilize certificate...\n"
-	# sed the systemd file and add appropriate TLS settings here
-	# we may need to generate a .pem base64 file from the crt files to utilize here.
-	#	https://stackoverflow.com/questions/991758/how-to-get-pem-file-from-key-and-crt-files
-	#	openssl x509 -inform DER -outform PEM -in server.crt -out server.crt.pem
-	#	cat server.crt server.key > server.includesprivatekey.pem
-	#
-	#--client-cert-auth \
-	#--trusted-ca-file /etc/ipa/ca/ipa.crt \
-	#--cert-file /etc/pki/tls/certs/etcd.crt \
-	#--key-file /etc/pki/tls/certs/etcd.key \
-	#--peer-client-cert-auth \
-	#--peer-trusted-ca-file /etc/ipa/ca/ipa.crt \
-	#--peer-cert-file /etc/pki/tls/certs/etcd.crt \
-	#--peer-key-file /etc/pki/tls/certs/etcd.key \
-	#--auto-compaction-retention 1"
+	# Client devices should be requesting an etcd service certificate on their end, for that specific host once they are properly provisioned
+	# The client AND server cert is required to communicate with the etcd cluster, this prevents unauthorized clients from accessing etcd.
+	# Note that the PHP modules will now also need to provide a valid client certificate to successfully deal with etcd
+	# This might be a good time to roll them all up into a single file with a single curl function that operates appropriately.
 }
 
 configure_httpd_sp(){
@@ -266,12 +276,11 @@ configure_httpd_sp(){
 	echo -e "TLS Certificate for web services generated.\n"
 	echo -e "Reconfiguring httpd to utilize certificate...\n"
 	# Configure Apache service principal within freeIPA and tell Apache to monitor for the appropriate certificate
-	# Pull httpd.conf out of the container
-	podman run --rm httpd:2.4 cat /usr/local/apache2/conf/httpd.conf > custom-httpd.conf
+		# To Pull httpd.conf out of the container
+		# podman run --rm httpd:2.4 cat /usr/local/apache2/conf/httpd.conf > custom-httpd.conf
 	# Put the secure conf file in place
-		cp /var/home/wavelet/config/httpd.secure.conf  /var/home/wavelet/config/httpd.conf
-	# Add httpd.conf volume to the httpd quadlet, this file will now be mounted from the host to the container directly.
-	# Add the certificates to the httpd quadlet.  This will almost certainly require doing something nasty with SElinux..
+	cp /var/home/wavelet/config/httpd.secure.conf  /var/home/wavelet/config/httpd.conf
+	# Add the certificate files to the quadlet (note right now this is a container, more work needed to move it to quadlet, so path will change etc.)
 	sed -i \
 		-e 's|#cert|Volume=/etc/pki/tls/certs/httpd.crt:/usr/local/apache2/conf/httpd.crt:z' \
 		-e 's|#key|Volume=/etc/pki/tls/certs/httpd.key:/usr/local/apache2/conf/httpd.key:z' \
@@ -284,11 +293,8 @@ configure_httpd_sp(){
 
 configure_nginx_sp(){
 	echo -e "Re-utilizing the httpd certificate for Nginx services...\n"
-	# Reconfigure the nginx quadlet to look for the httpd certificates
-		sed -i \
-		-e 's|listen   80; #TLS|""' \
-		-e 's|#TLS|""' \
-		/var/home/wavelet/http-php/nginx/nginx.conf
+	# Copy new nginx configuration file configured for TLS certs
+	cp /var/home/wavelet/config/nginx.conf.secure /var/home/wavelet/http-php/nginx/nginx.conf
 }
 
 configure_registry_sp(){
@@ -299,7 +305,6 @@ configure_registry_sp(){
 configure_radius_sp(){
 	#	Configure FreeRADIUS in /etc/raddb along with a domain service principal with some additional mods.
 	#	It will auth utilizing the machine account using EAP-TTLS.
-
 	ipa service-add radius/`hostname`
 	ipa service-add-host --hosts=dc1.$(dnsdomainname) radius/`hostname`
 	ipa-getcert request \
