@@ -12,8 +12,8 @@ kernel_arguments:
     - mitigations=off
     - cpufreq.default_governor=performance
     - ip=192.168.1.32::192.168.1.1:255.255.255.0:svr.wavelet.local::on
+    - nameserver=192.168.1.32
     - nameserver=192.168.1.1
-    - nameserver=9.9.9.9
     # - net.ifnames=0
     # - biosdevname=0
 # Configure static networking. LAB IP is always 192.168.1.32
