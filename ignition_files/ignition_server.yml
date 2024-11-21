@@ -13,6 +13,7 @@ kernel_arguments:
     - cpufreq.default_governor=performance
     - ip=192.168.1.32::192.168.1.1:255.255.255.0:svr.wavelet.local::on
     - nameserver=192.168.1.32
+    - nameserver=192.168.1.200
     - nameserver=192.168.1.1
     # - net.ifnames=0
     # - biosdevname=0
@@ -59,7 +60,7 @@ storage:
       mode: 0755
       overwrite: true
       contents:
-        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.7/UltraGrid-1.9.7-x86_64.AppImage
+        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.8/UltraGrid-1.9.8-x86_64.AppImage
     # Inhibit systemd suspend
     - path: /etc/systemd/logind.conf.d/inhibit-suspend.conf
       mode: 0644
@@ -191,13 +192,16 @@ storage:
          skip_if_unavailable=True
          fastestmirror=1
          max_parallel_downloads=2
-    # Ensure ipa server is enabled in hosts
+    # Ensure ipa server is enabled in hosts along with standard server.  Two records to one IP, yes.
     - path: /etc/hosts
       mode: 0664
       overwrite: true
       contents:
         inline: |
-         192.168.1.32   ipa.wavelet.local ipa
+         127.0.0.1      localhost localhost.localdomain localhost4 localhost4.localdomain4
+         ::1            localhost localhost.localdomain localhost6 localhost6.localdomain6
+         192.168.1.200  dc1.ipa.wavelet.local dc1
+         192.168.1.32   svr.wavelet.local svr
     # Intel OneAPI RPM Repository
     - path: /etc/yum.repos.d/oneAPI.repo
       mode: 0664
