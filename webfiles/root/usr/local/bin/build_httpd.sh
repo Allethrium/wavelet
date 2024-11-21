@@ -2,9 +2,6 @@
 # Designed to be called by sway's build_ug.sh exec command.
 # Need to amend this to generate or utilize proper certificates
 # Called from build_ug.sh when hostname is svr.wavelet.local
-ETCDENDPOINT=192.168.1.32:2379
-KEYNAME=SERVER_HTTP_BOOTSTRAP_COMPLETED
-KEYVALUE=1
 USER=wavelet
 SCRHOME="/var/home/wavelet"
 
@@ -65,7 +62,7 @@ RestartSec=5
 # Start by default on boot
 WantedBy=default.target" > /home/wavelet/.config/containers/systemd/httpd.container
 	echo -e "\nApache Podman container generated, service has been enabled in systemd, and will start on next reboot.\n"
-	etcdctl --endpoints=${ETCDENDPOINT} put ${KEYNAME} -- ${KEYVALUE}
+	/usr/local/bin/wavelet_etcd_interaction "write_etcd_global" "SERVER_HTTP_BOOTSTRAP_COMPLETED" "1"
 	# populate necessary files for decoder spinup
 	cp /usr/local/bin/UltraGrid.AppImage /home/wavelet/http/
 	cp /home/wavelet/wavelet-files.tar.xz /home/wavelet/http/ignition/
