@@ -58,17 +58,8 @@ Description=PHP + FPM
 
 [Container]
 Image=docker.io/library/php:fpm
-ContainerName=php-fpm
 AutoUpdate=registry
-Notify=true
-Pod=http-php.pod
-
-[Service]
-Restart=always
-TimeoutStartSec=30
-
-[Install]
-WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/php-fpm.container
+Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/php-fpm.container
 
 # For Nginx, ports are mapped to 9080 and 9443 respectively..
 	echo -e "
@@ -77,17 +68,8 @@ Description=NGINX
 
 [Container]
 Image=docker.io/library/nginx:alpine
-ContainerName=nginx
 AutoUpdate=registry
-Notify=true
-Pod=http-php.pod
-
-[Service]
-Restart=always
-TimeoutStartSec=30
-
-[Install]
-WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/nginx.container
+Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/nginx.container
 
 	if [[ -f /var/prod.security.enabled ]]; then
 	echo -e "Security layer enabled, adding mounts for certificates..\n"
@@ -112,7 +94,10 @@ PublishPort=9443:443
 Volume=/etc/pki/tls/certs/:/etc/pki/tls/certs/
 Volume=/var/home/wavelet/http-php/log:/var/log/nginx
 Volume=/var/home/http-php/html:/var/www/html:Z
-Volume=/var/home/http-php/nginx:/etc/nginx/conf.d/:z" > /var/home/wavelet/.config/containers/systemd/http-php.pod
+Volume=/var/home/http-php/nginx:/etc/nginx/conf.d/:z
+
+[Install]
+WantedBy=" > /var/home/wavelet/.config/containers/systemd/http-php.pod
 	echo -e "Podman pod and containers, generated, service has been enabled in systemd, and will start on next reboot."
 	echo -e "The control service should be available via web browser I.E \nhttp://svr.wavelet.local\n"
 	etcdctl --endpoints=${ETCDENDPOINT} put ${KEYNAME} -- ${KEYVALUE}
