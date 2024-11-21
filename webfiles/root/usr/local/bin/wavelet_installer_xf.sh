@@ -91,8 +91,44 @@ ExecStartPost=systemctl disable wavelet_install_hardening.service
 [Install]
 WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_hardening.service
 	fi
+	# old etcd setup previously in build_ug.sh
+	#echo -e "Pulling etcd and generating systemd services.."
+	#cd /home/wavelet/.config/systemd/user/
+	#/bin/podman pull quay.io/coreos/etcd:v3.5.9
+	#/bin/podman create --name etcd-member --net=host \
+   #quay.io/coreos/etcd:v3.5.9 /usr/local/bin/etcd              \
+   #--data-dir /etcd-data --name wavelet_svr                  \
+   #--initial-advertise-peer-urls http://192.168.1.32:2380 \
+   #--listen-peer-urls http://192.168.1.32:2380           \
+   #--advertise-client-urls http://192.168.1.32:2379       \
+   #--listen-client-urls http://192.168.1.32:2379,http://127.0.0.1:2379        \
+	#   --initial-cluster wavelet_svr=http://192.168.1.32:2380 \
+	#   --initial-cluster-state new
+	#/bin/podman generate systemd --files --name etcd-member --restart-policy=always -t 2
+	#sleep 1
+	# Quadlet Etcd service, I have decided it's more appropriate to move this back to a system service
+	# This is because it would only run when a user is logged on
+	# We will likely want to secure the server console in prod deployment.
+	echo -e "
+[Unit]
+Description=etcd service
+Documentation=https://github.com/etcd-io/etcd
+
+[Container]
+Image=quay.io/coreos/etcd:v3.5.9
+ContainerName=etcd
+Network=host
+Volume=/var/etcd-data:/etcd-data:Z
+Environment=/etc/etcd.conf
+ReadOnly=true
+AutoUpdate=registry
+NoNewPrivileges=true
+Exec=/usr/local/bin/etcd
+
+[Install]
+WantedBy=multi-user.target" > /usr/share/containers/systemd/etcd.container
 	systemctl daemon-reload
-	# From here, the system will reboot.
+	systemctl enable etcd.service
 	# wavelet_install_depends.service will then run, and force enable wavelet_install_pxe.service
 	# wavelet_pxe_install.service will complete the root portion of the server spinup
 	# OR
