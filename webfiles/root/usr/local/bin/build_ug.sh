@@ -5,29 +5,40 @@
 # it launches run_ug if hostname/config flag are set.
 
 
-#Etcd Interaction
-ETCDURI=http://192.168.1.32:2379/v2/keys
-ETCDENDPOINT=192.168.1.32:2379
+# Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
-		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME} --print-value-only)
-		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
-}
-read_etcd_prefix(){
-		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix /$(hostname)/${KEYNAME} --print-value-only)
-		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
 read_etcd_global(){
-		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
-		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for Global value"
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
+	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
+}
+read_etcd_prefix(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
+}
+read_etcd_clients_ip() {
+	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
+}
+read_etcd_clients_ip_sed() {
+	# We need this to manage the \n that is returned from etcd.
+	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
+	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
 }
 write_etcd(){
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
-		echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
 }
 write_etcd_global(){
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
-		echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
 }
+write_etcd_client_ip(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
+}
+
+
 detect_ug_version(){
 	# This is fairly redudant, as the provisioning process should not get this far without download UG during Ignition..
 	APPIMAGE=/usr/local/bin/UltraGrid.AppImage
@@ -282,24 +293,6 @@ TimeoutStartSec=600
 [Install]
 WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/livestream.container
 	}
-
-	echo -e "Pulling etcd and generating systemd services.."
-	cd /home/wavelet/.config/systemd/user/
-	/bin/podman pull quay.io/coreos/etcd:v3.5.9
-	/bin/podman create --name etcd-member --net=host \
-   quay.io/coreos/etcd:v3.5.9 /usr/local/bin/etcd              \
-   --data-dir /etcd-data --name wavelet_svr                  \
-   --initial-advertise-peer-urls http://192.168.1.32:2380 \
-   --listen-peer-urls http://192.168.1.32:2380           \
-   --advertise-client-urls http://192.168.1.32:2379       \
-   --listen-client-urls http://192.168.1.32:2379,http://127.0.0.1:2379        \
-	   --initial-cluster wavelet_svr=http://192.168.1.32:2380 \
-	   --initial-cluster-state new
-	/bin/podman generate systemd --files --name etcd-member --restart-policy=always -t 2
-	systemctl --user daemon-reload
-	echo -e "Attempting to start etcd container.."
-	systemctl --user enable container-etcd-member.service --now
-	sleep 1
 	bootstrap_http
 	bootstrap_nginx_php
 	#bootstrap_nodejs		#	WAY in the future for UI stuff.
