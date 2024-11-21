@@ -55,36 +55,29 @@ podman_quadlet(){
 	echo -e "
 [Unit]
 Description=PHP + FPM
-
 [Container]
 Image=docker.io/library/php:fpm
 AutoUpdate=registry
 Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/php-fpm.container
-
 # For Nginx, ports are mapped to 9080 and 9443 respectively..
 	echo -e "
 [Unit]
 Description=NGINX
-
 [Container]
 Image=docker.io/library/nginx:alpine
 AutoUpdate=registry
 Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/nginx.container
-
 	if [[ -f /var/prod.security.enabled ]]; then
 	echo -e "Security layer enabled, adding mounts for certificates..\n"
+		# Check for prod certs
 		if [[ ! -f /etc/pki/tls/certs/http.crt ]]; then
 			# we generate a crappy certificate so things work, at the very least..
 			echo -e "Certificate has not been generated on server, generating a snake oil certificate for testing..\n"
 			openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/pki/tls/certs/httpd.key -out /etc/pki/tls/certs/httpd.crt -subj "/C=US/ST=NewYork/L=NewYork/O=ALLETHRIUM/OU=DevOps/CN=WaveletInterface"
 			openssl dhparam -out /etc/pki/certs/dhparam.pem 4096
 		fi
-		# Note we're mapping 9080 to port 80 and 9443 to port 443, 8080 and 8443 is used for the apache/ignition server.
 		# Cert directory mounted regardless, the conf file will determine if we bother looking for them.
 		cp /var/home/wavelet/config/nginx.secure.conf /var/home/wavelet/http-php/nginx/nginx.conf
-	else
-		# Default nginx config file is set for nonsecure.
-		#cp /var/home/wavelet/config/nginx.nonsecure.conf /var/home/wavelet/http-php/nginx/nginx.conf
 	fi
 	mkdir -p /var/log/nginx
 	echo -e "
@@ -93,9 +86,8 @@ PublishPort=9080:80
 PublishPort=9443:443
 Volume=/etc/pki/tls/certs/:/etc/pki/tls/certs/
 Volume=/var/home/wavelet/http-php/log:/var/log/nginx
-Volume=/var/home/http-php/html:/var/www/html:Z
-Volume=/var/home/http-php/nginx:/etc/nginx/conf.d/:z
-
+Volume=/var/home/wavelet/http-php/html:/var/www/html:Z
+Volume=/var/home/wavelet/http-php/nginx:/etc/nginx/conf.d/:z
 [Install]
 WantedBy=" > /var/home/wavelet/.config/containers/systemd/http-php.pod
 	echo -e "Podman pod and containers, generated, service has been enabled in systemd, and will start on next reboot."
