@@ -79,7 +79,7 @@ Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/nginx.container
 		# Cert directory mounted regardless, the conf file will determine if we bother looking for them.
 		cp /var/home/wavelet/config/nginx.secure.conf /var/home/wavelet/http-php/nginx/nginx.conf
 	fi
-	mkdir -p /var/log/nginx
+	mkdir -p /var/home/wavelet/http-php/log
 	echo -e "
 [Pod]
 PublishPort=9080:80
