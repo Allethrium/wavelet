@@ -110,6 +110,7 @@ PublishPort=953:953
 Volume=/var/freeipa-data:/data:z
 HostName=dc1.${domain}
 ReadOnly=true
+DNS=127.0.0.1
 AutoUpdate=registry
 NoNewPrivileges=true
 
@@ -127,26 +128,50 @@ WantedBy=multi-user.target" > /etc/containers/systemd/freeipa.container
 	# There is a ridiculously long delay after installation whilst it does a bunch of DNS nonsense...
 
 	# we are going to do horrible things with dns.
-	echo -e "
-192.168.1.32 svr.wavelet.local svr" > /etc/hosts
-	podman run -h "dc1.${domain}" \
+	# Quick explanation;
+	# We want the freeIPA internal DNS server (BIND) to handle dns resolution for the wavelet domain
+	# There is one caveat - the entire security layer will need to be re-installed if at some point the domain name changes to a valid TLD
+	# So we need to engineer a switch here, or provide a module to deprovision the security layer gracefully if we want to eventually hook the system in to a larger network with authoritative DNS.
+	# --allow-zone-overlap is enabled so we can play nice with the existing dnsmasq DNS server
+	# First we create a new ipvlan podman network so we can get another IP address.
+	active_networkInterface=$(ip route get 8.8.8.8 | sed -nr 's/.*dev ([^\ ]+).*/\1/p')
+
+	# These commands perform the following (evil) tasks:
+	#		Creates a podman network in the same subnet as the physical network
+	#		generates a "shim" ipvlan device and assigns an IP address to it
+	#		force-adds a route to that the container and the host can now communicate
+	#		Without this the controller wouldn't be able to function without moving the entirety into a container itself
+	podman network create -d ipvlan --subnet 192.168.1.0/24 --gateway 192.168.1.1 --ip-range 192.168.1.192/27 ipa_ipvlan -o parent=${active_networkInterface}
+	ip link add ipa_ipvlan_shim link ${active_networkInterface} type ipvlan mode l2
+	ip addr add 192.168.1.224/32 dev ipa_ipvlan_shim 
+	ip link set ipa_ipvlan_shim up
+	ip route add 192.168.1.192/27 dev ipa_ipvlan_shim
+	podman run -h "dc1.ipa.${domain}" \
 		--read-only \
+		--ip=192.168.1.200 \
+		--network=ipa_ipvlan \
 		--dns=127.0.0.1 \
-		-h=dc1.${domain} \
+		-h=dc1.ipa.${domain} \
 		-v /var/freeipa-data:/data:Z \
-		-e PASSWORD=**HIDDEN** \
-		quay.io/freeipa/freeipa-server:almalinux-9 ipa-server-install -U --domain=${domain} -r ${domain^^} \
-		--ntp-pool=3.us.pool.ntp.org --setup-dns --no-hbac-allow --forwarder=${gateway} #--no-forwarders
+		-e PASSWORD=${administratorPassword} \
+		quay.io/freeipa/freeipa-server:almalinux-9 ipa-server-install -U --domain=ipa.${domain} -r IPA.${domain^^} \
+		--ntp-pool=3.us.pool.ntp.org --setup-dns --no-hbac-allow --no-forwarders --allow-zone-overlap --auto-reverse --setup-adtrust
+
+ 		-p 53:53/udp \
+		-p 53:53 \
+		-p 389:389 -p 636:636 \
+		-p 88:88/udp -p 464:464/udp -p 464:464 -p 123:123/udp \
+
 
 	# Generate host record for dc1 in /etc/hosts, because until FreeIPA is up, we don't have any dns right now!
 	echo -e "192.168.1.32 dc1.${domain} dc1" >> /etc/hosts
 
 	# Even though the files in /etc/systemd/resolved.conf.d SHOULD override systemd's behavior... it ignores them.
 	# We do this to stop systemd-resolved binding on port 53, which will prevent freeipa.service from coming up.
-	systemctl disable dnsmasq.service --now
-	# Switch dnsmasq DNS off and re-enable dnsmasq so that it now does NOT handle DNS at all.
-	sed -i 's|#port=0|port=0|g' /etc/dnsmasq.conf
-	systemctl enable dnsmasq.service --now
+	#systemctl disable dnsmasq.service --now
+	# Switch dnsmasq DNS off and re-enable dnsmasq so that it now does NOT handle DNS at all.  May not be needed with allow-zone-overlap on IPA.
+	#sed -i 's|#port=0|port=0|g' /etc/dnsmasq.conf
+	#systemctl enable dnsmasq.service --now
 	systemctl daemon-reload
 
 	echo -e "
@@ -171,11 +196,11 @@ allow-recursion { wavelet_network; };" >> /var/freeipa-data/etc/named/ipa-option
 
 install_server_security_layer(){
 	user="domain_join"
-	waveletDomain=$(dnsdomainname)
-	waveletDCServer=dc1.$(dnsdomainname)
+	waveletDomain=ipa.$(dnsdomainname)
+	waveletDCServer=dc1.ipa.$(dnsdomainname)
 	waveletServer=$(hostname)
 	directoryManagerPassword=$(cat /var/secrets/ipadmpw.secure)
-	KRBDOMAIN=${domain^^}
+	KRBDOMAIN=${waveletDomain^^}
 	local administratorPassword=$(cat /var/secrets/ipaadmpw.secure)
 	# Here we will need to reconfigure systemd-resolved or it will break the container and prevent freeIPA from resolving hostnames because port53.
 	echo -e "
@@ -183,7 +208,7 @@ install_server_security_layer(){
 DNSStubListener=no" > /etc/systemd/resolved.conf
 	systemctl restart systemd-resolved.service
 	echo -e "
-192.168.1.32 ${waveletDCServer} dc1" > /etc/hosts
+${ip} ${waveletDCServer} dc1" >> /etc/hosts
 	echo -e "
 [Resolve]
 DNSStubListener=no
@@ -191,7 +216,7 @@ DNS=${ip}, ${gateway}
 Domains=~. {searchdomains}" > /etc/systemd/resolved.conf.d/10-ipa.conf
 	# The preferred method would be to run the ipa-client in a container, however there's no good (recent) documentation on this.
 	# I opted to replace the nfs-utils-coreos package that was blocking freeipa-client installation so we are running this in the package overlay
-	ipa-client-install --unattended --principal=admin --password=${administratorPassword} --enable-dns-updates
+	ipa-client-install --unattended --principal=admin --password=${administratorPassword} --enable-dns-updates --ssh-trust-dns --domain=${waveletDomain}
 	# These additional options might be needed but it would mean that DNS was broken on the system, we probably don't want them here.
 	# --server ${waveletServer} --domain ${waveletDomain} --realm ${waveletDomain^^}
 	# We are doing the following;  creating an initial user who has domain join privileges
