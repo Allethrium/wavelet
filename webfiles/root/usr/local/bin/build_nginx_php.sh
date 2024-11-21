@@ -52,34 +52,42 @@ podman_quadlet(){
 	# The .kube file at the end basically allows us to link these two services into a podman pod.   
 	# The install wantedBy= section is how we do systemctl enable --now, basically.
 	mkdir -p /var/home/wavelet/.config/containers/systemd/
-	echo -e "[Unit]
+	echo -e "
+[Unit]
 Description=PHP + FPM
+
 [Container]
 Image=docker.io/library/php:fpm
-ContainerName=container-php-fpm
+ContainerName=php-fpm
 AutoUpdate=registry
 Notify=true
-Pod=http-php
+Pod=http-php.pod
+
 [Service]
 Restart=always
 TimeoutStartSec=30
+
 [Install]
-WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/container.php-fpm
+WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/php-fpm.container
 
 # For Nginx, ports are mapped to 9080 and 9443 respectively..
-	echo -e "[Unit]
+	echo -e "
+[Unit]
 Description=NGINX
+
 [Container]
 Image=docker.io/library/nginx:alpine
-ContainerName=container-nginx
+ContainerName=nginx
 AutoUpdate=registry
 Notify=true
-Pod=http-php
+Pod=http-php.pod
+
 [Service]
 Restart=always
 TimeoutStartSec=30
+
 [Install]
-WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/container.nginx
+WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/nginx.container
 
 	if [[ -f /var/prod.security.enabled ]]; then
 	echo -e "Security layer enabled, adding mounts for certificates..\n"
@@ -97,14 +105,14 @@ WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/container
 		#cp /var/home/wavelet/config/nginx.nonsecure.conf /var/home/wavelet/http-php/nginx/nginx.conf
 	fi
 	mkdir -p /var/log/nginx
-	echo -e "[Pod]
+	echo -e "
+[Pod]
 PublishPort=9080:80
 PublishPort=9443:443
-PodName=http-php.pod
 Volume=/etc/pki/tls/certs/:/etc/pki/tls/certs/
-Volume=/var/log/nginx:/var/log/nginx:Z
-Volume=${SCRHOME}/http-php/html:/var/www/html:Z
-Volume=${SCRHOME}/http-php/nginx:/etc/nginx/conf.d/:z" > /var/home/wavelet/.config/containers/systemd/http-php.pod
+Volume=/var/home/wavelet/http-php/log:/var/log/nginx
+Volume=/var/home/http-php/html:/var/www/html:Z
+Volume=/var/home/http-php/nginx:/etc/nginx/conf.d/:z" > /var/home/wavelet/.config/containers/systemd/http-php.pod
 	echo -e "Podman pod and containers, generated, service has been enabled in systemd, and will start on next reboot."
 	echo -e "The control service should be available via web browser I.E \nhttp://svr.wavelet.local\n"
 	etcdctl --endpoints=${ETCDENDPOINT} put ${KEYNAME} -- ${KEYVALUE}
