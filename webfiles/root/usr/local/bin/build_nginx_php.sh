@@ -85,7 +85,7 @@ Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/nginx.container
 PublishPort=9080:80
 PublishPort=9443:443
 Volume=/etc/pki/tls/certs/:/etc/pki/tls/certs/
-Volume=/var/home/wavelet/http-php/log:/var/log/nginx
+Volume=/var/home/wavelet/http-php/log:/var/log/nginx:Z
 Volume=/var/home/wavelet/http-php/html:/var/www/html:Z
 Volume=/var/home/wavelet/http-php/nginx:/etc/nginx/conf.d/:z
 [Install]
