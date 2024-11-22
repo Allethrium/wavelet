@@ -92,7 +92,6 @@ Volume=/var/home/wavelet/http-php/nginx:/etc/nginx/conf.d/:z
 WantedBy=" > /var/home/wavelet/.config/containers/systemd/http-php.pod
 	echo -e "Podman pod and containers, generated, service has been enabled in systemd, and will start on next reboot."
 	echo -e "The control service should be available via web browser I.E \nhttp://svr.wavelet.local\n"
-	etcdctl --endpoints=${ETCDENDPOINT} put ${KEYNAME} -- ${KEYVALUE}
 	systemctl --user daemon-reload
 	systemctl --user start http-php-pod.service
 	exit 0
