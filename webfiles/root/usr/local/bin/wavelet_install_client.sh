@@ -1,6 +1,6 @@
 #!/bin/bash
 # This runs as a systemd unit on the SECOND boot on the Client devices ONLY
-# It extracts the wavelet modules from the tarball to the appropriate places, and that's about it.
+# It is responsible for extracting the wavelet modules, joining the domain and provisioning services so that it can talk to etcd and the DC.
 
 extract_base(){
 	tar xf /home/wavelet/wavelet-files.tar.xz -C /home/wavelet --no-same-owner
@@ -27,26 +27,49 @@ install_security_layer(){
 	# This function checks for the presence of the security layer flag, and if it exists we run domain enrollment
 	if [[ -f /var/prod.security.enabled ]]; then
 		echo -e "Security layer is enabled.. enrolling to domain.\n\nThis will fail if a DC is not available on the wavelet network!\n"
-		# This password should be prepopulated from the DC as part of the initial imaging process.
-		# Umm.. how.  The Server would know a pxe installation request and may have a mac address and IP to play with from dnsmasq.. 
-		# that's the only ID info we will get from that part...
-
-		# Perhaps unattended might work this way..
 		password=$(cat /var/secrets/domainEnrollment.password)
 		user=$(cat /var/secrets/domainEnrollment.userAccount)
-		# These files will be empty if security is not provisioned on the server.
-		waveletDomain=$(cat /var/secrets/wavelet.domain)
-		waveletServer=$(cat /var/secrets/wavelet.server)
+		# These files will be empty if security is not provisioned on the server, they will be populated during PXE boot ignition from the server.
 		rm -rf /var/secrets/domainEnrollment.password
 		rm -rf /var/secrets/domainEnrollment.userAccount
-		ipa-client-install --principal "${user}" --password "${password}" --domain ${waveletDomain} --server ${waveletServer} --unattended
+		# Install FreeIPA Client
+		ipa-client-install --principal "${user}" --password "${password}" --unattended # --request-cert seems broken?
+		
+		# These might not be necessary.
+		#ipa service-add etcd-client/$(hostname) && ipa service-add-host --hosts=dc1.$(dnsdomainname) etcd-client/`hostname`
+		hostname=$(hostname)
+		ipa-getcert request \
+		-f /var/home/wavelet/pki/tls/certs/etcd-client.crt \
+		-k /var/home/wavelet/pki/tls/private/etcd-client.key \
+		-K etcd-client/${hostname}@${hostname^^} \
+		-D $(dnsdomainname)
 
+
+		#ipa service-add radius-client/$(hostname) && ipa service-add-host --hosts=dc1.$(dnsdomainname) radius-client/`hostname`
+		#ipa-getcert request \
+		#-f /etc/pki/tls/certs/radius-client.crt \
+		#-k /etc/pki/tls/private/radius-client.key \
+		#-K radius-client/$(hostname) \
+		#-D $(dnsdomainname)
+		
 		# Reconfigure etcd to utilize certificates
+		# As long as the machine is enrolled correctly into the etcd and wifi groups on the server, it should be able to authenticate
+		# We are going to do this with the machine host certificate
 		echo -e "Reconfiguring etcd client..\n"
+		# Here
+
 		# Reconfigure WiFi to utilize EAP-TTLS
 		echo -e "Reconfiguring WiFi supplicant..\n"
-}
 
+		nmcli con mod ${wifiConnection} \
+		802-11-wireless.ssid 'My Wifi' \
+		802-11-wireless-security.key-mgmt wpa-eap \
+		802-1x.eap tls \
+		802-1x.identity identity@example.com \
+		802-1x.ca-cert /etc/ipa/ca.crt \
+		802-1x.client-cert /etc/nssdb/ \
+		802-1x.private-key /etc/nssdb/ \
+}
 
 
 
