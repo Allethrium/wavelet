@@ -6,41 +6,44 @@
 # It will attempt to make sense of available v4l devices and update etcd
 # WebUI updates, and is updated from, many of these keys.
 
-#Etcd Interaction
-ETCDENDPOINT=http://192.168.1.32:2379
+# Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
-		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME} --print-value-only)
-		echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
-
 read_etcd_global(){
-		printdetectvalueglobal=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
-		echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for Global value"
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
+	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
 }
-
-write_etcd(){
-		etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
-		echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
+read_etcd_prefix(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
-
-write_etcd_inputs(){
-	etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/inputs${KEYNAME}" -- "${KEYVALUE}"
-		echo -e "Set ${KEYVALUE} for /inputs/$(hostname)${KEYNAME}"
-}
-
-write_etcd_global(){
-		etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
-		echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
-}
-
-write_etcd_clientip(){
-		etcdctl --endpoints=${ETCDENDPOINT} put /decoderip/$(hostname) "${KEYVALUE}"
-		echo -e "$(hostname) set to ${KEYVALUE} for Global value"
+read_etcd_keysonly(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_keysonly" "${KEYNAME}")
 }
 read_etcd_clients_ip() {
-		return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix /decoderip/ --print-value-only)
+	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
 }
-
+read_etcd_clients_ip_sed() {
+	# We need this to manage the \n that is returned from etcd.
+	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
+	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
+}
+write_etcd(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
+}
+write_etcd_global(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
+}
+write_etcd_client_ip(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
+}
+delete_etcd_key(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
+}
 
 sense_devices() {
 	shopt -s nullglob
@@ -79,10 +82,8 @@ generate_device_info() {
 	echo -e "generated device hash: $deviceHash \n"
 	device_string_short=$(echo "${device_string_long}" | sed 's/.*usb-//')
 	# Let's look for the device hash in the /interface prefix to make sure it doesn't already exist!
-		# umm - isn't this deleting everything in /hash/ each time a device is generated??
-		# First delete empty /hash/ values that might be there incorrectly (WHY???)
-		#etcdctl --endpoints=http://192.168.1.32:2379 del "/hash/"
-	output_return=$(etcdctl --endpoints=http://192.168.1.32:2379 get "/hash/${deviceHash}")
+	KEYNAME="/hash/${deviceHash}"
+	output_return=$(read_etcd_global)
 	if [[ $output_return == "" ]] then
 		echo -e "\n${deviceHash} not located within etcd, assuming we have a new device and continuing with process to set parameters..\n"
 		isDevice_input_or_output
@@ -147,7 +148,9 @@ device_cleanup() {
 # Generate an associative array from etcd's /hash/ and /interface/ prefixes
 # It effectively shouldn't be possible for v4lArray to be longer than interfaceLongArray, if this is the case then something has gone wrong
 # This is because we should be cleaning up unused devices, and the pruning happens every time a device is plugged in, or a button is pressed.
-declare -a interfaceLongArray=$(etcdctl --endpoints=${ETCDENDPOINT} get /long_interface/ --prefix --keys-only | sed 's/\/long_interface// ')
+KEYNAME="/long_interface/"
+declare -a interfaceLongArray=$(read_etcd_keysonly | sed 's/\/long_interface// ')
+#$(etcdctl --endpoints=${ETCDENDPOINT} get /long_interface/ --prefix --keys-only | sed 's/\/long_interface// ')
 	leftOversArray=(`printf '%s\n' "${interfaceLongArray[@]}" "${v4lArray[@]}" | sort | uniq -u`)
 	if (( ${#leftOversArray[@]} == 0 )); then
 		echo -e "Array is empty, there is no discrepancy between detected device paths and available devices in Wavelet.  Terminating process.. \n"
@@ -159,30 +162,26 @@ declare -a interfaceLongArray=$(etcdctl --endpoints=${ETCDENDPOINT} get /long_in
 					do
 				cleanupStringLong=$i
 				echo -e "\n\nCleanup device is ${cleanupStringLong}"
-
 				# delete the input caps key for the missing device
 				echo -e "Deleting $(hostname)/inputs${cleanupStringLong}  entry"
-				etcdctl --endpoints=${ETCDENDPOINT} del "$(hostname)/inputs${cleanupStringLong}"
-				
+				KEYNAME="/$(hostname)/inputs${cleanupStringLong}"; delete_etcd_key
 				# find the device hash 
-				cleanupHash=$(etcdctl --endpoints=${ETCDENDPOINT} get "/long_interface${cleanupStringLong}" --print-value-only)
+				KEYNAME="/long_interface${cleanupStringLong}"; cleanupHash=$(read_etcd)
 				echo -e "Device hash located as ${cleanupHash}"
-				
 				# delete from long_interface prefix
 				echo -e "Deleting /long_interface${cleanupStringLong} entry"
-				etcdctl --endpoints=${ETCDENDPOINT} del /long_interface${cleanupStringLong}
-				
+				delete_etcd_key
 				# delete from hash prefix
 				echo -e "Deleting /hash/${cleanupHash} entry"
-				etcdctl --endpoints=${ETCDENDPOINT} del "/hash/${cleanupHash}"
+				KEYNAME="/hash/${cleanupHash}"; delete_etcd_key
 				
 				# finally, find and delete from interface prefix - Guess we need ANOTHER lookup table to manage to keep all of this straight..
-				cleanupInterface=$(etcdctl --endpoints=${ETCDENDPOINT} get "/short_hash/${cleanupHash}" --print-value-only)
+				KEYNAME="/short_hash/${cleanupHash}"; cleanupInterface=$(read_etcd_global)
 				echo -e "Device UI Interface label located in /short_hash/${cleanupHash} for the value ${cleanupInterface}"
-				echo -e "Deleting /interface/${cleanupInterface} entry"
-				etcdctl --endpoints=${ETCDENDPOINT} del "/interface/$${cleanupInterface}"
 				echo -e "Deleting /short_hash/${cleanupHash}  entry"
-				etcdctl --endpoints=${ETCDENDPOINT} del "/short_hash/${cleanupHash}"
+				delete_etcd_key
+				echo -e "Deleting /interface/${cleanupInterface} entry"
+				KEYNAME="/interface/$${cleanupInterface}"; delete_etcd_key
 				echo -e "Device entry ${cleanupStringLong} should be removed along with all references to ${cleanupHash}\n\n"
 					done
 	fi
