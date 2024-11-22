@@ -87,6 +87,46 @@ configure_idm(){
 	done
 	echo -e "LDAP DN Structure:\n${ldap_dn}\n"
 
+	# This block should generate an intelligent subnet for the freeipa container based off the server's current values
+
+	# Pull config data that should have been prepopulated with install_wavelet_server.sh during initial configuration
+	# Compare against current network environment
+	# Look for authoritative DHCP/DNS servers
+
+	# Calculate subnets (we need only four addresses, really)
+	# Probably not the most elegant approach :|
+	# What we're doing is finding the current subnet, 
+	# subtracting four addresses and effectively putting the wavelet domain subnet at the end of the current subnet range.
+	currentIPCIDR=$(ip -o -f inet addr show | awk '/scope global/ {print $4}' | head -n 1)
+	childSubnetCIDR="/28"
+	childSubnetCIDRHosts="14"
+	currentSubnet=$(ipcalc ${currentIPCIDR} | sed -n '2p')
+	childSubnetMaxAddr=$(ipcalc ${currentIPCIDR} --maxaddr)
+	childSubnetClean=$(echo ${childSubnetMaxAddr##*=})
+	childSubnetNetworkAddr=$(echo ${childSubnetClean%.*}.)
+	childSubnetLastOctet=$(echo ${childSubnetClean##*.})
+	# We don't want to eat the existing subnet's broadcast address..
+	childSubnetRangeStart=$(( ${childSubnetLastOctet} - $(( 14 * 2 )) ))
+	IPAServerHostIP=$(( ${childSubnetRangeStart} + 1 )) ; IPAServerHostIP="${childSubnetNetworkAddr}${IPAServerHostIP}"
+	hostLinkIP=$(( ${childSubnetRangeStart} + 2 )) ; hostLinkIP="${childSubnetNetworkAddr}${hostLinkIP}"
+	echo -e "\n\nGenerated subnet is:\n$(ipcalc "${childSubnetNetworkAddr}${childSubnetRangeStart}${childSubnetCIDR}")"
+	ipaSubnetArg=$(ipcalc "${childSubnetNetworkAddr}${childSubnetRangeStart}${childSubnetCIDR}" | sed -n 2p | awk '{ print $2 }')
+	echo -e "\nIPA Server will be granted IP Address:\n${IPAServerHostIP}"
+	echo -e "\nAn additional IP link will be generated with the arguments:\nip link add ipa_ipvlan_shim link ${active_networkInterface} type ipvlan mode l2\nip addr add ${hostLinkIP} dev ipa_ipvlan_shim\nip link set ipa_ipvlan_shim up\nip route add ${childSubnetNetworkAddr}${childSubnetRangeStart} dev ipa_ipvlan_shim"
+
+
+	# TODO
+	# if configured_subnets match discovered subnets; then
+	#		echo -e "Configured subnet matches host subnet, proceeding"
+	# else
+	# 	echo -e "Wavelet's subnet configuration has changed.\nIf you want to install this system on a pre-existing network or drastically alter the underlying network configuration, it is highly recommended to reprovision the system from the beginning!\n"
+	#	  exit 1
+	# fi
+
+	# TODO 
+	# IPv6? @_@  To be honest getting a real handle on that would likely invalidate all of the above work.
+
+
 	echo -e "Generating paths and quadlets..\n"
 	mkdir -p /var/freeipa-data
 	# This sets up the QUADLET to run freeipa, but it does not set the server itself up.
@@ -108,7 +148,9 @@ PublishPort=464:464/udp
 PublishPort=636:636
 PublishPort=953:953
 Volume=/var/freeipa-data:/data:z
-HostName=dc1.${domain}
+HostName=dc1.ipa.$(dnsdomainname)
+IP=${IPAServerHostIP}
+Network=ipa_ipvlan
 ReadOnly=true
 DNS=127.0.0.1
 AutoUpdate=registry
@@ -141,26 +183,36 @@ WantedBy=multi-user.target" > /etc/containers/systemd/freeipa.container
 	#		generates a "shim" ipvlan device and assigns an IP address to it
 	#		force-adds a route to that the container and the host can now communicate
 	#		Without this the controller wouldn't be able to function without moving the entirety into a container itself
-	podman network create -d ipvlan --subnet 192.168.1.0/24 --gateway 192.168.1.1 --ip-range 192.168.1.192/27 ipa_ipvlan -o parent=${active_networkInterface}
+	#		We might want to actually do this with macvlan after all.  
+	podman network create -d ipvlan --subnet ${currentIPCIDR} --gateway ${gateway} --ip-range ${ipaSubnetArg} ipa_ipvlan -o parent=${active_networkInterface}
+
+	# Can't use nmcli - no ipvlan support?
 	ip link add ipa_ipvlan_shim link ${active_networkInterface} type ipvlan mode l2
-	ip addr add 192.168.1.224/32 dev ipa_ipvlan_shim 
+	ip addr add ${hostLinkIP}/32 dev ipa_ipvlan_shim 
 	ip link set ipa_ipvlan_shim up
-	ip route add 192.168.1.192/27 dev ipa_ipvlan_shim
+	ip route add ${ipaSubnetArg} dev ipa_ipvlan_shim
+
+	# Quick container command to test this, just try to ping the svr.wavelet.local host:
+	# podman run -it --network=ipa_ipvlan alpine:latest /bin/sh
+	# If ping successful (and vice versa) the IPA container should now have no problem communicating with host.
+
+	echo -e "${IPAServerHostIP}	dc1.ipa.${domain} dc1" >> /etc/hosts
 	podman run -h "dc1.ipa.${domain}" \
 		--read-only \
-		--ip=192.168.1.200 \
+		--ip=${IPAServerHostIP} \
 		--network=ipa_ipvlan \
 		--dns=127.0.0.1 \
 		-h=dc1.ipa.${domain} \
 		-v /var/freeipa-data:/data:Z \
 		-e PASSWORD=${administratorPassword} \
 		quay.io/freeipa/freeipa-server:almalinux-9 ipa-server-install -U --domain=ipa.${domain} -r IPA.${domain^^} \
-		--ntp-pool=3.us.pool.ntp.org --setup-dns --no-hbac-allow --no-forwarders --allow-zone-overlap --auto-reverse --setup-adtrust
+		--ntp-pool=3.us.pool.ntp.org --setup-dns --no-hbac-allow --auto-forwarder --allow-zone-overlap --auto-reverse --setup-adtrust
 
- 		-p 53:53/udp \
-		-p 53:53 \
-		-p 389:389 -p 636:636 \
-		-p 88:88/udp -p 464:464/udp -p 464:464 -p 123:123/udp \
+		# We don't need port arguments now that the container has its own IP address via ipvlan, right?
+ 		#-p 53:53/udp \
+		#-p 53:53 \
+		#-p 389:389 -p 636:636 \
+		#-p 88:88/udp -p 464:464/udp -p 464:464 -p 123:123/udp \
 
 
 	# Generate host record for dc1 in /etc/hosts, because until FreeIPA is up, we don't have any dns right now!
@@ -183,6 +235,29 @@ acl "wavelet_network" {
 allow-recursion { wavelet_network; };" >> /var/freeipa-data/etc/named/ipa-options-ext.conf
 	systemctl start freeipa.service
 
+	# Here we will need to reconfigure systemd-resolved or it will break the container and prevent freeIPA from resolving hostnames because port53.
+	echo -e "
+[Resolve]
+DNSStubListener=no" > /etc/systemd/resolved.conf
+	systemctl restart systemd-resolved.service
+	# Generate an appropriate file for systemd-resolved to try to ignore and make a dog's dinner of (I hate that thing)
+	echo -e "
+[Main]
+dns=default
+
+[global-dns]
+searches=ipa.${domain}
+
+[global-dns-domain-*]
+servers=${IPAServerHostIP}" > /etc/NetworkManager/conf.d/123-ipa.conf
+	echo -e "DNS=${IPAServerHostIP}, ${gateway}
+Domains=~. {searchdomains}" > /etc/systemd/resolved.conf.d/dns_servers.conf
+	systemctl daemon-reload
+	systemctl restart systemd-resolved.service --now
+	resolvectl dns ${active_networkInterface} ${IPAServerHostIP}
+	resolvectl domain ${active_networkInterface} ipa.${domain}
+
+
 	if systemctl is-active --quiet freeipa.service; then
 		echo -e "FreeIPA configured and container is running!\n"
 		echo -e "Enrolling server to freeIPA..\n"
@@ -202,21 +277,10 @@ install_server_security_layer(){
 	directoryManagerPassword=$(cat /var/secrets/ipadmpw.secure)
 	KRBDOMAIN=${waveletDomain^^}
 	local administratorPassword=$(cat /var/secrets/ipaadmpw.secure)
-	# Here we will need to reconfigure systemd-resolved or it will break the container and prevent freeIPA from resolving hostnames because port53.
-	echo -e "
-[Resolve]
-DNSStubListener=no" > /etc/systemd/resolved.conf
-	systemctl restart systemd-resolved.service
-	echo -e "
-${ip} ${waveletDCServer} dc1" >> /etc/hosts
-	echo -e "
-[Resolve]
-DNSStubListener=no
-DNS=${ip}, ${gateway}
-Domains=~. {searchdomains}" > /etc/systemd/resolved.conf.d/10-ipa.conf
+
 	# The preferred method would be to run the ipa-client in a container, however there's no good (recent) documentation on this.
 	# I opted to replace the nfs-utils-coreos package that was blocking freeipa-client installation so we are running this in the package overlay
-	ipa-client-install --unattended --principal=admin --password=${administratorPassword} --enable-dns-updates --ssh-trust-dns --domain=${waveletDomain}
+	ipa-client-install --unattended --principal=admin --password=${administratorPassword} --enable-dns-updates --ssh-trust-dns --server=${waveletDCServer} --domain=${waveletDomain}
 	# These additional options might be needed but it would mean that DNS was broken on the system, we probably don't want them here.
 	# --server ${waveletServer} --domain ${waveletDomain} --realm ${waveletDomain^^}
 	# We are doing the following;  creating an initial user who has domain join privileges
@@ -275,7 +339,7 @@ WantedBy=multi-user.target" > /etc/containers/systemd/radiusd.container
 configure_etcd_certs(){
 	# Configure ETCD service principal within freeIPA and tell ETCD to monitor for the appropriate certificate
 	ipa service-add etcd/`hostname`
-	ipa service-add-host --hosts=dc1.$(dnsdomainname) etcd/`hostname`
+	ipa service-add-host --hosts=dc1.ipa.$(dnsdomainname) etcd/`hostname`
 	ipa-getcert request \
 		-f /etc/pki/tls/certs/etcd.crt \
 		-k /etc/pki/tls/private/etcd.key \
