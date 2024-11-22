@@ -2,43 +2,57 @@
 # Monitors etcd for input device changes over the prefix and updates as necessary
 #
 
-ETCDURI=http://192.168.1.32:2379/v2/keys
-ETCDENDPOINT=192.168.1.32:2379
-
-read_etcd_global() {
-        printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
-        echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for Global value"
+# Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
+read_etcd(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
-
-read_etcd() {
-        printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME} --print-value-only)
-        echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
+read_etcd_global(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
+	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
 }
-
-read_etcd_input_prefix() {
-		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/interface/)
+read_etcd_prefix(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
-
-write_etcd_global() {
-        etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
-        echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
+read_etcd_clients_ip() {
+	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
+}
+read_etcd_clients_ip_sed() {
+	# We need this to manage the \n that is returned from etcd.
+	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
+	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
+}
+write_etcd(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
+}
+write_etcd_global(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
+}
+write_etcd_client_ip(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
+}
+delete_etcd_key(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
 }
 
 detect_self(){
 UG_HOSTNAME=$(hostname)
 	echo -e "Hostname is $UG_HOSTNAME \n"
 	case $UG_HOSTNAME in
-	enc*) 					echo -e "I am an Encoder \n" && self="encoder"
+	enc*) 			echo -e "I am an Encoder \n" && self="encoder"
 	;;
-	dec*)					echo -e "I am a Decoder \n" && self="decoder"
+	dec*)			echo -e "I am a Decoder \n" && self="decoder"
 	;;
-	livestream*)			echo -e "I am a Livestreamer \n" && self="livestream"
+	livestream*)		echo -e "I am a Livestreamer \n" && self="livestream"
 	;;
-	gateway*)				echo -e "I am an input Gateway for another video streaming system \n"  && self="input_gateway"
+	gateway*)		echo -e "I am an input Gateway for another video streaming system \n"  && self="input_gateway"
 	;;
-	svr*)					echo -e "I am a Server.  Launching encoder detection \n"  && self="server"
+	svr*)			echo -e "I am a Server.  Launching encoder detection \n"  && self="server"
 	;;
-	*) 						echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
+	*) 			echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
 	;;
 	esac
 }
@@ -79,6 +93,6 @@ event_inputdevice_update() {
 	# T
 }
 
-set -x
+#set -x
 exec >/home/wavelet/monitor_encoderflag.log 2>&1
 main
