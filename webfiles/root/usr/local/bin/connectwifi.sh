@@ -20,8 +20,21 @@ connectwifi(){
 	nmcli dev wifi connect ${networkssid} hidden yes password ${wifipassword} bssid ${wifibssid}
 }
 
+# If security layer is enabled and we aren't running with a PSK, this will wind up looking quite different
+
+connectwifi_enterprise(){
+	nmcli dev wifi rescan
+	sleep 5
+	nmcli dev wifi rescan
+	sleep 3
+	wifiCACert=/etc/ipa/ca.crt
+	wifiClientCert=/etc/pki/tls/certs/wificlient.crt
+	wifiClientKey=/etc/pki/tls/private/wificlient.crt
+	#nmcli <blablabla>
+}
+
 # Main
-if nc -zw1 http://192.168.1.32:8180; then
+if # curl the provioning httpd server succeeds
   echo "we have connectivity"
 else
  connectwifi
