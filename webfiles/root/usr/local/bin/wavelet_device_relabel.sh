@@ -16,7 +16,6 @@
 #	3) It will need to regenerate any service principals so it will maintain the capability to talk to the etcd cluster as a valid client
 #	4) test connectivity and write change completed in etcd if good.
 
-
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
@@ -48,6 +47,9 @@ write_etcd_global(){
 }
 write_etcd_client_ip(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
+}
+delete_etcd_key(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
 }
 
 detect_self(){
@@ -117,7 +119,7 @@ set_newLabel(){
 	echo "${appendedHostName}" > newHostName.txt
 	KEYNAME="/hostHash/${myHostHash}/newHostLabel"
 	# remove the newHostLabel value
-	etcdctl --endpoints=${ETCDENDPOINT} del ${KEYNAME}
+	delete_etcd_key ${KEYNAME}
 	KEYNAME="${currentHostName}/RECENT_RELABEL"
 	KEYVALUE="1"
 	write_etcd_global
@@ -190,10 +192,6 @@ remove_old_keys(){
 	;;
 	dec*)					echo -e "\nI was a Decoder \n"					; clean_oldDecoderHostnameSettings ${oldHostname}
 	;;
-	livestream*)			echo -e "\nI was a Livestreamer \n"				; clean_oldLivestreamHostnameSettings ${oldHostname}
-	;;
-	gateway*)				echo -e "\nI was an input Gateway\n"  			; clean_oldGatewayHostnameSettings ${oldHostname}
-	;;
 	svr*)					echo -e "\nI was a Server. Proceeding..."			; clean_oldServerHostnameSettings ${oldHostname}
 	;;
 	*) 						echo -e "\nThis device Hostname was not set appropriately, exiting \n" && exit 0
@@ -204,40 +202,19 @@ remove_old_keys(){
 clean_oldEncoderHostnameSettings(){
 	# Finds and cleans up any references in etcd to the old hostname
 	# Delete all reverse lookups, labels and hashes for this device
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /encoderlabel/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName} --prefix
+	KEYNAME="/encoderlabel/${oldHostName}"; delete_etcd_key
+	KEYNAME="/hostHash/${oldHostName}"; delete_etcd_key
+	KEYNAME="/hostLabel/${oldHostName}"; delete_etcd_key
+	KEYNAME="/${oldHostName}"; delete_etcd_key
 }
 
 clean_oldDecoderHostnameSettings(){
 	# Finds and cleans up any references in etcd to the old hostname
 	# Delete all reverse lookups, labels and hashes for this device
 	echo -e "Attempting to remove all legacy keys for: ${oldHostName}\n"
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName} --prefix
-}
-
-clean_oldLivestreamHostnameSettings(){
-	# Finds and cleans up any references in etcd to the old hostname
-	# We'd be doing livestream specific stuff here, but since we haven't developed that feature this is just here as a placeholder
-	echo -e "\nRemoving and disabling services referring to his host's previous role as a livestreamer..\n"
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /livestreamlabel/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName} --prefix
-}
-
-clean_oldGatewayHostnameSettings(){
-	# Finds and cleans up any references in etcd to the old hostname
-	# We'd be doing gateway specific stuff here, but since we haven't developed that feature this is just here as a placeholder
-	# Delete all reverse lookups, labels and hashes for this device
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /gatewaylabel/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName} --prefix
+	KEYNAME="/hostHash/${oldHostName}"; delete_etcd_key
+	KEYNAME="/hostLabel/${oldHostName}"; delete_etcd_key
+	KEYNAME="/${oldHostName}"; delete_etcd_key
 }
 
 clean_oldServerHostnameSettings(){
