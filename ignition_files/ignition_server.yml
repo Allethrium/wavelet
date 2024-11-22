@@ -13,7 +13,6 @@ kernel_arguments:
     - cpufreq.default_governor=performance
     - ip=192.168.1.32::192.168.1.1:255.255.255.0:svr.wavelet.local::on
     - nameserver=192.168.1.32
-    - nameserver=192.168.1.200
     - nameserver=192.168.1.1
     # - net.ifnames=0
     # - biosdevname=0
@@ -200,7 +199,6 @@ storage:
         inline: |
          127.0.0.1      localhost localhost.localdomain localhost4 localhost4.localdomain4
          ::1            localhost localhost.localdomain localhost6 localhost6.localdomain6
-         192.168.1.200  dc1.ipa.wavelet.local dc1
          192.168.1.32   svr.wavelet.local svr
     # Intel OneAPI RPM Repository
     - path: /etc/yum.repos.d/oneAPI.repo
