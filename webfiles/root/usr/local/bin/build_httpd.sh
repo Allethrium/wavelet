@@ -19,7 +19,6 @@ oldMethod(){
 	systemctl --user enable container-httpd.service
 	echo -e "\nApache Podman container generated, service has been enabled in systemd, and will start on next reboot.\n"
 	# Set ETCD key to true for this build step
-	etcdctl --endpoints=${ETCDENDPOINT} put ${KEYNAME} -- ${KEYVALUE}
 	# populate necessary files for decoder spinup
 	cp /usr/local/bin/UltraGrid.AppImage /home/wavelet/http/
 	cp /home/wavelet/wavelet-files.tar.xz /home/wavelet/http/ignition/
