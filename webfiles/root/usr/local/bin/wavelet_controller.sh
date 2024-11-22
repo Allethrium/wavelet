@@ -152,6 +152,14 @@ read_etcd_clients_ip_sed() {
 	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
 	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
 }
+read_etcd_json_revision(){
+	# Special case used in controller
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_json_revision" uv_hash_select | jq -r '.header.revision')
+}
+read_etcd_lastrevision(){
+	# Special case used in controller
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_lastrevision")	
+}
 write_etcd(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
 	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
@@ -162,6 +170,13 @@ write_etcd_global(){
 }
 write_etcd_client_ip(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
+}
+delete_etcd_key(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
+}
+generate_service(){
+	# Can be called with more args with "generate_servier" ${keyToWatch} 0 0 "${serviceName}"
+	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
 }
 
 
@@ -235,10 +250,10 @@ wavelet_testcard() {
 
 wavelet_refresh() {
 	# This is only called by the RD, refresh-devices button, and it finds the previous hash and resets to it.
-	revisions=$(etcdctl --endpoints=192.168.1.32:2379 get -w json uv_hash_select | jq -r '.header.revision')
+	revisions=$(read_etcd_json_revision)
 	lastrev=$((${revisions} - 1))
-	previousHash=$(etcdctl --endpoints=192.168.1.32:2379 get uv_hash_select --rev=${lastrev} --print-value-only)
 	KEYNAME=uv_hash_select
+	previousHash=$(read_etcd_lastrevision)
 	KEYVALUE=${previousHash}
 	write_etcd_global
 	echo -e "Previous hash value reset, running detectv4l to redetect local sources on all hosts.."
@@ -517,15 +532,15 @@ wavelet_pip2() {
 }
 
 wavelet_decoder_reset() {
-# Finds all decoders and sets client reSET flag.  This restarts UltraGrid without a full system reboot.
-# Have to clean /DECODER_RESET from result or we get recursion, remember etcd isn't hierarchical!
-return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix decoderip/ --keys-only)
+	# Finds all decoders and sets client reSET flag.  This restarts UltraGrid without a full system reboot.
+	# Have to clean /DECODER_RESET from result or we get recursion, remember etcd isn't hierarchical!
+	return_etcd_clients_ip=$(read_etcd_clients_ip)
 	RESULT="${return_etcd_clients_ip///DECODER_RESET/}"
 	for host in ${RESULT}; do
 		trimmed_host=$(echo ${host} | sed 's|decoderip/||g')
 		echo -e "working on : ${trimmed_host}"
-		etcdctl --endpoints=${ETCDENDPOINT} put "${trimmed_host}/DECODER_RESET" -- "1"
-
+		KEYNAME="/${trimmed_host}/DECODER_RESET"
+		KEYVALUE="1"
 		echo -e "DECODER_RESET flag enabled for ${trimmed_host}..\n"
 	done
 	echo -e "Decoder tasks instructed to reset on all attached decoders.\n"
@@ -535,14 +550,14 @@ wavelet_encoder_reboot() {
 # Finds all encoders and sets client reboot flag (need to implement reboot watcher service)
 # re-use the reflector code and then foreach hostname set it to reboot encoders
 # UltraGrid encoder task will SIGTERM every time a source is changed, this on the other hand reboots the WHOLE encoder.
-	etcdctl --endpoints=${ETCDENDPOINT} put "ENCODER_REBOOT" -- "1"
+	KEYNAME="ENCODER_REBOOT"; KEYVALUE="1"; write_etcd_global
 	echo -e "Encoder reboot flag enabled, encoders will hard reset momentarily.."
 }
 
 wavelet_system_reboot() {
 # This hard reboots everything, including the server.
 # set reboot flag on every host in etcd
-	etcdctl --endpoints=${ETCDENDPOINT} put "SYSTEM_REBOOT" -- "1"
+	KEYNAME="SYSTREM_REBOOT"; KEYVALUE="1"; write_etcd_global
 	echo -e "All hosts instructed to hard reset.  Server and all reachable devices will restart immediately..\n"
 }
 
@@ -551,26 +566,18 @@ wavelet_clear_inputs() {
 # Until I fix the detection/removal stuff so that it works perfectly, this will effectively clean out any cruft from 'stuck'
 # source devices which no longer exist, but still populate on the UI.
 # bad solution
-	etcdctl --endpoints=http://192.168.1.32:2379 del "interface" --prefix
-	etcdctl --endpoints=http://192.168.1.32:2379 del "/interface" --prefix
-	etcdctl --endpoints=http://192.168.1.32:2379 del "/hash" --prefix
-	etcdctl --endpoints=http://192.168.1.32:2379 del "/short_hash" --prefix
-	etcdctl --endpoints=http://192.168.1.32:2379 del "/long" --prefix
-	etcdctl --endpoints=http://192.168.1.32:2379 del "/$(hostname)/inputs" --prefix
-	etcdctl --endpoints=http://192.168.1.32:2379 del "/network_long" --prefix
-	etcdctl --endpoints=http://192.168.1.32:2379 del "/network_short" --prefix
-	etcdctl --endpoints=http://192.168.1.32:2379 del "/network_interface" --prefix
-	etcdctl --endpoints=http://192.168.1.32:2379 del "/network_ip" --prefix
-	etcdctl --endpoints=http://192.168.1.32:2379 del "/network_uv_stream_command" --prefix
+	keysArray=("interface" "/interface" "/hash" "/short_hash" "long" "/$(hostname)/inputs" "/network_long" "/network_short" "/network_interface" "/network_ip" "/network_uv_stream_command")
+	for key in ${keysArray[@]}; do
+		delete_ecd_key
+	done
 	echo -e "All interface devices and their configuration data, as well as labels have been deleted\n
 	Plugging in a new device will cause the detection module to run again.\n"
 }
 
 wavelet_detect_inputs() {
-	# Tells detectv4l to run on everything
+	# Tells detectv4l to run on everything, all encoders watch this flag when they are provisioned as such.
+	KEYNAME="DEVICE_REDETECT"; KEYVALUE=1; write_etcd_global
 	echo -e "\nAll devices now redetecting available input video sources..\n"
-	# here we might need a list of encoder hostNames and do a forEach loop..
-	etcdctl --endpoints=http://192.168.1.32:2379 put "DEVICE_REDETECT" -- "1"
 }
 
 
