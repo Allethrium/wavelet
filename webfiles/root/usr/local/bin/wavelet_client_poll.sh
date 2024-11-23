@@ -36,6 +36,9 @@ write_etcd_global(){
 write_etcd_client_ip(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
 }
+delete_etcd_key(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
+}
 
 
 reflector_monitor() {
@@ -44,39 +47,37 @@ reflector_monitor() {
 # Combined with the self-registration/connection logic on the subordinate devices, it forms a limited self-healing capability within the system
 	reflector_generate_lists() {
 	# CURL's reflector list every second and updates client list if inconsistent with existing IPs
-			FILE=/home/wavelet/reflector_clients_ip.txt
-			if test -f "$FILE"; then
-				echo "$FILE Exists, reflector is running and proceeding to test against monitor_list.txt..."
-	        	diff=$(diff /home/wavelet/monitor_list.txt /home/wavelet/reflector_clients_ip.txt)
-        		read_etcd_clients_ip
-        		echo ${return_etcd_clients_ip} > /home/wavelet/monitor_list.txt &>/dev/null
-        		reflector_testisalive
-        	else
-        		echo "$FILE does not exist.  Reflector is not running, or something went wrong.  Doing nothing..."
-        		:
-        	fi
+		FILE=/home/wavelet/reflector_clients_ip.txt
+		if test -f "$FILE"; then
+			echo "$FILE Exists, reflector is running and proceeding to test against monitor_list.txt..."
+	       	diff=$(diff /home/wavelet/monitor_list.txt /home/wavelet/reflector_clients_ip.txt)
+        	read_etcd_clients_ip
+        	echo ${return_etcd_clients_ip} > /home/wavelet/monitor_list.txt &>/dev/null
+        	reflector_testisalive
+        else
+        	echo "$FILE does not exist.  Reflector is not running, or something went wrong.  Doing nothing..."
+        	:
+        fi
 	}
+
 	reflector_testisalive() {
 	# This runs every n seconds as define by "while sleep $;"" above.  It doesn't need to happen too fast because this is just for housekeeping to avoid the reflector generating too many unicast streams.
 	# First, tests whether the etcd flag is already set, if so does nothing because the reflector will be reloaded the next time the system state changes.
 	# It tests the etcd master list with the monitor list, if there's a discrepancy it will set an etcd flag for the wavelet_kill_all routine to restart the reflector to reflect the client IP pool changes
 	# Otherwise, this component sends a single ping with a 2 second TTL, returns an alive or dead value.
-				KEYNAME="reload_reflector"
-				read_etcd_global
-				if [[ "$printvalue" -eq 1 ]]; then
-					:
-					else
-	        			if [[ "$diff" != '' ]] ; then
-                			echo -e "IP Address(es) have changed, setting reflector reload flag.  Stream may be momentarily interrupted."
-                			KEYNAME="reload_reflector"
-                			KEYVALUE="1"
-                			write_etcd_global
-                		else 
-                			reflector_pingme
-                		fi
-                fi
-
+		KEYNAME="reload_reflector"; read_etcd_global
+		if [[ "$printvalue" -eq 1 ]]; then
+			:
+		else
+	    	if [[ "$diff" != '' ]] ; then
+        		echo -e "IP Address(es) have changed, setting reflector reload flag.  Stream may be momentarily interrupted."
+        		KEYNAME="reload_reflector"; KEYVALUE="1"; write_etcd_global
+            else 
+            	reflector_pingme
+            fi
+        fi
 	}
+
 	reflector_pingme() {
 	# Pings the current list of IP addresses associated with Decoders, Livestreams or other clients.
 	# If a ping comes back unreachable, it deletes the host registration key from ETCD and the next generate_lists pass will register it as dead,
@@ -95,8 +96,7 @@ reflector_monitor() {
         	echo "$line=DEAD"
         	# Get hostname from $line value by querying against DNS
         	deadhostkeyname=$(dig +short -x $line | cut -d"." -f1)
-        	KEYNAME=$deadkeyhostname
-        	delete_etcd_clients_ip
+        	KEYNAME="/decoderip/$deadkeyhostname"; delete_etcd_key
         	echo -e "${deadhostkeyname} has been deleted from /decoderip/ list in etcd \n"
         	sleep 2
         	systemctl --user restart wavelet_reflector.service
@@ -120,8 +120,7 @@ service_exists() {
 set -x
 exec >/home/wavelet/wavelet_reflector_polling.log 2>&1
 if service_exists wavelet_reflector; then
-    KEYNAME="reload_reflector"
-    read_etcd_global
+    KEYNAME="reload_reflector"; read_etcd_global
     if [[ "$printvalue" -eq 1 ]]; then
     	echo -e "Reflector reload key is already set!  Restarting reflector service"
     	systemctl --user restart wavelet_reflector.service
