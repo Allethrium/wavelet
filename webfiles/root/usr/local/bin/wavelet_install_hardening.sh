@@ -131,8 +131,7 @@ configure_idm(){
 	mkdir -p /var/freeipa-data
 	# This sets up the QUADLET to run freeipa, but it does not set the server itself up.
 	# Port 953 needed for dynamic DNS updates
-	echo -e "
-[Container]
+	echo -e "[Container]
 Image=quay.io/freeipa/freeipa-server:almalinux-9
 ContainerName=freeipa
 PublishPort=53:53
