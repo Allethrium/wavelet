@@ -73,22 +73,14 @@ check_label(){
 	# Finds our current hash and gets the new label from Etcd as set from UI
 	oldHostName=$(hostname)
 	echo "${oldHostName}" > /home/wavelet/oldHostName.txt
-	KEYNAME="/hostHash/$(hostname)/relabel_active"
-	KEYVALUE="1"
-	write_etcd_global
-	KEYNAME="/$(hostname)/Hash"
-	read_etcd_global
-	myHostHash="${printvalue}"
+	KEYNAME="/hostHash/$(hostname)/relabel_active"; KEYVALUE="1"; write_etcd_global
+	KEYNAME="Hash"; read_etcd; myHostHash="${printvalue}"
 	echo -e "My hash is ${myHostHash}, attempting to find a my new device label..\n"
-	KEYNAME="/hostHash/${myHostHash}/newHostLabel"
-	read_etcd_global
-	myNewHostLabel="${printvalue}"
+	KEYNAME="/hostHash/${myHostHash}/newHostLabel"; read_etcd_global; myNewHostLabel="${printvalue}"
 	echo -e "My *New* host label is ${myNewHostLabel}!\n"
 	if [[ "$(hostname)" == "${myNewHostLabel}" ]]; then
 		echo -e "New label and current hostname are identical, doing nothing..\n"
-		KEYNAME="/hostHash/$(hostname)/relabel_active"
-		KEYVALUE="0"
-		write_etcd_global
+		KEYNAME="/hostHash/$(hostname)/relabel_active"; KEYVALUE="0"; write_etcd_global
 		exit 0
 	else
 		echo -e "New label and current hostname are different, proceding to initiate change.."
@@ -117,12 +109,8 @@ set_newLabel(){
 		echo -e "Generated FQDN hostname as ${appendedHostName}\n"
 	fi
 	echo "${appendedHostName}" > newHostName.txt
-	KEYNAME="/hostHash/${myHostHash}/newHostLabel"
-	# remove the newHostLabel value
-	delete_etcd_key ${KEYNAME}
-	KEYNAME="${currentHostName}/RECENT_RELABEL"
-	KEYVALUE="1"
-	write_etcd_global
+	KEYNAME="/hostHash/${myHostHash}/newHostLabel"; delete_etcd_key
+	KEYNAME="RECENT_RELABEL"; KEYVALUE="1"; write_etcd
 	# Generate the necessary files, then reboot.
 	set_newHostName ${appendedHostName}
 }
@@ -137,11 +125,8 @@ event_prefix_set(){
 	systemctl --user disable wavelet_monitor_decoder_reveal.service --now
 	systemctl --user disable wavelet_monitor_decoder_reset.service --now
 	systemctl --user disable wavelet_device_relabel.service --now
-	KEYNAME="/$(hostname)/Hash"
-	read_etcd_global
-	myHostHash="${printvalue}"
-	KEYNAME="/hostHash/${myHostHash}"
-	read_etcd_global
+	KEYNAME="/$(hostname)/Hash"; read_etcd_global; myHostHash="${printvalue}"
+	KEYNAME="/hostHash/${myHostHash}"; read_etcd_global
 	myHostLabel="${printvalue}"
 	echo -e "My host label is ${myHostLabel}!\n"
 	FQDN=$(nslookup $(hostname) -i | grep $(hostname) | head -n 1)
@@ -242,27 +227,19 @@ set_newHostName(){
 }
 
 event_hostNameChange() {
-# Check to see if hostname has changed since last session
-if [[ -f /home/wavelet/oldhostname.txt ]]; then
-		check_hostname
-fi
-
-
-KEYNAME="/$(hostname)/RELABEL"
-read_etcd_global
-if [[ "${printvalue}" -eq "0" ]]; then
-	echo -e "Relabel task bit for this hostname is set to 0, doing nothing.."
-	exit 0
-fi
-
-echo -e "Relabel bits active, resetting them to 0 prior to starting task.."
-KEYNAME="/hostHash/$(hostname)/relabel_active"
-KEYVALUE="0"
-write_etcd_global
-KEYNAME="/$(hostname)/RELABEL"
-KEYVALUE="0"
-write_etcd_global
-detect_self
+	# Check to see if hostname has changed since last session
+	if [[ -f /home/wavelet/oldhostname.txt ]]; then
+			check_hostname
+	fi
+	KEYNAME="/$(hostname)/RELABEL"; read_etcd_global
+	if [[ "${printvalue}" -eq "0" ]]; then
+		echo -e "Relabel task bit for this hostname is set to 0, doing nothing.."
+		exit 0
+	fi
+	echo -e "Relabel bits active, resetting them to 0 prior to starting task.."
+	KEYNAME="/hostHash/$(hostname)/relabel_active"; KEYVALUE="0"; write_etcd_global
+	KEYNAME="RELABEL"; KEYVALUE="0"; write_etcd
+	detect_self
 }
 
 ###
