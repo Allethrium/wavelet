@@ -4,7 +4,7 @@
 # Effectively, it intercepts the etcd calls from the other modules and injects certificates as necessary
 
 #Etcd Interaction global variables
-ETCDENDPOINT=$(cat /home/wavelet/etcd_ip)
+ETCDENDPOINT="$(cat /home/wavelet/etcd_ip):2379"
 ETCDCTL_API=3
 clientCertificateFile="/etc/pki/tls/cert/etcd.cert"
 clientCertificateKeyFile="/etc/pki/tls/private/etcd.key"
