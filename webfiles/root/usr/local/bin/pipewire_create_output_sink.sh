@@ -45,12 +45,8 @@ main(){
 								audio.position=[FL FR] }'
 	
 	# etcdctl find current video source
-	KEYNAME="uv_hash_select"
-	read_etcd_global
-	currentVideoInputHash=${printvalue}
-	KEYNAME="/short_hash/${currentVideoInputHash}"
-	read_etcd_global
-	currentVideoPath=${printvalue}
+	KEYNAME="uv_hash_select"; read_etcd_global; currentVideoInputHash=${printvalue}
+	KEYNAME="/short_hash/${currentVideoInputHash}"; read_etcd_global; currentVideoPath=${printvalue}
 
 	case in ${currentVideoPath}
 		if we have a magewell device we probably have a serial number
