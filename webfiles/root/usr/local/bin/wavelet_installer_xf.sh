@@ -110,7 +110,7 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_hardening.serv
 	mkdir -p /var/lib/etcd-data
 	cp /etc/etcd.yaml.conf /etc/etcd.conf
 	ip=$(hostname -I | cut -d " " -f 1)
-	sed -i 's|svrIP|${ip}|g' /etc/etcd.conf
+	sed -i "s|svrIP|${ip}|g" /etc/etcd.conf
 
 	# Old systemd method
 	echo -e "[Unit]
@@ -145,7 +145,7 @@ Description=etcd service
 Documentation=https://github.com/etcd-io/etcd
 
 [Container]
-Image=https://quay.io/coreos/etcd
+Image=quay.io/coreos/etcd
 ContainerName=etcd-container
 Network=host
 EnvironmentFile=/etc/etcd.conf
