@@ -103,7 +103,6 @@ Description=etcd service
 Documentation=https://github.com/etcd-io/etcd
 Documentation=man:etcd
 After=network.target
-Wants=network-online.target
 
 [Container]
 Environment=ETCD_DATA_DIR=/etcd-data
@@ -125,7 +124,7 @@ ExecStartPre=-/bin/podman pull quay.io/coreos/etcd
 Restart=always
 
 [Install]
-WantedBy=multi-user.target" > /etc/containers/systemd/etcd-quadlet.container
+WantedBy=default.target" > /etc/containers/systemd/etcd-quadlet.container
 	systemctl daemon-reload
 	# Remember, quadlets don't work with systemd enable <arg>
 	systemctl start etcd-quadlet.service
