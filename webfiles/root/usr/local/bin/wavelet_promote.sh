@@ -82,8 +82,7 @@ event_encoder(){
 
 exec >/home/wavelet/promote.log 2>&1
 
-KEYNAME=/$(hostname)/PROMOTE
-read_etcd_global
+KEYNAME=PROMOTE; etcd_global
 if [[ "${printvalue}" == 1 ]]; then
 	echo -e "\nPROMOTE key is set to 1, continuing with task.. \n"
 	detect_self
