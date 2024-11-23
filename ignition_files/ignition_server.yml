@@ -289,13 +289,13 @@ storage:
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/dnsmasq.conf
     # etcd.conf file for nonsecure access
-    - path: /etc/etcd.yaml.conf
+    - path: /etc/etcd/etcd.yaml.conf
       mode: 0644
       overwrite: true
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/etcd.yaml.conf
     # etcd.conf file for nonsecure access
-    - path: /etc/etcd.yaml.conf.secure
+    - path: /etc/etcd/etcd.yaml.conf.secure
       mode: 0644
       overwrite: true
       contents:
@@ -415,95 +415,13 @@ storage:
         inline: |
          [Unit]
          Description=Wavelet Controller Service
-         After=network-online.target etcd-member.service
+         After=network-online.target
          Wants=network-online.target
          [Service]
          Type=simple
          ExecStart=/usr/bin/sh -c "/usr/local/bin/wavelet_init.sh"
          [Install]
          WantedBy=default.target
-      user:
-        name: wavelet
-      group:
-        name: wavelet
-    # Etcd watch controller input channel service
-    - path: /home/wavelet/.config/systemd/user/wavelet_controller.service
-      mode: 0644
-      overwrite: true
-      contents:
-        inline: |
-          [Unit]
-          Description=Wavelet Controller - etcd input triggers orchestration
-          After=network-online.target etcd-member.service
-          Wants=network-online.target
-          [Service]
-          Environment=ETCDCTL_API=3
-          RemainAfterExit=yes
-          ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch input_update -w simple -- sh -c "/usr/local/bin/wavelet_controller.sh"
-          Restart=on-failure
-          RestartSec=1
-          [Install]
-          WantedBy=default.target
-      user:
-        name: wavelet
-      group:
-        name: wavelet
-    # Etcd watch reflectorflag service
-    - path: /home/wavelet/.config/systemd/user/watch_reflectorreload.service
-      mode: 0644
-      overwrite: true
-      contents:
-        inline: |
-          [Unit]
-          Description=Watches etcd for reflector restart
-          After=network-online.target etcd-member.service
-          Wants=network-online.target
-          [Service]
-          Environment=ETCDCTL_API=3
-          ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch --prefix /decoderip/ -w simple -- sh -c "/usr/local/bin/wavelet_client_poll.sh"
-          Restart=on-failure
-          [Install]
-          WantedBy=default.target
-      user:
-        name: wavelet
-      group:
-        name: wavelet
-    # Etcd watch encoderflag service
-    - path: /home/wavelet/.config/systemd/user/watch_encoderflag.service
-      mode: 0644
-      overwrite: true
-      contents:
-        inline: |
-          [Unit]
-          Description=Watches etcd for encoder restart
-          After=network-online.target etcd-member.service
-          Wants=network-online.target
-          [Service]
-          Environment=ETCDCTL_API=3
-          ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/encoder_restart -w simple -- sh -c "/usr/local/bin/monitor_encoderflag.sh"
-          Restart=on-failure
-          RestartSec=1
-          [Install]
-          WantedBy=default.target
-      user:
-        name: wavelet
-      group:
-        name: wavelet
-    # UltraGrid AppImage Launcher - this is a placeholder unit file, it's always overwritten by the script calling it.
-    - path: /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
-      mode: 0644
-      overwrite: true
-      contents:
-        inline: |
-          [Unit]
-          Description=UltraGrid AppImage executable
-          After=network-online.target etcd-member.service
-          Wants=network-online.target
-          [Service]
-          Environment=ETCDENDPOINT=192.168.1.32:2379
-          ExecStart=/usr/local/bin/UltraGrid.AppImage $(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/UG_ARGS --print-value-only)
-          [Install]
-          WantedBy=default.target
       user:
         name: wavelet
       group:
@@ -534,29 +452,10 @@ storage:
         inline: |
           [Unit]
           Description=UltraGrid AppImage executable
-          After=network-online.target etcd-member.service
+          After=network-online.target
           Wants=network-online.target
           [Service]
           ExecStart=/usr/local/bin/wavelet_reflector.sh
-          [Install]
-          WantedBy=default.target
-      user:
-        name: wavelet
-      group:
-        name: wavelet
-    # UltraGrid reflector - placeholder, it's overwritten in the reflector script, like the AppImage unit file!
-    - path: /home/wavelet/.config/systemd/user/UltraGrid.Reflector.service
-      mode: 0644
-      overwrite: true
-      contents:
-        inline: |
-          [Unit]
-          Description=UltraGrid AppImage executable
-          After=network-online.target etcd-member.service
-          Wants=network-online.target
-          [Service]
-          Environment=ETCDENDPOINT=192.168.1.32:2379
-          ExecStart=/usr/local/bin/UltraGrid.AppImage $(etcdctl --endpoints=${ETCDENDPOINT} get REFLECTOR_ARGS --print-value-only)
           [Install]
           WantedBy=default.target
       user:
@@ -571,7 +470,7 @@ storage:
         inline: |
           [Unit]
           Description=Wavelet Encoder/Decoder runner
-          After=network-online.target etcd-member.service
+          After=network-online.target
           Wants=network-online.target
           [Service]
           ExecStart=/usr/local/bin/run_ug.sh
@@ -590,7 +489,7 @@ storage:
         inline: |
           [Unit]
           Description=Wavelet Initial Setup Service
-          After=network-online.target etcd-member.service
+          After=network-online.target
           Wants=network-online.target
           [Service]
           Type=oneshot
