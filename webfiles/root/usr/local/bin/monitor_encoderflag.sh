@@ -59,19 +59,19 @@ UG_HOSTNAME=$(hostname)
 
 main() {
 # main thread, checks encoder restart flag in etcd
-	KEYNAME="encoder_restart"
-	read_etcd
+	KEYNAME="encoder_restart"; read_etcd
 	if [[ "${printvalue}" -eq 1 ]]; then
 		echo -e "Encoder restart bit is set! continuing..\n"
 		detect_self
 		if [[ "${self}" = "encoder" ]]; then		
+			systemctl --user stop UltraGrid.AppImage.service
 			systemctl --user restart run_ug.service
-			echo -e "Encoder restart flag is enabled, restarting encoder.."
+			echo -e "Encoder restart flag is enabled, restarting encoder process on this host.."
 		elif [[ "${self}" = "server" ]]; then
 			# we check whether an input device has been added via detectv4l.sh to this  server
-			KEYNAME=INPUT_DEVICE_PRESENT
-			read_etcd
+			KEYNAME=INPUT_DEVICE_PRESENT; read_etcd
 				if [[ "$printvalue" -eq 1 ]]; then
+					systemctl --user stop UltraGrid.AppImage.service
 					systemctl --user restart run_ug.service
 					echo -e "An input device is present on this server, and it is running as an encoder, restarting encoder component.."
 				else
@@ -83,9 +83,7 @@ main() {
 			:
 		fi
 		echo -e "Resetting encoder restart flag to 0.."
-		KEYNAME=encoder_restart
-		KEYVALUE=0
-		write_etcd
+		KEYNAME=encoder_restart; KEYVALUE=0; write_etcd
 	fi
 }
 
