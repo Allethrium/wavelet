@@ -179,7 +179,7 @@ event_server(){
 		echo -e "\nPXE service has not completed setup, exiting until the next reboot..\n"
 		exit 1
 	fi
-	if service_exists etcd-container; then
+	if systemctl is-active --quiet etcd-quadlet; then
 		echo -e "Etcd service present, checking for bootstrap key\n"
 			KEYNAME=SERVER_BOOTSTRAP_COMPLETED; read_etcd_global; result=${printvalue}
 				if [[ "${result}" = 1 ]]; then
@@ -280,7 +280,7 @@ WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/container
 	touch /var/server_bootstrap_completed
 	echo -e "Reloading systemctl user daemon, and enabling the controller service immediately"
 	systemctl --user daemon-reload
-		if service_exists etcd-container; then
+		if systemctl is-active --quiet etcd-quadlet; then
 			KEYNAME=wavelet_build_completed; KEYVALUE=1; write_etcd
 		else
 			echo -e "\nETCD is down! cannot continue.\n"
@@ -308,15 +308,6 @@ WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/container
 	echo -e "Server configuration is now complete, rebooting system.."
 	sleep 1
 	systemctl reboot -i
-}
-
-service_exists() {
-	local n=$1
-	if [[ $(systemctl list-units --user -t service --full --no-legend "$n.service" | sed 's/^\s*//g' | cut -f1 -d' ') == $n.service ]]; then
-		return 0
-	else
-		return 1
-	fi
 }
 
 event_reboot(){
