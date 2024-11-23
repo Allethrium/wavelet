@@ -4,7 +4,7 @@
 name: 'wavelet-etcd-member'
 
 # Path to the data directory.
-data-dir: /etc-data
+data-dir: /etcd-data
 snapshot-count: 10000
 heartbeat-interval: 500
 election-timeout: 1000
