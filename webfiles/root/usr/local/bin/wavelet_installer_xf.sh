@@ -79,7 +79,7 @@ Wants=network-online.target
 ExecStartPre=-mkdir -p /var/lib/etcd-data
 ExecStartPre=-/bin/podman kill etcd
 ExecStartPre=-/bin/podman rm etcd
-ExecStartPre=-/bin/podman pull quay.io/coreos/etcd
+ExecStartPre=-/bin/podman pull quay.io/coreos/etcd:v3.5.17
 ExecStart=/bin/podman run --name etcd \
 	--volume /var/lib/etcd-data:/etcd-data:Z \
 	--net=host quay.io/coreos/etcd /usr/local/bin/etcd \
@@ -107,7 +107,7 @@ Wants=network-online.target
 [Container]
 Environment=ETCD_DATA_DIR=/etcd-data
 Environment=ETCD_CONFIG_FILE=/etc/etcd/etcd.conf
-Image=quay.io/coreos/etcd
+Image=quay.io/coreos/etcd:v3.5.17
 ContainerName=etcd-container
 Network=host
 Volume=/etc/etcd/etcd.conf:/etc/etcd/etcd.conf:Z
