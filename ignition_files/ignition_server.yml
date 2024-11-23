@@ -191,7 +191,7 @@ storage:
          skip_if_unavailable=True
          fastestmirror=1
          max_parallel_downloads=2
-    # Ensure ipa server is enabled in hosts along with standard server.  Two records to one IP, yes.
+    # Generate hosts file
     - path: /etc/hosts
       mode: 0664
       overwrite: true
@@ -288,6 +288,18 @@ storage:
       overwrite: true
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/dnsmasq.conf
+    # etcd.conf file for nonsecure access
+    - path: /etc/etcd.yaml.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/etcd.yaml.conf
+    # etcd.conf file for nonsecure access
+    - path: /etc/etcd.yaml.conf.secure
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/etcd.yaml.conf.secure
     # Automation to spin up and install dnsmasq as a SYSTEM service
     - path: /usr/local/bin/build_dnsmasq.sh
       mode: 0755
