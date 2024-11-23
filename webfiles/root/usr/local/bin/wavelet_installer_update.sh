@@ -1,5 +1,5 @@
 #!/bin/bash
-# Updates wavelet modules automatically from Git repo.
+# Updates wavelet modules automatically from Git repo.  Useful for installing updates to wavelet as long as no system services are affected.
 
 detect_self(){
 systemctl --user daemon-reload
