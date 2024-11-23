@@ -11,7 +11,7 @@ exec >/home/wavelet/build_httpd.log 2>&1
 oldMethod(){
 	# Podman generate systemd method
 	echo -e "Generating Apache Podman container and systemd service file"
-	podman create --name httpd -p 8080:80 -v /home/wavelet/http:/usr/local/apache2/htdocs:Z -v /home/wavelet/config/httpd.conf:/usr/local/apache2/conf/httpd.conf docker://docker.io/library/httpd
+	podman create --name httpd -p 8080:80 -v /home/wavelet/http:/usr/local/apache2/htdocs:Z -v /home/wavelet/config/httpd.conf:/usr/local/apache2/conf/httpd.conf:z docker://docker.io/library/httpd
 	cd /home/wavelet/.config/systemd/user
 	podman generate systemd --restart-policy=always -t 5 --name httpd --files
 	cp container-httpd.service ${SCRHOME}/.config/systemd/user
@@ -44,8 +44,8 @@ After=local-fs.target
 ContainerName=httpd
 Image=docker://docker.io/library/httpd
 PublishPort=8080:80
-Volume=/home/wavelet/http:/usr/local/apache2/htdocs:Z
-Volume=/home/wavelet/config/httpd.conf:/usr/local/apache2/conf/httpd.conf:Z
+Volume=/home/wavelet/http:/usr/local/apache2/htdocs:z
+Volume=/home/wavelet/config/httpd.conf:/usr/local/apache2/conf/httpd.conf:z
 #cert
 #key
 Tmpfs=/run
