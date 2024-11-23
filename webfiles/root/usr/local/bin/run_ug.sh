@@ -84,8 +84,7 @@ event_encoder_server() {
 event_server(){
 	# Generate a catch-all audio sink for simultaneous output to transient devices
 	/usr/local/bin/pipewire_create_output_sink.sh
-	KEYNAME=INPUT_DEVICE_PRESENT
-	read_etcd
+	KEYNAME=INPUT_DEVICE_PRESENT; read_etcd
 	echo -e "Ensuring dnsmasq service is up.."
 	hostname=$(hostname)
 	systemctl enable dnsmasq.service --now
@@ -108,9 +107,7 @@ event_encoder(){
 	# Registers self as a decoder in etcd for the reflector to query & include in its client args
 	echo -e "Calling wavelet_encoder systemd unit.."
 	# I've added a blank bit here too.. it might make more sense to call it "host blank" though..
-	KEYVALUE="0"
-	KEYNAME="/$(hostname)/DECODER_BLANK"
-	write_etcd_global
+	KEYNAME="DECODER_BLANK"; KEYVALUE="0"; write_etcd
 	systemctl --user daemon-reload
 	systemctl enable systemd-resolved.service --now
 	echo -e "Pinging wavelet_detectv4l.sh to ensure any USB devices are detected prior to start.. \n"
@@ -127,15 +124,10 @@ event_decoder(){
 	# Ensure all reset, reveal and reboot flags are set to 0 so they are
 	# 1) populated
 	# 2) not active so the new device goes into a reboot/reset/reveal loop
-	KEYVALUE="0"
-	KEYNAME="/$(hostname)/DECODER_RESET"
-	write_etcd_global
-	KEYNAME="/$(hostname)/DECODER_REVEAL"
-	write_etcd_global
-	KEYNAME="/$(hostname)/DECODER_REBOOT"
-	write_etcd_global
-	KEYNAME="/$(hostname)/DECODER_BLANK"
-	write_etcd_global
+	KEYNAME="DECODER_RESET"; KEYVALUE="0"; write_etcd
+	KEYNAME="DECODER_REVEAL"; write_etcd
+	KEYNAME="DECODER_REBOOT"; write_etcd
+	KEYNAME="DECODER_BLANK"; write_etcd
 	sleep 1
 	# Enable watcher services now all task activation keys are set to 0
 	systemctl --user enable wavelet_monitor_decoder_reset.service --now
@@ -147,10 +139,7 @@ event_decoder(){
 	# If not connected the primary display will be used.
 	# Tries three possible GPU devices for acceleration in order of efficiency, before failing.
 	# If it crashes, you have hw/driver issues someplace or an improperly configured display env.
-		KEYNAME=UG_ARGS
-		ug_args="--tool uv -d vulkan_sdl2:fs:keep-aspect:nocursor:nodecorate -r pipewire"
-		KEYVALUE="${ug_args}"
-		write_etcd
+		KEYNAME=UG_ARGS; ug_args="--tool uv -d vulkan_sdl2:fs:keep-aspect:nocursor:nodecorate -r pipewire"; KEYVALUE="${ug_args}"; write_etcd
 		rm -rf /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 		echo "
 		[Unit]
@@ -171,10 +160,7 @@ event_decoder(){
 		if [[ ${return} -eq !0 ]]; then
 			echo "Decoder failed to start, there may be something wrong with the system.
 			\nTrying GL as a fallback, and then failing for good.."
-			KEYNAME=UG_ARGS
-			ug_args="--tool uv -d gl:fs -r pipewire"
-			KEYVALUE="${ug_args}"
-			write_etcd
+			KEYNAME=UG_ARGS; ug_args="--tool uv -d gl:fs -r pipewire"; KEYVALUE="${ug_args}"; write_etcd
 			rm -rf /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 			echo "
 			[Unit]
@@ -226,22 +212,20 @@ event_livestream(){
 		:
 	fi
 
-# Alternatively, we can use ffmpeg to extract UV uncompressed and transcode it to YouTube or another CDN with appropriate settings.  
-# Would require dual homing to an internet connection.
+	# Alternatively, we can use ffmpeg to extract UV uncompressed and transcode it to YouTube or another CDN with appropriate settings.  
+	# Would require dual homing to an internet connection.
 
-# API Key would be set by a simple read -p script or by the installation engineer.
+	# API Key would be set by a simple read -p script or by the installation engineer.
 
-# FFMPEG commands:
-#				KEYNAME=wavelet_livestream_apikey
-#				read_etcd
-#				MYAPIKEY=${printvalue}
-#				ffmpeg -protocol_whitelist tcp,udp,http,rtp,file -i http://127.0.0.1:8554/ug.sdp \
-#				-re -f lavdi -i anullsrc -c:v libx264 -preset veryfast -b:v 1024k -maxrate 1024k -bufsize 4096k \
-#				-vf 'format=yuv420p' -g 60 \
-#				flv rtmp://a.rtmp.youtube.com/live2/${MYAPIKEY}
-KEYNAME="livestreaming_cmd"
-KEYVALUE="${generatedCommand}"
-write_etcd_global
+	# FFMPEG commands:
+	#				KEYNAME=wavelet_livestream_apikey
+	#				read_etcd
+	#				MYAPIKEY=${printvalue}
+	#				ffmpeg -protocol_whitelist tcp,udp,http,rtp,file -i http://127.0.0.1:8554/ug.sdp \
+	#				-re -f lavdi -i anullsrc -c:v libx264 -preset veryfast -b:v 1024k -maxrate 1024k -bufsize 4096k \
+	#				-vf 'format=yuv420p' -g 60 \
+	#				flv rtmp://a.rtmp.youtube.com/live2/${MYAPIKEY}
+	KEYNAME="livestreaming_cmd"; KEYVALUE="${generatedCommand}"; write_etcd_global
 }
 
 event_gateway_in(){
@@ -275,9 +259,7 @@ get_ipValue(){
 				local ip=$1 regex='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
 				if [[ $ip =~ $regex ]]; then
 					echo -e "\nIP Address is valid, continuing..\n"
-					KEYNAME="/hostHash/$(hostname)/ipaddr"
-					keyvalue="${IPVALUE}"
-					write_etcd_global
+					KEYNAME="/hostHash/$(hostname)/ipaddr"; keyvalue="${IPVALUE}"; write_etcd_global
 				else
 					echo "\nIP Address is not valid, sleeping and calling function again\n"
 					get_ipValue
@@ -290,6 +272,7 @@ get_ipValue(){
 detect_disable_ethernet(){
 	# We disable ethernet preferentially if we have two active connections
 	# This prevents some of the IP detection automation from having issues.
+	# This should have been done already once the decoder provisioned and successfully connected to wifi.
 	for interface in $(ip link show | awk '{print $2}' | grep ":$" | cut -d ':' -f1); do
 		if [[ $(nmcli dev show "${interface}" | grep "connected") ]] && \
 		[[ $(nmcli dev show "${interface}" | grep "ethernet") ]] && \
