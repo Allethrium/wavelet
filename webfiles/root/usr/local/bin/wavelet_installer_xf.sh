@@ -27,13 +27,13 @@ event_decoder(){
 	# First we'd need to determine our architecture.
 	arch=$(uname -m)
 	case ${arch} in
-		"x86_64") echo -e "AMD64 architecture, checking if we are a Microsoft Surface for custom kernel..\n";	determine_ifSurface
+		"x86_64")	echo -e "AMD64 architecture, checking if we are a Microsoft Surface for custom kernel..\n";		determine_ifSurface
 		;;
-		"arm") echo -e "aarch64 architecture, switching to ARM ostree..";	rpm_ostree_ARM
+		"arm")		echo -e "aarch64 architecture, switching to ARM ostree..";										rpm_ostree_ARM
 		;;
-		"riscV") echo -e "RISC-V architecture, switching to RISCV ostree..";	rpm_ostree_RISCV
+		"riscV")	echo -e "RISC-V architecture, switching to RISCV ostree..";										rpm_ostree_RISCV
 		;;
-		*) echo -e "Architecture obsolete or unsupported, exiting..\n"
+		*)			echo -e "Architecture obsolete or unsupported, exiting..\n"
 	esac
 }
 
@@ -52,8 +52,7 @@ event_server(){
 	# Generate and enable systemd units
 	# Therefore, they will start on next boot, run, and disable themselves
 	# Installing the security layer will require two reboots, one for the domain enrollment and one to move to userland.
-	echo -e "\
-[Unit]
+	echo -e "[Unit]
 Description=Install Dependencies
 ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
 After=multi-user.target
@@ -64,8 +63,7 @@ ExecStartPost=systemctl disable wavelet_install_depends.service
 [Install]
 WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_depends.service
 
-	echo -e "\
-[Unit]
+	echo -e "[Unit]
 Description=Install PXE support
 ConditionPathExists=/var/wavelet_depends.complete
 After=multi-user.target
@@ -78,8 +76,7 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_pxe.service
 
 	if [[ -f /var/prod.security.enabled ]]; then
 		echo -e "Generating systemd unit for security layer.."
-		echo -e "\
-[Unit]
+		echo -e "[Unit]
 Description=Install Security Layer
 ConditionPathExists=/var/prod.security.enabled
 ConditionPathExists=/var/wavelet_depends.complete
@@ -110,20 +107,47 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_hardening.serv
 	# This is because it would only run when a user is logged on
 	# We will likely want to secure the server console in prod deployment.
 	mkdir -p /var/etcd-data
+	# Quadlet
+	#echo -e "[Unit]
+#Description=etcd service
+#Documentation=https://github.com/etcd-io/etcd
+#
+#[Container]
+#Image=quay.io/coreos/etcd
+#ContainerName=etcd-container
+#Network=host
+#Volume=/var/etcd-data:/etcd-data:Z
+#AutoUpdate=registry
+#NoNewPrivileges=true
+#
+#[Install]
+#WantedBy=multi-user.target" > /etc/containers/systemd/etcd-container.container
+	ip=$(hostname -I | cut -d " " -f 1)
 	echo -e "[Unit]
-Description=etcd service
-Documentation=https://github.com/etcd-io/etcd
+Description=Run single node etcd
+After=network-online.target
+Wants=network-online.target
 
-[Container]
-Image=quay.io/coreos/etcd:v3.5.9
-ContainerName=etcd-container
-Network=host
-Volume=/var/etcd-data:/etcd-data:Z
-AutoUpdate=registry
-NoNewPrivileges=true
+[Service]
+ExecStartPre=mkdir -p /var/lib/etcd
+ExecStartPre=-/bin/podman kill etcd
+ExecStartPre=-/bin/podman rm etcd
+ExecStartPre=-/bin/podman pull quay.io/coreos/etcd
+ExecStart=/bin/podman run --name etcd \
+	--volume /var/lib/etcd-data:/etcd-data:z \
+	--net=host quay.io/coreos/etcd /usr/local/bin/etcd \
+	--data-dir /etcd-data \
+	--name wavelet_svr \
+	--initial-advertise-peer-urls http://${ip}:2380 \
+	--listen-peer-urls http://${ip}:2380 \
+	--advertise-client-urls http://${ip}:2379 \
+	--listen-client-urls http://${ip}:2379,http://127.0.0.1:2379 \
+	--initial-cluster wavelet_svr=http://${ip}:2380 \
+	--initial-cluster-state new
+ExecStop=/bin/podman stop etcd
 
 [Install]
-WantedBy=multi-user.target" > /etc/containers/systemd/etcd-container.container
+WantedBy=multi-user.target" > /etc/systemd/system/etcd-container.service
 	systemctl daemon-reload
 	systemctl enable etcd-container.service --now
 	# wavelet_install_depends.service will then run, and force enable wavelet_install_pxe.service
