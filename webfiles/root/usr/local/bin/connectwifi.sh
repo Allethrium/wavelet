@@ -14,6 +14,12 @@ connectwifi(){
 	sleep 3
 	wifibssid=$(nmcli -f BSSID device wifi | grep ${wifi_ap_mac} | head -n 1)
 	nmcli dev wifi connect ${networkssid} hidden yes password ${wifipassword} bssid ${wifibssid}
+	while read i; do
+		if [[ $i = "Error: bssid argument is missing" ]]; then
+			echo -e "SSID is broadcast, retrying without BSSID argument..\n"
+			nmcli dev wifi connect ${networkssid} password ${wifipassword}
+		fi
+	done
 	sleep 3
 	nmcli dev wifi connect ${networkssid} hidden yes password ${wifipassword} bssid ${wifibssid}
 	sleep 3
@@ -22,7 +28,7 @@ connectwifi(){
 
 # If security layer is enabled and we aren't running with a PSK, this will wind up looking quite different
 
-connectwifi_enterprise(){
+connectwifi_enterprise(){          
 	nmcli dev wifi rescan
 	sleep 5
 	nmcli dev wifi rescan
