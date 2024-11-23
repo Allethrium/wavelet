@@ -57,11 +57,8 @@ delete_etcd_key(){
 event_decoder(){
 	# Kill the systemd monitor task for a few moments
 	systemctl --user stop wavelet-decoder-reveal.service
-	echo -e "\nDecoder Reveal flag change detected, resetting flag and displaying reveal card for 15 seconds..\n\n\n"
-	KEYNAME="DECODER_REVEAL"
-	KEYVALUE="0"
-	write_etcd
-	#etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/DECODER_REVEAL" -- "0"
+	echo -e "\nDecoder Reveal flag change detected, resetting flag and displaying reveal card for 10 seconds..\n"
+	KEYNAME="DECODER_REVEAL"; KEYVALUE="0"; write_etcd
 	systemctl --user stop UltraGrid.AppImage.service
 	mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.reveal
 	# set ug_args to generate and display smpte testcard
@@ -96,8 +93,7 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage
 #set -x
 exec >/home/wavelet/wavelet_reveal_decoder.log 2>&1
 
-KEYNAME=/$(hostname)/DECODER_REVEAL
-		read_etcd_global
+KEYNAME="DECODER_REVEAL"; read_etcd
 		if [[ "${printvalue}" == 1 ]]; then
 				echo -e "\ninput_update key is set to 1, continuing with task.. \n"
 				detect_self
