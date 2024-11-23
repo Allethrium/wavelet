@@ -148,8 +148,9 @@ Documentation=https://github.com/etcd-io/etcd
 Image=quay.io/coreos/etcd
 ContainerName=etcd-container
 Network=host
-EnvironmentFile=/etc/etcd.conf
-Volume=/var/etcd-data:/etcd-data:Z
+Environment=ETCD_CONFIG_FILE=/etc/etcd.conf
+Volume=/etc/etcd.conf:/etcd/etcd.conf:z
+Volume=/var/lib/etcd-data:/etcd-data:Z
 AutoUpdate=registry
 NoNewPrivileges=true
 
