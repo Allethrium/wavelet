@@ -40,22 +40,19 @@ delete_etcd_key(){
 }
 
 event_livestream(){
-	KEYNAME=uv_islivestreaming
-	read_etcd
+	KEYNAME=uv_islivestreaming; read_etcd
 	if [[ ${printvalue} -eq 0 ]]; then
 		echo -e "uv_islivestreaming is NOT enabled, and yet the service was called. Exiting silently.\n"
 		exit 0
 	fi
-	KEYNAME=/livestream/url
-	read_etcd_global
+	KEYNAME=/livestream/url; read_etcd_global
 	liveStreamURL=${printvalue}
 	if [[ ${printvalue} = "" ]]; then
 		echo -e "There is no livestream URL populated.  Exiting.\n"
 		exit 0
 	fi
 	KEYNAME=/livestream/apikey
-	read_etcd_global
-	if [[ ${printvalue} = "" ]]; then
+	read_etcd_global; if [[ ${printvalue} = "" ]]; then
 		echo -e "There is no livestream API key populated.  We can continue here if we know the service doesn't require an API key.\n"
 		# Something to determine if server needs apikey?  curl command?
 		# if [[ result = OK ]]; then
