@@ -100,18 +100,23 @@ WantedBy=multi-user.target" > /etc/systemd/system/etcd-container.service
 	echo -e "[Unit]
 Description=etcd service
 Documentation=https://github.com/etcd-io/etcd
+Documentation=man:etcd
+After=network.target
+Wants=network-online.target
 
 [Container]
+Environment=ETCD_DATA_DIR=/etcd-data
+Environment=ETCD_CONFIG_FILE=/etc/etcd/etcd.conf
 Image=quay.io/coreos/etcd
 ContainerName=etcd-container
 Network=host
-Volume=/etc/etcd/:/etc/etcd:z
+Volume=/etc/etcd/etcd.conf:/etc/etcd/etcd.conf:Z
 Volume=/var/lib/etcd-data:/etcd-data:Z
-Environment=ETCD_CONFIG_FILE=/etc/etcd/etcd.conf
 AutoUpdate=registry
 NoNewPrivileges=true
 
 [Service]
+Environment=ETCD_CONFIG_FILE=/etc/etcd/etcd.conf
 ExecStartPre=-mkdir -p /var/lib/etcd-data
 ExecStartPre=-/bin/podman kill etcd
 ExecStartPre=-/bin/podman rm etcd
@@ -121,7 +126,8 @@ Restart=always
 [Install]
 WantedBy=multi-user.target" > /etc/containers/systemd/etcd-quadlet.container
 	systemctl daemon-reload
-	systemctl enable etcd-quadlet.service --now
+	# Remember, quadlets don't work with systemd enable <arg>
+	systemctl start etcd-quadlet.service
 	#systemctl enable etcd-container.service --now
 
 	# Generate and enable systemd units
