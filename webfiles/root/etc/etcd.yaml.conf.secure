@@ -1,7 +1,7 @@
 # This is the configuration file for the etcd server.
 
 # Human-readable name for this member.
-name: 'wavelet-etcd-member'
+name: 'wavelet_svr'
 
 # Path to the data directory.
 data-dir: /etcd-data
@@ -24,7 +24,6 @@ discovery-srv:
 # Comma separated string of initial cluster configuration for bootstrapping.
 # Example: initial-cluster: "infra0=http://10.0.1.10:2380,infra1=http://10.0.1.11:2380,infra2=http://10.0.1.12:2380"
 initial-cluster: wavelet_svr=http://svrIP:2380
-initial-cluster-token: 'etcd-cluster'
 initial-cluster-state: 'new'
 strict-reconfig-check: false
 enable-pprof: false
