@@ -1,7 +1,7 @@
 #!/bin/bash
 # This file concatenates appropriate command line values and passes them to a systemd environment file
 # Directly launches and terminates the reflector as a service.
-# User permissions for this service are handled via Polkit, as the service is installed via Inition.
+# User permissions for this service are handled via Polkit, as the service is installed via Ignition.
 
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
@@ -38,6 +38,8 @@ write_etcd_client_ip(){
 
 wavelet_reflector() {
 # queries etcd for list of registered decoders
+	# Write the reflector IP address to an etcd key so we can find it from other hosts.
+	KEYNAME="REFLECTOR_IP"; KEYVALUE=$(hostname -I | cut -d " " -f 1); write_etcd_global
 	read_etcd_clients_ip
 	read_etcd_clients_ip_sed
 	echo ${return_etcd_clients_ip} > /home/wavelet/reflector_clients_ip.txt
@@ -59,7 +61,6 @@ wavelet_reflector() {
 		# this removes duplicate IP's from the subscription
 		deDupReturnClientsIP=$(echo "${return_etcd_clients_ip}" | tr ' ' '\n' | nl | sort -u -k2 | sort -n | cut -f2- | tr '\n' ' ')
 		deDupProcessedIP=$(echo "${processed_clients_ip}" | tr ' ' '\n' | nl | sort -u -k2 | sort -n | cut -f2-)
-		# KEYNAME=uv_filter_cmd
 		echo -e "Systemd will execute hd-rum-transcode with commandline:\nhd-rum-transcode 2M 5004 ${return_etcd_clients_ip}"
 		KEYNAME=REFLECTOR_ARGS
 		# Reduce HD-RUM buffer to 2M
@@ -90,14 +91,9 @@ wavelet_reflector() {
 		systemctl --user daemon-reload
 		systemctl --user restart UltraGrid.Reflector.service
 		echo -e "Reload_reflector flag is being set to 0.."
-		KEYNAME=reload_reflector
-		KEYVALUE=0
-		write_etcd_global
+		KEYNAME=reload_reflector; KEYVALUE=0; write_etcd_global
 		# Audio reflector, IP settings identical to video reflector so we don't need to do all that again
-		KEYNAME=AUDIO_REFLECTOR_ARGS
-		ugargs="--tool hd-rum-transcode 2M 5006 ${deDupReturnClientsIP}"
-		KEYVALUE="${ugargs}"
-		write_etcd_global
+		KEYNAME=AUDIO_REFLECTOR_ARGS; ugargs="--tool hd-rum-transcode 2M 5006 ${deDupReturnClientsIP}"; KEYVALUE="${ugargs}"; write_etcd_global
 		echo -e "[Unit]
 		Description=UltraGrid AppImage Audio Reflector
 		After=network-online.target
@@ -127,8 +123,8 @@ wavelet_reflector() {
 		After=network-online.target
 		Wants=network-online.target
 		[Timer]
-		OnBootSec=300s
-		OnUnitActiveSec=300s
+		OnBootSec=500s
+		OnUnitActiveSec=500s
 		[Install]
 		WantedBy=default.target
 		" > /home/wavelet/.config/systemd/user/Wavelet_reflector_janitor.timer
