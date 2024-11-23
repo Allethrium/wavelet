@@ -190,8 +190,16 @@ event_server(){
 					systemctl --user enable watch_reflectorreload.service --now
 					systemctl --user start wavelet_init.service
 					# N.B - the encoder reset flag script is supposed to run only on an active encoder
-					# If the server is also an encoder, run_ug.service must be enabled manually
 				else			
+					if [[ -f /var/home/wavelet/server_bootstrap_completed ]]; then
+						echo -e "Server bootstrap completed, but etcd is not available.  Something is wrong.  Attempting to start etcd-quadlet.service and restart process.."
+						systemctl start etcd-quadlet.service 
+						event_server
+					else
+						echo -e "Server setup is not complete, and etcd is down.  installation has failed!"
+						exit 1
+					fi
+				fi
 					echo -e "Server bootstrap key is not present, executing bootstrap process."
 					server_bootstrap
 				fi
@@ -285,13 +293,6 @@ WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/container
 	touch /var/home/wavelet/server_bootstrap_completed
 	echo -e "Reloading systemctl user daemon, and enabling the controller service immediately"
 	systemctl --user daemon-reload
-		if systemctl is-active --quiet etcd-quadlet; then
-			KEYNAME="SERVER_BOOTSTRAP_COMPLETED"; KEYVALUE=1; write_etcd_global
-			KEYNAME="wavelet_build_completed"; KEYVALUE=1; write_etcd
-		else
-			echo -e "\nETCD is down! cannot continue.\n"
-			exit 1
-		fi
 	echo -e "Enabling server notification services"
 	systemctl --user enable wavelet_controller.service --now
 	systemctl --user enable watch_reflectorreload.service --now
