@@ -110,7 +110,7 @@ Environment=ETCD_CONFIG_FILE=/etc/etcd/etcd.conf
 Image=quay.io/coreos/etcd:v3.5.17
 ContainerName=etcd-container
 Network=host
-Volume=/etc/etcd/etcd.conf:/etc/etcd/etcd.conf:Z
+Volume=/etc/etcd/:/etc/etcd/:Z
 Volume=/var/lib/etcd-data:/etcd-data:Z
 AutoUpdate=registry
 NoNewPrivileges=true

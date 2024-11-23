@@ -10,7 +10,7 @@ heartbeat-interval: 500
 election-timeout: 1000
 quota-backend-bytes: 0
 listen-peer-urls: http://svrIP:2380
-listen-client-urls: http://svrIP:2379
+listen-client-urls: http://svrIP:2379,http://svrIP:4001
 max-snapshots: 5
 max-wals: 5
 cors:
