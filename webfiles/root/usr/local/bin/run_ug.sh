@@ -273,10 +273,12 @@ detect_disable_ethernet(){
 	# We disable ethernet preferentially if we have two active connections
 	# This prevents some of the IP detection automation from having issues.
 	# This should have been done already once the decoder provisioned and successfully connected to wifi.
+	# Add another filter to exclude veth interfaces
 	for interface in $(ip link show | awk '{print $2}' | grep ":$" | cut -d ':' -f1); do
 		if [[ $(nmcli dev show "${interface}" | grep "connected") ]] && \
 		[[ $(nmcli dev show "${interface}" | grep "ethernet") ]] && \
-		[[ $(nmcli device status | grep -a 'wifi.*connect') ]]; then
+		[[ $(nmcli device status | grep -a 'wifi.*connect') ]] && \
+		[[ $(nmcli dev show "${interface}") != *"veth"* ]]; then
 			echo -e "${interface} is an ethernet connection, active WiFi connection also detected..."
 			wifiFound="1"
 			ethernetFound="1"
@@ -330,8 +332,6 @@ wifi_connect_retry(){
 ###
 #set -x
 exec >/home/wavelet/run_ug.log 2>&1
-# Disable systemd-resolved, because it interferes with name resolution despite DNSSstublistener=no being set.  sigh.
-systemctl disable systemd-resolved.service --now
 detect_disable_ethernet
 #set_ethernet_mtu
 get_ipValue
