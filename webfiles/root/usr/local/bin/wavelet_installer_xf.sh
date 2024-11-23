@@ -43,51 +43,7 @@ event_server(){
 	# Generate RPM Container overlay
 	cp /usr/local/bin/wavelet_install_ug_depends.sh	/home/wavelet/containerfiles/
 	cp /usr/local/bin/wavelet_pxe_grubconfig.sh		/home/wavelet/containerfiles/
-	detect_custom_requirements
-	# generate a hostname file so that dnsmasq's dhcp-script call works properly
-	get_ipValue
-	sed -i "s/SVR_IPADDR/${IPVALUE}/g" /etc/dnsmasq.conf
 
-
-	# Generate and enable systemd units
-	# Therefore, they will start on next boot, run, and disable themselves
-	# Installing the security layer will require two reboots, one for the domain enrollment and one to move to userland.
-	echo -e "[Unit]
-Description=Install Dependencies
-ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-After=multi-user.target
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_install_ug_depends.sh"
-ExecStartPost=systemctl disable wavelet_install_depends.service
-[Install]
-WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_depends.service
-
-	echo -e "[Unit]
-Description=Install PXE support
-ConditionPathExists=/var/wavelet_depends.complete
-After=multi-user.target
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_pxe_grubconfig.sh"
-ExecStartPost=systemctl disable wavelet_install_pxe.service
-[Install]
-WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_pxe.service
-
-	if [[ -f /var/prod.security.enabled ]]; then
-		echo -e "Generating systemd unit for security layer.."
-		echo -e "[Unit]
-Description=Install Security Layer
-ConditionPathExists=/var/prod.security.enabled
-ConditionPathExists=/var/wavelet_depends.complete
-After=multi-user.target
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_install_hardening.sh"
-ExecStartPost=systemctl disable wavelet_install_hardening.service
-[Install]
-WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_hardening.service
-	fi
 	# old etcd setup previously in build_ug.sh
 	#echo -e "Pulling etcd and generating systemd services.."
 	#cd /home/wavelet/.config/systemd/user/
@@ -163,14 +119,59 @@ Restart=always
 
 [Install]
 WantedBy=multi-user.target" > /etc/containers/systemd/etcd-quadlet.container
-
 	systemctl daemon-reload
 	systemctl enable etcd-quadlet.service --now
 	#systemctl enable etcd-container.service --now
+
+	# Generate and enable systemd units
+	# Therefore, they will start on next boot, run, and disable themselves
+	# Installing the security layer will require two reboots, one for the domain enrollment and one to move to userland.
+	echo -e "[Unit]
+Description=Install Dependencies
+ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+After=multi-user.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_install_ug_depends.sh"
+ExecStartPost=systemctl disable wavelet_install_depends.service
+[Install]
+WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_depends.service
+
+	echo -e "[Unit]
+Description=Install PXE support
+ConditionPathExists=/var/wavelet_depends.complete
+After=multi-user.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_pxe_grubconfig.sh"
+ExecStartPost=systemctl disable wavelet_install_pxe.service
+[Install]
+WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_pxe.service
+
+	if [[ -f /var/prod.security.enabled ]]; then
+		echo -e "Generating systemd unit for security layer.."
+		echo -e "[Unit]
+Description=Install Security Layer
+ConditionPathExists=/var/prod.security.enabled
+ConditionPathExists=/var/wavelet_depends.complete
+After=multi-user.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_install_hardening.sh"
+ExecStartPost=systemctl disable wavelet_install_hardening.service
+[Install]
+WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_hardening.service
+	fi
 	# wavelet_install_depends.service will then run, and force enable wavelet_install_pxe.service
 	# wavelet_pxe_install.service will complete the root portion of the server spinup
 	# OR
 	# It will detect the security layer flag and call wavelet_install_hardening.sh, then reboot allowing build_ug.sh to run in userspace.
+
+	# Start installing ostree updates via OCI container image
+	detect_custom_requirements
+	# generate a hostname file so that dnsmasq's dhcp-script call works properly
+	get_ipValue
+	sed -i "s/SVR_IPADDR/${IPVALUE}/g" /etc/dnsmasq.conf
 	systemctl enable wavelet_install_depends.service
 }
 
