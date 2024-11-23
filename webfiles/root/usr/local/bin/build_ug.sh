@@ -183,8 +183,7 @@ event_server(){
 	sleep 10	
 	if service_exists container-etcd-member; then
 		echo -e "Etcd service present, checking for bootstrap key\n"
-			KEYNAME=SERVER_BOOTSTRAP_COMPLETED
-			result=$(read_etcd_global)
+			KEYNAME=SERVER_BOOTSTRAP_COMPLETED; read_etcd_global; result=${printvalue}
 				if [[ "${result}" = 1 ]]; then
 					echo -e "Server bootstrap is already completed, starting services and terminating process..\n"
 					systemctl --user enable watch_reflectorreload.service --now
@@ -233,13 +232,13 @@ server_bootstrap(){
 	}
 
 	bootstrap_nodejs(){
-		/usr/local/bin/build_nodejs.sh
-		sleep 1
+		# not used right now
+		#	/usr/local/bin/build_nodejs.sh
+		#	sleep 1
 	}
 
 	bootstrap_dnsmasq_watcher_service(){
-		echo -e "\
-[Unit]
+		echo -e "[Unit]
 Description=Dnsmasq inotify service
 After=network.target
 [Service]
@@ -261,8 +260,7 @@ WantedBy=default.target" > wavelet_dnsmasq_inotify.service
 		podman build -t localhost/livestreamer -f /home/wavelet/containerfiles/Containerfile.livestreamer
 		podman tag localhost/livestreamer localhost:5000/livestreamer:latest
 		podman push localhost:5000/coreos_overlay:latest 192.168.1.32:5000/livestreamer--tls-verify=false
-		echo -e "\
-[Unit]
+		echo -e "[Unit]
 Description=Livestreamer
 
 [Container]
@@ -285,10 +283,8 @@ WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/container
 	#bootstrap_nodejs		#	WAY in the future for UI stuff.
 	#bootstrap_livestream 	#	Probably not necessary to spin up a whole container for this..
 	bootstrap_dnsmasq_watcher_service
-	KEYNAME=SERVER_BOOTSTRAP_COMPLETED
-	KEYVALUE=1
+	KEYNAME=SERVER_BOOTSTRAP_COMPLETED;	KEYVALUE=1; write_etcd_global
 	touch /var/server_bootstrap_completed
-	write_etcd_global
 	echo -e "Reloading systemctl user daemon, and enabling the controller service immediately"
 	systemctl --user daemon-reload
 		if service_exists container-etcd-member; then
@@ -306,8 +302,7 @@ WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/container
 	sed -i '/exec firefox/s/^# *//' config $HOME/.config/sway/config
 	#same for dnsmasq because it inexplicably stops working.
 	sed -i '/exec systemctl restart dnsmasq.service/s/^# *//' config $HOME/.config/sway/config
-	#
-	#sed -i '/exec \/usr\/local\/bin\/local_rpm.sh/s/^# *//' config $HOME/.config/sway/config
+
 	# Next, we build the reflector prune function.  This is necessary for removing streams for old decoders and maintaining the long term health of the system
 		# Get decoderIP list
 		# Ping each decoder on list
@@ -402,8 +397,7 @@ event_generateHash(){
 		hostHash=$(cat /etc/machine-id | sha256sum | tr -d "[:space:]-")
 		echo -e "generated device hash: ${hostHash} \n"
 		# Check for pre-existing keys here
-		KEYNAME="/hostHash/${hostHash}"
-		hashExists=$(read_etcd_global)
+		KEYNAME="/hostHash/${hostHash}"; read_etcd_global; hashExists=${printvalue}
 		if [[ -z "${hashExists}" || ${#hashExists} -le 1 ]] then
 			echo -e "\nHostname value was set to ${hashExists}, which is null or less than 1 char, therefore it is not valid. \n"
 			# Populate what will initially be used as the label variable from the webUI
@@ -428,8 +422,7 @@ event_generateHash(){
 		else
 			echo -e "\nHash value exists as /hostHash/${hashExists}\n"
 			echo -e "This means the device is already populated, or has not been removed cleanly. Checking to see if we've been relabeled.."
-			KEYNAME="/${currentHostName}/RECENT_RELABEL"
-			read_etcd_global
+			KEYNAME="/${currentHostName}/RECENT_RELABEL"; read_etcd_global
 			if [[ "${printvalue}" == "1" ]]; then
 				echo -e "This device was recently relabeled!  Clearing hash and running this function again..\n"
 				KEYNAME="${currentHostName}/RECENT_RELABEL"; KEYVALUE="0"; write_etcd_global
