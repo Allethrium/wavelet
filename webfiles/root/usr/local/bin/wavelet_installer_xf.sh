@@ -153,6 +153,8 @@ Volume=/var/etcd-data:/etcd-data:Z
 AutoUpdate=registry
 NoNewPrivileges=true
 
+[Service]
+Restart=always
 [Install]
 WantedBy=multi-user.target" > /etc/containers/systemd/etcd-quadlet.container
 
