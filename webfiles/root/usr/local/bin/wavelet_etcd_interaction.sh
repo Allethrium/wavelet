@@ -121,6 +121,7 @@ case ${action} in
 	read_etcd_lastrevision)		action="get ${inputKeyName} --rev=${revisionID}";
 	;;
 	read_etcd_keysonly)			action="get {inputKeyName} --prefix --keys-only";
+	;;
 	# Write an etcd value under a hostname
 	write_etcd)					action="put"; inputKeyName="/$(hostname)/${inputKeyName} --"; valueOnlySwitch=""
 	;;
