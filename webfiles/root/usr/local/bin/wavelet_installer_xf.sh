@@ -148,14 +148,19 @@ Documentation=https://github.com/etcd-io/etcd
 Image=quay.io/coreos/etcd
 ContainerName=etcd-container
 Network=host
-Environment=ETCD_CONFIG_FILE=/etc/etcd.conf
-Volume=/etc/etcd.conf:/etcd/etcd.conf:z
+Volume=/etc/etcd.conf:z
 Volume=/var/lib/etcd-data:/etcd-data:Z
 AutoUpdate=registry
 NoNewPrivileges=true
 
 [Service]
+ExecStartPre=-mkdir -p /var/lib/etcd-data
+ExecStartPre=-/bin/podman kill etcd
+ExecStartPre=-/bin/podman rm etcd
+ExecStartPre=-/bin/podman pull quay.io/coreos/etcd
 Restart=always
+Environment=ETCD_CONFIG_FILE=/etc/etcd.conf
+
 [Install]
 WantedBy=multi-user.target" > /etc/containers/systemd/etcd-quadlet.container
 
