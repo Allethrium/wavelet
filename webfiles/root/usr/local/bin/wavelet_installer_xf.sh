@@ -106,23 +106,13 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_hardening.serv
 	# Quadlet Etcd service, I have decided it's more appropriate to move this back to a system service
 	# This is because it would only run when a user is logged on
 	# We will likely want to secure the server console in prod deployment.
+	# Make etcd datadir and copy nonsecure yaml to conf file, and update with server IP address.  We are using network=host in the container.
 	mkdir -p /var/lib/etcd-data
-	# Quadlet
-	#echo -e "[Unit]
-#Description=etcd service
-#Documentation=https://github.com/etcd-io/etcd
-#
-#[Container]
-#Image=quay.io/coreos/etcd
-#ContainerName=etcd-container
-#Network=host
-#Volume=/var/etcd-data:/etcd-data:Z
-#AutoUpdate=registry
-#NoNewPrivileges=true
-#
-#[Install]
-#WantedBy=multi-user.target" > /etc/containers/systemd/etcd-container.container
+	cp /etc/etcd.yaml.conf /etc/etcd.conf
 	ip=$(hostname -I | cut -d " " -f 1)
+	sed -i 's|svrIP|${ip}|g' /etc/etcd.conf
+
+	# Old systemd method
 	echo -e "[Unit]
 Description=Run single node etcd
 After=network-online.target
@@ -148,8 +138,27 @@ ExecStop=/bin/podman stop etcd
 
 [Install]
 WantedBy=multi-user.target" > /etc/systemd/system/etcd-container.service
+
+	# Quadlet
+	echo -e "[Unit]
+Description=etcd service
+Documentation=https://github.com/etcd-io/etcd
+
+[Container]
+Image=https://quay.io/coreos/etcd
+ContainerName=etcd-container
+Network=host
+EnvironmentFile=/etc/etcd.conf
+Volume=/var/etcd-data:/etcd-data:Z
+AutoUpdate=registry
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target" > /etc/containers/systemd/etcd-quadlet.container
+
 	systemctl daemon-reload
-	systemctl enable etcd-container.service --now
+	systemctl enable etcd-quadlet.service --now
+	#systemctl enable etcd-container.service --now
 	# wavelet_install_depends.service will then run, and force enable wavelet_install_pxe.service
 	# wavelet_pxe_install.service will complete the root portion of the server spinup
 	# OR
