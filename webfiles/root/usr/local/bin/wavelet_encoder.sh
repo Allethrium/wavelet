@@ -42,8 +42,7 @@ write_etcd_client_ip(){
 
 event_encoder(){
 	# Before we do anything, check that we have an input device present.
-		KEYNAME=INPUT_DEVICE_PRESENT
-		read_etcd
+		KEYNAME=INPUT_DEVICE_PRESENT; read_etcd
 				if [[ "$printvalue" -eq 1 ]]; then
 						echo -e "An input device is present on this host, continuing.. \n"
 						:
@@ -52,9 +51,7 @@ event_encoder(){
 						exit 0
 				fi
 	# Register yourself with etcd as an encoder and your IP address
-	KEYNAME=encoder_ip_address
-	KEYVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
-	write_etcd_global
+	KEYNAME=encoder_ip_address; KEYVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}'); write_etcd
 	systemctl --user daemon-reload
 	systemctl --user enable watch_encoderflag.service --now
 	echo -e "now monitoring for encoder reset flag changes.. \n"
@@ -66,9 +63,7 @@ event_encoder(){
 		generatedLine=""
 		KEYNAME="$(hostname)/inputs/"; swmixVar=$(read_etcd_global | xargs -d'\n' $(echo "${generatedLine}"))
 		#swmixVar=$(etcdctl --endpoints=${ETCDENDPOINT} get "$(hostname)/inputs/" --prefix --print-value-only | xargs -d'\n' $(echo "${generatedLine}"))
-		KEYNAME=uv_input_cmd
-		KEYVALUE="-t swmix:1920:1080:30 ${swmixVar}"
-		write_etcd_global
+		KEYNAME=uv_input_cmd; KEYVALUE="-t swmix:1920:1080:30 ${swmixVar}"; write_etcd_global
 		echo -e "Generated command line is:\n${KEYVALUE}\n"
 		inputvar=${KEYVALUE}
 		/usr/local/bin/wavelet_textgen.sh
@@ -103,36 +98,30 @@ event_encoder(){
 		if [ -n "${printvalue}" ]; then
 			echo -e "found ${printvalue} in /hash/ - we have a local device\n"
 			case ${printvalue} in
-				${currentHostName}*)    echo -e "\nThis device is attached to this encoder, proceeding\n"; 
+				${currentHostName}*)		echo -e "\nThis device is attached to this encoder, proceeding\n"	; 
 				;;
-				*)              echo -e "\nThis device is attached to a different encoder\n"    ;       exit 0
+				*)							echo -e "\nThis device is attached to a different encoder\n"		;	exit 0
 				;;
 			esac
 			encoderDeviceStringFull="${printvalue}"
 			echo -e "\nDevice string ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash}\n"
 			printvalue=""
-			KEYNAME="${encoderDeviceStringFull}"
-			read_etcd_global
-			inputvar=${printvalue}
+			KEYNAME="${encoderDeviceStringFull}"; read_etcd_global; inputvar=${printvalue}
 			echo -e "\n Device input key $inputvar located for this device string, proceeding to set encoder parameters \n"
 			# For Audio we will select pipewire here
 			audiovar="-s pipewire"
 		else
 			echo -e "null string found in /hash/ - this is a network device\n"
-			KEYNAME="/network_shorthash/${encoderDeviceHash}"
-			read_etcd_global
+			KEYNAME="/network_shorthash/${encoderDeviceHash}"; read_etcd_global
 			if [ -n "${printvalue}" ]; then
 				echo -e "found in /network_shorthash/, proceeding..\n"
 				encoderDeviceStringFull="${printvalue}"
 				echo -e "\nDevice String ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash}\n"
 				printvalue=""
 				# Locate device hash in network_ip folder and return the device IP address
-				KEYNAME="/network_ip/${encoderDeviceHash}"
-				read_etcd_global
-				ipAddr=${printvalue}
+				KEYNAME="/network_ip/${encoderDeviceHash}"; read_etcd_global; ipAddr=${printvalue}
 				# Locate input command from the IP value retreived above
-				KEYNAME="/network_uv_stream_command/${printvalue}"
-				read_etcd_global
+				KEYNAME="/network_uv_stream_command/${printvalue}"; read_etcd_global
 				# We have to check the NDI device for port changes because they do not seem stable..
 				if [[ "${printvalue}" == *"ndi"* ]]; then
 					echo -e "\nNDI Device in play, rescanning ports on IP Address ${ipAddr}..\n"
@@ -162,27 +151,19 @@ event_encoder(){
 	KEYNAME="/banner/enabled"
 	if [[ "${printvalue}" == "0" ]]; then
 		echo -e "\nBanner is enabled, so filtervar will be set appropriately.  Note currently the logo.c file in UltraGrid can generate errors on particular kinds of streams!..\n"
-		KEYNAME=uv_filter_cmd
-		read_etcd_global
-		filtervar=${printvalue}
+		KEYNAME=uv_filter_cmd; read_etcd_global; filtervar=${printvalue}
 	else 
 		echo -e "\nBanner is not enabled, so filtervar will be set to NULL..\n"
 		filtervar=""
 	fi
 	# Reads Encoder codec settings, should be populated from the Controller
-	KEYNAME=uv_encoder
-	read_etcd_global
-	encodervar=${printvalue}
+	KEYNAME=uv_encoder; read_etcd_global; encodervar=${printvalue}
 	# Videoport is always 5004 unless we are doing some strange future project requiring bidirectionality or conference modes
-	KEYNAME=uv_videoport
-	read_etcd_global
-	video_port=${printvalue}
+	KEYNAME=uv_videoport; read_etcd_global; video_port=${printvalue}
 	# Audio Port is always 5006, unless UltraGrid has gotten far better at handling audio we likely won't use this.
-	KEYNAME=uv_audioport
-	read_etcd_global
-	audio_port=${printvalue}
-	# Destination IP is the IP address of the UG Reflector
-	destinationipv4="192.168.1.32"
+	KEYNAME=uv_audioport; read_etcd_global; audio_port=${printvalue}
+	# Destination IP is the IP address of the UG Reflector, usually the server IP.
+	KEYNAME=REFLECTOR_IP; read_etcd_global; destinationipv4=${printvalue}
 
 	# Currently -f V:rs:200:240 on the end specifies reed-solomon forward error correction 
 	# For higher btirate streams, we can use "-f LDGM:40%" - must be >2mb frame size!
@@ -190,15 +171,12 @@ event_encoder(){
 	# This command would use the switcher;
 	# --tool uv $filtervar -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${inputvar} -s pipewire -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}
 	# can be used remote with this kind of tool (netcat) : echo 'capture.data 0' | busybox nc localhost <control_port>
-	# not using right now as different inputs have different formats.. may be problematic.
 	UGMTU="9000"
 	echo -e "Assembled command is:\n--tool uv $filtervar -f V:rs:200:250 --control-port 6160 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4} \n"
 	ugargs="--tool uv $filtervar--control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4} --param control-accept-global"
-	KEYNAME=UG_ARGS
-	KEYVALUE=${ugargs}
-	write_etcd
+	KEYNAME=UG_ARGS; KEYVALUE=${ugargs}; write_etcd
 	echo -e "Verifying stored command line"
-	read_etcd
+	read_etcd; echo ${printvalue}
 	echo "
 	[Unit]
 	Description=UltraGrid AppImage executable
