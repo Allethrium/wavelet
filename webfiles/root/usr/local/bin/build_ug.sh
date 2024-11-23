@@ -156,6 +156,9 @@ event_encoder(){
 	event_device_redetect
 	event_host_relabel_watcher
 	event_promote
+}
+
+event_generate_watch_encoderflag(){
 	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
 	hostname=$(hostname)
 	# We need to add this switch here to ensure if we're a server we don't populate ourselves to the encoders DOM in the webUI..
@@ -199,6 +202,9 @@ event_server(){
 	event_generateHash svr
 	# Server always also provisions as an encoder!
 	event_encoder
+	event_generate_reflector
+	event_generate_controllerWatch
+	event_generate_reflectorreload
 	event_reboot
 }
 
@@ -370,6 +376,24 @@ event_livestreamservice(){
 	# I think this can run on the server without causing performance issues.
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "uv_islivestreaming" 0 0 "wavelet_livestream"
 	systemctl --user enable wavelet_livestream.service --now
+}
+event_generate_reflector(){
+	# These may require us to rename some of the module .sh filenames because they don't appropriately reflect the flag or the service name!
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "REFLECTOR_ARGS" 0 0 "UltraGrid.Reflector"
+	# ExecStart=/usr/local/bin/UltraGrid.AppImage $(etcdctl --endpoints=${ETCDENDPOINT} get REFLECTOR_ARGS --print-value-only)
+}
+
+event_generate_controllerWatch(){
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "input_update" 0 0 "wavelet_controller"
+}
+
+event_generate_reflectorreload(){
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/decoderip/" 0 0 "watch_reflectorreload"
+}
+
+event_generate_watch_encoderflag(){
+	#ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/encoder_restart -w simple -- sh -c "/usr/local/bin/monitor_encoderflag.sh"
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/\"%H\"/encoder_restart" 0 0 "watch_encoderflag"
 }
 
 event_generateHash(){
