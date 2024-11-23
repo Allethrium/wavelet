@@ -64,7 +64,8 @@ event_server(){
 	# We will likely want to secure the server console in prod deployment.
 	# Make etcd datadir and copy nonsecure yaml to conf file, and update with server IP address.  We are using network=host in the container.
 	mkdir -p /var/lib/etcd-data
-	cp /etc/etcd.yaml.conf /etc/etcd/etcd.conf
+	# Copy nonsecure conf file.  The secure file would be added by the wavelet_install_hardening.sh module if hardening is enabled.
+	cp /etc/etcd/etcd.yaml.conf /etc/etcd/etcd.conf
 	ip=$(hostname -I | cut -d " " -f 1)
 	sed -i "s|svrIP|${ip}|g" /etc/etcd.conf
 
