@@ -34,8 +34,8 @@ connectwifi_enterprise(){
 }
 
 # Main
-if # curl the provioning httpd server succeeds
-  echo "we have connectivity"
-else
+#if curl 'https://192.168.1.32:8080' > HTML_Output # curl the provioning httpd server succeeds
+#  echo "we have connectivity"
+#else
  connectwifi
-fi
+#fi
