@@ -38,13 +38,10 @@ write_etcd_client_ip(){
 
 main(){
 	# set bluetooth connection notification bit to 0
-	KEYNAME="/audio/bluetooth_connect_notify"
-	KEYVALUE="0"
-	write_etcd_global
+	KEYNAME="/audio/bluetooth_connect_notify"; KEYVALUE="0"; write_etcd_global
 
 	# check to see if audio is even enabled, if not, we exit 0
-	KEYNAME="/audio_interface/bluetooth_connect_active"
-	read_etcd_global
+	KEYNAME="/audio_interface/bluetooth_connect_active"; read_etcd_global
 	if [[ "${printvalue}" -eq "0" ]]; then
 	echo -e "\nAudio bit is not enabled, disabling bluetooth and exiting\n"
 	echo -e 'power off\n' | bluetoothctl
@@ -52,9 +49,7 @@ main(){
 	fi
 
 	# Get bluetooth MAC for ExUBT (set in Audio control portion on webUI)
-	KEYNAME="/audio_interface_bluetooth_mac"
-	read_etcd_global
-	bluetoothMAC=${printvalue}
+	KEYNAME="/audio_interface_bluetooth_mac"; read_etcd_global; bluetoothMAC=${printvalue}
 	# if bluetoothMAC=""; then
 	# echo -e "Bluetooth MAC ID is not populated! Exiting and resetting connect bit"
 	# KEYNAME="/interface/bluetooth_connect_active"
@@ -62,6 +57,7 @@ main(){
 	# write_etcd_global
 
 	# we echo a set of commands to bluetoothctl here.  Obviously this won't work if the server machine has no bluetooth capability!
+	# ... so we might want to include a test here and disable the entire area on the webUI if it isn't there?
 	echo -e 'power on\n' | bluetoothctl
 	echo -e 'default-agent\n' | bluetoothctl
 	echo -e 'discoverable on\ndiscoverable-timeout 100\nscan on\n' | bluetoothctl
@@ -74,9 +70,7 @@ main(){
 	echo -e 'pairable off\n' | bluetoothctl
 
 	# Set bluetooth connection successful for webUI tracking
-	KEYNAME="/audio_interface/bluetooth_connect_active"
-	KEYVALUE="1"
-	write_etcd_global
+	KEYNAME="/audio_interface/bluetooth_connect_active"; KEYVALUE="1"; write_etcd_global
 	echo -e "Bluetooth connection set for ${bluetoothMAC}"
 	# do we need to do anything with Pipewire here to set the exUBT/BT device as the audio sink?  
 }
