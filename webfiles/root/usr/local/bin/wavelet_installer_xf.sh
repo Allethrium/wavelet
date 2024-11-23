@@ -106,7 +106,7 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_hardening.serv
 	# Quadlet Etcd service, I have decided it's more appropriate to move this back to a system service
 	# This is because it would only run when a user is logged on
 	# We will likely want to secure the server console in prod deployment.
-	mkdir -p /var/etcd-data
+	mkdir -p /var/lib/etcd-data
 	# Quadlet
 	#echo -e "[Unit]
 #Description=etcd service
@@ -129,12 +129,12 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStartPre=mkdir -p /var/lib/etcd
+ExecStartPre=-mkdir -p /var/lib/etcd-data
 ExecStartPre=-/bin/podman kill etcd
 ExecStartPre=-/bin/podman rm etcd
 ExecStartPre=-/bin/podman pull quay.io/coreos/etcd
 ExecStart=/bin/podman run --name etcd \
-	--volume /var/lib/etcd-data:/etcd-data:z \
+	--volume /var/lib/etcd-data:/etcd-data:Z \
 	--net=host quay.io/coreos/etcd /usr/local/bin/etcd \
 	--data-dir /etcd-data \
 	--name wavelet_svr \
