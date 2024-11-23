@@ -282,12 +282,12 @@ WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/container
 	#bootstrap_nodejs		#	WAY in the future for UI stuff.
 	#bootstrap_livestream 	#	Probably not necessary to spin up a whole container for this..
 	bootstrap_dnsmasq_watcher_service
-	KEYNAME=SERVER_BOOTSTRAP_COMPLETED;	KEYVALUE=1; write_etcd_global
 	touch /var/home/wavelet/server_bootstrap_completed
 	echo -e "Reloading systemctl user daemon, and enabling the controller service immediately"
 	systemctl --user daemon-reload
 		if systemctl is-active --quiet etcd-quadlet; then
-			KEYNAME=wavelet_build_completed; KEYVALUE=1; write_etcd
+			KEYNAME="SERVER_BOOTSTRAP_COMPLETED"; KEYVALUE=1; write_etcd_global
+			KEYNAME="wavelet_build_completed"; KEYVALUE=1; write_etcd
 		else
 			echo -e "\nETCD is down! cannot continue.\n"
 			exit 1
@@ -452,8 +452,6 @@ event_host_relabel_watcher(){
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/RELABEL 0 0 "wavelet_device_relabel" \'relabel\'
 	systemctl --user enable wavelet_device_relabel.service --now
 }
-
-# Execution order
 
 #set -x
 exec >/home/wavelet/build_ug.log 2>&1
