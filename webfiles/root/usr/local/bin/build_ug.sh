@@ -182,7 +182,7 @@ event_server(){
 		echo -e "\nPXE service has not completed setup, exiting until the next reboot..\n"
 		exit 1
 	fi
-	if systemctl is-active --quiet etcd-quadlet; then
+	if systemctl is-active --quiet etcd-quadlet.service; then
 		echo -e "Etcd service present, checking for bootstrap key\n"
 			KEYNAME=SERVER_BOOTSTRAP_COMPLETED; read_etcd_global; result=${printvalue}
 				if [[ "${result}" = 1 ]]; then
