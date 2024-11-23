@@ -214,7 +214,7 @@ server_bootstrap(){
 	do
 		sleep 1
 	done
-	if test -f "/var/server_bootstrap_completed"; then
+	if test -f "/var/home/wavelet/server_bootstrap_completed"; then
 		echo -e "\n server bootstrap has already been completed, exiting..\n"
 		exit 0
 	fi
@@ -248,7 +248,7 @@ StandardOutput=inherit
 StandardError=inherit
 
 [Install]
-WantedBy=default.target" > wavelet_dnsmasq_inotify.service
+WantedBy=default.target" > /var/home/wavelet/.config/systemd/user/wavelet_dnsmasq_inotify.service
 		systemctl --user daemon-reload
 		systemctl --user enable wavelet_dnsmasq_inotify.service --now
 		echo -e "\ninotify service enabled for wavelet network sense via dnsmasq..\n"
@@ -283,7 +283,7 @@ WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/container
 	#bootstrap_livestream 	#	Probably not necessary to spin up a whole container for this..
 	bootstrap_dnsmasq_watcher_service
 	KEYNAME=SERVER_BOOTSTRAP_COMPLETED;	KEYVALUE=1; write_etcd_global
-	touch /var/server_bootstrap_completed
+	touch /var/home/wavelet/server_bootstrap_completed
 	echo -e "Reloading systemctl user daemon, and enabling the controller service immediately"
 	systemctl --user daemon-reload
 		if systemctl is-active --quiet etcd-quadlet; then
