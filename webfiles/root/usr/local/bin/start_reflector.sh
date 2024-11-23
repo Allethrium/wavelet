@@ -38,16 +38,12 @@ delete_etcd_key(){
 }
 
 
-KEYNAME=REFLECTOR_ARGS
-command=$(read_etcd_global)
-#command=$(etcdctl --endpoints=${ETCDENDPOINT} get "${KEYNAME}" -- "${KEYVALUE}" --print-value-only)
+KEYNAME=REFLECTOR_ARGS; read_etcd_global; command=${printvalue}
 echo -e "Requesting UG runtime parameters from UG_ARGS and applying to AppImage..\n"
 echo -e "Command line for video is:  ${command}"
 /usr/local/bin/UltraGrid.AppImage ${command}
 echo -e "Video Reflector started"
-KEYNAME=AUDIO_REFLECTOR_ARGS
-audio_command=$(read_etcd_global)
-#audio_command=$(etcdctl --endpoints=${ETCDENDPOINT} get "${KEYNAME}" -- "${KEYVALUE}" --print-value-only)
+KEYNAME=AUDIO_REFLECTOR_ARGS; read_etcd_global; audio_command=${printvalue}
 echo -e "Requesting UG runtime parameters from hostname/AUDIO_REFLECTOR_ARGS and applying to AppImage..\n"
 echo -e "Command line for audio is:  ${audio_command}"
 /usr/local/bin/UltraGrid.AppImage ${audio_command}
