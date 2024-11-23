@@ -179,9 +179,7 @@ event_server(){
 		echo -e "\nPXE service has not completed setup, exiting until the next reboot..\n"
 		exit 1
 	fi
-	systemctl --user start container-etcd-member.service
-	sleep 10	
-	if service_exists container-etcd-member; then
+	if service_exists etcd-container; then
 		echo -e "Etcd service present, checking for bootstrap key\n"
 			KEYNAME=SERVER_BOOTSTRAP_COMPLETED; read_etcd_global; result=${printvalue}
 				if [[ "${result}" = 1 ]]; then
@@ -206,7 +204,7 @@ event_server(){
 
 server_bootstrap(){
 # Bootstraps the server processes including Apache HTTP server for distribution files, and the web interface NGINX/PHP pod
-	until [ -f /var/ug_depends.complete ]
+	until [[ -f /var/ug_depends.complete ]]
 	do
 		sleep 1
 	done
@@ -214,6 +212,7 @@ server_bootstrap(){
 		echo -e "\n server bootstrap has already been completed, exiting..\n"
 		exit 0
 	fi
+
 	bootstrap_http(){
 		# check for bootstrap_completed, verify services running
 		echo -e "Generating HTTPD server and copying/compressing wavelet files to server directory.."
@@ -229,12 +228,6 @@ server_bootstrap(){
 		# Remove executable bit from all webserver files and make sure to reset +x for the directory only
 		#find /var/home/wavelet/http-php/ -type f -print0 | xargs -0 chmod 644
 		chmod +x /var/home/wavelet/http
-	}
-
-	bootstrap_nodejs(){
-		# not used right now
-		#	/usr/local/bin/build_nodejs.sh
-		#	sleep 1
 	}
 
 	bootstrap_dnsmasq_watcher_service(){
@@ -287,11 +280,11 @@ WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/container
 	touch /var/server_bootstrap_completed
 	echo -e "Reloading systemctl user daemon, and enabling the controller service immediately"
 	systemctl --user daemon-reload
-		if service_exists container-etcd-member; then
+		if service_exists etcd-container; then
 			KEYNAME=wavelet_build_completed; KEYVALUE=1; write_etcd
 		else
-			systemctl --user enable container-etcd-member.service --now
-			KEYNAME=wavelet_build_completed; KEYVALUE=1; write_etcd
+			echo -e "\nETCD is down! cannot continue.\n"
+			exit 1
 		fi
 	echo -e "Enabling server notification services"
 	systemctl --user enable wavelet_controller.service --now
