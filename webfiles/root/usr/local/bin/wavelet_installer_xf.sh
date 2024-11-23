@@ -67,7 +67,7 @@ event_server(){
 	# Copy nonsecure conf file.  The secure file would be added by the wavelet_install_hardening.sh module if hardening is enabled.
 	cp /etc/etcd/etcd.yaml.conf /etc/etcd/etcd.conf
 	ip=$(hostname -I | cut -d " " -f 1)
-	sed -i "s|svrIP|${ip}|g" /etc/etcd.conf
+	sed -i "s|svrIP|${ip}|g" /etc/etcd/etcd.conf
 
 	# Old systemd method
 	echo -e "[Unit]
