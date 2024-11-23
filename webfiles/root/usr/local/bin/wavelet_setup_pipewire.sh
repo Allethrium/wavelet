@@ -40,10 +40,8 @@ delete_etcd_key(){
 
 
 etcd_get_currentvideosource(){
-	KEYNAME="uv_hash_select"; read_etcd_global
-	currentInputHash=${printvalue}
-	KEYNAME="/hash/${currentInputHash}"; read_etcd_global
-	long_interface_path=${printvalue}
+	KEYNAME="uv_hash_select"; read_etcd_global; currentInputHash=${printvalue}
+	KEYNAME="/hash/${currentInputHash}"; read_etcd_global; long_interface_path=${printvalue}
 	# use awk to clean long_interface var for matching
 	# this should give us Magewell USB Capture, Magewell USB Capture+, Logitech Screen Share or IPEVO Ziggi, or whatever else we get
 	return long_interface_var_cleaned
