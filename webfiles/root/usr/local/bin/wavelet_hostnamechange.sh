@@ -79,7 +79,7 @@ getNewHostName(){
 		KEYNAME="IS_PROMOTED"; KEYVALUE=1; write_etcd
 		hostnamectl hostname "${encHostname}.wavelet.local"
 	fi
-	echo -e "Promotion bit is not set to 1, proceeding with hostname change.."
+	echo -e "Promotion bit is not set to 1, proceeding with hostname change instead.."
 	# Set the hostname
 	hostnamectl hostname "${prefix}${newHostnameValue}.wavelet.local"
 	# reboot system, build_ug/run_ug will pick everything up from here.
