@@ -11,6 +11,7 @@ exec >/home/wavelet/build_httpd.log 2>&1
 oldMethod(){
 	# Podman generate systemd method
 	echo -e "Generating Apache Podman container and systemd service file"
+	podman pull docker://docker.io/library/httpd
 	podman create --name httpd -p 8080:80 -v /home/wavelet/http:/usr/local/apache2/htdocs:Z -v /home/wavelet/config/httpd.conf:/usr/local/apache2/conf/httpd.conf:z docker://docker.io/library/httpd
 	cd /home/wavelet/.config/systemd/user
 	podman generate systemd --restart-policy=always -t 5 --name httpd --files

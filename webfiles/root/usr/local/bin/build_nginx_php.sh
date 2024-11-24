@@ -114,7 +114,7 @@ event_server(){
 #
 #####
 
-set -x
+#set -x
 exec >/var/home/wavelet/build_nginx_php.log 2>&1
 cd ${SCRHOME}
 detect_self

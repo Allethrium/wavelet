@@ -145,7 +145,7 @@ event_decoder(){
 
 event_encoder(){
 	echo -e "reloading systemctl user daemon, moving to run_ug"
-	if -f /var/no.wifi; then
+	if [[ -f /var/no.wifi ]]; then
 		echo "wifi disabled on this host.."
 		:
 	else		
@@ -221,11 +221,14 @@ event_server(){
 
 server_bootstrap(){
 # Bootstraps the server processes including Apache HTTP server for distribution files, and the web interface NGINX/PHP pod
-	until [[ -f /var/ug_depends.complete ]]
-	do
+	# We still have problems with DNS resolution so we force start dnsmasq here.
+	systemctl start dnsmasq.service
+	sleep 2
+	until [[ -f /var/ug_depends.complete ]]; do
 		sleep 1
 	done
-	if test -f "/var/home/wavelet/server_bootstrap_completed"; then
+	
+	if [[ -f "/var/home/wavelet/server_bootstrap_completed" ]]; then
 		echo -e "\n server bootstrap has already been completed, exiting..\n"
 		exit 0
 	fi
