@@ -221,13 +221,14 @@ storage:
       contents:
         inline: |
           polkit.addRule(function(action, subject) {
-          if (action.id == "org.freedesktop.systemd1.manage-units") {
+          if (action.id == "org.freedesktop.systemd1.manage-units") &&
+          if (subject.user == "wavelet") {
               polkit.log("action=" + action)
               polkit.log("subject=" + subject)
               polkit.log("unit="+action.lookup("unit"))
               polkit.log("verb="+action.lookup("verb"))
               if (action.lookup("unit") == "systemd-resolved.service" ||
-                  action.lookup("unit") == "dnsmasq.service")
+                  action.lookup("unit") == "dnsmasq.service") ||
                   action.lookup("unit") == "etcd-quadlet.service") {
                   var verb = action.lookup("verb");
                   if (verb == "start" || verb == "stop" || verb == "restart" || verb == "enable" || verb == "disable") {
@@ -236,19 +237,19 @@ storage:
                   }
               }
           }
-          polkit.log("returning NO") });
+          });
     # Wifi control
     - path: /etc/polkit-1/rules.d/1338-wavelet-wifi.rules
       mode: 0644
       overwrite: true
       contents:
         inline: |
-          [Allow wi-fi scans for all users]
-          Identity=unix-user:*
-          Action=org.freedesktop.NetworkManager.wifi.scan
-          ResultAny=yes
-          ResultInactive=yes
-          ResultActive=yes
+          polkit.addRule(function(action, subject) {
+          if (action.id == "org.freedesktop.NetworkManager.wifi.scan") &&
+          if (subject.user == "wavelet") {
+            return polkit.Result.YES;
+          }
+          });
     # SystemD resolved
     - path: /etc/polkit-1/rules.d/51-systemd-resolved.rules
       mode: 0644
@@ -256,12 +257,10 @@ storage:
       contents:
         inline: |
           polkit.addRule(function(action, subject) {
-          if (action.id == "org.freedesktop.resolve1") {
-              if (subject.user == "wavelet") {
+          if (action.id == "org.freedesktop.resolve1") &&
+          if (subject.user == "wavelet") {
                   return polkit.Result.YES;
               }
-          }
-          polkit.log("returning NO") });
           });
     # Reboot
     - path: /etc/polkit-1/rules.d/1336-systemd-reboot.rules
@@ -270,12 +269,10 @@ storage:
       contents:
         inline: |
           polkit.addRule(function(action, subject) {
-          if (action.id == "org.freedesktop.reboot") {
-              if (subject.user == "wavelet") {
+          if (action.id == "org.freedesktop.reboot") &&
+          if (subject.user == "wavelet") {
                   return polkit.Result.YES;
-              }
           }
-          polkit.log("returning NO") });
           });
     # Wavelet user does NOT have access to change hostname on the server
     # hence missing the polkit entry that's in the decoder ignition file!
