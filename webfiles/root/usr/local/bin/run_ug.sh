@@ -88,6 +88,7 @@ event_server(){
 	echo -e "Ensuring dnsmasq service is up.."
 	hostname=$(hostname)
 	systemctl enable dnsmasq.service --now
+	systemctl --user start http-php-pod.service
 	sed -i '/!!hostnamegoeshere!!/s/${hostname} //' /usr/local/bin/wavelet_network_sense.sh
 	if [[ "$printvalue" -eq 1 ]]; then
 		echo -e "An input device is present on this host,
@@ -270,7 +271,7 @@ get_ipValue(){
 }
 
 detect_disable_ethernet(){
-	if [[ -f /var/no.wifi ]];; then
+	if [[ -f /var/no.wifi ]]; then
 		echo -e "The /var/no.wifi flag is set.  Please remove this file if this host should utilize wireless connectivity."
 	else
 		# We disable ethernet preferentially if we have two active connections
