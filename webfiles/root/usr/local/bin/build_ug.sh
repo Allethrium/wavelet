@@ -314,7 +314,7 @@ WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/container
 		# Prune anything !=alive
 	echo -e "Server configuration is now complete, rebooting system.."
 	sleep 1
-	systemctl reboot -i
+	systemctl reboot
 }
 
 event_reboot(){
