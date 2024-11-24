@@ -186,28 +186,11 @@ event_server(){
 		echo -e "\nPXE service has not completed setup, exiting until the next reboot..\n"
 		exit 1
 	fi
-	if systemctl is-active --quiet etcd-quadlet.service; then
-		echo -e "Etcd service present, checking for bootstrap key\n"
-			KEYNAME=SERVER_BOOTSTRAP_COMPLETED; read_etcd_global; result=${printvalue}
-				if [[ "${result}" = 1 ]]; then
-					echo -e "Server bootstrap is already completed, starting services and terminating process..\n"
-					systemctl --user enable watch_reflectorreload.service --now
-					systemctl --user start wavelet_init.service
-					# N.B - the encoder reset flag script is supposed to run only on an active encoder
-				else			
-					if [[ -f /var/home/wavelet/server_bootstrap_completed ]]; then
-						echo -e "Server bootstrap completed, but etcd is not available.  Something is wrong.  Attempting to start etcd-quadlet.service and restart process.."
-						systemctl start etcd-quadlet.service 
-						event_server
-					else
-						echo -e "Server setup is not complete, and etcd is down.  installation has failed!"
-						exit 1
-					fi
-				fi
-					echo -e "Server bootstrap key is not present, executing bootstrap process."
-					server_bootstrap
+
+	if [[ -f /var/home/wavelet/server_bootstrap_completed ]]; then
+		echo -e "Server bootstrap completed, continuing"
 	else
-		echo -e "Etcd service is not present, cannot check for bootstrap key and assuming that bootstrap has not been run. Executing bootstrap process..\n"
+		echo -e "Server bootstrap not completed\n"
 		server_bootstrap
 	fi
 	event_generateHash svr
