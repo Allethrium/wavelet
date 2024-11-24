@@ -87,9 +87,7 @@ event_server(){
 	KEYNAME=INPUT_DEVICE_PRESENT; read_etcd
 	echo -e "Ensuring dnsmasq service is up.."
 	hostname=$(hostname)
-	systemctl enable dnsmasq.service --now
 	systemctl --user start http-php-pod.service
-	sed -i '/!!hostnamegoeshere!!/s/${hostname} //' /usr/local/bin/wavelet_network_sense.sh
 	if [[ "$printvalue" -eq 1 ]]; then
 		echo -e "An input device is present on this host,
 		 assuming we want an encoder running on the server.. \n"
@@ -260,7 +258,7 @@ get_ipValue(){
 				local ip=$1 regex='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
 				if [[ $ip =~ $regex ]]; then
 					echo -e "\nIP Address is valid, continuing..\n"
-					KEYNAME="/hostHash/$(hostname)/ipaddr"; keyvalue="${IPVALUE}"; write_etcd_global
+					KEYNAME="/hostHash/$(hostname)/ipaddr"; keyvalue="${ip}"; write_etcd_global
 				else
 					echo "\nIP Address is not valid, sleeping and calling function again\n"
 					get_ipValue
