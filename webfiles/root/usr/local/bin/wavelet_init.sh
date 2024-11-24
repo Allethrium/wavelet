@@ -73,7 +73,8 @@ event_init_seal(){
 	ugargs="--tool uv $filtervar --control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}"
 	KEYNAME=UG_ARGS; KEYVALUE=${ugargs}; write_etcd
 	echo -e "Verifying stored command line:\n"
-	echo "[Unit]
+	echo -e "${ugargs}"
+	echo -e "[Unit]
 Description=UltraGrid AppImage executable
 After=network-online.target
 Wants=network-online.target
@@ -84,6 +85,7 @@ TimeoutStopSec=0.25
 [Install]
 WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 	systemctl --user daemon-reload
+	echo -e "Retarting UltraGrid.AppImage.service..\n"
 	systemctl --user restart UltraGrid.AppImage.service
 	# Sleep for a couple of seconds to allow the encoder to come up, then Select switcher input #1 which should always be the Seal image.
 	sleep 2
@@ -93,7 +95,7 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage
 # Populate standard values into etcd
 #set -x
 # Sleep for five seconds to allow etcd cluster to start
-Sleep 5
+Sleep 10
 exec >/home/wavelet/initialize.log 2>&1
 echo -e "Populating standard values into etcd, the last step will trigger the Controller and Reflector functions, bringing the system up.\n"
 KEYNAME="uv_videoport"; KEYVALUE="5004"; write_etcd_global
