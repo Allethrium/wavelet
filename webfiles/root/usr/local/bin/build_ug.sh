@@ -227,7 +227,7 @@ server_bootstrap(){
 	until [[ -f /var/ug_depends.complete ]]; do
 		sleep 1
 	done
-	
+
 	if [[ -f "/var/home/wavelet/server_bootstrap_completed" ]]; then
 		echo -e "\n server bootstrap has already been completed, exiting..\n"
 		exit 0
@@ -322,7 +322,8 @@ WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/container
 		# Get "alive mountpoints"
 		# Prune anything !=alive
 	echo -e "Server configuration is now complete, rebooting system.."
-	sleep 1
+	# Allow time
+	sleep 30
 	systemctl reboot
 }
 
