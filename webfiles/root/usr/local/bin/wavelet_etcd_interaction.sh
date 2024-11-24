@@ -45,7 +45,6 @@ main() {
 	fi
 	etcdCommand
 	echo ${printvalue}
-	return ${printvalue}
 }
 
 generate_service(){
