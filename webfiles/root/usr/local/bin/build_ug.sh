@@ -189,6 +189,7 @@ event_server(){
 
 	if [[ -f /var/home/wavelet/server_bootstrap_completed ]]; then
 		echo -e "Server bootstrap completed, continuing"
+		systemctl --user enable wavelet_init.service
 	else
 		echo -e "Server bootstrap not completed\n"
 		server_bootstrap

@@ -99,7 +99,7 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/${waveletModule}.s
 #####
 
 #set -x
-exec >/home/wavelet/etcd_interaction.log 2>&1
+#exec >/home/wavelet/etcd_interaction.log 2>&1
 action=$1
 inputKeyName=$2
 inputKeyValue=$3
