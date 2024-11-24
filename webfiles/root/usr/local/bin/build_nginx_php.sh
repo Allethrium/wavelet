@@ -89,7 +89,7 @@ Volume=/var/home/wavelet/http-php/log:/var/log/nginx:Z
 Volume=/var/home/wavelet/http-php/html:/var/www/html:Z
 Volume=/var/home/wavelet/http-php/nginx:/etc/nginx/conf.d/:z
 [Install]
-WantedBy=" > /var/home/wavelet/.config/containers/systemd/http-php.pod
+WantedBy=multi-user.target" > /var/home/wavelet/.config/containers/systemd/http-php.pod
 	echo -e "Podman pod and containers, generated, service has been enabled in systemd, and will start on next reboot."
 	echo -e "The control service should be available via web browser I.E \nhttp://svr.wavelet.local\n"
 	systemctl --user daemon-reload
