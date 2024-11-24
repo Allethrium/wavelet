@@ -319,9 +319,9 @@ event_reboot(){
 	# Everything should watch the system reboot flag for a hard reset
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service SYSTEM_REBOOT 0 0 "wavelet_reboot"
 	# and the same for the host reboot
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/DECODER_REBOOT 0 0 "wavelet_reboot"
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/DECODER_REBOOT 0 0 "wavelet_decoder_reboot"
 	systemctl --user enable wavelet_reboot.service --now
-	systemctl --user enable wavelet_monitor_decoder_reboot.service --now
+	systemctl --user enable wavelet_decoder_reboot.service --now
 }
 
 event_reset(){
