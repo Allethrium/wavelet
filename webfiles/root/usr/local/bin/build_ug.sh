@@ -202,7 +202,6 @@ event_server(){
 				fi
 					echo -e "Server bootstrap key is not present, executing bootstrap process."
 					server_bootstrap
-				fi
 	else
 		echo -e "Etcd service is not present, cannot check for bootstrap key and assuming that bootstrap has not been run. Executing bootstrap process..\n"
 		server_bootstrap
