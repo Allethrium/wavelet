@@ -36,14 +36,16 @@ main() {
 	else
 		ETCDURI=http://192.168.1.32:2379/v3/kv/put
 		etcdCommand(){
-			etcdctl --endpoints=${ETCDENDPOINT} \
+			printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} \
 			${action} \
 			${inputKeyName} \
 			${inputKeyValue} \
-			${valueOnlySwitch}
+			${valueOnlySwitch})
 		}
 	fi
 	etcdCommand
+	echo ${printvalue}
+	return ${printvalue}
 }
 
 generate_service(){
