@@ -114,7 +114,7 @@ wifi_connect_retry(){
 			echo -e "Active WiFi connection available! return 0"
 			return 0
 		else
-			echo -e "Attempting to connect to WiFi.  If this device is NOT planned to be on WiFi, run the command:\n"
+			echo -e "Attempting to connect to WiFi.  If this device is NOT planned to be on WiFi, run the command as a privileged user:\n"
 			echo -e "touch /var/no.wifi"
 			while ! /usr/local/bin/connectwifi.sh; do
 				sleep 2
@@ -122,8 +122,6 @@ wifi_connect_retry(){
 		fi
 	else
 		echo -e "This machine has no wifi connectivity, exiting..\n"
-		echo -e "If this device is NOT planned to be on WiFi, run the command:\n"
-		echo -e "touch /var/no.wifi"
 		exit 0
 	fi
 }
@@ -225,10 +223,6 @@ server_bootstrap(){
 		echo -e "\n server bootstrap has already been completed, exiting..\n"
 		exit 0
 	fi
-
-	# Set no wifi tag, it is set here during the bootstrap proces so that it only activates once, not every server reboot.
-	# This way if the server absolutely must run wirelessly - and it can - you can do that by removing this file.
-	touch /var/no.wifi
 
 	bootstrap_http(){
 		# check for bootstrap_completed, verify services running
