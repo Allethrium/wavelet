@@ -297,8 +297,6 @@ WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/container
 	# uncomment a firefox exec command into sway config, this will bring up the management console on the server in a new sway window, as a backup control surface.
 	# - note we need to work on a firefox policy/autoconfig.
 	sed -i '/exec firefox/s/^# *//' /var/home/wavelet/.config/sway/config
-	#same for dnsmasq because it inexplicably stops working.
-	sed -i '/exec systemctl restart dnsmasq.service/s/^# *//' /var/home/wavelet/.config/sway/config
 
 	# Next, we build the reflector prune function.  This is necessary for removing streams for old decoders and maintaining the long term health of the system
 		# Get decoderIP list
