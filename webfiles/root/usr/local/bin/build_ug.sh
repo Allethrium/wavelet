@@ -206,9 +206,7 @@ event_server(){
 
 server_bootstrap(){
 # Bootstraps the server processes including Apache HTTP server for distribution files, and the web interface NGINX/PHP pod
-	# We still have problems with DNS resolution so we force start dnsmasq here.
-	systemctl start dnsmasq.service
-	sleep 2
+	sleep 10
 	# Build_httpd and build http-php both seem to have issues pulling the container images from quadlets, so we will try to head that issue off by pulling the images here.
 	podman pull docker://docker.io/library/nginx:alpine
 	podman pull docker://docker.io/library/php:fpm
