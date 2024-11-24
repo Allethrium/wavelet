@@ -284,6 +284,15 @@ storage:
         inline: |
           [Resolve]
           DNSStubListener=no
+    # disable systemd-resolved to free up port 53 and allow dnsmasq to launch
+    # This also has to be set here, because resolved appears to ignore the drop-ins.
+    - path: /etc/systemd/resolved.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          [Resolve]
+          DNSStubListener=no
     # Same will affect freeIPA.. so we want to create that file too.
     - path: /etc/systemd/resolved.conf.d/20-freeipa.conf
       mode: 0644

@@ -95,6 +95,7 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage
 # Populate standard values into etcd
 #set -x
 # Sleep for five seconds to allow etcd cluster to start
+echo -e "Sleep for fifteen seconds to allow etcd cluster to stabilize..\n"
 Sleep 15
 exec >/home/wavelet/initialize.log 2>&1
 echo -e "Populating standard values into etcd, the last step will trigger the Controller and Reflector functions, bringing the system up.\n"
@@ -108,7 +109,7 @@ systemctl --user enable watch_reflectorreload.service --now
 systemctl --user enable wavelet_reflector.service --now
 systemctl --user enable watch_encoderflag.service --now
 echo -e "Values populated, monitor services launched.  Starting reflector\n\n"
-systemctl --user enable UltraGrid.Reflector.service --now
+systemctl --user enable ultragrid.reflector.service --now
 event_init_av1
 systemctl --user restart wavelet_reflector.service --now
 systemctl --user enable wavelet_controller.service --now

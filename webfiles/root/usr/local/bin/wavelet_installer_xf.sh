@@ -80,7 +80,7 @@ Wants=network-online.target
 ExecStartPre=-mkdir -p /var/lib/etcd-data
 ExecStartPre=-/bin/podman kill etcd
 ExecStartPre=-/bin/podman rm etcd
-ExecStartPre=-/bin/podman pull quay.io/coreos/etcd:v3.5.17
+ExecStartPre=-/bin/podman pull quay.io/coreos/etcd:v3.5.9
 ExecStart=/bin/podman run --name etcd \
 	--volume /var/lib/etcd-data:/etcd-data:Z \
 	--net=host quay.io/coreos/etcd /usr/local/bin/etcd \
@@ -107,7 +107,7 @@ After=network.target
 [Container]
 Environment=ETCD_DATA_DIR=/etcd-data
 Environment=ETCD_CONFIG_FILE=/etc/etcd/etcd.conf
-Image=quay.io/coreos/etcd:v3.5.17
+Image=quay.io/coreos/etcd:v3.5.9
 ContainerName=etcd-container
 Network=host
 Volume=/etc/etcd/:/etc/etcd/:Z
@@ -124,11 +124,15 @@ ExecStartPre=-/bin/podman pull quay.io/coreos/etcd
 Restart=always
 
 [Install]
-WantedBy=default.target" > /etc/containers/systemd/etcd-quadlet.container
+WantedBy=multi-user.target" > /etc/containers/systemd/etcd-quadlet.container
 	systemctl daemon-reload
 	# Remember, quadlets don't work with systemd enable <arg>
 	systemctl start etcd-quadlet.service
 	#systemctl enable etcd-container.service --now
+
+	# Fix gssproxy SElinux bug
+	ausearch -c '(gssproxy)' --raw | audit2allow -M my-gssproxy
+	semodule -X 300 -i my-gssproxy.pp
 
 	# Generate and enable systemd units
 	# Therefore, they will start on next boot, run, and disable themselves
@@ -178,7 +182,9 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_hardening.serv
 	detect_custom_requirements
 	# generate a hostname file so that dnsmasq's dhcp-script call works properly
 	get_ipValue
+	systemctl disable systemd-resolved.service --now
 	sed -i "s/SVR_IPADDR/${IPVALUE}/g" /etc/dnsmasq.conf
+	systemctl enable dnsmasq.service --now
 	systemctl enable wavelet_install_depends.service
 	touch /var/no.wifi
 }
