@@ -38,16 +38,27 @@ delete_etcd_key(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
 }
 
+magewell(){
+	#grep for serial number
+	#return search string
+}
+
+ipevo(){
+	#find any audio that's sqawking at all and select it
+	#return search string
+}
+
+lgCapture(){
+	#find any lg device we can
+	#return search string
+}
 
 main(){
 	# Create a new sink called Simultaneous Output
-	pw-cli create-node adapter '{ factory.name=support.null-audio-sink node.name="SimultaneousOutput" \
-								node.description="SimultaneousOutput" media.class=Audio/Sink object.linger=true \
-								audio.position=[FL FR] }'
-	
+	pw-cli create-node adapter '{ factory.name=support.null-audio-sink node.name="SimultaneousOutput" node.description="SimultaneousOutput" media.class=Audio/Sink object.linger=true audio.position=[FL FR] }'
 	# etcdctl find current video source
-	KEYNAME="uv_hash_select"; read_etcd_global; currentVideoInputHash=${printvalue}
-	KEYNAME="/short_hash/${currentVideoInputHash}"; read_etcd_global; currentVideoPath=${printvalue}
+	KEYNAME="uv_hash_select"; read_etcd_global; currentVideoInputHash="${printvalue}"
+	KEYNAME="/short_hash/${currentVideoInputHash}"; read_etcd_global; currentVideoPath="${printvalue}"
 
 	#case in ${currentVideoPath}
 		#if we have a magewell device we probably have a serial number
@@ -57,21 +68,6 @@ main(){
 		#if we have an LG capture card, we will just pick one and hope for the best..
 		#	;;
 	#esac
-
-	magewell(){
-		#grep for serial number
-		#return search string
-	}
-
-	ipevo(){
-		#find any audio that's sqawking at all and select it
-		#return search string
-	}
-
-	lgCapture(){
-		#find any lg device we can
-		#return search string
-	}
 
 	# compare current video source to available audio inputs, start w/ Vendor and then run through serial# etc..
 	# if ${searchstring} match; then
