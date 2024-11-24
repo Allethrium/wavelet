@@ -180,6 +180,7 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_hardening.serv
 	get_ipValue
 	sed -i "s/SVR_IPADDR/${IPVALUE}/g" /etc/dnsmasq.conf
 	systemctl enable wavelet_install_depends.service
+	touch /var/no.wifi
 }
 
 get_ipValue(){
