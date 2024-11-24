@@ -270,23 +270,27 @@ get_ipValue(){
 }
 
 detect_disable_ethernet(){
-	# We disable ethernet preferentially if we have two active connections
-	# This prevents some of the IP detection automation from having issues.
-	# This should have been done already once the decoder provisioned and successfully connected to wifi.
-	# Add another filter to exclude veth interfaces
-	for interface in $(ip link show | awk '{print $2}' | grep ":$" | cut -d ':' -f1); do
-		if [[ $(nmcli dev show "${interface}" | grep "connected") ]] && \
-		[[ $(nmcli dev show "${interface}" | grep "ethernet") ]] && \
-		[[ $(nmcli device status | grep -a 'wifi.*connect') ]] && \
-		[[ $(nmcli dev show "${interface}") != *"veth"* ]]; then
-			echo -e "${interface} is an ethernet connection, active WiFi connection also detected..."
-			wifiFound="1"
-			ethernetFound="1"
-			ethernetInterface="${interface}"
-		fi
-	done
-	nmcli device down "${ethernetInterface}"
-	echo -e "Interface ${ethernetInterface} has been disabled.\n\nTo re-enable, you can use:\nnmcli device up ${ethernetInterface}\n\nor:\nnmtui\n"
+	if [[ -f /var/no.wifi ]];; then
+		echo -e "The /var/no.wifi flag is set.  Please remove this file if this host should utilize wireless connectivity."
+	else
+		# We disable ethernet preferentially if we have two active connections
+		# This prevents some of the IP detection automation from having issues.
+		# This should have been done already once the decoder provisioned and successfully connected to wifi.
+		# Add another filter to exclude veth interfaces
+		for interface in $(ip link show | awk '{print $2}' | grep ":$" | cut -d ':' -f1); do
+			if [[ $(nmcli dev show "${interface}" | grep "connected") ]] && \
+			[[ $(nmcli dev show "${interface}" | grep "ethernet") ]] && \
+			[[ $(nmcli device status | grep -a 'wifi.*connect') ]] && \
+			[[ $(nmcli dev show "${interface}") != *"veth"* ]]; then
+				echo -e "${interface} is an ethernet connection, active WiFi connection also detected..."
+				wifiFound="1"
+				ethernetFound="1"
+				ethernetInterface="${interface}"
+			fi
+		done
+		nmcli device down "${ethernetInterface}"
+		echo -e "Interface ${ethernetInterface} has been disabled.\n\nTo re-enable, you can use:\nnmcli device up ${ethernetInterface}\n\nor:\nnmtui\n"
+	fi
 }
 
 set_ethernet_mtu(){
