@@ -314,7 +314,8 @@ exec_always cat /proc/acpi/button/lid/LID/state | awk '{print $2}' | grep -q 'cl
 
 # Below are SED'd out by build_ug.sh for the server only
 
-#exec firefox http://localhost:9080 &
+# Wait for UI containers to come up
+#exec sleep 15; firefox http://localhost:9080 &
 #exec systemctl restart dnsmasq.service
 
 include /etc/sway/config.d/*
