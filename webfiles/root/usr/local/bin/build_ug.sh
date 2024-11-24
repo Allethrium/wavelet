@@ -291,14 +291,17 @@ WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/container
 	echo -e "Reloading systemctl user daemon, and enabling the controller service immediately"
 	systemctl --user daemon-reload
 	echo -e "Enabling server notification services"
+	event_generate_controllerWatch
+	event_generate_reflectorreload
+	event_generate_watch_encoderflag
 	systemctl --user enable wavelet_controller.service --now
 	systemctl --user enable watch_reflectorreload.service --now
 	systemctl --user enable wavelet_reflector.service --now
 	# uncomment a firefox exec command into sway config, this will bring up the management console on the server in a new sway window, as a backup control surface.
 	# - note we need to work on a firefox policy/autoconfig.
-	sed -i '/exec firefox/s/^# *//' config /var/home/wavelet/.config/sway/config
+	sed -i '/exec firefox/s/^# *//' /var/home/wavelet/.config/sway/config
 	#same for dnsmasq because it inexplicably stops working.
-	sed -i '/exec systemctl restart dnsmasq.service/s/^# *//' config /var/home/wavelet/.config/sway/config
+	sed -i '/exec systemctl restart dnsmasq.service/s/^# *//' /var/home/wavelet/.config/sway/config
 
 	# Next, we build the reflector prune function.  This is necessary for removing streams for old decoders and maintaining the long term health of the system
 		# Get decoderIP list
