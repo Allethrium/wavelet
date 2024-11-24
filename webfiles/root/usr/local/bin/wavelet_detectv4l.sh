@@ -36,7 +36,7 @@ write_etcd(){
 }
 write_etcd_global(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
-	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
+	echo -e "Key Name ${KEYNAME} set to Global value ${KEYVALUE}\n"
 }
 write_etcd_client_ip(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
@@ -235,7 +235,7 @@ event_dellWB3023(){
 event_unknowndevice() {
 # 30fps is a compatibility setting, catch all for other devices we will leave at 30.  Try YUYV with RGB conversion..
 	echo -e "The connected device has not been previously assigned an input ID for the UI component.  Storing hash.\n"
-	KEYNAME=KEYNAME="/inputs/${device_string_long}"; KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"; write_etcd
+	KEYNAME="/inputs/${device_string_long}"; KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"; write_etcd
 	echo -e "\n Detection completed for device..\n"
 	device_cleanup
 }
