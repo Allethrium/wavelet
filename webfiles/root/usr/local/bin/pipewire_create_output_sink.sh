@@ -1,5 +1,6 @@
 #!/bin/bash
 # Ref Arch Linux Wiki - https://wiki.archlinux.org/title/WirePlumber
+# The issues this module addresses will require some amount of work.
 
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
@@ -48,28 +49,28 @@ main(){
 	KEYNAME="uv_hash_select"; read_etcd_global; currentVideoInputHash=${printvalue}
 	KEYNAME="/short_hash/${currentVideoInputHash}"; read_etcd_global; currentVideoPath=${printvalue}
 
-	case in ${currentVideoPath}
-		if we have a magewell device we probably have a serial number
-			;;
-		if we have an IPEVO device, we probably won't want audio from it 
-			;;
-		if we have an LG capture card, we will just pick one and hope for the best..
-			;;
-	esac
+	#case in ${currentVideoPath}
+		#if we have a magewell device we probably have a serial number
+		#	;;
+		#if we have an IPEVO device, we probably won't want audio from it 
+		#	;;
+		#if we have an LG capture card, we will just pick one and hope for the best..
+		#	;;
+	#esac
 
 	magewell(){
-		grep for serial number
-		return search string
+		#grep for serial number
+		#return search string
 	}
 
 	ipevo(){
-		find any audio that's sqawking at all and select it
-		return search string
+		#find any audio that's sqawking at all and select it
+		#return search string
 	}
 
 	lgCapture(){
-		find any lg device we can
-		return search string
+		#find any lg device we can
+		#return search string
 	}
 
 	# compare current video source to available audio inputs, start w/ Vendor and then run through serial# etc..
@@ -95,4 +96,12 @@ main(){
 	wpctl set-default `wpctl status | grep "\. SimultaneousOutput" | egrep '^ │( )*[0-9]*' -o | cut -c6-55 | egrep -o '[0-9]*'`wpctl}
 
 set -x
+logName=/home/wavelet/pipewire_input.log
+if [[ -e $logName || -L $logName ]] ; then
+	i=0
+	while [[ -e $logName-$i || -L $logName-$i ]] ; do
+		let i++
+	done
+	logName=$logName-$i
+fi
 main
