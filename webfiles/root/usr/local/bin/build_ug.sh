@@ -107,6 +107,7 @@ wifi_connect_retry(){
 		echo "Device configured to ignore wifi!"
 		exit 0
 	fi
+
 	if nmcli device status | grep -a 'wifi.*connect'; then
 		echo -e "WiFi device detected, proceeding.."
 		# Look for active wifi
@@ -144,9 +145,14 @@ event_decoder(){
 
 event_encoder(){
 	echo -e "reloading systemctl user daemon, moving to run_ug"
-	wifi_connect_retry
+	if -f /var/no.wifi; then
+		echo "wifi disabled on this host.."
+		:
+	else		
+		wifi_connect_retry
+	fi
 	systemctl --user daemon-reload
-	systemctl --user enable run_ug.service --now
+	/usr/local/bin/run_ug.sh
 	# Generate Systemd notifier services for encoders
 	event_encoder_reboot
 	event_reboot
