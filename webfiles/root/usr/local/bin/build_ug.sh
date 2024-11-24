@@ -376,7 +376,7 @@ event_livestreamservice(){
 }
 event_generate_reflector(){
 	# These may require us to rename some of the module .sh filenames because they don't appropriately reflect the flag or the service name!
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "REFLECTOR_ARGS" 0 0 "UltraGrid.Reflector"
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "REFLECTOR_ARGS" 0 0 "ultragrid.reflector"
 	# ExecStart=/usr/local/bin/UltraGrid.AppImage $(etcdctl --endpoints=${ETCDENDPOINT} get REFLECTOR_ARGS --print-value-only)
 }
 
