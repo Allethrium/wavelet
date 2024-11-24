@@ -262,6 +262,20 @@ storage:
           }
           polkit.log("returning NO") });
           });
+    # Reboot
+    - path: /etc/polkit-1/rules.d/1336-systemd-reboot.rules
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          polkit.addRule(function(action, subject) {
+          if (action.id == "org.freedesktop.reboot") {
+              if (subject.user == "wavelet") {
+                  return polkit.Result.YES;
+              }
+          }
+          polkit.log("returning NO") });
+          });
     # Wavelet user does NOT have access to change hostname on the server
     # hence missing the polkit entry that's in the decoder ignition file!
     # disable systemd-resolved to free up port 53 and allow dnsmasq to launch
