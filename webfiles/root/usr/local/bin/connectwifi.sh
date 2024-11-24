@@ -45,7 +45,15 @@ connectwifi_enterprise(){
 #else
 if [[ $(hostname) = *"svr"* ]]; then
 	echo -e "This script enables wifi and disables other networking devices.  It is highly recommended to have the server running on a wired link.  Exiting."
+	echo -e "If you want to run the server off of a WiFi connection, this should be configured and enabled manually via nmtui or nmcli."
+	echo -e "Not that performance will likely suffer as a result."
 	exit 1
 fi
+
+if [[ -f /var/no.wifi ]];; then
+	echo -e "The /var/no.wifi flag is set.  Please remove this file if this host should utilize wireless connectivity."
+	exit 2
+fi
+
 connectwifi
 #fi
