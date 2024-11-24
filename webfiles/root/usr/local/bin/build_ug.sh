@@ -207,6 +207,10 @@ server_bootstrap(){
 	# We still have problems with DNS resolution so we force start dnsmasq here.
 	systemctl start dnsmasq.service
 	sleep 2
+	# Build_httpd and build http-php both seem to have issues pulling the container images from quadlets, so we will try to head that issue off by pulling the images here.
+	podman pull docker://docker.io/library/nginx:alpine
+	podman pull docker://docker.io/library/php:fpm
+	podman pull docker://docker.io/library/httpd
 	until [[ -f /var/ug_depends.complete ]]; do
 		sleep 1
 	done
@@ -397,6 +401,7 @@ Description=Wavelet Encoder/Decoder runner
 After=network-online.target etcd-member.service
 Wants=network-online.target
 [Service]
+
 ExecStart=/usr/local/bin/run_ug.sh
 [Install]
 WantedBy=default.target" > /var/home/wavelet/.config/systemd/user/run_ug.service
