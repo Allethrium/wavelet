@@ -43,5 +43,9 @@ connectwifi_enterprise(){
 #if curl 'https://192.168.1.32:8080' > HTML_Output # curl the provioning httpd server succeeds
 #  echo "we have connectivity"
 #else
- connectwifi
+if [[ $(hostname) = *"svr"* ]]; then
+	echo -e "This script enables wifi and disables other networking devices.  It is highly recommended to have the server running on a wired link.  Exiting."
+	exit 1
+fi
+connectwifi
 #fi
