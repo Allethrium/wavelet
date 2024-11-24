@@ -102,11 +102,11 @@ event_gateway(){
 }
 
 wifi_connect_retry(){
+	# No.wifi tag should be set on the server
 	if [[ -f /var/no.wifi ]]; then
 		echo "Device configured to ignore wifi!"
 		exit 0
 	fi
-	
 	if nmcli device status | grep -a 'wifi.*connect'; then
 		echo -e "WiFi device detected, proceeding.."
 		# Look for active wifi
@@ -226,6 +226,10 @@ server_bootstrap(){
 		exit 0
 	fi
 
+	# Set no wifi tag, it is set here during the bootstrap proces so that it only activates once, not every server reboot.
+	# This way if the server absolutely must run wirelessly - and it can - you can do that by removing this file.
+	touch /var/no.wifi
+
 	bootstrap_http(){
 		# check for bootstrap_completed, verify services running
 		echo -e "Generating HTTPD server and copying/compressing wavelet files to server directory.."
@@ -298,9 +302,9 @@ WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/container
 	systemctl --user enable wavelet_reflector.service --now
 	# uncomment a firefox exec command into sway config, this will bring up the management console on the server in a new sway window, as a backup control surface.
 	# - note we need to work on a firefox policy/autoconfig.
-	sed -i '/exec firefox/s/^# *//' config $HOME/.config/sway/config
+	sed -i '/exec firefox/s/^# *//' config /var/home/wavelet/.config/sway/config
 	#same for dnsmasq because it inexplicably stops working.
-	sed -i '/exec systemctl restart dnsmasq.service/s/^# *//' config $HOME/.config/sway/config
+	sed -i '/exec systemctl restart dnsmasq.service/s/^# *//' config /var/home/wavelet/.config/sway/config
 
 	# Next, we build the reflector prune function.  This is necessary for removing streams for old decoders and maintaining the long term health of the system
 		# Get decoderIP list
