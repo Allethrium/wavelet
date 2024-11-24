@@ -91,7 +91,9 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage
 }
 
 # Populate standard values into etcd
-set -x
+#set -x
+# Sleep for five seconds to allow etcd cluster to start
+Sleep 5
 exec >/home/wavelet/initialize.log 2>&1
 echo -e "Populating standard values into etcd, the last step will trigger the Controller and Reflector functions, bringing the system up.\n"
 KEYNAME="uv_videoport"; KEYVALUE="5004"; write_etcd_global
