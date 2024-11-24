@@ -189,7 +189,8 @@ event_server(){
 
 	if [[ -f /var/home/wavelet/server_bootstrap_completed ]]; then
 		echo -e "Server bootstrap completed, continuing"
-		systemctl --user enable wavelet_init.service
+		systemctl --user enable run_ug.service --now
+		systemctl --user enable wavelet_init.service --now
 	else
 		echo -e "Server bootstrap not completed\n"
 		server_bootstrap
@@ -291,6 +292,7 @@ WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/container
 	event_generate_controllerWatch
 	event_generate_reflectorreload
 	event_generate_watch_encoderflag
+	event_generate_run_ug
 	systemctl --user enable wavelet_controller.service --now
 	systemctl --user enable watch_reflectorreload.service --now
 	systemctl --user enable wavelet_reflector.service --now
