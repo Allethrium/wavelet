@@ -390,6 +390,18 @@ event_generate_watch_encoderflag(){
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/\"%H\"/encoder_restart" 0 0 "watch_encoderflag"
 }
 
+event_generate_run_ug(){
+	# Generate userspace run_ug service
+	echo -e "[Unit]
+Description=Wavelet Encoder/Decoder runner
+After=network-online.target etcd-member.service
+Wants=network-online.target
+[Service]
+ExecStart=/usr/local/bin/run_ug.sh
+[Install]
+WantedBy=default.target" > /var/home/wavelet/.config/systemd/user/run_ug.service
+}
+
 event_generateHash(){
 		# Can be modified from webUI, populates with hostname by default
 		# arg is the device type I.E enc, dec, svr etc.
@@ -447,6 +459,18 @@ event_host_relabel_watcher(){
 	systemctl --user enable wavelet_device_relabel.service --now
 }
 
-#set -x
-exec >/home/wavelet/build_ug.log 2>&1
+
+# Check for pre-existing log file
+# This is necessary because of system restarts, the log will get overwritten, and we need to see what it's doing across reboots.
+logName=/home/wavelet/build_ug.log
+if [[ -e $logName || -L $logName ]] ; then
+	i=0
+	while [[ -e $logName-$i || -L $logName-$i ]] ; do
+		let i++
+	done
+	logName=$logName-$i
+fi
+set -x
+exec > "${logName}" 2>&1
+
 detect_self
