@@ -52,6 +52,7 @@ event_init_seal(){
 	# Because of the way the controller operates with video switchers, we initially need to start Wavelet with a single input option
 	# 2
 	# Serves a static image in .jpg format in a loop to the encoder.
+	# Note that it starts the UG AppImage service directly and doesn't rely on run_ug, like an encoder will.
 	current_event="wavelet-seal"
 	rm -rf seal.mp4
 	ffmpeg -r 1 -i ny-stateseal.jpg -c:v mjpeg -vf fps=30 -color_range 2 -pix_fmt yuv440p seal.mp4
