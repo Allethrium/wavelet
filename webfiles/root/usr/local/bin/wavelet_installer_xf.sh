@@ -184,6 +184,21 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_hardening.serv
 	get_ipValue
 	systemctl disable systemd-resolved.service --now
 	sed -i "s/SVR_IPADDR/${IPVALUE}/g" /etc/dnsmasq.conf
+
+	domain=$(dnsdomainname)
+	gateway=$(read _ _ gateway _ < <(ip route list match 0/0); echo "$gateway")
+
+	ehco -e "# The domain directive is only necessary, if your local
+	     # router advertises something like	localdomain and	you have
+	     # set up your hostnames via an external domain.
+	     domain ${domain}
+	     # In case you a running a local dns server	or caching name	server
+	     # like local-unbound(8) for example.
+	     nameserver	127.0.0.1
+	     # IP address of the local or ISP name service
+	     nameserver	${gateway}
+	     # quad9 as fallback
+	     nameserver	9.9.9.9" > /etc/resolv.conf
 	systemctl enable dnsmasq.service --now
 	systemctl enable wavelet_install_depends.service
 	touch /var/no.wifi
