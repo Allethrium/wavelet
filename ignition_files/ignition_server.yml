@@ -16,11 +16,6 @@ kernel_arguments:
     - nameserver=192.168.1.1
     # - net.ifnames=0
     # - biosdevname=0
-# Configure static networking. LAB IP is always 192.168.1.32
-# GW always 192.168.1.1
-# The DNSMasq.conf file is set for same values
-# Changing these will break the install process for everything
-# A bootstrap script may be written to preconfig this.
 # UltraGrid AppImage
 storage:
   files:
@@ -94,6 +89,14 @@ storage:
       overwrite: true
       contents:
         inline: DeveloperModeEnabled - will pull from working branch (default behavior)
+    # Add a resolv.conf, self, gateway & quad9
+    - path: /etc/resolv.conf
+      overwrite: true
+      contents:
+        inline: |
+          nameserver 192.168.1.32
+          nameserver 192.168.1.1
+          nameserver 9.9.9.9
     # Detect NetworkManager name and set as static script
     - path: /usr/local/bin/configure_ethernet.sh
       mode: 0755
@@ -221,22 +224,21 @@ storage:
       contents:
         inline: |
           polkit.addRule(function(action, subject) {
-          if (action.id == "org.freedesktop.systemd1.manage-units") &&
-          if (subject.user == "wavelet") {
-              polkit.log("action=" + action)
-              polkit.log("subject=" + subject)
-              polkit.log("unit="+action.lookup("unit"))
-              polkit.log("verb="+action.lookup("verb"))
-              if (action.lookup("unit") == "systemd-resolved.service" ||
-                  action.lookup("unit") == "dnsmasq.service") ||
-                  action.lookup("unit") == "etcd-quadlet.service") {
-                  var verb = action.lookup("verb");
-                  if (verb == "start" || verb == "stop" || verb == "restart" || verb == "enable" || verb == "disable") {
-                      polkit.log("returning YES")
-                      return polkit.Result.YES;
+            if ((action.id == "org.freedesktop.systemd1.manage-units" &&
+                 subject.user == "wavelet")) {
+                  polkit.log("action=" + action)
+                  polkit.log("subject=" + subject)
+                  polkit.log("unit="+action.lookup("unit"))
+                  polkit.log("verb="+action.lookup("verb"))
+            if ((action.lookup("unit") == "dnsmasq.service") ||
+                 action.lookup("unit") == "etcd-quadlet.service") {
+                 var verb = action.lookup("verb");
+                 if (verb == "start" || verb == "stop" || verb == "restart" || verb == "enable" || verb == "disable") {
+                  polkit.log("returning YES")
+                  return polkit.Result.YES;
                   }
+                }
               }
-          }
           });
     # Wifi control
     - path: /etc/polkit-1/rules.d/1338-wavelet-wifi.rules
@@ -245,10 +247,10 @@ storage:
       contents:
         inline: |
           polkit.addRule(function(action, subject) {
-          if (action.id == "org.freedesktop.NetworkManager.wifi.scan") &&
-          if (subject.user == "wavelet") {
-            return polkit.Result.YES;
-          }
+            if ((action.id == "org.freedesktop.NetworkManager.wifi.scan" &&
+              subject.user == "wavelet")) {
+                return polkit.Result.YES;
+              }
           });
     # SystemD resolved
     - path: /etc/polkit-1/rules.d/51-systemd-resolved.rules
@@ -257,10 +259,10 @@ storage:
       contents:
         inline: |
           polkit.addRule(function(action, subject) {
-          if (action.id == "org.freedesktop.resolve1") &&
-          if (subject.user == "wavelet") {
+            if ((action.id == "org.freedesktop.resolve1") &&
+                 subject.user == "wavelet") {
                   return polkit.Result.YES;
-              }
+                  }
           });
     # Reboot
     - path: /etc/polkit-1/rules.d/1336-systemd-reboot.rules
@@ -269,10 +271,10 @@ storage:
       contents:
         inline: |
           polkit.addRule(function(action, subject) {
-          if (action.id == "org.freedesktop.reboot") &&
-          if (subject.user == "wavelet") {
+            if ((action.id == "org.freedesktop.reboot" &&
+                 subject.user == "wavelet")) {
                   return polkit.Result.YES;
-          }
+                }
           });
     # Wavelet user does NOT have access to change hostname on the server
     # hence missing the polkit entry that's in the decoder ignition file!
