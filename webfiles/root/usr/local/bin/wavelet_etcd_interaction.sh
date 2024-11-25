@@ -125,10 +125,10 @@ case ${action} in
 	read_etcd_keysonly)			action="get {inputKeyName} --prefix --keys-only";
 	;;
 	# Write an etcd value under a hostname
-	write_etcd)					action="put"; inputKeyName="/$(hostname)/${inputKeyName} --"; valueOnlySwitch=""
+	write_etcd)					action="put"; inputKeyName="/$(hostname)/${inputKeyName}"; valueOnlySwitch=""
 	;;
 	# Write a global etcd value where the key is implicit
-	write_etcd_global)			action="put"; inputKeyName="${inputKeyName} -- "; valueOnlySwitch=""
+	write_etcd_global)			action="put"; inputKeyName="${inputKeyName}"; valueOnlySwitch=""
 	;;
 	# Special function for writing ip addresses under /decoderip/ 
 	write_etcd_clientip)		action="put"; inputKeyName="/decoderip/$(hostname) -- ";
