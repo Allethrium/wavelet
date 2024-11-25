@@ -188,7 +188,7 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_hardening.serv
 	domain=$(dnsdomainname)
 	gateway=$(read _ _ gateway _ < <(ip route list match 0/0); echo "$gateway")
 
-	ehco -e "# The domain directive is only necessary, if your local
+	echo -e "# The domain directive is only necessary, if your local
 	     # router advertises something like	localdomain and	you have
 	     # set up your hostnames via an external domain.
 	     domain ${domain}
