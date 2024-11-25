@@ -1,3 +1,4 @@
+
 #!/bin/bash
 # Checks device hostname to define behavior and launches ultragrid from AppImage as appropriate
 # Script runs as a user service, calls other user services.  Nothing here should be asking for root.
@@ -82,11 +83,12 @@ event_encoder_server() {
 }
 
 event_server(){
+	# The server is a special case because it serves blanks screen, static image and test bars.
+	# As a result, instead of run_ug it calls wavelet_init.service
 	# Generate a catch-all audio sink for simultaneous output to transient devices
 	/usr/local/bin/pipewire_create_output_sink.sh
+	# Ensure web interface is up
 	KEYNAME=INPUT_DEVICE_PRESENT; read_etcd
-	echo -e "Ensuring dnsmasq service is up.."
-	hostname=$(hostname)
 	systemctl --user start http-php-pod.service
 	if [[ "$printvalue" -eq 1 ]]; then
 		echo -e "An input device is present on this host,
@@ -102,13 +104,11 @@ event_server(){
 }
 
 event_encoder(){
-	# MOVED - Encoder is now self-contained service/script
 	# Registers self as a decoder in etcd for the reflector to query & include in its client args
 	echo -e "Calling wavelet_encoder systemd unit.."
 	# I've added a blank bit here too.. it might make more sense to call it "host blank" though..
 	KEYNAME="DECODER_BLANK"; KEYVALUE="0"; write_etcd
 	systemctl --user daemon-reload
-	systemctl enable systemd-resolved.service --now
 	echo -e "Pinging wavelet_detectv4l.sh to ensure any USB devices are detected prior to start.. \n"
 	/usr/local/bin/wavelet_detectv4l.sh
 	systemctl --user start wavelet_encoder.service
