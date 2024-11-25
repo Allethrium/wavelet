@@ -65,7 +65,7 @@ RUN	rpm-ostree install -y -A \
 RUN mkdir -p /usr/lib/blackmagic && mkdir -p /var/lib/blackmagic && \
 	mokdir="/usr/lib/blackmagic" && \
 	openssl rand -writerand /usr/lib/blackmagic/.rnd && ln -s /usr/lib/blackmagic/.rnd /var/lib/blackmagic/.rnd && \
-	openssl req -config "/mount/openssl.cnf" -subj "/CN=MOK Signing Key/C=USA/ST=New York/L=New York/O=Global Security/OU=ALLETHRIUM/CN=wavelet.local"-new -x509 -newkey rsa:2048 -nodes -days 36500 -outform DER -keyout "/usr/lib/blackmagic/MOK.priv" -out "/usr/lib/blackmagic/MOK.der" && \
+	openssl req -subj "/CN=MOK Signing Key/C=US/ST=New York/L=New York/O=Global Security/OU=ALLETHRIUM/CN=wavelet.local"-new -x509 -newkey rsa:2048 -nodes -days 36500 -outform DER -keyout "/usr/lib/blackmagic/MOK.priv" -out "/usr/lib/blackmagic/MOK.der" && \
 	ln -s /usr/lib/blackmagic/MOK.priv /var/lib/blackmagic/MOK.priv && \
 	ln -s /usr/lib/blackmagic/MOK.der /var/lib/blackmagic/MOK.der && \
 	curl -L https://www.andymelville.net/wavelet/desktopvideo-14.2.1a1.x86_64.rpm -f --retry 5 > "desktopvideo.rpm" && \
