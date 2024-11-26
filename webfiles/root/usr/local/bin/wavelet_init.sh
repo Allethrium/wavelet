@@ -10,7 +10,7 @@ read_etcd(){
 	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
 read_etcd_global(){
-	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
 	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
 }
 read_etcd_prefix(){
@@ -55,7 +55,7 @@ event_init_seal(){
 	# Note that it starts the UG AppImage service directly and doesn't rely on run_ug, like an encoder will.
 	current_event="wavelet-seal"
 	rm -rf seal.mp4
-	ffmpeg -r 1 -i ny-stateseal.jpg -c:v mjpeg -vf fps=30 -color_range 2 -pix_fmt yuv440p seal.mp4
+	ffmpeg -r 1 -i ny-stateseal.jpg -c:v mjpeg -vf fps=30 -color_range 2 -t 240 -pix_fmt yuv440p seal.mp4
 	KEYNAME=uv_input; KEYVALUE="SEAL"; write_etcd_global
 	cd /home/wavelet/
 	# call uv_hash_select to process the provided device hash and select the input from these data
@@ -71,7 +71,7 @@ event_init_seal(){
 	# Destination IP is the IP address of the UG Reflector
 	destinationipv4="192.168.1.32"
 	UGMTU="9000"
-	ugargs="--tool uv $filtervar --control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}"
+	ugargs="--tool uv ${filtervar} --control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/var/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}"
 	KEYNAME=UG_ARGS; KEYVALUE=${ugargs}; write_etcd
 	echo -e "Verifying stored command line:\n"
 	echo -e "${ugargs}"
@@ -79,12 +79,19 @@ event_init_seal(){
 Description=UltraGrid AppImage executable
 After=network-online.target
 Wants=network-online.target
+
 [Service]
 ExecStart=/usr/local/bin/UltraGrid.AppImage ${ugargs}
 KillMode=mixed
-TimeoutStopSec=0.25
+TimeoutStopSec=0.5
+RestartSec=5
+StartLimitBurst=8
+StartLimitIntervalSec=30
+Restart=always
+RemainAfterExit=no
+
 [Install]
-WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
+WantedBy=graphical-session.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 	systemctl --user daemon-reload
 	echo -e "Retarting UltraGrid.AppImage.service..\n"
 	systemctl --user restart UltraGrid.AppImage.service
@@ -97,13 +104,16 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage
 #set -x
 # Sleep for five seconds to allow etcd cluster to start
 echo -e "Sleep for fifteen seconds to allow etcd cluster to stabilize..\n"
-Sleep 15
+sleep 15
 exec >/home/wavelet/initialize.log 2>&1
 echo -e "Populating standard values into etcd, the last step will trigger the Controller and Reflector functions, bringing the system up.\n"
 KEYNAME="uv_videoport"; KEYVALUE="5004"; write_etcd_global
+KEYNAME="uv_audioport"; KEYVALUE="5006"; write_etcd_global
 KEYNAME="/livestream/enabled"; KEYVALUE="0"; write_etcd_global
 KEYNAME="uv_hash_select"; KEYVALUE="2"; write_etcd_global
 KEYNAME="/banner/enabled"; KEYVALUE="0"; write_etcd_global
+KEYNAME="uv_filter_cmd"; KEYVALUE=""; write_etcd_global
+event_init_av1
 
 echo -e "Enabling monitor services..\n"
 systemctl --user enable watch_reflectorreload.service --now
@@ -111,7 +121,6 @@ systemctl --user enable wavelet_reflector.service --now
 systemctl --user enable watch_encoderflag.service --now
 echo -e "Values populated, monitor services launched.  Starting reflector\n\n"
 systemctl --user enable ultragrid.reflector.service --now
-event_init_av1
 systemctl --user restart wavelet_reflector.service --now
 systemctl --user enable wavelet_controller.service --now
 # Attempt to connect to a cached bluetooth audio output device
