@@ -130,10 +130,6 @@ WantedBy=multi-user.target" > /etc/containers/systemd/etcd-quadlet.container
 	systemctl start etcd-quadlet.service
 	#systemctl enable etcd-container.service --now
 
-	# Fix gssproxy SElinux bug
-	ausearch -c '(gssproxy)' --raw | audit2allow -M my-gssproxy
-	semodule -X 300 -i my-gssproxy.pp
-
 	# Generate and enable systemd units
 	# Therefore, they will start on next boot, run, and disable themselves
 	# Installing the security layer will require two reboots, one for the domain enrollment and one to move to userland.
@@ -441,8 +437,4 @@ systemctl disable zincati.service --now
 # Debug flag
 # set -x
 exec >/home/wavelet/installer.log 2>&1
-	# Fix AVAHI otherwise NDI won't function correctly, amongst other things;  https://www.linuxfromscratch.org/blfs/view/svn/basicnet/avahi.html
-	# Runs first because it doesn't matter what kind of server/client device, it'll need this.
-	groupadd -fg 84 avahi && useradd -c "Avahi Daemon Owner" -d /run/avahi-daemon -u 84 -g avahi -s /bin/false avahi
-	groupadd -fg 86 netdev
 detect_self

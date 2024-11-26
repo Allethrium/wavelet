@@ -224,6 +224,14 @@ fun_with_dkms(){
 #
 ####
 
+# Fix AVAHI otherwise NDI won't function correctly, amongst other things;  https://www.linuxfromscratch.org/blfs/view/svn/basicnet/avahi.html
+# Runs first because it doesn't matter what kind of server/client device, it'll need this.
+groupadd -fg 84 avahi && useradd -c "Avahi Daemon Owner" -d /run/avahi-daemon -u 84 -g avahi -s /bin/false avahi
+groupadd -fg 86 netdev
+
+# Fix gssproxy SElinux bug
+ausearch -c '(gssproxy)' --raw | audit2allow -M my-gssproxy
+semodule -X 300 -i my-gssproxy.pp
 
 exec >/home/wavelet/ug_depends.log 2>&1
 rpm_ostree_install_git

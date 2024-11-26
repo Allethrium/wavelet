@@ -80,7 +80,10 @@ install_security_layer(){
 ####
 
 
-
+# Fix AVAHI otherwise NDI won't function correctly, amongst other things;  https://www.linuxfromscratch.org/blfs/view/svn/basicnet/avahi.html
+# Runs first because it doesn't matter what kind of server/client device, it'll need this.
+groupadd -fg 84 avahi && useradd -c "Avahi Daemon Owner" -d /run/avahi-daemon -u 84 -g avahi -s /bin/false avahi
+groupadd -fg 86 netdev
 
 nmcli dev wifi rescan
 sleep 5
