@@ -184,8 +184,9 @@ generate_device_info() {
 }
 
 read_commandfile(){
+	# WIP
 	# Commandfile generated from dnsmasq to update NS records.
-	cat $(basename $(ls -t /var/tmp/*.command | head -n1)) | `xargs`
+	# cat $(basename $(ls -t /var/tmp/*.command | head -n1)) | `xargs`
 }
 
 read_leasefile(){
