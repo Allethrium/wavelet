@@ -50,7 +50,7 @@ RUN	rpm-ostree install -y -A \
 	make cmake coreutils binutils binutils-gold libtool gcc gcc-c++ glibc libgcc libstdc++ zlib-ng-compat glibc-devel \
 	cpio dkms usbutils tuned realtime-setup realtime-tests rtkit jo openssl openssl-devel \
 	autoconf automake libtirpc-devel libblkid-devel libaio-devel libattr-devel elfutils-libelf-devel ncompress libcurl-devel \
-	asciidoc go bzip2-devel libffi-devel zlib-devel libuuid-devel libudev-devel chkconfig akmods kmod kmod-devel kmodtool mokutil \
+	asciidocs go bzip2-devel libffi-devel zlib-devel libuuid-devel libudev-devel chkconfig akmods kmod kmod-devel kmodtool mokutil \
 	intel-media-driver intel-gpu-tools intel-compute-runtime oneVPL-intel-gpu intel-media-driver intel-gmmlib \
     intel-level-zero oneapi-level-zero libvpl intel-mediasdk libva libva-utils libva-v4l2-request libva-vdpau-driver intel-ocloc \
     ocl-icd opencl-headers mpv libsrtp mesa-dri-drivers intel-opencl libvdpau-va-gl mesa-vdpau-drivers libvdpau libvdpau-devel \
