@@ -241,6 +241,7 @@ server_bootstrap(){
 		echo -e "[Unit]
 Description=Dnsmasq inotify service
 After=network.target
+
 [Service]
 ExecStart=/usr/local/bin/wavelet_dnsmasq_inotify_service.sh
 RestartSec=10s
@@ -276,7 +277,7 @@ Restart=always
 TimeoutStartSec=600
 
 [Install]
-WantedBy=multi-user.target default.target" > /var/home/wavelet/.config/containers/systemd/livestream.container
+WantedBy=multi-user.target" > /var/home/wavelet/.config/containers/systemd/livestream.container
 	}
 	bootstrap_http
 	bootstrap_nginx_php
@@ -392,18 +393,31 @@ event_generate_watch_encoderflag(){
 	#ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/encoder_restart -w simple -- sh -c "/usr/local/bin/monitor_encoderflag.sh"
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/\"%H\"/encoder_restart" 0 0 "watch_encoderflag"
 }
+event_generate_encoder_service(){
+	# Generate userspace run_ug service
+	echo -e "[Unit]
+Description=Wavelet Encoder service
+After=network-online.target etcd-member.service
+Wants=network-online.target
 
+[Service]
+ExecStart=/bin/bash -c "/usr/local/bin/wavelet_encoder.sh"
+
+[Install]
+WantedBy=multi-user.target" > /var/home/wavelet/.config/systemd/user/wavelet_encoder.service
+}
 event_generate_run_ug(){
 	# Generate userspace run_ug service
 	echo -e "[Unit]
 Description=Wavelet Encoder/Decoder runner
 After=network-online.target etcd-member.service
 Wants=network-online.target
-[Service]
 
-ExecStart=/usr/local/bin/run_ug.sh
+[Service]
+ExecStart=/bin/bash -c "/usr/local/bin/run_ug.sh"
+
 [Install]
-WantedBy=default.target" > /var/home/wavelet/.config/systemd/user/run_ug.service
+WantedBy=multi-user.target" > /var/home/wavelet/.config/systemd/user/run_ug.service
 }
 
 event_generateHash(){
