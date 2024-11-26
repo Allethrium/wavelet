@@ -47,6 +47,7 @@ parse_input_opts(){
 event_detect_networkDevice(){
 	# We write out a lease file to /var/tmp/
 	# Inotifywait will monitor this directory and process the most recent .lease file.  The actual device setup will be launched as the wavelet user.
+	echo -e "Writing lease file for ${dnsmasq_ipAddr} and ${dnsmasq_mac}\n"
 	touch /var/tmp/${dnsmasq_ipAddr}_${dnsmasq_mac}.lease
 	sleep .5
 	# we remove the file .5 seconds later so that the device can be re-detected once dnsmasq hands out a new lease I.E on system reboot
@@ -56,7 +57,7 @@ event_detect_networkDevice(){
 
 event_inactive_networkDevice(){
 	# If security layer is enabled, dnsmasq won't handle DNS and we must update FreeIPA's BIND server manually;
-	echo -e "WIP.."
+	echo -e "WIP function that will clean up entries if the lease is expired and the device is no longer on the network..."
 	exit 0
 }
 
@@ -69,6 +70,5 @@ event_inactive_networkDevice(){
 #set -x
 exec >/var/tmp/network_sense.log 2>&1
 # check to see if I'm a server or an encoder
-
-echo -e "\n\n\n********Begin network detection and registration process...********\n\n\n"
+echo -e "\n\n********Begin network detection and registration process...********\n\n"
 detect_self
