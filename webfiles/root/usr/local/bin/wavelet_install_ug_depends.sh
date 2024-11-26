@@ -74,6 +74,19 @@ install_ug_depends(){
 	install_live555
 	install_libndi
 	touch /var/ug_depends.complete
+	# This ought to be some kind of useful process for MOK signing but so far... not working.
+	# kmodgenca -a
+	# openssl passwd wavelet123 > /var/home/wavelet/mok_pw
+	# Found sbctl, perhaps this would work?
+	cd /var/home/wavelet/
+	git clone https://github.com/foxboron/sbctl.git
+  	cd /var/home/wavelet/sbctl
+  	make && make install
+  	cd ..
+	#sbctl create-keys
+	#sbctl enroll-keys
+	#mokutil --hash-file /var/home/wavelet/mok_pw --import /etc/pki/akmods/certs/public_key.der
+
 }
 
 rpm_ostree_install_git(){
