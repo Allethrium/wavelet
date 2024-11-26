@@ -86,7 +86,7 @@ event_server(){
 	# The server is a special case because it serves blanks screen, static image and test bars.
 	# As a result, instead of run_ug it calls wavelet_init.service
 	# Generate a catch-all audio sink for simultaneous output to transient devices
-	/usr/local/bin/pipewire_create_output_sink.sh
+	# /usr/local/bin/pipewire_create_output_sink.sh
 	# Ensure web interface is up
 	KEYNAME=INPUT_DEVICE_PRESENT; read_etcd
 	systemctl --user start http-php-pod.service
