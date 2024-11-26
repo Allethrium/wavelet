@@ -21,30 +21,31 @@ certificateAuthorityFile="/etc/ipa/ca.crt"
 
 main() {
 	#echo -e "\nFunction:\nAction: ${action}\nKey Name: ${inputKeyName}\nKey Value: ${inputKeyValue}\nPrint Value Only?:${valueOnlySwitch}"
+	# We need to add a separator to etcd doesn't try to process any command inputs starting with the -- delimeter as etcd flags
+	set --
+	if [[ ${inputKeyValue} != "" ]]; then flagSeparator="-- "; fi
+	# Here we are going to parse the entire command line, otherwise injected '' for unused variables mess with the results.
+	# check for security layer
 	if [[ -f /var/prod.security.enabled ]]; then
 		ETCDURI=https://192.168.1.32:2379/v3/kv/put
 		etcdCommand(){
-			etcdctl --endpoints=${ETCDENDPOINT} \
-			--cert-file ${clientCertificateFile} \
-			--key-file ${clientKeyFile} \
-			--ca-file ${certificateAuthorityFile} \
-			${action} \
-			${inputKeyName} \
-			${inputKeyValue} \
-			${valueOnlySwich}
+			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" \
+			--cert-file "${clientCertificateFile}" \
+			--key-file "${clientKeyFile}" \
+			--ca-file "${certificateAuthorityFile}" "${commandLine[@]}")
 		}
 	else
 		ETCDURI=http://192.168.1.32:2379/v3/kv/put
 		etcdCommand(){
-			printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} \
-			${action} \
-			${inputKeyName} \
-			${inputKeyValue} \
-			${valueOnlySwitch})
+			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" "${commandLine[@]}")
 		}
 	fi
 	etcdCommand
-	echo ${printvalue}
+	if [[ ${printvalue} = "OK" ]]; then
+		echo -e "etcd key written successfully"
+	else
+		echo ${printvalue}
+	fi
 }
 
 generate_service(){
@@ -97,8 +98,6 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/${waveletModule}.s
 #
 #####
 
-#set -x
-#exec >/home/wavelet/etcd_interaction.log 2>&1
 action=$1
 inputKeyName=$2
 inputKeyValue=$3
@@ -110,37 +109,34 @@ revisionID=$7
 case ${action} in
 	# Read an etcd value stored under a hostname - note the preceding / 
 	# Etcd does not have a hierarchical structure so we're 'simulating' directories by adding the /
-	read_etcd)					action="get"; inputKeyName="/$(hostname)/${inputKeyName}" inputKeyValue=""; valueOnlySwitch="--print-value-only";
+	read_etcd)					declare -A commandLine=([3]="get" [2]="/$(hostname)/${inputKeyName}" [1]="--print-value-only");
 	;;
 		# Read an etcd value set globally - may still be hostname but would be defined in inputKeyName
-	read_etcd_global)			action="get"; valueOnlySwitch="--print-value-only";
+	read_etcd_global)			declare -A commandLine=([3]="get" [2]="${inputKeyName}" [1]="--print-value-only");
 	;;
 	# Read a set of etcd values by prefix.  I.E a list of IP addresses
-	read_etcd_prefix)   	    action="get --prefix"; inputKeyName="/$(hostname)/${inputKeyName}"; valueOnlySwitch="--print-value-only"
+	read_etcd_prefix)   	    declare -A commandLine=([3]="get" [2]="/$(hostname)/${inputKeyName}" [1]="--prefix" [0]="--print-value-only");
 	;;
-	read_etcd_json_revision)	action="get -w json";
+	read_etcd_json_revision)	declare -A commandline=([0]="get -w json");
 	;;
-	read_etcd_lastrevision)		action="get ${inputKeyName} --rev=${revisionID}";
+	read_etcd_lastrevision)		declare -A commandLine=([2]="get" [1]="${inputKeyName}" [0]="--rev=${revisionID}");
 	;;
-	read_etcd_keysonly)			action="get {inputKeyName} --prefix --keys-only";
+	read_etcd_keysonly)			declare -A commandLine=([3]="get" [2]="${inputKeyName}" [1]="--prefix" [0]="--keys-only");
 	;;
 	# Write an etcd value under a hostname
-	write_etcd)					action="put"; inputKeyName="/$(hostname)/${inputKeyName}"; valueOnlySwitch=""
+	write_etcd)					declare -A commandLine=([3]="put" [2]="/$(hostname)/${inputKeyName}" [1]="--" [0]="${inputKeyValue}");
 	;;
-	# Write a global etcd value where the key is implicit
-	write_etcd_global)			action="put"; inputKeyName="${inputKeyName}"; valueOnlySwitch=""
+	# Write a global etcd value where the key is root and not considered "under" a host
+	write_etcd_global)			declare -A commandLine=([3]="put" [2]="${inputKeyName}" [1]="--" [0]="${inputKeyValue}");
 	;;
 	# Special function for writing ip addresses under /decoderip/ 
-	write_etcd_clientip)		action="put"; inputKeyName="/decoderip/$(hostname) -- ";
+	write_etcd_clientip)		declare -A commandLine=([3]="put" [2]="/decoderip/$(hostname)" [1]="--" [0]="${inputKeyValue}");
 	;;
-	# returns value list of IP Addresses
-	read_etcd_clients_ip)		action="get"; inputKeyName="--prefix /decoderip/"; valueOnlySwitch="--print-value-only";
-	;;
-	# Special function only used for reflector.  Probably overcomlicating things and unnecessary.
-	read_etcd_clients_sed)		action="get --prefix /decoderip/"; valueOnlySwitch="--print-value-only";
+	# returns value list of IP Addresses, special case to parse directly to command (used for read_etcd_clients and the sed variant)
+	read_etcd_clients*)			declare -A commandLine=([3]="get" [2]="--prefix" [1]="/decoderip/" [0]="--print-value-only");
 	;;
 	# Delete a key
-	delete_etcd_key)			action="del"; inputKeyName="$()hostname)/${inputKeyName}";
+	delete_etcd_key)			declare -A commandLine=([1]="del" [0]="$()hostname)/${inputKeyName}");
 	;;
 	# Generate a user systemd watcher based off keyname and module arguments.
 	generate_service)			generate_service "${inputKeyName}" "${waveletModule}" "${additionalArg}";
@@ -150,6 +146,6 @@ case ${action} in
 	;;
 esac
 
+set -x
+exec >/home/wavelet/etcdlog.log 2>&1
 main "${action}" "${inputKeyName}" "${inputKeyValue}" "${valueOnlySwitch}"
-
-
