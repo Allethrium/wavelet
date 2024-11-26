@@ -183,11 +183,11 @@ generate_device_info() {
 	fi
 }
 
-read_commandfile(){
+#read_commandfile(){
 	# WIP
 	# Commandfile generated from dnsmasq to update NS records.
 	# cat $(basename $(ls -t /var/tmp/*.command | head -n1)) | `xargs`
-}
+#}
 
 read_leasefile(){
 	# Here we read in the leasefile and generate a devicehash from the IP:MAC combination.
