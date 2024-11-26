@@ -40,7 +40,7 @@ RUN	rpm-ostree install -y -A \
 	https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
     https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm && \
 	rpm-ostree install -y -A \
-	wget fontawesome-fonts wl-clipboard nnn mako sway bemenu rofi-wayland lxsession sway-systemd waybar \
+	wget fontawesome-fonts wl-clipboard nnn mako sway bemenu rofi-wayland lxsession sway-systemd waybar chronie \
 	foot vim powerline powerline-fonts vim-powerline perl NetworkManager-wifi iw wireless-regdb wpa_supplicant \
 	buildah rdma butane freeipa-client kea \
 	iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd sha libdrm python3-pip \
@@ -50,7 +50,7 @@ RUN	rpm-ostree install -y -A \
 	make cmake coreutils binutils binutils-gold libtool gcc gcc-c++ glibc libgcc libstdc++ zlib-ng-compat glibc-devel \
 	cpio dkms usbutils tuned realtime-setup realtime-tests rtkit jo openssl openssl-devel \
 	autoconf automake libtirpc-devel libblkid-devel libaio-devel libattr-devel elfutils-libelf-devel ncompress libcurl-devel \
-	bzip2-devel libffi-devel zlib-devel libuuid-devel libudev-devel chkconfig akmods kmod kmod-devel kmodtool mokutil \
+	asciidoc go bzip2-devel libffi-devel zlib-devel libuuid-devel libudev-devel chkconfig akmods kmod kmod-devel kmodtool mokutil \
 	intel-media-driver intel-gpu-tools intel-compute-runtime oneVPL-intel-gpu intel-media-driver intel-gmmlib \
     intel-level-zero oneapi-level-zero libvpl intel-mediasdk libva libva-utils libva-v4l2-request libva-vdpau-driver intel-ocloc \
     ocl-icd opencl-headers mpv libsrtp mesa-dri-drivers intel-opencl libvdpau-va-gl mesa-vdpau-drivers libvdpau libvdpau-devel \
@@ -64,8 +64,9 @@ RUN	rpm-ostree install -y -A \
 	# Module key signing needs much more understanding on my part to get working correctly..
 RUN mkdir -p /usr/lib/blackmagic && mkdir -p /var/lib/blackmagic && \
 	mokdir="/usr/lib/blackmagic" && \
-	openssl rand -writerand /usr/lib/blackmagic/.rnd && ln -s /usr/lib/blackmagic/.rnd /var/lib/blackmagic/.rnd && \
-	openssl req -subj "/CN=MOK Signing Key/C=US/ST=New York/L=New York/O=Global Security/OU=ALLETHRIUM/CN=wavelet.local"-new -x509 -newkey rsa:2048 -nodes -days 36500 -outform DER -keyout "/usr/lib/blackmagic/MOK.priv" -out "/usr/lib/blackmagic/MOK.der" && \
+	kmodgenca -a
+	#openssl rand -writerand /usr/lib/blackmagic/.rnd && ln -s /usr/lib/blackmagic/.rnd /var/lib/blackmagic/.rnd && \
+	#openssl req -subj "/CN=MOK Signing Key/C=US/ST=New York/L=New York/O=Global Security/OU=ALLETHRIUM/CN=wavelet.local"-new -x509 -newkey rsa:2048 -nodes -days 36500 -outform DER -keyout "/usr/lib/blackmagic/MOK.priv" -out "/usr/lib/blackmagic/MOK.der" && \
 	ln -s /usr/lib/blackmagic/MOK.priv /var/lib/blackmagic/MOK.priv && \
 	ln -s /usr/lib/blackmagic/MOK.der /var/lib/blackmagic/MOK.der && \
 	curl -L https://www.andymelville.net/wavelet/desktopvideo-14.2.1a1.x86_64.rpm -f --retry 5 > "desktopvideo.rpm" && \
