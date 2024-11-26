@@ -93,6 +93,6 @@ generate_image(){
 ###
 
 rm -rf /home/wavelet/banner.bmp, /home/wavelet/banner.pam
-set -x
+#set -x
 exec >/home/wavelet/textgen.log 2>&1
 banner_onoff
