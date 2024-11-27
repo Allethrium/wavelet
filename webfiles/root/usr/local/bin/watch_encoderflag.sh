@@ -88,5 +88,5 @@ main() {
 }
 
 #set -x
-exec >/home/wavelet/monitor_encoderflag.log 2>&1
+exec >/home/wavelet/watch_encoderflag.log 2>&1
 main
