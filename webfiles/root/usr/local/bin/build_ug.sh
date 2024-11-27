@@ -159,10 +159,11 @@ event_encoder(){
 	event_reset
 	event_device_redetect
 	event_host_relabel_watcher
+	event_generate_monitor_encoderflag
 	event_promote
 }
 
-event_generate_watch_encoderflag(){
+event_generate_monitor_encoderflag(){
 	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
 	hostname=$(hostname)
 	# We need to add this switch here to ensure if we're a server we don't populate ourselves to the encoders DOM in the webUI..
@@ -172,10 +173,11 @@ event_generate_watch_encoderflag(){
 		# generateHash was already called from the server event function.
 		:
 	fi
-	systemctl --user stop watch_encoderflag.service
+	systemctl --user stop monitor_encoderflag.service
 	# Can be called directly, remember to escape quotes if we want to preserve them as per bash standards.
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/encoder_restart 0 0 "monitor_encoderflag"
-	systemctl --user enable watch_encoderflag.service --now
+	systemctl --user daemon-reload
+	systemctl --user enable monitor_encoderflag.service --now
 	sleep 1
 }
 
@@ -227,6 +229,7 @@ server_bootstrap(){
 		# Remove executable bit from all webserver files and make sure to reset +x for the directory only
 		#find /var/home/wavelet/http/ -type f -print0 | xargs -0 chmod 644
 		chmod +x /var/home/wavelet/http
+		sleep 5
 	}
 
 	bootstrap_nginx_php(){
@@ -235,6 +238,7 @@ server_bootstrap(){
 		# Remove executable bit from all webserver files and make sure to reset +x for the directory only
 		#find /var/home/wavelet/http-php/ -type f -print0 | xargs -0 chmod 644
 		chmod +x /var/home/wavelet/http
+		sleep 5
 	}
 
 	bootstrap_dnsmasq_watcher_service(){
@@ -290,7 +294,7 @@ WantedBy=multi-user.target" > /var/home/wavelet/.config/containers/systemd/lives
 	echo -e "Enabling server notification services"
 	event_generate_controllerWatch
 	event_generate_reflectorreload
-	event_generate_watch_encoderflag
+	event_generate_monitor_encoderflag
 	event_generate_run_ug
 	systemctl --user enable wavelet_controller.service --now
 	systemctl --user enable watch_reflectorreload.service --now
@@ -319,6 +323,7 @@ event_reboot(){
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service SYSTEM_REBOOT 0 0 "wavelet_reboot"
 	# and the same for the host reboot
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/DECODER_REBOOT 0 0 "wavelet_decoder_reboot"
+	systemctl --user daemon-reload
 	systemctl --user enable wavelet_reboot.service --now
 	systemctl --user enable wavelet_decoder_reboot.service --now
 }
@@ -328,6 +333,7 @@ event_reset(){
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service SYSTEM_RESET 0 0 "wavelet_reset"
 	# and the same for the host reset
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/DECODER_RESET 0 0 "wavelet_decoder_reset"
+	systemctl --user daemon-reload
 	systemctl --user enable wavelet_reset.service --now
 	systemctl --user enable wavelet_monitor_decoder_reset.service --now
 }
@@ -341,6 +347,7 @@ event_reveal(){
 event_blankhost(){
 	# Tells specific host to display a black testcard on the screen, use this for privacy modes as necessary.
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/DECODER_BLANK 0 0 "wavelet_decoder_blank"
+	systemctl --user daemon-reload
 	systemctl --user enable wavelet_monitor_decoder_blank.service --now
 }
 
@@ -353,12 +360,14 @@ event_promote(){
 event_encoder_reboot(){
 	# Encoders have their own reboot flag should watch the system reboot flag for a hard reset
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/SYSTEM_REBOOT 0 0 "wavelet_reboot"
+	systemctl --user daemon-reload
 	systemctl --user enable wavelet_encoder_reboot.service --now
 }
 
 event_audio_toggle(){
 	# Toggles audio functionality on and off
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/interface/audio/enabled" 0 0 "wavelet_audio_toggle"
+	systemctl --user daemon-reload
 	systemctl --user enable wavelet_audio_toggle.service --now
 }
 
@@ -366,6 +375,7 @@ event_audio_bluetooth_connect(){
 	# Monitors the bluetooth MAC value and updates the system if there's a change
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/audio_interface_bluetooth_mac" 0 0 "wavelet_set_bluetooth_connect"
 	echo -e "Generating Reboot SystemdD unit in /.config/systemd/user.."
+	systemctl --user daemon-reload
 	systemctl --user enable wavelet_bluetooth_audio.service --now
 }
 
@@ -379,20 +389,22 @@ event_generate_reflector(){
 	# These may require us to rename some of the module .sh filenames because they don't appropriately reflect the flag or the service name!
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "REFLECTOR_ARGS" 0 0 "ultragrid.reflector"
 	# ExecStart=/usr/local/bin/UltraGrid.AppImage $(etcdctl --endpoints=${ETCDENDPOINT} get REFLECTOR_ARGS --print-value-only)
+	systemctl --user daemon-reload
+	systemctl enable ultragrid.reflector.service --now
 }
 
 event_generate_controllerWatch(){
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "input_update" 0 0 "wavelet_controller"
+	systemctl --user daemon-reload
+	systemctl enable wavelet_controller.service --now
 }
 
 event_generate_reflectorreload(){
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/decoderip/" 0 0 "watch_reflectorreload"
+	systemctl --user daemon-reload
+	systemctl enable reflectorreload.service --now
 }
 
-event_generate_watch_encoderflag(){
-	#ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/encoder_restart -w simple -- sh -c "/usr/local/bin/monitor_encoderflag.sh"
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/\"%H\"/encoder_restart" 0 0 "watch_encoderflag"
-}
 event_generate_encoder_service(){
 	# Generate userspace run_ug service
 	echo -e "[Unit]
@@ -405,7 +417,9 @@ ExecStart=/bin/bash -c "/usr/local/bin/wavelet_encoder.sh"
 
 [Install]
 WantedBy=multi-user.target" > /var/home/wavelet/.config/systemd/user/wavelet_encoder.service
+	systemctl --user daemon-reload
 }
+
 event_generate_run_ug(){
 	# Generate userspace run_ug service
 	echo -e "[Unit]
@@ -418,6 +432,7 @@ ExecStart=/bin/bash -c "/usr/local/bin/run_ug.sh"
 
 [Install]
 WantedBy=multi-user.target" > /var/home/wavelet/.config/systemd/user/run_ug.service
+	systemctl --user daemon-reload
 }
 
 event_generateHash(){
