@@ -159,11 +159,11 @@ event_encoder(){
 	event_reset
 	event_device_redetect
 	event_host_relabel_watcher
-	event_generate_monitor_encoderflag
+	event_generate_watch_encoderflag
 	event_promote
 }
 
-event_generate_monitor_encoderflag(){
+event_generate_watch_encoderflag(){
 	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
 	hostname=$(hostname)
 	# We need to add this switch here to ensure if we're a server we don't populate ourselves to the encoders DOM in the webUI..
@@ -173,11 +173,11 @@ event_generate_monitor_encoderflag(){
 		# generateHash was already called from the server event function.
 		:
 	fi
-	systemctl --user stop monitor_encoderflag.service
+	systemctl --user stop watch_encoderflag.service
 	# Can be called directly, remember to escape quotes if we want to preserve them as per bash standards.
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/encoder_restart 0 0 "monitor_encoderflag"
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/encoder_restart 0 0 "watch_encoderflag"
 	systemctl --user daemon-reload
-	systemctl --user enable monitor_encoderflag.service --now
+	systemctl --user enable watch_encoderflag.service --now
 	sleep 1
 }
 
@@ -294,7 +294,7 @@ WantedBy=multi-user.target" > /var/home/wavelet/.config/containers/systemd/lives
 	echo -e "Enabling server notification services"
 	event_generate_controllerWatch
 	event_generate_reflectorreload
-	event_generate_monitor_encoderflag
+	event_generatewatch_encoderflag
 	event_generate_run_ug
 	systemctl --user enable wavelet_controller.service --now
 	systemctl --user enable watch_reflectorreload.service --now
@@ -335,20 +335,20 @@ event_reset(){
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/DECODER_RESET 0 0 "wavelet_decoder_reset"
 	systemctl --user daemon-reload
 	systemctl --user enable wavelet_reset.service --now
-	systemctl --user enable wavelet_monitor_decoder_reset.service --now
+	systemctl --user enable wavelet_watch_decoder_reset.service --now
 }
 
 event_reveal(){
 	# Tells specific host to display SMPTE bars on screen, useful for finding which is what and where
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/DECODER_REVEAL 0 0 "wavelet_decoder_reveal"
-	systemctl --user enable wavelet_monitor_decoder_reveal.service --now
+	systemctl --user enable wavelet_watch_decoder_reveal.service --now
 }
 
 event_blankhost(){
 	# Tells specific host to display a black testcard on the screen, use this for privacy modes as necessary.
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/DECODER_BLANK 0 0 "wavelet_decoder_blank"
 	systemctl --user daemon-reload
-	systemctl --user enable wavelet_monitor_decoder_blank.service --now
+	systemctl --user enable wavelet_watch_decoder_blank.service --now
 }
 
 event_promote(){
