@@ -98,4 +98,4 @@ sleep 2
 install_security_layer
 touch /var/client_install.complete
 systemctl disable wavelet_install_client.service
-connectwifi
+/usr/local/bin/connectwifi.sh
