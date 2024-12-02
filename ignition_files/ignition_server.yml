@@ -444,7 +444,7 @@ storage:
          Type=simple
          ExecStart=/usr/bin/sh -c "/usr/local/bin/wavelet_init.sh"
          [Install]
-         WantedBy=default.target
+         WantedBy=multi-user.target
       user:
         name: wavelet
       group:
@@ -462,7 +462,7 @@ storage:
           [Service]
           ExecStart=/usr/local/bin/wavelet_encoder.sh
           [Install]
-          WantedBy=default.target
+          WantedBy=multi-user.target
       user:
         name: wavelet
       group:
@@ -480,7 +480,7 @@ storage:
           [Service]
           ExecStart=/usr/local/bin/wavelet_reflector.sh
           [Install]
-          WantedBy=default.target
+          WantedBy=multi-user.target
       user:
         name: wavelet
       group:
@@ -498,7 +498,7 @@ storage:
           [Service]
           ExecStart=/usr/local/bin/run_ug.sh
           [Install]
-          WantedBy=default.target
+          WantedBy=multi-user.target
       user:
         name: wavelet
       group:
@@ -519,7 +519,7 @@ storage:
           ExecStartPre=/usr/local/bin/wavelet_check_dependencies.sh
           ExecStart=/usr/local/bin/build_ug.sh
           [Install]
-          WantedBy=default.target
+          WantedBy=multi-user.target
       user:
         name: wavelet
       group:
@@ -648,7 +648,7 @@ systemd:
       enabled: true
       contents: |
         [Unit]
-        Description=Install Overlay packages, and generate second-boot systemd units
+        Description=Install packages, generate second-boot systemd rootful units
         ConditionFirstBoot=yes
         After=multi-user.target
         [Service]
