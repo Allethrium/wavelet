@@ -188,6 +188,7 @@ restorecon -Rv /var/lib/tftpboot
 cp -R /var/lib/tftpboot/*.efi /home/wavelet/http/pxe
 cp -R /var/lib/tftpboot/boot /home/wavelet/http/pxe
 cp -R /var/lib/tftpboot/efi /home/wavelet/http/pxe
+cp /var/home/wavelet/etcd_ip /home/wavelet/http/ignition
 # Ensure the wavelet user owns the http folder, and set +x and read perms on http folder and subfolders
 chmod -R 0755 /home/wavelet/http
 chown -R wavelet /home/wavelet/
