@@ -68,7 +68,10 @@ install_security_layer(){
 		802-1x.identity identity@example.com \
 		802-1x.ca-cert /etc/ipa/ca.crt \
 		802-1x.client-cert /etc/nssdb/ \
-		802-1x.private-key /etc/nssdb/ \
+		802-1x.private-key /etc/nssdb/
+	else
+		echo -e "security layer is not enabled, not configuring"
+	fi
 }
 
 
