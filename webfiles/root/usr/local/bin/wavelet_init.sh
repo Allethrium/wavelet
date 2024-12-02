@@ -71,6 +71,9 @@ event_init_seal(){
 	# Destination IP is the IP address of the UG Reflector
 	destinationipv4="192.168.1.32"
 	UGMTU="9000"
+	# There may be a bug in UG continuous regarding streaming the static image
+	# avformat_seek_file(s->fmt_ctx, -1, INT64_MIN, s->fmt_ctx->start_time, INT64_MAX, 0): Operation not permitted
+	# test against 1.9.8
 	ugargs="--tool uv ${filtervar} --control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/var/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}"
 	KEYNAME=UG_ARGS; KEYVALUE=${ugargs}; write_etcd
 	echo -e "Verifying stored command line:\n"
