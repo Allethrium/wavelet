@@ -14,7 +14,7 @@ connectwifi(){
 	sleep 5
 	nmcli dev wifi rescan
 	sleep 3
-	wifibssid=$(nmcli -f BSSID device wifi | grep ${wifi_ap_mac} | head -n 1 | cut -d ' ')
+	wifibssid=$(nmcli -f BSSID device wifi | grep ${wifi_ap_mac} | head -n 1 | xargs )
 
 	nmcli dev wifi connect ${networkssid} hidden yes password ${wifipassword} bssid ${wifibssid}
 	
@@ -84,6 +84,14 @@ if [[ -f /var/no.wifi ]]; then
 	exit 0
 fi
 
+#####
+#
+# Main
+#
+#####
 
+
+#set -x
+exec >/home/wavelet/connectwifi.log 2>&1
 connectwifi
 detect_disable_ethernet
