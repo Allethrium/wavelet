@@ -55,7 +55,7 @@ event_init_seal(){
 	# Note that it starts the UG AppImage service directly and doesn't rely on run_ug, like an encoder will.
 	current_event="wavelet-seal"
 	rm -rf seal.mp4
-	ffmpeg -r 1 -i ny-stateseal.jpg -c:v mjpeg -vf fps=30 -color_range 2 -t 240 -pix_fmt yuv440p seal.mp4
+	ffmpeg -fflags +genpts -i ny-stateseal.jpg -c:v mjpeg -vf fps=30 -color_range 2 -t 240 -pix_fmt yuvj444p seal.mp4
 	KEYNAME=uv_input; KEYVALUE="SEAL"; write_etcd_global
 	cd /home/wavelet/
 	# call uv_hash_select to process the provided device hash and select the input from these data
@@ -94,10 +94,13 @@ RemainAfterExit=no
 [Install]
 WantedBy=graphical-session.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 	systemctl --user daemon-reload
-	echo -e "Retarting UltraGrid.AppImage.service..\n"
-	systemctl --user restart UltraGrid.AppImage.service
+	echo -e "Starting UG executable and then restarting UltraGrid.AppImage.service..\n"
+	/usr/local/bin/UltraGrid.AppImage ${ugargs}
+	sleep 2
+	pkill -9 uv
+	systemctl --user start UltraGrid.AppImage.service
 	# Sleep for a couple of seconds to allow the encoder to come up, then Select switcher input #1 which should always be the Seal image.
-	sleep 5
+	sleep 2
 	echo 'capture.data 1' | busybox nc -v 127.0.0.1 6160
 }
 
