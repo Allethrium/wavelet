@@ -1,4 +1,3 @@
-
 #!/bin/bash
 # Checks device hostname to define behavior and launches ultragrid from AppImage as appropriate
 # Script runs as a user service, calls other user services.  Nothing here should be asking for root.
@@ -116,7 +115,7 @@ event_encoder(){
 
 event_decoder(){
 	# Sleep for 5 seconds so we have a chance for the decoder to connect to the network
-	sleep 3
+	sleep 5
 	# Registers self as a decoder in etcd for the reflector to query & include in its client args
 	sleep 1
 	write_etcd_clientip
@@ -249,46 +248,22 @@ get_ipValue(){
 	# IP value MUST be populated or the decoder writes gibberish into the server
 	if [[ "${IPVALUE}" == "" ]] then
 			# sleep for five seconds, then call yourself again
-			echo -e "\nIP Address is null, sleeping and calling function again\n"
+			echo -e "IP Address is null, sleeping and calling function again\n"
 			sleep 5
 			get_ipValue
 		else
-			echo -e "\nIP Address is not null, testing for validity..\n"
+			echo -e "IP Address is not null, testing for validity..\n"
 			valid_ipv4() {
 				local ip=$1 regex='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
 				if [[ $ip =~ $regex ]]; then
 					echo -e "\nIP Address is valid, continuing..\n"
 					KEYNAME="/hostHash/$(hostname)/ipaddr"; keyvalue="${ip}"; write_etcd_global
 				else
-					echo "\nIP Address is not valid, sleeping and calling function again\n"
+					echo -e "IP Address is not valid, sleeping and calling function again\n"
 					get_ipValue
 				fi
 			}
 			valid_ipv4 "${IPVALUE}"
-	fi
-}
-
-detect_disable_ethernet(){
-	if [[ -f /var/no.wifi ]]; then
-		echo -e "The /var/no.wifi flag is set.  Please remove this file if this host should utilize wireless connectivity."
-	else
-		# We disable ethernet preferentially if we have two active connections
-		# This prevents some of the IP detection automation from having issues.
-		# This should have been done already once the decoder provisioned and successfully connected to wifi.
-		# Add another filter to exclude veth interfaces
-		for interface in $(ip link show | awk '{print $2}' | grep ":$" | cut -d ':' -f1); do
-			if [[ $(nmcli dev show "${interface}" | grep "connected") ]] && \
-			[[ $(nmcli dev show "${interface}" | grep "ethernet") ]] && \
-			[[ $(nmcli device status | grep -a 'wifi.*connect') ]] && \
-			[[ $(nmcli dev show "${interface}") != *"veth"* ]]; then
-				echo -e "${interface} is an ethernet connection, active WiFi connection also detected..."
-				wifiFound="1"
-				ethernetFound="1"
-				ethernetInterface="${interface}"
-			fi
-		done
-		nmcli device down "${ethernetInterface}"
-		echo -e "Interface ${ethernetInterface} has been disabled.\n\nTo re-enable, you can use:\nnmcli device up ${ethernetInterface}\n\nor:\nnmtui\n"
 	fi
 }
 
@@ -326,16 +301,13 @@ wifi_connect_retry(){
 	fi
 }
 
-###
+#####
 #
+# Main
 #
-# Execute script
-#
-#
-###
+#####
+
 #set -x
 exec >/home/wavelet/run_ug.log 2>&1
-detect_disable_ethernet
-#set_ethernet_mtu
 get_ipValue
 detect_self
