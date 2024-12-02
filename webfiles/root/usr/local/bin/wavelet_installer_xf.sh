@@ -416,7 +416,7 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
 	touch /var/rpm-ostree-overlay.dev.pkgs.complete
 	echo -e "RPM package updates completed, finishing installer task..\n"
-	while -f /var/client_install.complete; do
+	while [[ ! -f /var/client_install.complete ]]; do
 		sleep 5
 		echo "waiting for client install to complete.."
 	done
