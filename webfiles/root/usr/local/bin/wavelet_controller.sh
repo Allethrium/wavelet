@@ -260,7 +260,7 @@ wavelet_dynamic() {
 		sleep 2
 		# Set appropriate capture channel for running encoder
 		KEYNAME="/hostHash/${targetHost}/ipaddr"; read_etcd_global; targetIP=${printvalue}
-		echo -3 "\nAttempting to set switcher channel to new device for ${targetHost}..\n"
+		echo -e "\nAttempting to set switcher channel to new device for ${targetHost}..\n"
 		echo 'capture.data 3' | busybox nc -v ${targetIP} 6160
 	fi
 }
