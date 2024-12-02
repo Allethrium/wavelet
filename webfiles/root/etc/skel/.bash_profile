@@ -9,7 +9,9 @@ fi
 
 # If running from tty1, start nginx web UI service and start sway after a five second delay
 if [ "$(tty)" = "/dev/tty1" ]; then
-	systemctl --user start http-php-pod.service
+	if [[ $(hostname) == *"svr"* ]]; then
+		systemctl --user start http-php-pod.service
+	fi
 	sleep 5
 	exec sway
 fi
