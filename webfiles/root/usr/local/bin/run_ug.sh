@@ -118,7 +118,7 @@ event_decoder(){
 	sleep 5
 	# Registers self as a decoder in etcd for the reflector to query & include in its client args
 	sleep 1
-	write_etcd_clientip
+	write_etcd_client_ip
 	# Ensure all reset, reveal and reboot flags are set to 0 so they are
 	# 1) populated
 	# 2) not active so the new device goes into a reboot/reset/reveal loop
@@ -128,9 +128,12 @@ event_decoder(){
 	KEYNAME="DECODER_BLANK"; write_etcd
 	sleep 1
 	# Enable watcher services now all task activation keys are set to 0
-	systemctl --user enable wavelet_monitor_decoder_reset.service --now
-	systemctl --user enable wavelet_monitor_decoder_reveal.service --now
-	systemctl --user enable wavelet_monitor_decoder_reboot.service --now
+	systemctl --user enable wavelet_decoder_reset.service --now
+	systemctl --user enable wavelet_decoder_reveal.service --now
+	systemctl --user enable wavelet_decoder_reboot.service --now
+	systemctl --user enable wavelet_decoder_blank.service --now
+	systemctl --user enable wavelet_device_relabel.service --now
+	systemctl --user enable wavelet_promote.service --now
 	sleep 1
 	# Note - ExecStartPre=-swaymsg workspace 2 is a failable command 
 	# It will always send the UG output to a second display.  
@@ -291,9 +294,7 @@ wifi_connect_retry(){
 		else
 			echo -e "Attempting to connect to WiFi.  If this device is NOT planned to be on WiFi, run the command:\n"
 			echo -e "touch /var/no.wifi"
-			while ! connectwifi; do
-				sleep 2
-			done
+			/usr/local/bin/connectwifi.sh
 		fi
 	else
 		echo -e "This machine has no wifi connectivity, exiting..\n"
