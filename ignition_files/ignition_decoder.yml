@@ -85,36 +85,34 @@ storage:
       contents:
         inline: |
           polkit.addRule(function(action, subject) {
-          if (action.id == "org.freedesktop.systemd1.manage-units") {
-              polkit.log("action=" + action)
-              polkit.log("subject=" + subject)
-              polkit.log("unit="+action.lookup("unit"))
-              polkit.log("verb="+action.lookup("verb"))
-              if (action.lookup("unit") == "systemd-resolved.service" ||
-                  action.lookup("unit") == "dnsmasq.service" ||
-                  action.lookup("unit") == "decoderhostname.service" ||
-                  action.lookup("unit") == "etcd-member.service")
-                  {
-                  var verb = action.lookup("verb");
-                  if (verb == "start" || verb == "stop" || verb == "restart" || verb == "enable" || verb == "disable") {
-                      polkit.log("returning YES")
-                      return polkit.Result.YES;
+            if ((action.id == "org.freedesktop.systemd1.manage-units" &&
+                 subject.user == "wavelet")) {
+                  polkit.log("action=" + action)
+                  polkit.log("subject=" + subject)
+                  polkit.log("unit="+action.lookup("unit"))
+                  polkit.log("verb="+action.lookup("verb"))
+            if ((action.lookup("unit") == "dnsmasq.service") ||
+                 action.lookup("unit") == "etcd-quadlet.service") {
+                 var verb = action.lookup("verb");
+                 if (verb == "start" || verb == "stop" || verb == "restart" || verb == "enable" || verb == "disable") {
+                  polkit.log("returning YES")
+                  return polkit.Result.YES;
                   }
+                }
               }
-          }
-          polkit.log("returning NO") });
-    # WiFI control
+          });
+    # Wifi control
     - path: /etc/polkit-1/rules.d/1338-wavelet-wifi.rules
       mode: 0644
       overwrite: true
       contents:
         inline: |
-          [Allow wi-fi scans for all users]
-          Identity=unix-user:*
-          Action=org.freedesktop.NetworkManager.wifi.scan
-          ResultAny=yes
-          ResultInactive=yes
-          ResultActive=yes
+          polkit.addRule(function(action, subject) {
+            if ((action.id == "org.freedesktop.NetworkManager.wifi.scan" &&
+              subject.user == "wavelet")) {
+                return polkit.Result.YES;
+              }
+          });
     # SystemD resolved
     - path: /etc/polkit-1/rules.d/51-systemd-resolved.rules
       mode: 0644
@@ -122,12 +120,10 @@ storage:
       contents:
         inline: |
           polkit.addRule(function(action, subject) {
-          if (action.id == "org.freedesktop.resolve1") {
-              if (subject.user == "wavelet") {
+            if ((action.id == "org.freedesktop.resolve1") &&
+                 subject.user == "wavelet") {
                   return polkit.Result.YES;
-              }
-          }
-          polkit.log("returning NO") });
+                  }
           });
     # Hostnamectl control
     - path: /etc/polkit-1/rules.d/49-wavelet-hostnamectl.rules
@@ -139,26 +135,22 @@ storage:
           if (action.id == "org.freedesktop.hostname1.set-hostname") {
             if (subject.user == "wavelet") {
               return polkit.Result.YES;
-                  }
+              }
+            }
+            polkit.log("returning NO") 
+          });
+    # Reboot
+    - path: /etc/polkit-1/rules.d/1336-systemd-reboot.rules
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          polkit.addRule(function(action, subject) {
+            if ((action.id == "org.freedesktop.reboot" &&
+                 subject.user == "wavelet")) {
+                  return polkit.Result.YES;
                 }
-          polkit.log("returning NO") });
-              });
-    # generate dnf repository
-    # looks at the server for cached packages before trying to download anything
-    # saves about 800mb+ BW per install!
-    # DNF is currently not properly working on rpm-ostree systems - have to revert to pulling everything down from web
-    # https://github.com/rpm-software-management/dnf/issues/2108
-#    - path: /etc/yum.repos.d/wavelet.repo
-#      mode: 0644
-#      overwrite: true
-#      contents:
-#        inline: |
-#          [wavelet-repo]
-#          name=Wavelet local server repository
-#          baseurl=http://192.168.1.32:8080/repo_mirror/fedora/releases/$releasever/$basearch
-#          enabled=1
-#          gpgcheck=0
-#          priority=10
+          });
     # Define system performance settings
     - path: /etc/sysctl.d/90-sysrq.conf
       mode: 0644
@@ -241,6 +233,12 @@ storage:
         inline: |
           # Allow wavelet to set device hostname
           wavelet ALL=(ALL) NOPASSWD: /usr/bin/hostnamectl
+    # populate the etcd cluster hostname/IP address from the server
+    - path: /var/home/wavelet/etcd_ip
+      mode: 0644
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/etcd_ip
 # Systemd user units
     # systemD user unit for wavelet initialization
     # Called with other initializations when Sway is executed from;
