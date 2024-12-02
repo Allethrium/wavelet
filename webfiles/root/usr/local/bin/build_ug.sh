@@ -208,7 +208,7 @@ event_server(){
 
 server_bootstrap(){
 # Bootstraps the server processes including Apache HTTP server for distribution files, and the web interface NGINX/PHP pod
-	sleep 10
+	sleep 5
 	# Build_httpd and build http-php both seem to have issues pulling the container images from quadlets, so we will try to head that issue off by pulling the images here.
 	podman pull docker://docker.io/library/nginx:alpine
 	podman pull docker://docker.io/library/php:fpm
@@ -229,7 +229,7 @@ server_bootstrap(){
 		# Remove executable bit from all webserver files and make sure to reset +x for the directory only
 		#find /var/home/wavelet/http/ -type f -print0 | xargs -0 chmod 644
 		chmod +x /var/home/wavelet/http
-		sleep 5
+		sleep 1
 	}
 
 	bootstrap_nginx_php(){
@@ -238,7 +238,7 @@ server_bootstrap(){
 		# Remove executable bit from all webserver files and make sure to reset +x for the directory only
 		#find /var/home/wavelet/http-php/ -type f -print0 | xargs -0 chmod 644
 		chmod +x /var/home/wavelet/http
-		sleep 5
+		sleep 1
 	}
 
 	bootstrap_dnsmasq_watcher_service(){
@@ -314,7 +314,7 @@ WantedBy=multi-user.target" > /var/home/wavelet/.config/containers/systemd/lives
 		# Prune anything !=alive
 	echo -e "Server configuration is now complete, rebooting system.."
 	# Allow time
-	sleep 30
+	sleep 5
 	systemctl reboot
 }
 
