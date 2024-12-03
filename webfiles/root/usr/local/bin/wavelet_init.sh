@@ -95,10 +95,7 @@ RemainAfterExit=no
 WantedBy=graphical-session.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 	systemctl --user daemon-reload
 	echo -e "Starting UG executable and then restarting UltraGrid.AppImage.service..\n"
-	/usr/local/bin/UltraGrid.AppImage ${ugargs}
-	sleep 2
-	pkill -9 uv
-	systemctl --user start UltraGrid.AppImage.service
+	systemctl --user enable UltraGrid.AppImage.service --now
 	# Sleep for a couple of seconds to allow the encoder to come up, then Select switcher input #1 which should always be the Seal image.
 	sleep 2
 	echo 'capture.data 1' | busybox nc -v 127.0.0.1 6160
@@ -107,8 +104,9 @@ WantedBy=graphical-session.target" > /home/wavelet/.config/systemd/user/UltraGri
 # Populate standard values into etcd
 #set -x
 # Sleep for five seconds to allow etcd cluster to start
-echo -e "Sleep for eight seconds to allow etcd cluster to stabilize..\n"
-sleep 8
+echo -e "Sleep for five seconds to allow etcd cluster to stabilize..\n"
+sleep 5
+
 exec >/home/wavelet/initialize.log 2>&1
 echo -e "Populating standard values into etcd, the last step will trigger the Controller and Reflector functions, bringing the system up.\n"
 KEYNAME="uv_videoport"; KEYVALUE="5004"; write_etcd_global
@@ -127,8 +125,10 @@ echo -e "Values populated, monitor services launched.  Starting reflector\n\n"
 systemctl --user enable ultragrid.reflector.service --now
 systemctl --user restart wavelet_reflector.service --now
 systemctl --user enable wavelet_controller.service --now
+
 # Attempt to connect to a cached bluetooth audio output device
 /usr/local/bin/wavelet_set_bluetooth_connect.sh
 # Ping detectv4l so that we populate devices
 /usr/local/bin/wavelet_detectv4l.sh
+
 event_init_seal
