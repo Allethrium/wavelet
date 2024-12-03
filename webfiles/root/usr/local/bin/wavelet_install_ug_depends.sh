@@ -20,17 +20,18 @@ install_ug_depends(){
 		# removed mkdir build && cd build too
 		cmake -DBUILD_TOOLS=OFF
 		cmake --build . --parallel "$(nproc)"
-		sudo cmake --install .
+		cmake --install .
 		cd /var/home/wavelet
 	}
 	install_libaja(){
 		#Install libAJA Library
+		# Setting driver=ON breaks because I think it expects a card with valid S/N to be present.
 		git clone https://github.com/aja-video/libajantv2.git && \
-		cmake -DAJANTV2_DISABLE_DEMOS=ON  -DAJANTV2_DISABLE_DRIVER=OFF \
+		cmake -DAJANTV2_DISABLE_DEMOS=ON  -DAJANTV2_DISABLE_DRIVER=ON \
 		-DAJANTV2_DISABLE_TOOLS=ON  -DAJANTV2_DISABLE_TESTS=ON \
 		-DAJANTV2_BUILD_SHARED=ON \
 		-DCMAKE_BUILD_TYPE=Release -Blibajantv2/build -Slibajantv2 && \
-		cmake --build libajantv2/build --config Release -j "1" && \
+		cmake --build libajantv2/build --config Release -j "$(nproc)" && \
 		sleep 2 && \
 		sudo cmake --install libajantv2/build
 		cd /var/home/wavelet
@@ -39,6 +40,8 @@ install_ug_depends(){
 		# Live555
 		git clone https://github.com/xanview/live555/
 		cd live555
+		# Ensure DNO_STD_LIB is set otherwise compilation will fail
+		sed -i 's|-D_FILE_OFFSET_BITS=64 -fPIC|-D_FILE_OFFSET_BITS=64 -fPIC -DNO_STD_LIB|g' /var/home/wavelet/live555/config.linux-with-shared-libraries
 		./genMakefiles linux-with-shared-libraries
 		make -j "$(nproc)"
 		make install
@@ -69,7 +72,7 @@ install_ug_depends(){
 		echo -e "\nLibNDI Installed..\n"
 		cd /var/home/wavelet
 	}
-	#install_libaja
+	install_libaja
 	install_cineform
 	install_live555
 	install_libndi
