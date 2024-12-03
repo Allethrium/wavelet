@@ -174,12 +174,18 @@ storage:
       overwrite: true
       contents:
         source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/usr/local/bin/wavelet_pxe_grubconfig.sh
-    # Containerfile for Ostree overlay
-    - path: /home/wavelet/containerfiles/Containerfile.coreos.overlay
+    # Containerfile for Ostree overlay client
+    - path: /home/wavelet/containerfiles/Containerfile.coreos.overlay.client
       mode: 0644
       overwrite: true
       contents:
-        source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/home/wavelet/containerfiles/Containerfile.coreos.overlay
+        source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/home/wavelet/containerfiles/Containerfile.coreos.overlay.client
+    # Containerfile for Ostree overlay server
+    - path: /home/wavelet/containerfiles/Containerfile.coreos.overlay.server
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/home/wavelet/containerfiles/Containerfile.coreos.overlay.server
     # Enable proxy for dnf.conf for all the good it may do us..
     - path: /etc/dnf/dnf.conf
       mode: 0664
