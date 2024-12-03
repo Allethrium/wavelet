@@ -1,22 +1,31 @@
 #!/bin/bash
 # Attempts to find and join a Wavelet network if it's available
 
+get_full_bssid(){
+	sleep 1
+	wifibssid=$(nmcli -f BSSID device wifi | grep ${wifi_ap_mac} | head -n 1 | xargs)
+	echo ${wifibssid}
+}
+
 connectwifi(){
-	# 5/28/2024 - fix echo to cat so connectwifi spits out proper values and connects appropriately.
-	# These are now defined by inline files in ignition so they can be "securely" customized ahead of time
 	networkssid=$(cat /var/home/wavelet/wifi_ssid)
 	wifipassword=$(cat /var/home/wavelet/wifi_pw)
 	wifi_ap_mac=$(cat /var/home/wavelet/wifi_bssid)
+	# Determine wifi ifname (what a pain..)
+	ifname=$(nmcli dev show | grep wifi -B1 | head -n 1 | awk '{print $2}')
 
-	echo -e "802-11-wireless-security.psk:${wifipassword}" > /home/wavelet/wpa_psk.file
+	# Keep scanning until we get a match on wifi_ap_mac
+	until get_full_bssid | grep -m 1 "${wifi_ap_mac}"; do
+		nmcli dev wifi rescan
+	done
+	# We need to do this once more, or the variable isn't populated.
+	wifibssid=$(get_full_bssid)
+	echo -e "\nFound WiFi BSSID match! It is: ${wifibssid}\n"
 
-	nmcli dev wifi rescan
-	sleep 5
-	nmcli dev wifi rescan
-	sleep 3
-	wifibssid=$(nmcli -f BSSID device wifi | grep ${wifi_ap_mac} | head -n 1 | xargs )
+	nmcli connection add type wifi con-name ${networkssid} ifname ${ifname} ssid ${networkssid}
+	nmcli connection modify ${networkssid} wifi-sec.key-mgmt wpa-psk wifi-sec.psk ${wifipassword}
+	nmcli connection up ${networkssid}
 
-	nmcli dev wifi connect ${networkssid} hidden yes password ${wifipassword} bssid ${wifibssid}
 	
 	if [ $? -eq 0 ]; then
 		echo -e "\nConnection successful!  Continuing..\n"
@@ -26,6 +35,7 @@ connectwifi(){
 			nmcli dev wifi connect ${networkssid} password ${wifipassword}
 		fi
 			echo -e "Continuing to connect for three more tries..\n"
+			sleep 2
 			nmcli dev wifi connect ${networkssid} hidden yes password ${wifipassword} bssid ${wifibssid}
 			sleep 2
 			nmcli dev wifi connect ${networkssid} hidden yes password ${wifipassword} bssid ${wifibssid}
@@ -35,17 +45,33 @@ connectwifi(){
 }
 
 connectwifi_enterprise(){          
+	networkssid=$(cat /var/home/wavelet/wifi_ssid)
+	wifi_ap_mac=$(cat /var/home/wavelet/wifi_bssid)
+	# Determine wifi ifname (what a pain..)
+	ifname=$(nmcli dev show | grep wifi -B1 | head -n 1 | awk '{print $2}')
 	# Generates an nmcli connection with the appropriate certificates
-	nmcli dev wifi rescan
-	sleep 3
-	nmcli dev wifi rescan
-	sleep 3
+	until get_full_bssid | grep -m 1 "${wifi_ap_mac}"; do
+		nmcli dev wifi rescan
+		get_full_bssid
+	done
+
+	# Define paths to pregenerated certificates.
+	# These might be generated and managed by the DC, or we could do them manually if we need to at some point.
 	wifiCACert=/etc/ipa/ca.crt
-	wifiClientCert=/etc/pki/tls/certs/wificlient.crt
-	wifiClientKey=/etc/pki/tls/private/wificlient.crt
+	wifiClientCert=/etc/pki/tls/certs/this_wificlient.crt
+	wifiClientKey=/etc/pki/tls/private/this_wificlient.crt
+	wifiServerKey=/etc/pki/tls/certs/wifiserver.crt
+
 	# Some nmcli examples.  We would just be using certificates for our intended setup without any identity passwords.
 	#nmcli connection add type wifi con-name "MySSID" ifname wlp3s0 ssid "MySSID" -- wifi-sec.key-mgmt wpa-eap 802-1x.eap ttls 802-1x.phase2-auth mschapv2 802-1x.identity "USERNAME" 
 	#nmcli connection add type wifi con-name "MySSID" ifname wlp3s0 ssid "MySSID" -- wifi-sec.key-mgmt wpa-eap 802-1x.eap tls 802-1x.identity "USERNAME" 802-1x.ca-cert ~/ca.pem 802-1x.client-cert ~/cert.pem  802-1x.private-key-password "..." 802-1x.private-key ~/key.pem
+
+	# nmcli connection add type wifi con-name "${networkssid}" ifname ${ifname} ssid "${networkssid}" \
+	# -- wifi-sec.key-mgmt wpa-eap 802-1x.eap tls 802-1x.identity "WAVELET" \
+	# 802-1x.ca-cert ${wifiCACert} \
+	# 802-1x.client-cert ${wifiClientCert} \
+	# 802-1x.private-key-password "${privateKeyPassword}" \ 
+	# 802-1x.private-key ${wifiClientKey}
 }
 
 detect_disable_ethernet(){
@@ -67,15 +93,15 @@ detect_disable_ethernet(){
 				ethernetInterface="${interface}"
 			fi
 		done
-		nmcli device down "${ethernetInterface}"
-		echo -e "Interface ${ethernetInterface} has been disabled.\n\nTo re-enable, you can use:\nnmcli device up ${ethernetInterface}\n\nor:\nnmtui\n"
+		nmcli device disconnect "${ethernetInterface}"
+		echo -e "Interface ${ethernetInterface} has been disabled.\n\nTo re-enable, you can use:\nnmcli device up ${ethernetInterface}\nOr:\nnmtui\nFor a gui interface."
 	fi
 }
 
 if [[ $(hostname) = *"svr"* ]]; then
 	echo -e "This script enables wifi and disables other networking devices.  It is highly recommended to have the server running on a wired link."
-	echo -e "If you want to run the server off of a WiFi connection, this should be configured and enabled manually via nmtui or nmcli."
-	echo -e "Not that performance will likely suffer as a result."
+	echo -e "If you want to run the server via a WiFi connection, this should be configured and enabled manually via nmtui or nmcli."
+	echo -e "Performance will likely suffer as a result."
 	exit 0
 fi
 
@@ -91,7 +117,9 @@ fi
 #####
 
 
-#set -x
+set -x
 exec >/home/wavelet/connectwifi.log 2>&1
+# Ensure wifi radio is on
+nmcli r wifi on
 connectwifi
 detect_disable_ethernet
