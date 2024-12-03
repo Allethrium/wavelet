@@ -38,7 +38,7 @@ read_etcd(){
 }
 read_etcd_global(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
-	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
+	echo -e "Key Name {$KEYNAME} read from etcd for Global Value: $printvalue\n"
 }
 read_etcd_prefix(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
@@ -58,10 +58,10 @@ write_etcd(){
 }
 write_etcd_global(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
-	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
+	echo -e "Key Name ${KEYNAME} set to Global value: ${KEYVALUE}\n"
 }
 write_etcd_client_ip(){
-	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_clientip" "${KEYNAME}" "${KEYVALUE}"
 }
 delete_etcd_key(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
@@ -117,7 +117,8 @@ event_decoder(){
 	# Sleep for 5 seconds so we have a chance for the decoder to connect to the network
 	sleep 5
 	# Registers self as a decoder in etcd for the reflector to query & include in its client args
-	sleep 1
+	echo -e "Populated IP Address is: ${IPVALUE}"
+	KEYVALUE=${IPVALUE}
 	write_etcd_client_ip
 	# Ensure all reset, reveal and reboot flags are set to 0 so they are
 	# 1) populated
@@ -197,8 +198,7 @@ event_decoder(){
 	# - other possible failure modes
 	#	???
 	get_ipValue
-	# Resolved is necessary on decoders, encoders
-	systemctl enable systemd-resolved.service --now
+	# Resolved is necessary on decoders, encoders, or is?
 	}
 
 event_livestream(){
@@ -259,8 +259,8 @@ get_ipValue(){
 			valid_ipv4() {
 				local ip=$1 regex='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
 				if [[ $ip =~ $regex ]]; then
-					echo -e "\nIP Address is valid, continuing..\n"
-					KEYNAME="/hostHash/$(hostname)/ipaddr"; keyvalue="${ip}"; write_etcd_global
+					echo -e "\nIP Address is valid as ${ip}, continuing.."
+					KEYNAME="/hostHash/$(hostname)/ipaddr"; KEYVALUE="${ip}"; write_etcd_global
 				else
 					echo -e "IP Address is not valid, sleeping and calling function again\n"
 					get_ipValue
@@ -308,7 +308,7 @@ wifi_connect_retry(){
 #
 #####
 
-#set -x
+set -x
 exec >/home/wavelet/run_ug.log 2>&1
 get_ipValue
 detect_self
