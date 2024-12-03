@@ -19,9 +19,6 @@ read_etcd_prefix(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
 	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
-read_etcd_keysonly(){
-	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_keysonly" "${KEYNAME}")
-}
 read_etcd_clients_ip() {
 	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
 }
@@ -30,19 +27,31 @@ read_etcd_clients_ip_sed() {
 	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
 	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
 }
+read_etcd_json_revision(){
+	# Special case used in controller
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_json_revision" uv_hash_select | jq -r '.header.revision')
+}
+read_etcd_lastrevision(){
+	# Special case used in controller
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_lastrevision")	
+}
 write_etcd(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
 	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
 }
 write_etcd_global(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
-	echo -e "Key Name ${KEYNAME} set to Global value ${KEYVALUE}\n"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
 }
 write_etcd_client_ip(){
-	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_clientip" "${KEYNAME}" "${KEYVALUE}"
 }
 delete_etcd_key(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
+}
+generate_service(){
+	# Can be called with more args with "generate_servier" ${keyToWatch} 0 0 "${serviceName}"
+	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
 }
 
 sense_devices() {
@@ -84,7 +93,7 @@ generate_device_info() {
 	# Let's look for the device hash in the /interface prefix to make sure it doesn't already exist!
 	KEYNAME="/hash/${deviceHash}"; read_etcd_global; output_return=${printvalue}
 	if [[ $output_return == "" ]] then
-		echo -e "\n${deviceHash} not located within etcd, assuming we have a new device and continuing with process to set parameters..\n"
+		echo -e "${deviceHash} not located within etcd, assuming we have a new device and continuing with process to set parameters..\n"
 		isDevice_input_or_output
 	else
 		echo -e "\n${deviceHash} located in etcd:\n\n${output_return}\n\n, terminating process.\nIf you wish for the device to be properly redetected from scratch, please move it to a different USB port.\n"
@@ -235,7 +244,7 @@ event_dellWB3023(){
 event_unknowndevice() {
 # 30fps is a compatibility setting, catch all for other devices we will leave at 30.  Try YUYV with RGB conversion..
 	echo -e "The connected device has not been previously assigned an input ID for the UI component.  Storing hash.\n"
-	KEYNAME="/inputs/${device_string_long}"; KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"; write_etcd
+	KEYNAME="/inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"; write_etcd
 	echo -e "\n Detection completed for device..\n"
 	device_cleanup
 }
