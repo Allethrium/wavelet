@@ -296,19 +296,22 @@ EOF
 	--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
 	-v=/home/wavelet/containerfiles:/mount:z \
 	-f /home/wavelet/containerfiles/Containerfile.coreos.overlay.client
-	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay_client:latest
+	podman tag localhost/coreos_overlay_client localhost:5000/coreos_overlay_client:latest
 	touch /var/rpm-ostree-overlay.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+	podman push localhost:5000/coreos_overlay_client:latest 192.168.1.32:5000/coreos_overlay_client --tls-verify=false	
 	# Build the server overlay
 	podman build -t localhost/coreos_overlay_server \
 	--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
 	-v=/home/wavelet/containerfiles:/mount:z \
 	-f /home/wavelet/containerfiles/Containerfile.coreos.overlay.server
+	podman tag localhost/coreos_overlay_server localhost:5000/coreos_overlay_server:latest
+	# We don't need to push the server overlay to the registry, because this it the only host which will use it.
 	# Rebase server on server overlay image
 	rpm-ostree rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay_server
 	# Push client image to container registry - N.B can only use --compress with dir: transport method.  
-	podman push localhost:5000/coreos_overlay:latest 192.168.1.32:5000/coreos_overlay_client --tls-verify=false
+
 	echo -e "\nRPM package updates completed, finishing installer task and checking for extended support..\n"
 }
 
