@@ -294,7 +294,7 @@ WantedBy=multi-user.target" > /var/home/wavelet/.config/containers/systemd/lives
 	echo -e "Enabling server notification services"
 	event_generate_controllerWatch
 	event_generate_reflectorreload
-	event_generatewatch_encoderflag
+	event_generate_watch_encoderflag
 	event_generate_run_ug
 	systemctl --user enable wavelet_controller.service --now
 	systemctl --user enable watch_reflectorreload.service --now
@@ -493,9 +493,15 @@ event_host_relabel_watcher(){
 }
 
 
+#####
+#
+# Main
+#
+#####
+
 # Check for pre-existing log file
 # This is necessary because of system restarts, the log will get overwritten, and we need to see what it's doing across reboots.
-logName=/home/wavelet/build_ug.log
+logName=/var/home/wavelet/build_ug.log
 if [[ -e $logName || -L $logName ]] ; then
 	i=0
 	while [[ -e $logName-$i || -L $logName-$i ]] ; do
@@ -503,7 +509,8 @@ if [[ -e $logName || -L $logName ]] ; then
 	done
 	logName=$logName-$i
 fi
-set -x
+
+#set -x
 exec > "${logName}" 2>&1
 
 detect_self
