@@ -10,7 +10,28 @@
 # The kernel download/install correctly calls dracut to regenerate initramfs.  Manual attempts at this failed (from coreos layering examples)
 
 FROM quay.io/fedora/fedora-coreos:stable
-ARG DKMS_KERNEL_VERSION
+
+# Client steps already run
+RUN rpm-ostree override remove nfs-utils-coreos --install nfs-utils
+RUN	rpm-ostree install -y -A \
+	https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
+    https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm && \
+	rpm-ostree install -y -A \
+	wget fontawesome-fonts wl-clipboard nnn mako sway bemenu rofi-wayland lxsession sway-systemd waybar chrony \
+	foot vim powerline powerline-fonts vim-powerline perl NetworkManager-wifi iw wireless-regdb wpa_supplicant \
+	rdma freeipa-client iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd sha python3-pip \
+	libv4l v4l-utils pipewire-v4l2 ImageMagick \
+	mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
+	mesa-libxatracker alsa-lib pipewire-alsa alsa-firmware alsa-plugins-speex bluez-tools netcat busybox \
+	tuned realtime-setup realtime-tests rtkit jo \
+	intel-media-driver intel-gpu-tools intel-compute-runtime intel-gmmlib intel-ocloc intel-opencl \
+    intel-level-zero libvpl intel-mediasdk \
+    libva libva-utils libva-intel-driver libva-v4l2-request libva-vdpau-driver libvdpau-va-gl libvdpau \
+    oneVPL-intel-gpu oneapi-level-zero ocl-icd opencl-headers mpv libsrtp \
+    ffmpeg ffmpeg-libs libheif-freeworld fastfetch htop mesa-libOpenCL srt srt-libs vlc mplayer \
+    libndi-sdk ndi-sdk ndi-sdk-documentation pipewire-utils \
+    rkhunter clamav clamav-freshclam && \
+	ostree container commit
 
 # Install necessary devel packages in addition to the pre-existing base layer
 RUN	rpm-ostree install -y -A \
@@ -26,6 +47,7 @@ RUN	rpm-ostree install -y -A \
 	ostree container commit
 
 # Define, download, and install host kernel version from Koji build system
+ARG DKMS_KERNEL_VERSION
 RUN KERNEL_VERSION="$(rpm -qa kernel --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}')" && echo "\n\nContainer Kernel Version is: ${KERNEL_VERSION}\n\n" && \
 	echo -e "\nHost Kernel: ${DKMS_KERNEL_VERSION}\n" && echo -e "\nContainer Kernel: ${KERNEL_VERSION}\n" && if [[ ${DKMS_KERNEL_VERSION} = ${KERNEL_VERSION} ]] ; then echo -e '\nKernel matches!\n' && \
 	rpm-ostree install -y kernel-devel-matched; else echo -e '\nKernels do not match, downloading matching host kernel from Koji..\n' && \
@@ -37,7 +59,7 @@ RUN KERNEL_VERSION="$(rpm -qa kernel --queryformat '%{VERSION}-%{RELEASE}.%{ARCH
 	koji download-build --rpm --arch=x86_64 kernel-modules-core-${DKMS_KERNEL_VERSION} && \
 	koji download-build --rpm --arch=x86_64 kernel-modules-extra-${DKMS_KERNEL_VERSION} && \
 	koji download-build --rpm --arch=x86_64 kernel-devel-matched-${DKMS_KERNEL_VERSION}; fi
-	
+
 RUN	rpm-ostree cliwrap install-to-root / && rpm-ostree override replace \
 	kernel-${DKMS_KERNEL_VERSION}.rpm \
 	kernel-core-${DKMS_KERNEL_VERSION}.rpm \
