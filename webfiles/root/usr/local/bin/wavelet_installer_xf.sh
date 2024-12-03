@@ -289,21 +289,26 @@ EOF
 	echo ':: A certificate to sign the driver has been created at /var/lib/blackmagic/MOK.der. This certificate needs to be enrolled if you run Secure Boot with validation (e.g. shim).'
 	echo -e "\nPlease run:\nmokutil --import '/var/lib/blackmagic/MOK.der'\nIn order to enroll the MOK key!!"
 	# Podman build, tags the image, uses DKMS_KERNEL_VERSION to parse host OS kernel version into container
-	# needs to mount the pregenerated openssl.cnf file so we generate the correct certificates for module signing
-	# finally specifies the containerfile to build.
-	podman build -t localhost/coreos_overlay \
+	# The first stage builds the container with the necessary software to run as a decoder/encoder
+	# The second stage adds everything necessary for the server.
+	# We do this two-stage process to keep the overlay size down as much as we can
+	podman build -t localhost/coreos_overlay_client \
 	--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
 	-v=/home/wavelet/containerfiles:/mount:z \
-	-f /home/wavelet/containerfiles/Containerfile.coreos.overlay
-	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay:latest
+	-f /home/wavelet/containerfiles/Containerfile.coreos.overlay.client
+	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay_client:latest
 	touch /var/rpm-ostree-overlay.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-	rpm-ostree rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay
-	#rpm-ostree --bypass-driver --experimental rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay
-	# Push image to container registry
-	# N.B can only use --compress with dir: transport method.  
-	podman push localhost:5000/coreos_overlay:latest 192.168.1.32:5000/coreos_overlay --tls-verify=false
+	# Build the server overlay
+	podman build -t localhost/coreos_overlay_server \
+	--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
+	-v=/home/wavelet/containerfiles:/mount:z \
+	-f /home/wavelet/containerfiles/Containerfile.coreos.overlay.server
+	# Rebase server on server overlay image
+	rpm-ostree rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay_server
+	# Push client image to container registry - N.B can only use --compress with dir: transport method.  
+	podman push localhost:5000/coreos_overlay:latest 192.168.1.32:5000/coreos_overlay_client --tls-verify=false
 	echo -e "\nRPM package updates completed, finishing installer task and checking for extended support..\n"
 }
 
@@ -354,7 +359,8 @@ EOF
 }
 
 rpm_ostree_ARM(){
-	# We are building ARM version here, so the containerfile would specify arm-specific libraries.  This would need A LOT of work...
+	# We are building ARM version here, so the containerfile would specify arm-specific libraries for multiple proprietary platforms.  
+	# Unless panfrost made some major progress on mainline hw video acceleration, this would need A LOT of work...
 	if [[ -f /var/arm_support.flag ]]; then
 		echo -e "ARM support is enabled, building ARM OCI overlay and downloading additional UltraGrid build..\n"
 	else
@@ -363,13 +369,13 @@ rpm_ostree_ARM(){
 	podman build -t localhost/coreos_overlay \
 	--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
 	-v=/home/wavelet/containerfiles:/mount:z \
-	-f /home/wavelet/containerfiles/Containerfile.arm.coreos.overlay
-	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay_arm
+	-f /home/wavelet/containerfiles/Containerfile.arm.coreos.overlay.client
+	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay_arm_client
 	touch /var/rpm-ostree-overlay.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
 	# N.B can only use --compress with dir: transport method. zstd would be pretty cool, no? 
-	podman push localhost:5000/coreos_overlay_surface:latest 192.168.1.32:5000/coreos_overlay_arm --tls-verify=false
+	podman push localhost:5000/coreos_overlay_surface:latest 192.168.1.32:5000/coreos_overlay_arm_client --tls-verify=false
 }
 
 rpm_ostree_RISCV(){
@@ -377,13 +383,13 @@ rpm_ostree_RISCV(){
 	podman build -t localhost/coreos_overlay \
 	--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
 	-v=/home/wavelet/containerfiles:/mount:z \
-	-f /home/wavelet/containerfiles/Containerfile.RISCV.coreos.overlay
-	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay_RISCV
+	-f /home/wavelet/containerfiles/Containerfile.RISCV.coreos.overlay.client
+	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay_RISCV_client
 	touch /var/rpm-ostree-overlay.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
 	# N.B can only use --compress with dir: transport method. zstd would be pretty cool, no? 
-	podman push localhost:5000/coreos_overlay_surface:latest 192.168.1.32:5000/coreos_overlay_RISCV --tls-verify=false
+	podman push localhost:5000/coreos_overlay_surface:latest 192.168.1.32:5000/coreos_overlay_RISCV_client --tls-verify=false
 }
 
 rpm_overlay_install_decoder(){
@@ -410,7 +416,7 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
 	echo -e "Installing via container and applying as Ostree overlay..\n"
 	# We need to pull the container from the server registry first, apparently manually?  Probably https issue here.
 	podman pull 192.168.1.32:5000/coreos_overlay --tls-verify=false 
-	rpm-ostree rebase ostree-unverified-image:containers-storage:192.168.1.32:5000/coreos_overlay
+	rpm-ostree rebase ostree-unverified-image:containers-storage:192.168.1.32:5000/coreos_overlay_client
 	touch /var/rpm-ostree-overlay.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
