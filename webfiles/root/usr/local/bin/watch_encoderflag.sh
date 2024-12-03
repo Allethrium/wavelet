@@ -71,7 +71,7 @@ main() {
 			# we check whether an input device has been added via detectv4l.sh to this  server
 			KEYNAME=INPUT_DEVICE_PRESENT; read_etcd
 				if [[ "$printvalue" -eq 1 ]]; then
-					systemctl --user stop UltraGrid.AppImage.service
+					systemctl --user disable UltraGrid.AppImage.service --now
 					systemctl --user restart run_ug.service
 					echo -e "An input device is present on this server, and it is running as an encoder, restarting encoder component.."
 				else
