@@ -214,37 +214,37 @@ event_ipevo() {
 # We will have to add to this over time to support more devices appropriately.
 # 
 	echo -e "IPEVO Camera detection running..\n"
-	KEYNAME="/inputs/${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPG:convert=RGB:size=1920x1080:tpf=1/30:device=${v4l_device_path}"; write_etcd
+	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPG:convert=RGB:size=1920x1080:tpf=1/30:device=${v4l_device_path}"; write_etcd
 	echo -e "\nDetection completed for IPEVO device..\n"
 	device_cleanup
 }
 event_logitech_hdmi() {
-	KEYNAME="/inputs/${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPEG:convert=RGB:size=1920x1080:tpf=1/30:device=${v4l_device_path}"; write_etcd
+	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPEG:convert=RGB:size=1920x1080:tpf=1/30:device=${v4l_device_path}"; write_etcd
 	echo -e "\nDetection completed for Logitech HDMI Capture device..\n"
 	device_cleanup
 }
 event_magewell() {
 	echo -e "Setting up Magewell USB capture card..\n"
-	KEYNAME="/inputs/${device_string_long}"; KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"; write_etcd
+	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"; write_etcd
 	echo -e "\nDetection completed for device..\n"
 	device_cleanup
 }
 event_epson() {
 	echo -e "Setting up EPSON Document camera device...\n"
-	KEYNAME="/inputs/${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/24:device=${v4l_device_path}"; write_etcd
+	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/24:device=${v4l_device_path}"; write_etcd
 	echo -e "\nDetection completed for device..\n"
 	device_cleanup
 }
 event_dellWB3023(){
 	echo -e "Setting up Dell WB3023 webcam..\n"
-	KEYNAME=KEYNAME="/inputs/${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPG:size=640x480:tpf=1/30:device=${v4l_device_path}"; write_etcd
+	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPG:size=640x480:tpf=1/30:device=${v4l_device_path}"; write_etcd
 	echo -e "\nDetection completed for device..\n"
 	device_cleanup	
 }
 event_unknowndevice() {
 # 30fps is a compatibility setting, catch all for other devices we will leave at 30.  Try YUYV with RGB conversion..
 	echo -e "The connected device has not been previously assigned an input ID for the UI component.  Storing hash.\n"
-	KEYNAME="/inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"; write_etcd
+	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"; write_etcd
 	echo -e "\n Detection completed for device..\n"
 	device_cleanup
 }
