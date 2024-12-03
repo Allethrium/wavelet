@@ -418,6 +418,7 @@ ExecStart=/bin/bash -c "/usr/local/bin/wavelet_encoder.sh"
 [Install]
 WantedBy=multi-user.target" > /var/home/wavelet/.config/systemd/user/wavelet_encoder.service
 	systemctl --user daemon-reload
+	systemctl --user enable wavelet_encoder.service
 }
 
 event_generate_run_ug(){
