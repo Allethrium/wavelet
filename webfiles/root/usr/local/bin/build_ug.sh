@@ -390,19 +390,19 @@ event_generate_reflector(){
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "REFLECTOR_ARGS" 0 0 "ultragrid.reflector"
 	# ExecStart=/usr/local/bin/UltraGrid.AppImage $(etcdctl --endpoints=${ETCDENDPOINT} get REFLECTOR_ARGS --print-value-only)
 	systemctl --user daemon-reload
-	systemctl enable ultragrid.reflector.service --now
+	systemctl --user enable ultragrid.reflector.service --now
 }
 
 event_generate_controllerWatch(){
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "input_update" 0 0 "wavelet_controller"
 	systemctl --user daemon-reload
-	systemctl enable wavelet_controller.service --now
+	systemctl --user enable wavelet_controller.service --now
 }
 
 event_generate_reflectorreload(){
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/decoderip/" 0 0 "watch_reflectorreload"
 	systemctl --user daemon-reload
-	systemctl enable reflectorreload.service --now
+	systemctl --user enable reflectorreload.service --now
 }
 
 event_generate_encoder_service(){
