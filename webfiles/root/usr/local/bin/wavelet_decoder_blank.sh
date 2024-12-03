@@ -74,6 +74,7 @@ event_decoder_blank(){
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 	systemctl --user daemon-reload
 	systemctl --user start UltraGrid.AppImage.service
+	systemctl --user start wavelet_decoder_blank.service
 	echo -e "\nTask Complete.\n"
 	exit 0
 }
@@ -86,6 +87,7 @@ event_decoder_unblank(){
 	mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.blank /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 	systemctl --user daemon-reload
 	systemctl --user start UltraGrid.AppImage.service
+	systemctl --user start wavelet_decoder_blank.service
 	echo -e "\nTask Complete.\n"
 	exit 0
 }
