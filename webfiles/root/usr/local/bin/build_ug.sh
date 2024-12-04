@@ -178,7 +178,6 @@ event_generate_watch_encoderflag(){
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/encoder_restart 0 0 "watch_encoderflag"
 	systemctl --user daemon-reload
 	systemctl --user enable watch_encoderflag.service --now
-	sleep 1
 }
 
 event_server(){
@@ -229,7 +228,6 @@ server_bootstrap(){
 		# Remove executable bit from all webserver files and make sure to reset +x for the directory only
 		#find /var/home/wavelet/http/ -type f -print0 | xargs -0 chmod 644
 		chmod +x /var/home/wavelet/http
-		sleep 1
 	}
 
 	bootstrap_nginx_php(){
@@ -238,7 +236,6 @@ server_bootstrap(){
 		# Remove executable bit from all webserver files and make sure to reset +x for the directory only
 		#find /var/home/wavelet/http-php/ -type f -print0 | xargs -0 chmod 644
 		chmod +x /var/home/wavelet/http
-		sleep 1
 	}
 
 	bootstrap_dnsmasq_watcher_service(){
@@ -313,8 +310,6 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 		# Get "alive mountpoints"
 		# Prune anything !=alive
 	echo -e "Server configuration is now complete, rebooting system.."
-	# Allow time
-	sleep 5
 	systemctl reboot
 }
 
@@ -358,56 +353,105 @@ event_promote(){
 }
 
 event_encoder_reboot(){
-	# Encoders have their own reboot flag should watch the system reboot flag for a hard reset
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/SYSTEM_REBOOT 0 0 "wavelet_reboot"
-	systemctl --user daemon-reload
-	systemctl --user enable wavelet_encoder_reboot.service --now
+	# We want to regenerate this every time because the hostname may change
+		# Generate userspace run_ug service
+		# Encoders have their own reboot flag should watch the system reboot flag for a hard reset
+		/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/SYSTEM_REBOOT 0 0 "wavelet_reboot"
+		systemctl --user daemon-reload
+		systemctl --user enable wavelet_encoder_reboot.service --now
 }
 
 event_audio_toggle(){
-	# Toggles audio functionality on and off
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/interface/audio/enabled" 0 0 "wavelet_audio_toggle"
-	systemctl --user daemon-reload
-	systemctl --user enable wavelet_audio_toggle.service --now
+	if [[ $(systemctl --user list-unit-files "wavelet_audio_toggle.service") ]]; then
+		echo -e "Unit file already generated, moving on\n"
+		:
+	else
+		echo -e "Unit file does not exist, generating..\n"
+		# Generate userspace run_ug service
+		# Toggles audio functionality on and off
+		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/interface/audio/enabled" 0 0 "wavelet_audio_toggle"
+		systemctl --user daemon-reload
+		systemctl --user enable wavelet_audio_toggle.service --now
+	fi
 }
 
 event_audio_bluetooth_connect(){
-	# Monitors the bluetooth MAC value and updates the system if there's a change
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/audio_interface_bluetooth_mac" 0 0 "wavelet_set_bluetooth_connect"
-	echo -e "Generating Reboot SystemdD unit in /.config/systemd/user.."
-	systemctl --user daemon-reload
-	systemctl --user enable wavelet_bluetooth_audio.service --now
+	if [[ $(systemctl --user list-unit-files "wavelet_bluetooth_audio.service") ]]; then
+		echo -e "Unit file already generated, moving on\n"
+		:
+	else
+		echo -e "Unit file does not exist, generating..\n"
+		# Generate userspace run_ug service
+		# Monitors the bluetooth MAC value and updates the system if there's a change
+		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/audio_interface_bluetooth_mac" 0 0 "wavelet_set_bluetooth_connect"
+		echo -e "Generating Reboot SystemdD unit in /.config/systemd/user.."
+		systemctl --user daemon-reload
+		systemctl --user enable wavelet_bluetooth_audio.service --now
+	fi
 }
 
 event_livestreamservice(){
-	# creates wavelet_livestream systemd unit.
-	# I think this can run on the server without causing performance issues.
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "uv_islivestreaming" 0 0 "wavelet_livestream"
-	systemctl --user enable wavelet_livestream.service --now
+	if [[ $(systemctl --user list-unit-files "wavelet_livestream.service") ]]; then
+		echo -e "Unit file already generated, moving on\n"
+		:
+	else
+		echo -e "Unit file does not exist, generating..\n"
+		# Generate userspace run_ug service
+		# creates wavelet_livestream systemd unit.
+		# I think this can run on the server without causing performance issues.
+		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "uv_islivestreaming" 0 0 "wavelet_livestream"
+		systemctl --user daemon-reload
+		systemctl --user enable wavelet_livestream.service --now
+	fi
 }
 event_generate_reflector(){
-	# These may require us to rename some of the module .sh filenames because they don't appropriately reflect the flag or the service name!
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "REFLECTOR_ARGS" 0 0 "wavelet.reflector"
-	# ExecStart=/usr/local/bin/UltraGrid.AppImage $(etcdctl --endpoints=${ETCDENDPOINT} get REFLECTOR_ARGS --print-value-only)
-	systemctl --user daemon-reload
-	systemctl --user enable wavelet.reflector.service --now
+	if [[ $(systemctl --user list-unit-files "wavelet_reflector.service") ]]; then
+		echo -e "Unit file already generated, moving on\n"
+		:
+	else
+		echo -e "Unit file does not exist, generating..\n"
+		# Generate userspace run_ug service
+		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "REFLECTOR_ARGS" 0 0 "wavelet.reflector"
+		# ExecStart=/usr/local/bin/UltraGrid.AppImage $(etcdctl --endpoints=${ETCDENDPOINT} get REFLECTOR_ARGS --print-value-only)
+		systemctl --user daemon-reload
+		systemctl --user enable wavelet.reflector.service --now
+	fi
 }
 
 event_generate_controllerWatch(){
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "input_update" 0 0 "wavelet_controller"
-	systemctl --user daemon-reload
-	systemctl --user enable wavelet_controller.service --now
+	if [[ $(systemctl --user list-unit-files "wavelet_controller.service") ]]; then
+		echo -e "Unit file already generated, moving on\n"
+		:
+	else
+		echo -e "Unit file does not exist, generating..\n"
+		# Generate userspace run_ug service
+		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "input_update" 0 0 "wavelet_controller"
+		systemctl --user daemon-reload
+		systemctl --user enable wavelet_controller.service --now
+	fi
 }
 
 event_generate_reflectorreload(){
+	if [[ $(systemctl --user list-unit-files "reflectorreload.service") ]]; then
+		echo -e "Unit file already generated, moving on\n"
+		:
+	else
+		echo -e "Unit file does not exist, generating..\n"
+		# Generate userspace run_ug service
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/decoderip/" 0 0 "watch_reflectorreload"
 	systemctl --user daemon-reload
 	systemctl --user enable reflectorreload.service --now
+	fi
 }
 
 event_generate_encoder_service(){
-	# Generate userspace run_ug service
-	echo -e "[Unit]
+	if [[ $(systemctl --user list-unit-files "wavelet_encoder.service") ]]; then
+		echo -e "Unit file already generated, moving on\n"
+		:
+	else
+		echo -e "Unit file does not exist, generating..\n"
+		# Generate userspace run_ug service
+		echo -e "[Unit]
 Description=Wavelet Encoder service
 After=network-online.target etcd-member.service
 Wants=network-online.target
@@ -417,8 +461,9 @@ ExecStart=/bin/bash -c "/usr/local/bin/wavelet_encoder.sh"
 
 [Install]
 WantedBy=default.target" > /var/home/wavelet/.config/systemd/user/wavelet_encoder.service
-	systemctl --user daemon-reload
-	systemctl --user enable wavelet_encoder.service
+		systemctl --user daemon-reload
+		systemctl --user enable wavelet_encoder.service
+	fi
 }
 
 event_generate_run_ug(){
