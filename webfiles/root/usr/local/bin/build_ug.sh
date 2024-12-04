@@ -281,7 +281,7 @@ Restart=always
 TimeoutStartSec=600
 
 [Install]
-WantedBy=multi-user.target" > /var/home/wavelet/.config/containers/systemd/livestream.container
+WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestream.container
 	}
 	bootstrap_http
 	bootstrap_nginx_php
@@ -416,7 +416,7 @@ Wants=network-online.target
 ExecStart=/bin/bash -c "/usr/local/bin/wavelet_encoder.sh"
 
 [Install]
-WantedBy=multi-user.target" > /var/home/wavelet/.config/systemd/user/wavelet_encoder.service
+WantedBy=default.target" > /var/home/wavelet/.config/systemd/user/wavelet_encoder.service
 	systemctl --user daemon-reload
 	systemctl --user enable wavelet_encoder.service
 }
@@ -432,7 +432,7 @@ Wants=network-online.target
 ExecStart=/bin/bash -c "/usr/local/bin/run_ug.sh"
 
 [Install]
-WantedBy=multi-user.target" > /var/home/wavelet/.config/systemd/user/run_ug.service
+WantedBy=default.target" > /var/home/wavelet/.config/systemd/user/run_ug.service
 	systemctl --user daemon-reload
 }
 
