@@ -74,8 +74,15 @@ event_init_seal(){
 	destinationipv4="192.168.1.32"
 	UGMTU="9000"
 	# We can use the default UG audio port which binds to 5006, we only need to mess with that if we are sending and receiving.
-	# We use a sparse array so the decans can be utilized for additional arguments if needed
-	declare -A commandLine=([61]="--tool uv" [51]="${filtervar}" [41]="--control-port 6160" [31]="-f V:rs:200:250" [24]="-t switcher" [23]="-t testcard:pattern=blank" [22]="-t file:/var/home/wavelet/seal.mkv:loop" [21]="-t testcard:pattern=smpte_bars" [11]="-c ${encodervar}" [3]="-P ${video_port}" [2]="-m ${UGMTU}" [1]="${destinationipv4}");
+	# We use a sparse array so the decans can be utilized for additional arguments if needed.  Note this isn't associative, we need ordering here.
+	commandLine=(\
+		[1]="--tool uv" \
+		[21]="${filtervar}" \
+		[31]="--control-port 6160" \
+		[41]="-f V:rs:200:250" \
+		[51]="-t switcher" [52]="-t testcard:pattern=blank" [53]="-t file:/var/home/wavelet/seal.mkv:loop" [54]="-t testcard:pattern=smpte_bars" \
+		[61]="-c ${encodervar}" \
+		[71]="-P ${video_port}" [72]="-m ${UGMTU}" [73]="${destinationipv4}");
 	ugargs="${commandLine[@]}"
 	KEYNAME=UG_ARGS; KEYVALUE=${ugargs}; write_etcd
 	echo -e "Verifying stored command line:\n"
