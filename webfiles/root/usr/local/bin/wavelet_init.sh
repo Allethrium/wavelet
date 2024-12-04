@@ -73,10 +73,10 @@ event_init_seal(){
 	# Destination IP is the IP address of the UG Reflector
 	destinationipv4="192.168.1.32"
 	UGMTU="9000"
-	# There may be a bug in UG continuous regarding streaming the static image
-	# avformat_seek_file(s->fmt_ctx, -1, INT64_MIN, s->fmt_ctx->start_time, INT64_MAX, 0): Operation not permitted
-	# test against 1.9.8
-	ugargs="--tool uv ${filtervar} --control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/var/home/wavelet/seal.mkv:loop -t testcard:pattern=smpte_bars -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}"
+	# We can use the default UG audio port which binds to 5006, we only need to mess with that if we are sending and receiving.
+	# We use a sparse array so the decans can be utilized for additional arguments if needed
+	declare -A commandLine=([61]="--tool uv" [51]="${filtervar}" [41]="--control-port 6160" [31]="-f V:rs:200:250" [24]="-t switcher" [23]="-t testcard:pattern=blank" [22]="-t file:/var/home/wavelet/seal.mkv:loop" [21]="-t testcard:pattern=smpte_bars" [11]="-c ${encodervar}" [3]="-P ${video_port}" [2]="-m ${UGMTU}" [1]="${destinationipv4}");
+	ugargs="${commandLine[@]}"
 	KEYNAME=UG_ARGS; KEYVALUE=${ugargs}; write_etcd
 	echo -e "Verifying stored command line:\n"
 	echo -e "${ugargs}"
@@ -94,7 +94,7 @@ Restart=always
 RemainAfterExit=no
 
 [Install]
-WantedBy=graphical-session.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
+WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 	systemctl --user daemon-reload
 	echo -e "Starting UG executable and then restarting UltraGrid.AppImage.service..\n"
 	systemctl --user enable UltraGrid.AppImage.service --now
