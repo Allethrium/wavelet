@@ -165,20 +165,33 @@ event_encoder(){
 	KEYNAME=uv_encoder; read_etcd_global; encodervar=${printvalue}
 	# Videoport is always 5004 unless we are doing some strange future project requiring bidirectionality or conference modes
 	KEYNAME=uv_videoport; read_etcd_global; video_port=${printvalue}
-	# Audio Port is always 5006, unless UltraGrid has gotten far better at handling audio we likely won't use this.
+	# Audio Port is always 5006, and this is the default so we won't specify it in our command line.
 	KEYNAME=uv_audioport; read_etcd_global; audio_port=${printvalue}
-	# Destination IP is the IP address of the UG Reflector, usually the server IP.
+	# Destination IP is the IP address of the UG Reflector, usually the server IP or it could also be an overflow reflector for externalization.
 	KEYNAME=REFLECTOR_IP; read_etcd_global; destinationipv4=${printvalue}
 
 	# Currently -f V:rs:200:240 on the end specifies reed-solomon forward error correction 
-	# For higher btirate streams, we can use "-f LDGM:40%" - must be >2mb frame size!
+	# For higher btirate streams, we can use "-f LDGM:40%" - must be >2mb frame size - so probably useless unless WiFi 8+ is MUCH faster and has jumbo packets..
 	# Audio runs as a multiplied stream, there are issues ensuring Pipewire autoselects the appropriate device however.
 	# This command would use the switcher;
 	# --tool uv $filtervar -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mkv:loop -t testcard:pattern=smpte_bars ${inputvar} -s pipewire -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}
 	# can be used remote with this kind of tool (netcat) : echo 'capture.data 0' | busybox nc localhost <control_port>
+	# channels 0-2 are:  Blank, Static Image, Test Bars respectively.  The live video device will therefore always be channel 3.
+	# For faster switching we COULD run all video inputs at once, but then the server would be simultaneously handling 5+ 1080p channels of HEVC/AV1
 	UGMTU="9000"
-	echo -e "Assembled command is:\n--tool uv $filtervar -f V:rs:200:250 --control-port 6160 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mkv:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4} \n"
-	ugargs="--tool uv $filtervar--control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mkv:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4} --param control-accept-global"
+
+	# We can use the default UG audio port which binds to 5006, we only need to mess with that if we are sending and receiving.
+	# We use a sparse array so the decans can be utilized for additional arguments if needed.  Note this isn't associative, we need ordering here.
+	commandLine=(\
+		[1]="--tool uv" \
+		[21]="${filtervar}" \
+		[31]="--control-port 6160" \
+		[41]="-f V:rs:200:250" \
+		[51]="-t switcher" [52]="-t testcard:pattern=blank" [53]="-t file:/var/home/wavelet/seal.mkv:loop" [54]="-t testcard:pattern=smpte_bars" \
+		[61]="-c ${encodervar}" \
+		[71]="-P ${video_port}" [72]="-m ${UGMTU}" [73]="${destinationipv4}")
+	ugargs="${commandLine[@]}"
+	echo -e "Assembled command is:\n${ugargs}\n"
 	KEYNAME=UG_ARGS; KEYVALUE=${ugargs}; write_etcd
 	echo -e "Verifying stored command line"
 	read_etcd; echo ${printvalue}
