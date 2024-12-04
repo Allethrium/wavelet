@@ -61,7 +61,7 @@ write_etcd_global(){
 	echo -e "Key Name ${KEYNAME} set to Global value: ${KEYVALUE}\n"
 }
 write_etcd_client_ip(){
-	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_clientip" "${KEYNAME}" "${KEYVALUE}"
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
 }
 delete_etcd_key(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
