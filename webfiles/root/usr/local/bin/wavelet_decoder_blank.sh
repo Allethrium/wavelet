@@ -54,8 +54,6 @@ delete_etcd_key(){
 }
 
 event_decoder_blank(){
-	# Kill the systemd monitor task for a few moments
-	systemctl --user stop wavelet_decoder_blank.service
 	echo -e "\nDecoder Blank flag change detected, switching host to blank input...\n\n\n"
 	systemctl --user stop UltraGrid.AppImage.service
 	mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.blank
@@ -74,20 +72,18 @@ event_decoder_blank(){
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 	systemctl --user daemon-reload
 	systemctl --user start UltraGrid.AppImage.service
-	systemctl --user start wavelet_decoder_blank.service
+	systemctl --user restart wavelet_decoder_blank.service
 	echo -e "\nTask Complete.\n"
 	exit 0
 }
 
 event_decoder_unblank(){
-	# Kill the systemd monitor task for a few moments
-	systemctl --user stop wavelet-decoder-blank.service
 	echo -e "\nDecoder Blank flag change detected, restoring host to previous input...\n\n\n"
 	systemctl --user stop UltraGrid.AppImage.service
 	mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.blank /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 	systemctl --user daemon-reload
 	systemctl --user start UltraGrid.AppImage.service
-	systemctl --user start wavelet_decoder_blank.service
+	systemctl --user restart wavelet_decoder_blank.service
 	echo -e "\nTask Complete.\n"
 	exit 0
 }
