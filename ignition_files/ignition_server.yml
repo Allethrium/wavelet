@@ -427,7 +427,7 @@ storage:
       overwrite: true
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/home/wavelet/.config/waybar/time.sh
-    # Firefox policies.json to precustomize the firefox UI
+    # Firefox policies.json to precustomize the firefox UI - which it still ignores somehow.
     - path: /etc/firefox/policies/policies.json
       mode: 0644
       overwrite: true
@@ -444,7 +444,7 @@ storage:
         inline: |
          [Unit]
          Description=Wavelet Controller Service
-         After=network-online.target
+         After=network-online.target etcd-quadlet.service
          Wants=network-online.target
          [Service]
          Type=simple
@@ -463,7 +463,7 @@ storage:
         inline: |
           [Unit]
           Description=Encoder service
-          After=network-online.target etcd-member.service
+          After=network-online.target etcd-quadlet.service
           Wants=network-online.target
           [Service]
           ExecStart=/usr/local/bin/wavelet_encoder.sh
@@ -481,7 +481,7 @@ storage:
         inline: |
           [Unit]
           Description=UltraGrid AppImage executable
-          After=network-online.target
+          After=network-online.target etcd-quadlet.service
           Wants=network-online.target
           [Service]
           ExecStart=/usr/local/bin/wavelet_reflector.sh
@@ -499,7 +499,7 @@ storage:
         inline: |
           [Unit]
           Description=Wavelet Encoder/Decoder runner
-          After=network-online.target
+          After=network-online.target etcd-quadlet.service
           Wants=network-online.target
           [Service]
           ExecStart=/usr/local/bin/run_ug.sh
@@ -518,7 +518,7 @@ storage:
         inline: |
           [Unit]
           Description=Wavelet Initial Setup Service
-          After=network-online.target
+          After=network-online.target etcd-quadlet.service
           Wants=network-online.target
           [Service]
           Type=oneshot
