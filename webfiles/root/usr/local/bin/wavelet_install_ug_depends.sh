@@ -84,7 +84,9 @@ install_ug_depends(){
 	cd /var/home/wavelet/
 	git clone https://github.com/foxboron/sbctl.git
   	cd /var/home/wavelet/sbctl
-  	make && make install
+  	git config --global --add safe.directory /var/home/wavelet/sbctl
+  	make
+  	make install
   	cd ..
 	#sbctl create-keys
 	#sbctl enroll-keys
