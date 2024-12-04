@@ -56,7 +56,7 @@ event_init_seal(){
 	current_event="wavelet-seal"
 	rm -rf seal.mkv
 	# Generate an image
-	ffmpeg -fflags +genpts -loop 1 -i ny-stateseal.jpg -t 30 -c:v mjpeg -vf scale=1080x1080 -t 30 seal.mkv
+	ffmpeg -fflags +genpts -loop 1 -i ny-stateseal.jpg -t 10 -c:v mjpeg -vf scale=1080x1080 -t 10 seal.mkv
 	KEYNAME=uv_input; KEYVALUE="SEAL"; write_etcd_global
 	cd /home/wavelet/
 
@@ -110,11 +110,16 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage
 	echo 'capture.data 1' | busybox nc -v 127.0.0.1 6160
 }
 
+
+#####
+#
+# Main
+#
+#####
+
+
 # Populate standard values into etcd
 #set -x
-# Sleep for five seconds to allow etcd cluster to start
-echo -e "Sleep for three seconds to allow etcd cluster to stabilize..\n"
-sleep 3
 
 exec >/home/wavelet/initialize.log 2>&1
 echo -e "Populating standard values into etcd, the last step will trigger the Controller and Reflector functions, bringing the system up.\n"
@@ -124,12 +129,13 @@ KEYNAME="/livestream/enabled"; KEYVALUE="0"; write_etcd_global
 KEYNAME="uv_hash_select"; KEYVALUE="2"; write_etcd_global
 KEYNAME="/banner/enabled"; KEYVALUE="0"; write_etcd_global
 KEYNAME="uv_filter_cmd"; KEYVALUE=""; write_etcd_global
+
 event_init_av1
 
 echo -e "Enabling monitor services..\n"
 systemctl --user enable watch_reflectorreload.service --now
 systemctl --user enable watch_encoderflag.service --now
-echo -e "Values populated, monitor services launched.  Starting reflector\n\n"
+echo -e "Values populated, monitor services launched.  Starting Reflector and Controller\n"
 systemctl --user enable wavelet_reflector.service --now
 systemctl --user enable wavelet_controller.service --now
 

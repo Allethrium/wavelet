@@ -88,8 +88,6 @@ wavelet_reflector() {
 		Restart=always
 		[Install]
 		WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.Reflector.service
-		systemctl --user daemon-reload
-		systemctl --user restart UltraGrid.Reflector.service
 		echo -e "Reload_reflector flag is being set to 0.."
 		KEYNAME=reload_reflector; KEYVALUE=0; write_etcd_global
 		# Audio reflector, IP settings identical to video reflector so we don't need to do all that again
@@ -104,6 +102,7 @@ wavelet_reflector() {
 		WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.Audio.Reflector.service
 		systemctl --user daemon-reload
 		systemctl --user restart UltraGrid.Audio.Reflector.service
+		systemctl --user restart UltraGrid.Reflector.service
 		echo -e "Reload_reflector flag is being set to 0.."
 
 		# setup Reflector cleanup service

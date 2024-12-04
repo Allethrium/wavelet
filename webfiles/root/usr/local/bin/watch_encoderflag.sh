@@ -64,7 +64,7 @@ main() {
 		echo -e "Encoder restart bit is set! continuing..\n"
 		detect_self
 		if [[ "${self}" = "encoder" ]]; then		
-			systemctl --user stop UltraGrid.AppImage.service
+			systemctl --user disable UltraGrid.AppImage.service --now
 			systemctl --user restart run_ug.service
 			echo -e "Encoder restart flag is enabled, restarting encoder process on this host.."
 		elif [[ "${self}" = "server" ]]; then
