@@ -12,6 +12,6 @@ if [ "$(tty)" = "/dev/tty1" ]; then
 	if [[ $(hostname) == *"svr"* ]]; then
 		systemctl --user start http-php-pod.service
 	fi
-	sleep 5
+	sleep 1
 	exec sway
 fi
