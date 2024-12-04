@@ -86,8 +86,7 @@ Restart=always
 [Install]
 WantedBy=default.target" > /home/wavelet/.config/systemd/user/${waveletModule}.service
 	fi
-	echo -e "User Systemd service unit generated, reloading systemd user daemon..\n"
-	systemctl --user daemon-reload
+	echo -e "User Systemd service unit for ${inputKeyName} generated, remember to systemd --user daemon-reload from your calling function!\n"
 	exit 0
 }
 
