@@ -450,7 +450,7 @@ storage:
          Type=simple
          ExecStart=/usr/bin/sh -c "/usr/local/bin/wavelet_init.sh"
          [Install]
-         WantedBy=multi-user.target
+         WantedBy=default.target
       user:
         name: wavelet
       group:
@@ -468,7 +468,7 @@ storage:
           [Service]
           ExecStart=/usr/local/bin/wavelet_encoder.sh
           [Install]
-          WantedBy=multi-user.target
+          WantedBy=default.target
       user:
         name: wavelet
       group:
@@ -486,7 +486,7 @@ storage:
           [Service]
           ExecStart=/usr/local/bin/wavelet_reflector.sh
           [Install]
-          WantedBy=multi-user.target
+          WantedBy=default.target
       user:
         name: wavelet
       group:
@@ -504,7 +504,7 @@ storage:
           [Service]
           ExecStart=/usr/local/bin/run_ug.sh
           [Install]
-          WantedBy=multi-user.target
+          WantedBy=default.target
       user:
         name: wavelet
       group:
@@ -525,7 +525,7 @@ storage:
           ExecStartPre=/usr/local/bin/wavelet_check_dependencies.sh
           ExecStart=/usr/local/bin/build_ug.sh
           [Install]
-          WantedBy=multi-user.target
+          WantedBy=default.target
       user:
         name: wavelet
       group:
