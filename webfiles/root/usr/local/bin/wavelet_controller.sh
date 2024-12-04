@@ -192,6 +192,8 @@ wavelet_blank() {
 	KEYNAME=uv_input; KEYVALUE="BLANK";	write_etcd_global
 	# Write server-local encoder restart key
 	KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
+	# Start UG AppImage service so something is streaming at all
+	systemctl --user enable UltraGrid.AppImage.Service --now
 	echo 'capture.data 0' | busybox nc -v 127.0.0.1 6160
 }
 
@@ -200,11 +202,13 @@ wavelet_seal() {
 # Serves a static image in .jpg format in a loop to the encoder.
 	cd /home/wavelet/
 	current_event="wavelet-seal"
-	rm -rf seal.mp4
-	ffmpeg -r 1 -i ny-stateseal.jpg -c:v mjpeg -vf fps=30 -color_range 2 -pix_fmt yuv440p seal.mp4
+	rm -rf seal.mkv
+	ffmpeg -fflags +genpts -i ny-stateseal.jpg -c:v mjpeg -vf fps=30 -color_range 2 -t 240 -pix_fmt yuvj444p seal.mkv
 	KEYNAME=uv_input; KEYVALUE="SEAL"; write_etcd_global
 	# Write server-local encoder restart key
 	KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
+	# Start UG AppImage service so something is streaming at all
+	systemctl --user enable UltraGrid.AppImage.Service --now
 	# We now use the switcher for simple things
 	echo 'capture.data 1' | busybox nc -v 127.0.0.1 6160
 	echo -e "\nStatic mage activated from server encoder..\n"
@@ -217,6 +221,8 @@ wavelet_testcard() {
 	KEYNAME=uv_input; KEYVALUE="BLANK";	write_etcd_global
 	# Write server-local encoder restart key
 	KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
+	# Start UG AppImage service so something is streaming at all
+	systemctl --user enable UltraGrid.AppImage.Service --now
 	echo 'capture.data 2' | busybox nc -v 127.0.0.1 6160
 }
 
