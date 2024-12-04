@@ -73,6 +73,9 @@ RUN	rpm-ostree cliwrap install-to-root / && rpm-ostree override replace \
 
 # Module key signing needs much more understanding on my part to get working correctly.
 # For now, the driver does at least build.
+
+RUN kmodgenca -a || true
+
 RUN mkdir -p /usr/lib/blackmagic && mkdir -p /var/lib/blackmagic && \
 	mokdir="/usr/lib/blackmagic" && \
 	ln -s /usr/lib/blackmagic/MOK.priv /var/lib/blackmagic/MOK.priv && \
