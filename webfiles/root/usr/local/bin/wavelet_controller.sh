@@ -455,6 +455,7 @@ wavelet_clear_inputs() {
 # bad solution
 	keysArray=("interface" "/interface" "/hash" "/short_hash" "long" "/$(hostname)/inputs" "/network_long" "/network_short" "/network_interface" "/network_ip" "/network_uv_stream_command")
 	for key in ${keysArray[@]}; do
+		KEYNAME=$key
 		delete_etcd_key_global
 	done
 	echo -e "All interface devices and their configuration data, as well as labels have been deleted\n
