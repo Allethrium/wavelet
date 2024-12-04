@@ -1,6 +1,8 @@
 #!/bin/bash
 # Updates wavelet modules automatically from Git repo.  Useful for installing updates to wavelet as long as no system services are affected.
 
+# Detects if we are on dev or master branch.  To switch, move that file flag someplace else.
+
 detect_self(){
 systemctl --user daemon-reload
 UG_HOSTNAME=$(hostname)
@@ -117,3 +119,5 @@ systemctl disable zincati.service --now
 #set -x
 exec >/home/wavelet/update_wavelet_modules.log 2>&1
 detect_self
+echo -e "Update completed.  The system will automatically reboot in ten seconds!"
+systemctl reboot
