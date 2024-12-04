@@ -2,10 +2,6 @@
 # Encoder launcher script
 # generates a systemd --user unit file for the UG appimage with the appropriate command lines
 # Launches it as its own systemd --user service.
-# 11/2023:
-# Relies on detectv4l to be told when and where everything is
-# Relies on hash values parsed from webUI/PHP to activate the valid device.
-# If hash value = invalid device, nothing will happen.
 
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
@@ -51,7 +47,7 @@ event_encoder(){
 						exit 0
 				fi
 	# Register yourself with etcd as an encoder and your IP address
-	KEYNAME=encoder_ip_address; KEYVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}'); write_etcd
+	KEYNAME=encoder_ip_address; KEYVALUE=$(ip a | awk '/inet / {gsub(/\/.*/,"",$2); print $2}'); write_etcd
 	systemctl --user daemon-reload
 	systemctl --user enable watch_encoderflag.service --now
 	echo -e "now monitoring for encoder reset flag changes.. \n"
@@ -79,11 +75,11 @@ event_encoder(){
 		read_etcd_global
 		encoderDeviceHash="${printvalue}"
 		case ${encoderDeviceHash} in
-		(1)	echo "Blank screen activated, as set from controller."				;	exit 0
+		(1)	echo "Blank screen activated, the Server will stream this directly via controller module."				;	exit 0
 		;;
-		(2)	echo "Seal image activated, as set from controller"					;	exit 0
+		(2)	echo "Seal image activated, the Server will stream this directly via controller module."				;	exit 0
 		;;
-		(T)	echo "Testcard generation activated, as set from controller"		;	exit 0
+		(T)	echo "Testcard generation activated, the Server will stream this directly via controller module."		;	exit 0
 		;;
 		(W)	echo "Four Panel split activated, attempting multidisplay swmix"	;	encoder_event_setfourway 
 		;;
@@ -169,11 +165,11 @@ event_encoder(){
 	# For higher btirate streams, we can use "-f LDGM:40%" - must be >2mb frame size!
 	# Audio runs as a multiplied stream, there are issues ensuring Pipewire autoselects the appropriate device however.
 	# This command would use the switcher;
-	# --tool uv $filtervar -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${inputvar} -s pipewire -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}
+	# --tool uv $filtervar -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mkv:loop -t testcard:pattern=smpte_bars ${inputvar} -s pipewire -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}
 	# can be used remote with this kind of tool (netcat) : echo 'capture.data 0' | busybox nc localhost <control_port>
 	UGMTU="9000"
-	echo -e "Assembled command is:\n--tool uv $filtervar -f V:rs:200:250 --control-port 6160 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4} \n"
-	ugargs="--tool uv $filtervar--control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4} --param control-accept-global"
+	echo -e "Assembled command is:\n--tool uv $filtervar -f V:rs:200:250 --control-port 6160 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mkv:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4} \n"
+	ugargs="--tool uv $filtervar--control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mkv:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar} -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4} --param control-accept-global"
 	KEYNAME=UG_ARGS; KEYVALUE=${ugargs}; write_etcd
 	echo -e "Verifying stored command line"
 	read_etcd; echo ${printvalue}
@@ -189,7 +185,7 @@ event_encoder(){
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 	systemctl --user daemon-reload
-	systemctl --user restart UltraGrid.AppImage.service
+	systemctl --user start UltraGrid.AppImage.service
 	echo -e "Encoder systemd units instructed to start..\n"
 	sleep 3
 	echo 'capture.data 3' | busybox nc -v 127.0.0.1 6160
