@@ -165,6 +165,9 @@ write_etcd_client_ip(){
 delete_etcd_key(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
 }
+delete_etcd_key_global(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key_global" "${KEYNAME}"
+}
 generate_service(){
 	# Can be called with more args with "generate_servier" ${keyToWatch} 0 0 "${serviceName}"
 	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
@@ -452,7 +455,7 @@ wavelet_clear_inputs() {
 # bad solution
 	keysArray=("interface" "/interface" "/hash" "/short_hash" "long" "/$(hostname)/inputs" "/network_long" "/network_short" "/network_interface" "/network_ip" "/network_uv_stream_command")
 	for key in ${keysArray[@]}; do
-		delete_ectd_key
+		delete_etcd_key_global
 	done
 	echo -e "All interface devices and their configuration data, as well as labels have been deleted\n
 	Plugging in a new device will cause the detection module to run again.\n"
