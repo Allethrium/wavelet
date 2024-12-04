@@ -55,9 +55,11 @@ event_init_seal(){
 	# Note that it starts the UG AppImage service directly and doesn't rely on run_ug, like an encoder will.
 	current_event="wavelet-seal"
 	rm -rf seal.mkv
-	ffmpeg -fflags +genpts -i ny-stateseal.jpg -c:v mjpeg -vf fps=30 -color_range 2 -t 240 -pix_fmt yuvj444p seal.mkv
+	# Generate an image
+	ffmpeg -fflags +genpts -loop 1 -i ny-stateseal.jpg -t 30 -c:v mjpeg -vf scale=1080x1080 -t 30 seal.mkv
 	KEYNAME=uv_input; KEYVALUE="SEAL"; write_etcd_global
 	cd /home/wavelet/
+
 	# call uv_hash_select to process the provided device hash and select the input from these data
 	KEYNAME=uv_hash_select; read_etcd_global; 
 	# Reads Filter settings, should be banner.pam most of the time
@@ -97,15 +99,15 @@ WantedBy=graphical-session.target" > /home/wavelet/.config/systemd/user/UltraGri
 	echo -e "Starting UG executable and then restarting UltraGrid.AppImage.service..\n"
 	systemctl --user enable UltraGrid.AppImage.service --now
 	# Sleep for a couple of seconds to allow the encoder to come up, then Select switcher input #1 which should always be the Seal image.
-	sleep 2
+	sleep 1
 	echo 'capture.data 1' | busybox nc -v 127.0.0.1 6160
 }
 
 # Populate standard values into etcd
 #set -x
 # Sleep for five seconds to allow etcd cluster to start
-echo -e "Sleep for five seconds to allow etcd cluster to stabilize..\n"
-sleep 5
+echo -e "Sleep for three seconds to allow etcd cluster to stabilize..\n"
+sleep 3
 
 exec >/home/wavelet/initialize.log 2>&1
 echo -e "Populating standard values into etcd, the last step will trigger the Controller and Reflector functions, bringing the system up.\n"

@@ -73,9 +73,9 @@ event_encoder_server() {
 		echo -e "wavelet_controller service is running and watching for input events, continuing..."
 		event_encoder
 	else
-		echo -e "\n bringing up Wavelet controller service, and sleeping for five seconds to allow config to settle..."
+		echo -e "\n bringing up Wavelet controller service, and sleeping for two seconds to allow config to settle..."
 		systemctl --user start wavelet_init.service
-		sleep 5
+		sleep 2
 		echo -e "\n Running encoder..."
 		event_encoder
 	fi
@@ -127,7 +127,6 @@ event_decoder(){
 	KEYNAME="DECODER_REVEAL"; write_etcd
 	KEYNAME="DECODER_REBOOT"; write_etcd
 	KEYNAME="DECODER_BLANK"; write_etcd
-	sleep 1
 	# Enable watcher services now all task activation keys are set to 0
 	systemctl --user enable wavelet_decoder_reset.service --now
 	systemctl --user enable wavelet_decoder_reveal.service --now
@@ -135,7 +134,6 @@ event_decoder(){
 	systemctl --user enable wavelet_decoder_blank.service --now
 	systemctl --user enable wavelet_device_relabel.service --now
 	systemctl --user enable wavelet_promote.service --now
-	sleep 1
 	# Note - ExecStartPre=-swaymsg workspace 2 is a failable command 
 	# It will always send the UG output to a second display.  
 	# If not connected the primary display will be used.
@@ -157,7 +155,7 @@ event_decoder(){
 		systemctl --user daemon-reload
 		systemctl --user restart UltraGrid.AppImage.service
 		echo -e "Decoder systemd units instructed to start..\n"
-		sleep 3
+		sleep 1
 		return=$(systemctl --user is-active --quiet UltraGrid.AppImage.service)
 		if [[ ${return} -eq !0 ]]; then
 			echo "Decoder failed to start, there may be something wrong with the system.
@@ -247,12 +245,16 @@ event_reflector(){
 get_ipValue(){
 	# Gets the current IP address for this host to register into server etcd.
 	# Identify Ethernet interfaces by checking for "eth" in their name
-	IPVALUE=$(ip a | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
+	# There HAS to be a better way of doing this?
+	primaryConnection=$(nmcli -g name con show | head -1)
+	primaryConnectionIP=$(nmcli con show "${primaryConnection}" | grep ipv4.addresses | awk '{print $2}' | head -n 1 )
+	echo -e "Detected primary connection \"${primaryConnection}\" with IP Address of \"${primaryConnectionIP}\""
+	IPVALUE=${primaryConnectionIP%/*}
 	# IP value MUST be populated or the decoder writes gibberish into the server
 	if [[ "${IPVALUE}" == "" ]] then
-			# sleep for five seconds, then call yourself again
+			# sleep for two seconds, then call yourself again
 			echo -e "IP Address is null, sleeping and calling function again\n"
-			sleep 5
+			sleep 2
 			get_ipValue
 		else
 			echo -e "IP Address is not null, testing for validity..\n"
@@ -308,7 +310,7 @@ wifi_connect_retry(){
 #
 #####
 
-set -x
+#set -x
 exec >/home/wavelet/run_ug.log 2>&1
 get_ipValue
 detect_self

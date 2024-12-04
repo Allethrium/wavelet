@@ -2,6 +2,7 @@
 # Encoder launcher script
 # generates a systemd --user unit file for the UG appimage with the appropriate command lines
 # Launches it as its own systemd --user service.
+# The encoder performs no host detection.  It simply runs whatever encoder tasks are set under the specific host
 
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
@@ -44,7 +45,13 @@ event_encoder(){
 						:
 				else
 						echo -e "No input devices are present on this system, Encoder cannot run! \n"
-						exit 0
+						if [[ $(hostname) == *"svr"* ]]; then
+							echo -e "This is the wavelet server, continuing.."
+							:
+						else
+							echo -e "No input devices, and not a server, ending task.."
+							exit 0
+						fi
 				fi
 	# Register yourself with etcd as an encoder and your IP address
 	KEYNAME=encoder_ip_address; KEYVALUE=$(ip a | awk '/inet / {gsub(/\/.*/,"",$2); print $2}'); write_etcd
@@ -139,12 +146,14 @@ event_encoder(){
 	# Run common options here
 	/usr/local/bin/wavelet_textgen.sh
 	}
+
 	# Encoder SubLoop
 	# call uv_hash_select to process the provided device hash and select the input from these data
 	read_uv_hash_select
 	# Reads Filter settings, should be banner.pam most of the time
 	# If banner isn't enabled filtervar will be null, as the logo.c file can result in crashes with RTSP streams and some other pixel formats.
 	KEYNAME="/banner/enabled"
+	read_etcd_global
 	if [[ "${printvalue}" == "0" ]]; then
 		echo -e "\nBanner is enabled, so filtervar will be set appropriately.  Note currently the logo.c file in UltraGrid can generate errors on particular kinds of streams!..\n"
 		KEYNAME=uv_filter_cmd; read_etcd_global; filtervar=${printvalue}
@@ -187,7 +196,7 @@ event_encoder(){
 	systemctl --user daemon-reload
 	systemctl --user start UltraGrid.AppImage.service
 	echo -e "Encoder systemd units instructed to start..\n"
-	sleep 3
+	sleep 1
 	echo 'capture.data 3' | busybox nc -v 127.0.0.1 6160
 }
 
