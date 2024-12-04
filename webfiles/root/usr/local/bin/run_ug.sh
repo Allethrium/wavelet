@@ -247,7 +247,7 @@ event_reflector(){
 get_ipValue(){
 	# Gets the current IP address for this host to register into server etcd.
 	# Identify Ethernet interfaces by checking for "eth" in their name
-	IPVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
+	IPVALUE=$(ip a | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
 	# IP value MUST be populated or the decoder writes gibberish into the server
 	if [[ "${IPVALUE}" == "" ]] then
 			# sleep for five seconds, then call yourself again
