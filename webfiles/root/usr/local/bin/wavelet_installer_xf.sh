@@ -398,12 +398,11 @@ rpm_ostree_RISCV(){
 rpm_overlay_install_decoder(){
 	# This differs from the server in that we don't need to build the container,
 	# We pull the client installer module and run it to generate the wavelet files in /usr/local/bin
-	dmidecode | grep "Manufacturer" | cut -d ':' -f 2 | head -n 1
+	#dmidecode | grep "Manufacturer" | cut -d ':' -f 2 | head -n 1
 	echo -e "\nDownloading client installer module..\n"
 	curl -o /usr/local/bin/wavelet_install_client.sh http://192.168.1.32:8080/ignition/wavelet_install_client.sh
 	chmod 0755 /usr/local/bin/wavelet_install_client.sh && /usr/local/bin/wavelet_install_client.sh
-	echo -e "\
-[Unit]
+	echo -e "[Unit]
 Description=Install Client Dependencies
 ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
 After=multi-user.target
@@ -418,7 +417,7 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
 	# This is the slowest part of the process, can we speed it up by compressing the overlay?
 	echo -e "Installing via container and applying as Ostree overlay..\n"
 	# We need to pull the container from the server registry first, apparently manually?  Probably https issue here.
-	podman pull 192.168.1.32:5000/coreos_overlay_client --tls-verify=false 
+	# podman pull 192.168.1.32:5000/coreos_overlay_client --tls-verify=false 
 	rpm-ostree rebase ostree-unverified-image:containers-storage:192.168.1.32:5000/coreos_overlay_client
 	touch /var/rpm-ostree-overlay.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
