@@ -54,8 +54,8 @@ event_init_seal(){
 	# Serves a static image in .jpg format in a loop to the encoder.
 	# Note that it starts the UG AppImage service directly and doesn't rely on run_ug, like an encoder will.
 	current_event="wavelet-seal"
-	rm -rf seal.mp4
-	ffmpeg -fflags +genpts -i ny-stateseal.jpg -c:v mjpeg -vf fps=30 -color_range 2 -t 240 -pix_fmt yuvj444p seal.mp4
+	rm -rf seal.mkv
+	ffmpeg -fflags +genpts -i ny-stateseal.jpg -c:v mjpeg -vf fps=30 -color_range 2 -t 240 -pix_fmt yuvj444p seal.mkv
 	KEYNAME=uv_input; KEYVALUE="SEAL"; write_etcd_global
 	cd /home/wavelet/
 	# call uv_hash_select to process the provided device hash and select the input from these data
@@ -74,7 +74,7 @@ event_init_seal(){
 	# There may be a bug in UG continuous regarding streaming the static image
 	# avformat_seek_file(s->fmt_ctx, -1, INT64_MIN, s->fmt_ctx->start_time, INT64_MAX, 0): Operation not permitted
 	# test against 1.9.8
-	ugargs="--tool uv ${filtervar} --control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/var/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}"
+	ugargs="--tool uv ${filtervar} --control-port 6160 -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/var/home/wavelet/seal.mkv:loop -t testcard:pattern=smpte_bars -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}"
 	KEYNAME=UG_ARGS; KEYVALUE=${ugargs}; write_etcd
 	echo -e "Verifying stored command line:\n"
 	echo -e "${ugargs}"
@@ -119,11 +119,9 @@ event_init_av1
 
 echo -e "Enabling monitor services..\n"
 systemctl --user enable watch_reflectorreload.service --now
-systemctl --user enable wavelet_reflector.service --now
 systemctl --user enable watch_encoderflag.service --now
 echo -e "Values populated, monitor services launched.  Starting reflector\n\n"
-systemctl --user enable ultragrid.reflector.service --now
-systemctl --user restart wavelet_reflector.service --now
+systemctl --user enable wavelet_reflector.service --now
 systemctl --user enable wavelet_controller.service --now
 
 # Attempt to connect to a cached bluetooth audio output device
