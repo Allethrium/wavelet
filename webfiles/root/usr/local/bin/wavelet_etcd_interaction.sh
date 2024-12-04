@@ -130,7 +130,7 @@ case ${action} in
 	write_etcd_global)			declare -A commandLine=([3]="put" [2]="${inputKeyName}" [1]="--" [0]="${inputKeyValue}");
 	;;
 	# Special function for writing ip addresses under /decoderip/ 
-	write_etcd_clientip)		declare -A commandLine=([3]="put" [2]="/decoderip/$(hostname)" [1]="--" [0]="${inputKeyValue}");
+	write_etcd_client_ip)		declare -A commandLine=([3]="put" [2]="/decoderip/$(hostname)" [1]="--" [0]="${inputKeyValue}");
 	;;
 	# returns value list of IP Addresses, special case to parse directly to command (used for read_etcd_clients and the sed variant)
 	read_etcd_clients*)			declare -A commandLine=([3]="get" [2]="--prefix" [1]="/decoderip/" [0]="--print-value-only");
