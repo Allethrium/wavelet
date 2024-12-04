@@ -107,10 +107,10 @@ event_encoder(){
 				;;
 			esac
 			encoderDeviceStringFull="${printvalue}"
-			echo -e "\nDevice string ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash}\n"
+			echo -e "Device string ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash}\n"
 			printvalue=""
 			KEYNAME="${encoderDeviceStringFull}"; read_etcd_global; inputvar=${printvalue}
-			echo -e "\n Device input key $inputvar located for this device string, proceeding to set encoder parameters \n"
+			echo -e "Device input key $inputvar located for this device string, proceeding to set encoder parameters \n"
 			# For Audio we will select pipewire here
 			audiovar="-s pipewire"
 		else
@@ -180,6 +180,11 @@ event_encoder(){
 	# For faster switching we COULD run all video inputs at once, but then the server would be simultaneously handling 5+ 1080p channels of HEVC/AV1
 	UGMTU="9000"
 
+	# Command line reference;
+	# --tool uv $filtervar--control-port 6160 -f V:rs:200:250 \
+	# -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar} \
+	# -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4} --param control-accept-global
+
 	# We can use the default UG audio port which binds to 5006, we only need to mess with that if we are sending and receiving.
 	# We use a sparse array so the decans can be utilized for additional arguments if needed.  Note this isn't associative, we need ordering here.
 	commandLine=(\
@@ -187,7 +192,7 @@ event_encoder(){
 		[21]="${filtervar}" \
 		[31]="--control-port 6160" \
 		[41]="-f V:rs:200:250" \
-		[51]="-t switcher" [52]="-t testcard:pattern=blank" [53]="-t file:/var/home/wavelet/seal.mkv:loop" [54]="-t testcard:pattern=smpte_bars" \
+		[51]="-t switcher" [52]="-t testcard:pattern=blank" [53]="-t file:/var/home/wavelet/seal.mkv:loop" [54]="-t testcard:pattern=smpte_bars" [55]="${audiovar}" [56]="${inputvar}" \
 		[61]="-c ${encodervar}" \
 		[71]="-P ${video_port}" [72]="-m ${UGMTU}" [73]="${destinationipv4}")
 	ugargs="${commandLine[@]}"
