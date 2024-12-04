@@ -65,6 +65,7 @@ generate_service(){
 Description=Wavelet ${inputKeyName}
 After=network-online.target
 Wants=network-online.target
+
 [Service]
 ExecStart=etcdctl --endpoints=${ETCDENDPOINT} \
 --cert-file ${clientCertificateFile} \
@@ -72,6 +73,7 @@ ExecStart=etcdctl --endpoints=${ETCDENDPOINT} \
 --ca-file ${certificateAuthorityFile} \
 watch ${inputKeyName} -w simple -- sh -c "/usr/local/bin/${waveletModule}.sh ${additionalArg}"
 Restart=always
+
 [Install]
 WantedBy=default.target" > /home/wavelet/.config/systemd/user/${waveletModule}.service
 	else
@@ -79,10 +81,12 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/${waveletModule}.s
 Description=Wavelet ${inputKeyName}
 After=network-online.target
 Wants=network-online.target
+
 [Service]
 ExecStart=etcdctl --endpoints=${ETCDENDPOINT} \
 watch ${inputKeyName} -w simple -- sh -c "/usr/local/bin/${waveletModule}.sh ${additionalArg}"
 Restart=always
+
 [Install]
 WantedBy=default.target" > /home/wavelet/.config/systemd/user/${waveletModule}.service
 	fi
