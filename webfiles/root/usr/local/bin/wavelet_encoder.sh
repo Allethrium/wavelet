@@ -214,7 +214,7 @@ event_encoder(){
 	systemctl --user daemon-reload
 	systemctl --user start UltraGrid.AppImage.service
 	echo -e "Encoder systemd units instructed to start..\n"
-	sleep 1
+	sleep .25
 	echo 'capture.data 3' | busybox nc -v 127.0.0.1 6160
 }
 

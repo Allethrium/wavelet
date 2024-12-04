@@ -246,7 +246,7 @@ wavelet_dynamic() {
 		echo -e "\setting encoder task to restart on server..\n"
 		KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
 		KEYNAME=input_update; KEYVALUE="0";	echo -e "Task completed, reset input_update key to 0..\n";	write_etcd_global
-		sleep 1
+		sleep .25
 	else
 		# Set encoder restart flag to 1 for appropriate host
 		targetHost=$(echo ${controllerInputLabel} | sed 's|\(.*\)/.*|\1|')
@@ -254,7 +254,7 @@ wavelet_dynamic() {
 		KEYNAME="/${targetHost}/encoder_restart"; KEYVALUE="1"; write_etcd_global
 		# Ensure input is set to 3 so we get the right selection out of the switcher.
 		KEYNAME=input_update; KEYVALUE="0"; echo -e "Task completed, reset input_update key to 0.. \n"; write_etcd_global
-		sleep 1
+		sleep .25
 		# Set appropriate capture channel for running encoder
 		KEYNAME="/hostHash/${targetHost}/ipaddr"; read_etcd_global; targetIP=${printvalue}
 		echo -e "\nAttempting to set switcher channel to new device for ${targetHost}..\n"

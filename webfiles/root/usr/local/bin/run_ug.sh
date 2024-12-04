@@ -73,9 +73,9 @@ event_encoder_server() {
 		echo -e "wavelet_controller service is running and watching for input events, continuing..."
 		event_encoder
 	else
-		echo -e "\n bringing up Wavelet controller service, and sleeping for two seconds to allow config to settle..."
+		echo -e "\n bringing up Wavelet controller service, and sleeping for one second to allow config to settle..."
 		systemctl --user start wavelet_init.service
-		sleep 2
+		sleep 1
 		echo -e "\n Running encoder..."
 		event_encoder
 	fi
