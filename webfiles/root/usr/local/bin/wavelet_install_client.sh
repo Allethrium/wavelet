@@ -90,7 +90,7 @@ groupadd -fg 86 netdev
 
 nmcli dev wifi rescan
 sleep 5
-exec >/home/wavelet/client_installer.log 2>&1
+exec > /home/wavelet/client_installer.log 2>&1
 extract_base
 extract_home
 extract_usrlocalbin
