@@ -300,6 +300,7 @@ EOF
 	touch /var/rpm-ostree-overlay.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+	# Push client image to container registry - N.B can only use --compress with dir: transport method. 
 	podman push localhost:5000/coreos_overlay_client:latest 192.168.1.32:5000/coreos_overlay_client --tls-verify=false	
 	# Build the server overlay
 	podman build -t localhost/coreos_overlay_server \
@@ -310,8 +311,6 @@ EOF
 	# We don't need to push the server overlay to the registry, because this it the only host which will use it.
 	# Rebase server on server overlay image
 	rpm-ostree rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay_server
-	# Push client image to container registry - N.B can only use --compress with dir: transport method.  
-
 	echo -e "\nRPM package updates completed, finishing installer task and checking for extended support..\n"
 }
 
