@@ -58,7 +58,7 @@ event_encoder(){
 	# Gets both IPV6 and IPV4 addresses.. since we might want to futureproof..
 	# nmcli dev show ${activeConnection#*:} | grep ADDRESS | awk '{print $2}'
 	activeConnectionIP=$(nmcli dev show ${activeConnection#*:} | grep ADDRESS | awk '{print $2}' | head -n 1)
-	KEYNAME=encoder_ip_address; KEYVALUE=$${activeConnectionIP%/*}; write_etcd
+	KEYNAME=encoder_ip_address; KEYVALUE=${activeConnectionIP%/*}; write_etcd
 	systemctl --user daemon-reload
 	systemctl --user enable watch_encoderflag.service --now
 	echo -e "now monitoring for encoder reset flag changes.. \n"
