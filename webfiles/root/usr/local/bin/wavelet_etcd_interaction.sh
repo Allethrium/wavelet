@@ -114,7 +114,7 @@ case ${action} in
 	# Etcd does not have a hierarchical structure so we're 'simulating' directories by adding the /
 	read_etcd)					declare -A commandLine=([3]="get" [2]="/$(hostname)/${inputKeyName}" [1]="--print-value-only");
 	;;
-		# Read an etcd value set globally - may still be hostname but would be defined in inputKeyName
+	# Read an etcd value set globally - may still be hostname but would be defined in inputKeyName
 	read_etcd_global)			declare -A commandLine=([3]="get" [2]="${inputKeyName}" [1]="--print-value-only");
 	;;
 	# Read a set of etcd values by prefix.  I.E a list of IP addresses
