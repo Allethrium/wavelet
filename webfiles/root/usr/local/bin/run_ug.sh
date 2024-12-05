@@ -287,15 +287,6 @@ get_ipValue(){
 	fi
 }
 
-set_ethernet_mtu(){
-	# Attempting to set an MTU of 9000 will break all wireless clients.  Leaving this in encase we can work around it.
-	for interface in $(ip link show | awk '{print $2}' | grep ":$" | cut -d ':' -f1); do
-		if [[ $(ip link show dev "${interface}" | grep "link/ether") ]]; then 
-			ip link set dev ${interface} mtu 1500
-		fi
-	done
-}
-
 wifi_connect_retry(){
 	if [[ -f /var/no.wifi ]]; then
 		echo "Device configured to ignore wifi!"
@@ -311,6 +302,7 @@ wifi_connect_retry(){
 		else
 			echo -e "Attempting to connect to WiFi.  If this device is NOT planned to be on WiFi, run the command:\n"
 			echo -e "touch /var/no.wifi"
+			echo -e "Ethernet connection can be enabled by running:\nconnectwifi -E\n"
 			/usr/local/bin/connectwifi.sh
 		fi
 	else
