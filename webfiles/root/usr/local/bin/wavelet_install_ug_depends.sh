@@ -234,6 +234,7 @@ sed -i "s|hostnamegoeshere|\"$(hostname)\"|g" /usr/local/bin/wavelet_network_sen
 # Runs first because it doesn't matter what kind of server/client device, it'll need this.
 groupadd -fg 84 avahi && useradd -c "Avahi Daemon Owner" -d /run/avahi-daemon -u 84 -g avahi -s /bin/false avahi
 groupadd -fg 86 netdev
+systemctl enable avahi-daemon.service --now
 
 # Fix gssproxy SElinux bug
 ausearch -c '(gssproxy)' --raw | audit2allow -M my-gssproxy
