@@ -4,14 +4,6 @@
 
 detect_self(){
 	UG_HOSTNAME=$(hostname)
-	# Create a hostname.local file in tmp so that nonprivileged users such as dnsmasq can tell who we are
-	# we aren't allowed to write to /var/tmp..
-	#hostname=$(hostname)
-	#echo ${hostname} > /var/tmp/hostname.local
-	#chmod 664 /var/tmp/hostname.local
-	#chown root:root /var/tmp/hostname.local
-	#sed -i "s|!!hostnamegoeshere!!|${hostname}|g" /usr/local/bin/wavelet_network_sense.sh
-	
 	echo -e "Hostname is $UG_HOSTNAME \n"
 	case $UG_HOSTNAME in
 	enc*) 					echo -e "I am an Encoder \n"; event_encoder
