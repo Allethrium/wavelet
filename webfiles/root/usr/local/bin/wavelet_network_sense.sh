@@ -15,7 +15,7 @@ detect_self(){
 	# hostname.local populated by run_ug.sh on system boot
 	# necessary because this script is spawned with restricted privileges, it can't call hostname or dnsdomainname
 	# This isn't a problem because once set the hostname of the server is static.
-	UG_HOSTNAME=!!hostnamegoeshere!!
+	UG_HOSTNAME=hostnamegoeshere
 	echo -e "Hostname is ${UG_HOSTNAME} \n"
 	case ${UG_HOSTNAME} in
 	svr*)			echo -e "I am a Server."; event_server
