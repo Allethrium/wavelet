@@ -79,14 +79,14 @@ parse_macaddr() {
 
 event_magewell_ndi(){
 	# Interrogates Magewell device, attempts preconfigured username and password, then tries to set appropriate settings for streaming into UltraGrid.
-	echo -e "Waiting for two seconds, then attempting to connect to device..\n"
+	echo -e "Waiting for two seconds, then attempting to connect to device on ${ipAddr}..\n"
 	sleep 2
 	echo -e "\nCalling curl with GET request for Default Username and Password..\n"
 	defaultPassword="Admin"
 	md5sumAdminPassword=$(echo -n "${defaultPassword}" | md5sum | cut -d' ' -f1)
 	curl --cookie-jar /var/tmp/sid.txt "http://${ipAddr}/mwapi?method=login&id=Admin&pass=${md5sumAdminPassword}"
 	if [ $? -ne 0 ]; then
-	echo "\nConnection to MageWell device failed!  Reset the device to FACTORY DEFAULTS and try again!\n"
+	echo -e "\nConnection to MageWell device failed!  Reset the device to FACTORY DEFAULTS and try again!\n"
 	exit 1
 	fi
 	# Perhaps we should autogen an admin password and store it in etcd here for security purposes?
@@ -100,14 +100,17 @@ event_magewell_ndi(){
 	curl --cookie /var/tmp/sid.txt "http://${ipAddr}/mwapi?method=add-user&id=Wavelet&pass=${md5sumWaveletPassword}"
 	# Now we login with the Wavelet User to save the cookie
 	curl --cookie-jar /var/tmp/wavelet_sid.txt "http://${ipAddr}/mwapi?method=login&id=Admin&pass=${md5sumAdminPassword}"
-	# LibNDI should be installed on wavelet by default (DEPENDENCY)
-	ndiSource=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | cut -d '(' -f1 | awk '{print $1}')
-	ndiIPAddr=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | awk '{print $5}')
+
+	# LibNDI should be installed on wavelet by default along with avahi mDNS (DEPENDENCY)
+	echo -e "\nAttempting to match with NDI devices found by UltraGrid..\n"
+	ndiSource=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep "${ipAddr}" | cut -d '(' -f1 | awk '{print $1}')
+	ndiIPAddr=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep "${ipAddr}" | awk '{print $5}')
+	
 	# We need to set the magewell card to raw framerate 30fps, AV1 compression had pauses at 60FPS!
 	declare -a magewellCommands=('mwapi?method=set-video-config&out-fr-convertion=frame-rate-half',	'mwapi?method=set-video-config&out-raw-resolution=false&out-cx=1920&out-cy=1080', 'mwapi?method=set-video-config&in-auto-quant-range=false&in-quant-range=full', 'mwapi?method=set-video-config&in-auto-color-fmt=false&in-color-fmt=rgb', 'mwapi?method=set-video-config&bit-rate-ratio=150', 'mwapi?method=out-quant-range=full', 'http://ip/mwapi?method=set-ndi-config&enable=true')
 	for i in "${magewellCommands[@]}"
 	do
-		curl --cookie /var/tmp/wavelet_sid.txt http://"${ipAddr}"/"$i"
+		curl --cookie /var/tmp/wavelet_sid.txt "http://${ipAddr}/${i}"
 	done
 	echo -e "\nMageWell ProConvert device should now be fully configured..\n"
 	# Generate UG Stream command from the appropriate NDI Source
@@ -245,5 +248,4 @@ populate_to_etcd(){
 
 #set -x
 exec >/var/tmp/network_device.log 2>&1
-read_commandfile
 read_leasefile
