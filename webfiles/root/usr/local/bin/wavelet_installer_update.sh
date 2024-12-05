@@ -116,6 +116,7 @@ generate_tarfiles(){
 
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 systemctl disable zincati.service --now
+sed -i "s/hostnamegoeshere/$(hostname)/g" /usr/local/bin/wavelet_network_sense.sh
 #set -x
 exec >/home/wavelet/update_wavelet_modules.log 2>&1
 detect_self
