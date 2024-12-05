@@ -208,11 +208,10 @@ detect() {
 }
 
 # VIDEO output device blocks
-
-event_ipevo() {
 # each of these blocks contains specific configuration options that must be preset for each device in order for them to work.  
 # We will have to add to this over time to support more devices appropriately.
-# 
+
+event_ipevo() {
 	echo -e "IPEVO Camera detection running..\n"
 	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPG:convert=RGB:size=1920x1080:tpf=1/30:device=${v4l_device_path}"; write_etcd
 	echo -e "\nDetection completed for IPEVO device..\n"
@@ -267,9 +266,9 @@ detect_self(){
 UG_HOSTNAME=$(hostname)
 	echo -e "Hostname is $UG_HOSTNAME \n"
 	case $UG_HOSTNAME in
-	enc*) 					echo -e "I am an Encoder, allowing device sense to proceed.. \n"; encoder_checkNetwork 1
+	enc*) 					echo -e "I am an Encoder, allowing device sense to proceed..\n"; encoder_checkNetwork 1
 	;;
-	decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.  An error has occurred at some point, and needs troubleshooting.\n Terminating process. \n"; exit 0
+	decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.  An error has occurred at some point, and needs troubleshooting.\nTerminating process."; exit 0
 	;;
 	dec*)					echo -e "I am a Decoder \n"; exit 0
 	;;
@@ -293,10 +292,10 @@ encoder_checkNetwork(){
 	fi
 	ping -c 3 192.168.1.32
 	if [[ $? -eq 0 ]]; then
-		echo -e "\nOnline and connected to Wavelet Server, continuing..\n"
+		echo -e "Online and connected to Wavelet Server, continuing..\n"
 		sense_devices
 	else
-		echo -e "\nNo network connection, device registration will be unsuccessful, sleeping for 5 seconds and trying again..\n"
+		echo -e "No network connection, device registration will be unsuccessful, sleeping for 5 seconds and trying again..\n"
 		sleep 5
 		let "$1=$1++"
 		encoder_checkNetwork 
@@ -322,5 +321,5 @@ if [[ "${1}" = "RD" ]]; then
 fi
 
 # check to see if I'm a server or an encoder
-echo -e "\n\n\n********Begin device detection and registration process...********\n\n\n"
+echo -e "\n********Begin device detection and registration process...********"
 detect_self
