@@ -228,7 +228,7 @@ fun_with_dkms(){
 
 
 # Set server hostname for network sense.  
-sed -i "s|hostnamegoeshere|$(hostname)|g" /usr/local/bin/wavelet_network_sense.sh
+sed -i "s|hostnamegoeshere|\"$(hostname)\"|g" /usr/local/bin/wavelet_network_sense.sh
 
 # Fix AVAHI otherwise NDI won't function correctly, amongst other things;  https://www.linuxfromscratch.org/blfs/view/svn/basicnet/avahi.html
 # Runs first because it doesn't matter what kind of server/client device, it'll need this.
