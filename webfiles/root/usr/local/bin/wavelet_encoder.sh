@@ -54,7 +54,11 @@ event_encoder(){
 						fi
 				fi
 	# Register yourself with etcd as an encoder and your IP address
-	KEYNAME=encoder_ip_address; KEYVALUE=$(ip a | awk '/inet / {gsub(/\/.*/,"",$2); print $2}'); write_etcd
+	activeConnection=$(nmcli -t -f NAME,DEVICE c s -a | head -n 1)
+	# Gets both IPV6 and IPV4 addresses.. since we might want to futureproof..
+	# nmcli dev show ${activeConnection#*:} | grep ADDRESS | awk '{print $2}'
+	activeConnectionIP=$(nmcli dev show ${activeConnection#*:} | grep ADDRESS | awk '{print $2}' | head -n 1)
+	KEYNAME=encoder_ip_address; KEYVALUE=$${activeConnectionIP%/*}; write_etcd
 	systemctl --user daemon-reload
 	systemctl --user enable watch_encoderflag.service --now
 	echo -e "now monitoring for encoder reset flag changes.. \n"
@@ -68,7 +72,7 @@ event_encoder(){
 		#swmixVar=$(etcdctl --endpoints=${ETCDENDPOINT} get "$(hostname)/inputs/" --prefix --print-value-only | xargs -d'\n' $(echo "${generatedLine}"))
 		KEYNAME=uv_input_cmd; KEYVALUE="-t swmix:1920:1080:30 ${swmixVar}"; write_etcd_global
 		echo -e "Generated command line is:\n${KEYVALUE}\n"
-		inputvar=${KEYVALUE}
+		multiInputvar=${KEYVALUE}
 		/usr/local/bin/wavelet_textgen.sh
 	}
 
@@ -109,8 +113,8 @@ event_encoder(){
 			encoderDeviceStringFull="${printvalue}"
 			echo -e "Device string ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash}\n"
 			printvalue=""
-			KEYNAME="${encoderDeviceStringFull}"; read_etcd_global; inputvar=${printvalue}
-			echo -e "Device input key $inputvar located for this device string, proceeding to set encoder parameters \n"
+			KEYNAME="${encoderDeviceStringFull}"; read_etcd_global; localInputvar=${printvalue}
+			echo -e "Device input key $localInputvar located for this device string, proceeding to set encoder parameters \n"
 			# For Audio we will select pipewire here
 			audiovar="-s pipewire"
 		else
@@ -125,14 +129,14 @@ event_encoder(){
 				KEYNAME="/network_ip/${encoderDeviceHash}"; read_etcd_global; ipAddr=${printvalue}
 				# Locate input command from the IP value retreived above
 				KEYNAME="/network_uv_stream_command/${printvalue}"; read_etcd_global
-				# We have to check the NDI device for port changes because they do not seem stable..
 				if [[ "${printvalue}" == *"ndi"* ]]; then
-					echo -e "\nNDI Device in play, rescanning ports on IP Address ${ipAddr}..\n"
+					# We have to check the NDI device for port changes because they do not seem stable..
+					echo -e "NDI Device in play, rescanning ports on IP Address ${ipAddr}..\n"
 					ndiIPAddr=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | awk '{print $5}')
-					inputvar="-t ndi:url=${ndiIPAddr}"
+					netInputvar="-t ndi:url=${ndiIPAddr}"
 					audiovar="-s embedded"
 				else
-					inputvar="-t ${printvalue}"
+					netInputvar="-t ${printvalue}"
 					# Audio is not implemented in UltraGrid's RTSP yet, so we will just utilize pipewire here or have NO audio.
 					audiovar="-s pipewire"
 				fi
@@ -189,12 +193,13 @@ event_encoder(){
 	# We use a sparse array so the decans can be utilized for additional arguments if needed.  Note this isn't associative, we need ordering here.
 	commandLine=(\
 		[1]="--tool uv" \
-		[21]="${filtervar}" \
-		[31]="--control-port 6160" \
-		[41]="-f V:rs:200:250" \
-		[51]="-t switcher" [52]="-t testcard:pattern=blank" [53]="-t file:/var/home/wavelet/seal.mkv:loop" [54]="-t testcard:pattern=smpte_bars" [55]="${audiovar}" [56]="${inputvar}" \
-		[61]="-c ${encodervar}" \
-		[71]="-P ${video_port}" [72]="-m ${UGMTU}" [73]="${destinationipv4}")
+		[2]="${filtervar}" \
+		[3]="--control-port 6160" \
+		[4]="-f V:rs:200:250" \
+		[11]="-t switcher" [12]="-t testcard:pattern=blank" [13]="-t file:/var/home/wavelet/seal.mkv:loop" [14]="-t testcard:pattern=smpte_bars" \
+		[21]="${localInputvar}" [22]="${netInputvar}" [23]=${multiInputvar} [24]="${audiovar}" \
+		[81]="-c ${encodervar}" \
+		[91]="-P ${video_port}" [72]="-m ${UGMTU}" [73]="${destinationipv4}")
 	ugargs="${commandLine[@]}"
 	echo -e "Assembled command is:\n${ugargs}\n"
 	KEYNAME=UG_ARGS; KEYVALUE=${ugargs}; write_etcd
@@ -207,7 +212,7 @@ event_encoder(){
 	Wants=network-online.target
 	[Service]
 	ExecStart=/usr/local/bin/UltraGrid.AppImage ${ugargs}
-	KillMode=mixed
+	KillMode=control-group
 	TimeoutStopSec=0.25
 	[Install]
 	WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
