@@ -155,7 +155,8 @@ event_decoder(){
 	event_generateHash dec
 	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
 	sleep 1
-	/usr/local/bin/run_ug.sh
+	# Executes run_ug in order to start the video streaming window
+	systemctl --user start run_ug.service
 }
 
 event_encoder(){
@@ -176,6 +177,7 @@ event_encoder(){
 	event_host_relabel_watcher
 	event_generate_watch_encoderflag
 	event_promote
+	# We do not perform run_ug for the encoder as that is enabled if it receives an encoderflag change.  It will be idle until then.
 }
 
 event_generate_watch_encoderflag(){
@@ -211,13 +213,16 @@ event_server(){
 		echo -e "Server bootstrap not completed\n"
 		server_bootstrap
 	fi
+	# The server runs a superset of most of the client machines units, however it shouldn't be renamed.
 	event_generateHash svr
-	# Server always also provisions as an encoder!
-	event_encoder
 	event_generate_reflector
 	event_generate_controller
 	event_generate_reflectorreload
+	event_encoder_reboot
 	event_reboot
+	event_reset
+	event_device_redetect
+	event_generate_watch_encoderflag
 }
 
 server_bootstrap(){
@@ -373,7 +378,7 @@ event_encoder_reboot(){
 		# Encoders have their own reboot flag should watch the system reboot flag for a hard reset
 		/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/SYSTEM_REBOOT 0 0 "wavelet_reboot"
 		systemctl --user daemon-reload
-		systemctl --user enable wavelet_encoder_reboot.service --now
+		systemctl --user enable wavelet_reboot.service --now
 }
 
 event_audio_toggle(){
@@ -536,6 +541,7 @@ event_generateHash(){
 				KEYNAME="${currentHostName}/RECENT_RELABEL"; KEYVALUE="0"; write_etcd_global
 				KEYNAME="/hostHash/${hostHash}"; delete_etcd_key_global
 				event_generateHash ${hashType}
+				regenerate_systemd_units="1"
 			fi
 		fi
 }
