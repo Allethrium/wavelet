@@ -215,7 +215,7 @@ event_server(){
 	# Server always also provisions as an encoder!
 	event_encoder
 	event_generate_reflector
-	event_generate_controllerWatch
+	event_generate_controller
 	event_generate_reflectorreload
 	event_reboot
 }
