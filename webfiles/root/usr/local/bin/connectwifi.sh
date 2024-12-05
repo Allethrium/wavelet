@@ -98,6 +98,24 @@ detect_disable_ethernet(){
 	fi
 }
 
+set_ethernet_mtu(){
+	# Attempting to set an MTU of 9000 will break all wireless clients.  Leaving this in encase we can work around it.
+	for interface in $(ip link show | awk '{print $2}' | grep ":$" | cut -d ':' -f1); do
+		if [[ $(ip link show dev "${interface}" | grep "link/ether") ]]; then 
+			ip link set dev ${interface} mtu 1500
+		fi
+	done
+}
+
+#####
+#
+# Main
+#
+#####
+
+set -x
+exec >/home/wavelet/connectwifi.log 2>&1
+
 if [[ $(hostname) = *"svr"* ]]; then
 	echo -e "This script enables wifi and disables other networking devices.  It is highly recommended to have the server running on a wired link."
 	echo -e "If you want to run the server via a WiFi connection, this should be configured and enabled manually via nmtui or nmcli."
@@ -110,20 +128,12 @@ if [[ -f /var/no.wifi ]]; then
 	exit 0
 fi
 
-#####
-#
-# Main
-#
-#####
-
-set -x
-exec >/home/wavelet/connectwifi.log 2>&1
 # Ensure wifi radio is on
 nmcli r wifi on
-connectwifi
 
 if [[ $1 == *"E"* ]]; then
 	echo -e "module run with -E flag, ethernet connection will remain enabled"
+	set_ethernet_mtu
 	connectwifi
 else
 	echo -e "no flags with module call, disabling ethernet connection."
