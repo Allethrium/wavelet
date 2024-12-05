@@ -32,12 +32,12 @@ main() {
 			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" \
 			--cert-file "${clientCertificateFile}" \
 			--key-file "${clientKeyFile}" \
-			--ca-file "${certificateAuthorityFile}" "${commandLine[@]}")
+			--ca-file "${certificateAuthorityFile}" ${commandLine[@]})
 		}
 	else
 		ETCDURI=http://192.168.1.32:2379/v3/kv/put
 		etcdCommand(){
-			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" "${commandLine[@]}")
+			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]})
 		}
 	fi
 	etcdCommand
@@ -146,6 +146,8 @@ case ${action} in
 	;;
 	# Generate a user systemd watcher based off keyname and module arguments.
 	generate_service)			generate_service "${inputKeyName}" "${waveletModule}" "${additionalArg}";
+	;;
+	check_status)				commandLine=("endpoint status");
 	;;
 	# exit with error because other commands are not valid!
 	*)			echo -e "\nInvalid command\n"; exit 1;
