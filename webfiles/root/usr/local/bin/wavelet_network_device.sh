@@ -50,7 +50,7 @@ delete_etcd_key(){
 parse_macaddr() {
 	echo -e "argument 1: ${1}\n"
 	echo -e "argument 2: ${2}\n"
-	echo -e "Detect network device function called with the following data:\nMAC: ${2},\nIP Address: ${1}\n"
+	echo -e "Detect network device function called with the following data:\nMAC: ${2}\nIP Address: ${1}\n"
 	# We put ^^ after the var to convert to uppercase!
 	case ${2^^} in
 		# Convert input to all uppercase with ^^i
