@@ -574,4 +574,10 @@ fi
 #set -x
 exec > "${logName}" 2>&1
 
+until [[ $(/usr/local/bin/wavelet_etcd_interaction.sh "check_status" | awk '{print $6}') = "true," ]]; do
+	echo -e "Etcd still down.. waiting one second.."
+	sleep 1
+done
+sleep 2
+
 detect_self
