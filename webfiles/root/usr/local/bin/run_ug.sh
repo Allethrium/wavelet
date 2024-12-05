@@ -105,14 +105,11 @@ event_server(){
 	KEYNAME=INPUT_DEVICE_PRESENT; read_etcd
 	systemctl --user start http-php-pod.service
 	if [[ "$printvalue" -eq 1 ]]; then
-		echo -e "An input device is present on this host,
-		 assuming we want an encoder running on the server.. \n"
+		echo -e "An input device is present on this host, assuming we want an encoder running on the server..\n"
 		event_encoder_server
 	else 
-		echo -e "No input devices are present on this server,
-		 assuming the encoder is running on a separate device.. \n"
-		echo -e "\nNote this routine calls wavelet_init.service which
-		 sets default video settings and clears previous settings! \n"
+		echo -e "No input devices are present on this server, assuming the encoder is running on a separate device..\n"
+		echo -e "Note this routine calls wavelet_init.service which sets default video settings and clears previous settings!\n"
 		systemctl --user start wavelet_init.service
 	fi
 }
@@ -123,7 +120,7 @@ event_encoder(){
 	# I've added a blank bit here too.. it might make more sense to call it "host blank" though..
 	KEYNAME="DECODER_BLANK"; KEYVALUE="0"; write_etcd
 	systemctl --user daemon-reload
-	echo -e "Pinging wavelet_detectv4l.sh to ensure any USB devices are detected prior to start.. \n"
+	echo -e "Pinging wavelet_detectv4l.sh to ensure any USB devices are detected prior to start..\n"
 	/usr/local/bin/wavelet_detectv4l.sh
 	systemctl --user start wavelet_encoder.service
 }
