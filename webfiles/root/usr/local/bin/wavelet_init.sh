@@ -142,6 +142,7 @@ until [[ $(/usr/local/bin/wavelet_etcd_interaction.sh "check_status" | awk '{pri
 	echo -e "Etcd still down.. waiting one second.."
 	sleep 1
 done
+sleep 2
 echo -e "Etcd cluster is up and responding, continuing.."
 exec >/home/wavelet/initialize.log 2>&1
 echo -e "Populating standard values into etcd, the last step will trigger the Controller and Reflector functions, bringing the system up.\n"
