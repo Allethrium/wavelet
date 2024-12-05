@@ -17,7 +17,7 @@ RUN	rpm-ostree install -y -A \
     https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm && \
 	rpm-ostree install -y -A \
 	wget fontawesome-fonts wl-clipboard nnn mako sway bemenu rofi-wayland lxsession sway-systemd waybar chrony \
-	foot vim powerline powerline-fonts vim-powerline perl NetworkManager-wifi iw wireless-regdb wpa_supplicant \
+	foot vim powerline powerline-fonts vim-powerline perl NetworkManager-wifi iw wireless-regdb wpa_supplicant avahi \
 	rdma freeipa-client iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd sha python3-pip \
 	libv4l v4l-utils pipewire-v4l2 ImageMagick \
 	mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
