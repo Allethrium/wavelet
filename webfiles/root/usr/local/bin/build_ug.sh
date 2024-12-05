@@ -304,7 +304,7 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 	echo -e "Reloading systemctl user daemon, and enabling the controller service immediately"
 	systemctl --user daemon-reload
 	echo -e "Enabling server notification services"
-	event_generate_controllerWatch
+	event_generate_controller
 	event_generate_reflectorreload
 	event_generate_watch_encoderflag
 	event_generate_run_ug
@@ -377,7 +377,7 @@ event_encoder_reboot(){
 }
 
 event_audio_toggle(){
-	if [[ $(systemctl --user list-unit-files "wavelet_audio_toggle.service") ]]; then
+	if [[ -f ~/.config/systemd/user/wavelet_audio_toggle.service ]]; then
 		echo -e "Unit file already generated, moving on\n"
 		:
 	else
@@ -391,7 +391,7 @@ event_audio_toggle(){
 }
 
 event_audio_bluetooth_connect(){
-	if [[ $(systemctl --user list-unit-files "wavelet_bluetooth_audio.service") ]]; then
+	if [[ -f ~/.config/systemd/user/wavelet_bluetooth_audio.service ]]; then
 		echo -e "Unit file already generated, moving on\n"
 		:
 	else
@@ -406,7 +406,7 @@ event_audio_bluetooth_connect(){
 }
 
 event_livestreamservice(){
-	if [[ $(systemctl --user list-unit-files "wavelet_livestream.service") ]]; then
+	if [[ -f ~/.config/systemd/user/wavelet_livestream.service ]]; then
 		echo -e "Unit file already generated, moving on\n"
 		:
 	else
@@ -420,12 +420,12 @@ event_livestreamservice(){
 	fi
 }
 event_generate_reflector(){
-	if [[ $(systemctl --user list-unit-files "wavelet_reflector.service") ]]; then
+	if [[ -f ~/.config/systemd/user/wavelet_reflector.service ]]; then
 		echo -e "Unit file already generated, moving on\n"
 		:
 	else
 		echo -e "Unit file does not exist, generating..\n"
-		# Generate userspace run_ug service
+		# Generate userspace reflector service
 		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "REFLECTOR_ARGS" 0 0 "wavelet.reflector"
 		# ExecStart=/usr/local/bin/UltraGrid.AppImage $(etcdctl --endpoints=${ETCDENDPOINT} get REFLECTOR_ARGS --print-value-only)
 		systemctl --user daemon-reload
@@ -433,13 +433,13 @@ event_generate_reflector(){
 	fi
 }
 
-event_generate_controllerWatch(){
-	if [[ $(systemctl --user list-unit-files "wavelet_controller.service") ]]; then
+event_generate_controller(){
+	if [[ -f ~/.config/systemd/user/wavelet_controller.service ]]; then
 		echo -e "Unit file already generated, moving on\n"
 		:
 	else
 		echo -e "Unit file does not exist, generating..\n"
-		# Generate userspace run_ug service
+		# Generate userspace controller service
 		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "input_update" 0 0 "wavelet_controller"
 		systemctl --user daemon-reload
 		systemctl --user enable wavelet_controller.service --now
@@ -447,25 +447,25 @@ event_generate_controllerWatch(){
 }
 
 event_generate_reflectorreload(){
-	if [[ $(systemctl --user list-unit-files "reflectorreload.service") ]]; then
+	if [[ -f ~/.config/systemd/user/wavelet_reflector_reload.service ]]; then
 		echo -e "Unit file already generated, moving on\n"
 		:
 	else
 		echo -e "Unit file does not exist, generating..\n"
-		# Generate userspace run_ug service
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/decoderip/" 0 0 "watch_reflectorreload"
+		# Generate userspace reflector_reload service
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/decoderip/" 0 0 "wavelet_reflector_reload"
 	systemctl --user daemon-reload
-	systemctl --user enable reflectorreload.service --now
+	systemctl --user enable wavelet_reflector_reload.service --now
 	fi
 }
 
 event_generate_encoder_service(){
-	if [[ $(systemctl --user list-unit-files "wavelet_encoder.service") ]]; then
+	if [[ -f ~/.config/systemd/user/wavelet_encoder.service ]]; then
 		echo -e "Unit file already generated, moving on\n"
 		:
 	else
 		echo -e "Unit file does not exist, generating..\n"
-		# Generate userspace run_ug service
+		# Generate userspace encoder service
 		echo -e "[Unit]
 Description=Wavelet Encoder service
 After=network-online.target etcd-member.service
