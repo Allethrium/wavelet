@@ -11,11 +11,15 @@ read_etcd(){
 }
 read_etcd_global(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
-	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
+	echo -e "Key Name {$KEYNAME} read from etcd for global value $printvalue\n"
 }
 read_etcd_prefix(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
-	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
+	echo -e "Key Name {$KEYNAME} read from etcd for value(s) $printvalue for host $(hostname)\n"
+}
+read_etcd_prefix_global(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix_global" "${KEYNAME}")
+	echo -e "Key Name {$KEYNAME} read from etcd for global value(s) $printvalue\n"
 }
 read_etcd_clients_ip() {
 	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
@@ -98,6 +102,22 @@ event_encoder(){
 		esac
 	}
 
+	encoder_event_server(){
+		# Because the server is a special case, we want to ensure it can quickly switch between static, net and whatever local devices are populated
+		# We create a sub-array with all of these devices and parse them to the encoder as normal
+		KEYNAME="/svr.wavelet.local/inputs/"; read_etcd_prefix_global;
+		read -r localInputsArray <<< ${printvalue}
+		# We now generate an array of these into our localInputs array
+		readarray -t localInputs < <(for i in ${localInputsArray}; do
+			if [[ "${i}" != *"-t"* ]];then
+				echo "-t $i"
+		    fi
+		done)
+
+		# Now we do the same for net devices
+		
+
+	}
 	encoder_event_singleDevice(){
 		KEYNAME="/hash/${encoderDeviceHash}"
 		read_etcd_global
@@ -197,7 +217,7 @@ event_encoder(){
 		[3]="--control-port 6160" \
 		[4]="-f V:rs:200:250" \
 		[11]="-t switcher" [12]="-t testcard:pattern=blank" [13]="-t file:/var/home/wavelet/seal.mkv:loop" [14]="-t testcard:pattern=smpte_bars" \
-		[21]="${localInputvar}" [22]="${netInputvar}" [23]=${multiInputvar} [24]="${audiovar}" \
+		[21]="${serverInputvar}" [22]="${localInputvar}" [23]="${netInputvar}" [24]=${multiInputvar} [29]="${audiovar}" \
 		[81]="-c ${encodervar}" \
 		[91]="-P ${video_port}" [72]="-m ${UGMTU}" [73]="${destinationipv4}")
 	ugargs="${commandLine[@]}"
