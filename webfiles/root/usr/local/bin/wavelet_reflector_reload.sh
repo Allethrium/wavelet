@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # This script is launched from systemd and acts as a detection sense for alive/dead hosts.  Originally part of the reflector logic in the controller,
-# moved to systemd-basis for better job control.   The systemd unit will run once, it's up to another event to call it as often as needed.
 # Currently as of 8/1/23 it's called by a systemd etcdctl watch unit every time the IP list changes.
 
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
@@ -118,7 +117,8 @@ service_exists() {
 
 # Main - test for reload flag before we do anything else!
 set -x
-exec >/home/wavelet/wavelet_reflector_polling.log 2>&1
+exec >/home/wavelet/wavelet_reflector_reload.log 2>&1
+
 if service_exists wavelet_reflector; then
     KEYNAME="reload_reflector"; read_etcd_global
     if [[ "$printvalue" -eq 1 ]]; then
