@@ -1,6 +1,6 @@
 #!/bin/bash
 # This runs as a systemd unit on the SECOND boot on the Client devices ONLY
-# It is responsible for extracting the wavelet modules, joining the domain and provisioning services so that it can talk to etcd and the DC.
+# It is responsible for extracting the wavelet modules, joining the domain (if security enabled) and provisioning services so that it can talk to etcd and the DC.
 
 extract_base(){
 	tar xf /home/wavelet/wavelet-files.tar.xz -C /home/wavelet --no-same-owner
@@ -89,13 +89,12 @@ groupadd -fg 84 avahi && useradd -c "Avahi Daemon Owner" -d /run/avahi-daemon -u
 groupadd -fg 86 netdev
 
 nmcli dev wifi rescan
-sleep 5
 exec > /home/wavelet/client_installer.log 2>&1
 extract_base
 extract_home
 extract_usrlocalbin
-sleep 2
 install_security_layer
 touch /var/client_install.complete
 systemctl disable wavelet_install_client.service
+echo -e "Calling connectwifi routine"
 /usr/local/bin/connectwifi.sh
