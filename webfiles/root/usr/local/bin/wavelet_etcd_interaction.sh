@@ -120,6 +120,9 @@ case ${action} in
 	# Read a set of etcd values by prefix.  I.E a list of IP addresses
 	read_etcd_prefix)   	    declare -A commandLine=([3]="get" [2]="/$(hostname)/${inputKeyName}" [1]="--prefix" [0]="--print-value-only");
 	;;
+	# For global keys
+	read_etcd_prefix_global)    declare -A commandLine=([3]="get" [2]="${inputKeyName}" [1]="--prefix" [0]="--print-value-only");
+	;;
 	read_etcd_json_revision)	declare -A commandline=([0]="get -w json");
 	;;
 	read_etcd_lastrevision)		declare -A commandLine=([2]="get" [1]="${inputKeyName}" [0]="--rev=${revisionID}");
