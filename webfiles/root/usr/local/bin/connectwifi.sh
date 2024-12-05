@@ -116,10 +116,16 @@ fi
 #
 #####
 
-
 set -x
 exec >/home/wavelet/connectwifi.log 2>&1
 # Ensure wifi radio is on
 nmcli r wifi on
 connectwifi
-detect_disable_ethernet
+
+if [[ $1 == *"E"* ]]; then
+	echo -e "module run with -E flag, ethernet connection will remain enabled"
+	connectwifi
+else
+	echo -e "no flags with module call, disabling ethernet connection."
+	detect_disable_ethernet
+fi
