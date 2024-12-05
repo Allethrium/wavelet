@@ -99,10 +99,10 @@ detect_disable_ethernet(){
 }
 
 set_ethernet_mtu(){
-	# Attempting to set an MTU of 9000 will break all wireless clients.  Leaving this in encase we can work around it.
-	for interface in $(ip link show | awk '{print $2}' | grep ":$" | cut -d ':' -f1); do
+	for interface in $(nmcli dev show | grep ethernet -B1 | head -n 1 | awk '{print $2}'); do
 		if [[ $(ip link show dev "${interface}" | grep "link/ether") ]]; then 
-			ip link set dev ${interface} mtu 1500
+			echo ${interface}
+			ip link set dev ${interface} mtu 9000
 		fi
 	done
 }
