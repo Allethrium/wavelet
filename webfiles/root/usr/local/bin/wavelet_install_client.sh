@@ -87,6 +87,7 @@ install_security_layer(){
 # Runs first because it doesn't matter what kind of server/client device, it'll need this.
 groupadd -fg 84 avahi && useradd -c "Avahi Daemon Owner" -d /run/avahi-daemon -u 84 -g avahi -s /bin/false avahi
 groupadd -fg 86 netdev
+systemctl enable avai-daemon.service --now
 
 nmcli dev wifi rescan
 exec > /home/wavelet/client_installer.log 2>&1
