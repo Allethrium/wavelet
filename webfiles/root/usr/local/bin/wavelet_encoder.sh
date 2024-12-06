@@ -21,6 +21,10 @@ read_etcd_prefix_global(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix_global" "${KEYNAME}")
 	echo -e "Key Name {$KEYNAME} read from etcd for global value(s) $printvalue\n"
 }
+read_etcd_prefix_list(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix_list" "${KEYNAME}")
+	echo -e "Key Name(s) {$KEYNAME} read from etcd for global value(s) $printvalue\n"
+}
 read_etcd_clients_ip() {
 	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
 }
@@ -105,19 +109,136 @@ event_encoder(){
 	encoder_event_server(){
 		# Because the server is a special case, we want to ensure it can quickly switch between static, net and whatever local devices are populated
 		# We create a sub-array with all of these devices and parse them to the encoder as normal
+		# We do not need to worry about static inputs because they are always there, and always 0,1,2
+		# Get keyvalues only for everything under inputs, this basically gives us all the valid generated command lines for our local devices.
+		
+		# First we need to know what device path matches what command line, so we need a matching array to check against:
+		KEYNAME="/svr.wavelet.local/inputs/"; read_etcd_prefix_list;
+		readarray -t matchingArray <<< $(echo ${printvalue} | sed 's|-t|\n|g' | xargs | sed 's|[[:space:]]|\n|g')
+		echo -e "Array contents:\n${matchingArray[@]}"
+
+		# Now we read the command line values only
 		KEYNAME="/svr.wavelet.local/inputs/"; read_etcd_prefix_global;
-		read -r localInputsArray <<< ${printvalue}
+		# Because we have spaces in the return value, and this value is returned as a string, we have to process everything
+		# remove -t, remove preceding space, 
+		readarray -t localInputsArray <<< $(echo ${printvalue} | sed 's|-t|\n|g' | cut -d ' ' -f 2 | sed '/^[[:space:]]*$/d')
+		echo -e "Array contents:\n${localInputsArray[@]}\n"
+
+		# Declare the master server inputs array
+		declare -A serverInputDevices=(); declare -A serverInputDevicesOrders
 		# We now generate an array of these into our localInputs array
-		readarray -t localInputs < <(for i in ${localInputsArray}; do
-			if [[ "${i}" != *"-t"* ]];then
-				echo "-t $i"
-		    fi
-		done)
+		declare -A localInputs=()
+		# Index is 2 because static inputs occupy 0-2, so the local inputs will always start at index 3
+		index=2
+		for element in ${localInputsArray[@]}; do
+			# Append "-t " to make it a valid UltraGrid command
+			if [[ "${element}" != *"-t"* ]];then
+				element="-t ${element}"
+			fi
+			((index++))
+			localInputs[$index]=${element}
+			serverInputDevices[$index]=${element}; serverInputDevicesOrders+=( $element )
+		done
+		#echo -e "Final local array contents:\n"
+		#for i in ${localInputs[@]}; do
+		#	echo -e "$i"
+		#done
+		# Increment index by N devices present in the local inputs array
+		localInputsOffset=$(echo ${#localInputs[@]})
+		echo -e "\n${localInputsOffset} device(s) in array..\n"
+		index=( ${index} + ${localInputsOffset} )
 
 		# Now we do the same for net devices
-		
+		declare -A networkInputs=()
+		KEYNAME="/network_uv_stream_command/"; read_etcd_prefix_global;
+		read -r networkInputsArray <<< $(echo ${printvalue} | sed 's|-t|\n|g' | cut -d ' ' -f 2 | sed '/^[[:space:]]*$/d')
+		echo -e "Network array contents:\n${networkInputsArray[@]}\n"
+		# We note generate these into our networkInputs array
+		for element in ${networkInputsArray[@]}; do
+			((index++))
+			# Append "-t " to make it a valid UltraGrid command
+			if [[ "${element}" != *"-t"* ]];then
+				element="-t ${element}"
+			fi
+			networkInputs[$index]=${element}
+			serverInputDevices[$index]=${element}
+		done
+		echo -e "Final network array contents:\n"
+		for i in ${networkInputs[@]}; do
+			echo -e "$i"
+		done
+		networkInputsOffset=$(echo ${#networkInputs[@]})
+		index=( ${index} + ${networkInputsOffset} )
 
-	}
+		# Now we create a new etcd key for each device with the corresponding channel ID, 
+		# controller will search this and use it to set the switcher to the appropriate index
+		echo "" > /var/home/wavelet/device_map_entries
+		for key in "${!matchingArray[@]}"; do
+			value="${matchingArray[$key]}"
+			if (( $key % 2 == 0 )); then
+				# 0 or even line, so $i is a device path
+				echo "$value" > /var/home/wavelet/part1
+			else
+				# an odd line, so $value is a command line
+				part2="${value}"
+				keys=()
+				# This walks through the list of keys in the serverInputDevices array, 
+				# and tests the value against the command line we have in matchingArray
+				for key in ${!serverInputDevices[@]}; do
+					if [[ ${serverInputDevices[$key]} == *"$part2"* ]]; then
+						keys+=( '$key' )
+						part3="$key, $(cat /var/home/wavelet/part1), ${part2}"
+						# Append to device_map_entries
+						echo "${part3}" >> /var/home/wavelet/device_map_entries
+					fi
+				done
+			fi
+		done
+
+		# Convert the completed array back to strings
+		mapfile -d '' sortedserverInputDevices < <(printf '%s\0' "${!serverInputDevices[@]}" | sort -z)
+		serverDevs=$(while IFS= read -r line; do
+				echo "$line"
+		done <<< $(for i in ${sortedserverInputDevices[@]};do
+						echo "$i)${serverInputDevices[$i]}"
+				done)
+		)
+		echo -e "\nGenerated switcher device list for all server local and network inputs devices is:\n${serverDevs}"
+
+		# Now we need to parse the indexing back to the Controller so that it knows what to select
+		# Perhaps a map file might be a good idea at this point
+		# 5:video2
+		# 4:video4
+		# 3:video0
+		# 6:192.168.1.xxx:5961
+
+		# Now we need to parse the indexing back to the Controller so that it knows what to select
+		# Perhaps a map file might be a good idea at this point
+		# 5:video2
+		# 4:video4
+		# 3:video0
+		# 6:192.168.1.xxx:5961
+        )
+
+        echo -e "\nGenerated switcher device list for all server local and network inputs devices is:\n${serverDevs}"
+
+        # Now we need to parse the indexing back to the Controller so that it knows what to select
+        # Perhaps a map file might be a good idea at this point
+        # 5:video2
+        # 4:video4
+        # 3:video0
+        # 6:192.168.1.xxx:5961
+
+        echo -e "\nGenerated switcher device list for all server local and network inputs devices is:\n${serverDevs}"
+
+        # Now we need to parse the indexing back to the Controller so that it knows what to select
+        # Perhaps a map file might be a good idea at this point
+        # 5:video2
+        # 4:video4
+        # 3:video0
+        # 6:192.168.1.xxx:5961
+		}
+
 	encoder_event_singleDevice(){
 		KEYNAME="/hash/${encoderDeviceHash}"
 		read_etcd_global
