@@ -26,18 +26,20 @@ main() {
 	if [[ ${inputKeyValue} != "" ]]; then flagSeparator="-- "; fi
 	# Here we are going to parse the entire command line, otherwise injected '' for unused variables mess with the results.
 	# check for security layer
+	# the commandline must be quoted, otherwise arguments such as "-t blablabla" aren't processed.
+	# This may mean we get quotation marks back out during queries, which will need to be stripped by their processing modules.
 	if [[ -f /var/prod.security.enabled ]]; then
-		ETCDURI=https://192.168.1.32:2379/v3/kv/put
+		ETCDURI=https://192.168.1.32:2379/v3/kv/
 		etcdCommand(){
 			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" \
 			--cert-file "${clientCertificateFile}" \
 			--key-file "${clientKeyFile}" \
-			--ca-file "${certificateAuthorityFile}" ${commandLine[@]})
+			--ca-file "${certificateAuthorityFile}" "${commandLine[@]}")
 		}
 	else
-		ETCDURI=http://192.168.1.32:2379/v3/kv/put
+		ETCDURI=http://192.168.1.32:2379/v3/kv/
 		etcdCommand(){
-			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]})
+			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" "${commandLine[@]}")
 		}
 	fi
 	etcdCommand
@@ -120,8 +122,11 @@ case ${action} in
 	# Read a set of etcd values by prefix.  I.E a list of IP addresses
 	read_etcd_prefix)   	    declare -A commandLine=([3]="get" [2]="/$(hostname)/${inputKeyName}" [1]="--prefix" [0]="--print-value-only");
 	;;
-	# For global keys
+	# For global keys, values only
 	read_etcd_prefix_global)    declare -A commandLine=([3]="get" [2]="${inputKeyName}" [1]="--prefix" [0]="--print-value-only");
+	;;
+	# For global keys + values, returned in a list key-value-key-value IFS is newline
+	read_etcd_prefix_list)    	declare -A commandLine=([3]="get" [2]="${inputKeyName}" [1]="--prefix");
 	;;
 	read_etcd_json_revision)	declare -A commandline=([0]="get -w json");
 	;;
