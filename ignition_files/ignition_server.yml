@@ -84,6 +84,12 @@ storage:
       overwrite: true
       contents:
         inline: SEDwaveletwifipassword
+    # The password Wavelet will use when attempting to configure network devices
+    - path: /var/home/wavelet/networkdevice_userpass
+      mode: 0600
+      overwrite: true
+      contents:
+        inline: SEDwaveletnetworkdevicepassword
     # Devloper Mode
     - path: /var/developerMode.enabled
       overwrite: true
