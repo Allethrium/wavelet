@@ -148,7 +148,8 @@ case ${action} in
 	read_etcd_keysonly)			declare -A commandLine=([3]="get" [2]="${inputKeyName}" [1]="--prefix" [0]="--keys-only"); fID="clearText";
 	;;
 	# Write an etcd value under a hostname.  Keys here are base64
-	write_etcd)					inputKeyValue=$(echo ${inputKeyValue} | base64); declare -A commandLine=([3]="put" [2]="/$(hostname)/${inputKeyName}" [1]="--" [0]="${inputKeyValue}");
+	# Note -w 0 to disable base64 line wrapping, or we get a newline \n after every 76 chars.
+	write_etcd)					inputKeyValue=$(echo ${inputKeyValue} | base64 -w 0); declare -A commandLine=([3]="put" [2]="/$(hostname)/${inputKeyName}" [1]="--" [0]="${inputKeyValue}");
 	;;
 	# Write a global etcd value where the key is root and not considered "under" a host.  Keys here are clear text.
 	write_etcd_global)			declare -A commandLine=([3]="put" [2]="${inputKeyName}" [1]="--" [0]="${inputKeyValue}");
