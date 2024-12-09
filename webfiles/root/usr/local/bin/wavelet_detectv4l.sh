@@ -132,7 +132,7 @@ set_device_input() {
 	# We need this to perform cleanup "gracefully"
 	KEYNAME="/long_interface${device_string_long}"; KEYVALUE=${deviceHash}; write_etcd_global
 	# This will enable us to find the device from its hash value, along with the registered host encoder, like a reverse DNS lookup..
-	# GLOBAL value\
+	# GLOBAL value
 	echo -e "Attempting to set keyname ${deviceHash} for $(hostname)${device_string_long}"
 	KEYNAME="/hash/${deviceHash}"
 	# Stores the device data under hostname/inputs/device_string_long
@@ -171,30 +171,33 @@ device_cleanup() {
 	else
 		echo -e "Orphaned devices located:\n"
 		printf "%s\n" "${interfaceLongArray[@]}"
-		for i in "${interfaceLongArray[@]}"
-			do
-				cleanupStringLong="${i}"
-				echo -e "\nCleanup device is ${cleanupStringLong}"
-				# delete the input caps key for the missing device
-				echo -e "Deleting $(hostname)/inputs${cleanupStringLong}  entry"
-				KEYNAME="/$(hostname)/inputs${cleanupStringLong}"; delete_etcd_key_global
-				# find the device hash 
-				KEYNAME="/long_interface${cleanupStringLong}"; cleanupHash=$(read_etcd)
-				echo -e "Device hash located as ${cleanupHash}"
-				# delete from long_interface prefix
-				echo -e "Deleting /long_interface${cleanupStringLong} entry"
-				delete_etcd_key
-				# delete from hash prefix
-				echo -e "Deleting /hash/${cleanupHash} entry"
-				KEYNAME="/hash/${cleanupHash}"; delete_etcd_key_global
-				# finally, find and delete from interface prefix - Guess we need ANOTHER lookup table to manage to keep all of this straight..
-				KEYNAME="/short_hash/${cleanupHash}"; read_etcd_global; cleanupInterface=${printvalue}
-				echo -e "Device UI Interface label located in /short_hash/${cleanupHash} for the value ${cleanupInterface}"
-				echo -e "Deleting /short_hash/${cleanupHash}  entry"
-				delete_etcd_key
-				echo -e "Deleting /interface/${cleanupInterface} entry"
-				KEYNAME="/interface/$${cleanupInterface}"; delete_etcd_key_global
-				echo -e "Device entry ${cleanupStringLong} should be removed along with all references to ${cleanupHash}\n\n"
+		for i in "${interfaceLongArray[@]}"; do
+				if [ ! -z "$i" ]; then
+					:
+				else
+					cleanupStringLong="${i}"
+					echo -e "\nCleanup device is ${cleanupStringLong}"
+					# delete the input caps key for the missing device
+					echo -e "Deleting $(hostname)/inputs${cleanupStringLong}  entry"
+					KEYNAME="/$(hostname)/inputs${cleanupStringLong}"; delete_etcd_key_global
+					# find the device hash 
+					KEYNAME="/long_interface${cleanupStringLong}"; cleanupHash=$(read_etcd)
+					echo -e "Device hash located as ${cleanupHash}"
+					# delete from long_interface prefix
+					echo -e "Deleting /long_interface${cleanupStringLong} entry"
+					delete_etcd_key
+					# delete from hash prefix
+					echo -e "Deleting /hash/${cleanupHash} entry"
+					KEYNAME="/hash/${cleanupHash}"; delete_etcd_key_global
+					# finally, find and delete from interface prefix - Guess we need ANOTHER lookup table to manage to keep all of this straight..
+					KEYNAME="/short_hash/${cleanupHash}"; read_etcd_global; cleanupInterface=${printvalue}
+					echo -e "Device UI Interface label located in /short_hash/${cleanupHash} for the value ${cleanupInterface}"
+					echo -e "Deleting /short_hash/${cleanupHash}  entry"
+					delete_etcd_key
+					echo -e "Deleting /interface/${cleanupInterface} entry"
+					KEYNAME="/interface/$${cleanupInterface}"; delete_etcd_key_global
+					echo -e "Device entry ${cleanupStringLong} should be removed along with all references to ${cleanupHash}\n\n"
+				fi
 			done
 	fi
 }
@@ -228,37 +231,31 @@ event_ipevo() {
 	echo -e "IPEVO Camera detection running..\n"
 	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPG:convert=RGB:size=1920x1080:tpf=1/30:device=${v4l_device_path}"; write_etcd
 	echo -e "\nDetection completed for IPEVO device..\n"
-	device_cleanup
 }
 event_logitech_hdmi() {
 	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPEG:convert=RGB:size=1920x1080:tpf=1/30:device=${v4l_device_path}"; write_etcd
 	echo -e "\nDetection completed for Logitech HDMI Capture device..\n"
-	device_cleanup
 }
 event_magewell() {
 	echo -e "Setting up Magewell USB capture card..\n"
 	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"; write_etcd
 	echo -e "\nDetection completed for device..\n"
-	device_cleanup
 }
 event_epson() {
 	echo -e "Setting up EPSON Document camera device...\n"
 	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/24:device=${v4l_device_path}"; write_etcd
 	echo -e "\nDetection completed for device..\n"
-	device_cleanup
 }
 event_dellWB3023(){
 	echo -e "Setting up Dell WB3023 webcam..\n"
 	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPG:size=640x480:tpf=1/30:device=${v4l_device_path}"; write_etcd
 	echo -e "\nDetection completed for device..\n"
-	device_cleanup	
 }
 event_unknowndevice() {
 # 30fps is a compatibility setting, catch all for other devices we will leave at 30.  Try YUYV with RGB conversion..
 	echo -e "The connected device has not been previously assigned an input ID for the UI component.  Storing hash.\n"
 	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"; write_etcd
 	echo -e "\n Detection completed for device..\n"
-	device_cleanup
 }
 
 #AUDIO output device block
@@ -269,7 +266,6 @@ event_biamp() {
 	# Set AUDIO_OUT flag so the UI does not generate an input button, but an audio OUT button instead?
 	KEYVALUE="1"; KEYNAME=${device_string_long}/AUDIO_OUT; write_etcd
 	echo -e "\n Detection completed for BiAmp audio device..\n"
-	device_cleanup
 }
 
 
@@ -334,3 +330,4 @@ fi
 # check to see if I'm a server or an encoder
 echo -e "\n********Begin device detection and registration process...********"
 detect_self
+device_cleanup
