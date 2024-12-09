@@ -34,19 +34,19 @@ main() {
 			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" \
 			--cert-file "${clientCertificateFile}" \
 			--key-file "${clientKeyFile}" \
-			--ca-file "${certificateAuthorityFile}" "${commandLine[@]}")
+			--ca-file "${certificateAuthorityFile}" ${commandLine[@]})
 		}
 	else
 		ETCDURI=http://192.168.1.32:2379/v3/kv/
 		etcdCommand(){
-			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" "${commandLine[@]}")
+			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]})
 		}
 	fi
 	etcdCommand
 	if [[ ${printvalue} = "OK" ]]; then
 		echo -e "etcd key written successfully"
 	else
-		echo ${printvalue}
+		echo ${printvalue} | base64 -d
 	fi
 }
 
@@ -110,6 +110,11 @@ valueOnlySwitch=$4
 waveletModule=$5
 additionalArg=$6
 revisionID=$7
+
+# We want to convert the inputKeyValue to a base64 string, much like etcd does internally, otherwise we run into difficulty handling spacing, escape chars and other common issues.
+# This means that ALL key values are base64 now.
+
+inputKeyValue=$(echo ${inputKeyValue} | base64)
 
 case ${action} in
 	# Read an etcd value stored under a hostname - note the preceding / 
