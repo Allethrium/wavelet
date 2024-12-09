@@ -44,16 +44,18 @@ main() {
 	fi
 	etcdCommand
 	# Process feedback
-	if [[ ${printvalue} = "OK" ]]; then
+	if	[[ ${fID} == "clearText" ]]; then
+	 	echo ${printvalue}
+	elif [[ ${printvalue} = "OK" ]]; then
 		# If we're performing a write, then we get OK back
 		echo -e "etcd key written successfully"
-	elif
-		# If we are processing a different no-get command, we won't want to base64 decode it
-		[[ ${fID} == "Status" ]]; then
-	 	echo ${printValue}
+		exit 0
+	elif [[ ${printvalue} = *"revision"* ]]; then
+		# We're pulling other etcd data such as key revision
+		echo ${printvalue}
 	else
 		# If we are performing a get operation, we need to decode from base64
-		echo ${printvalue} | base64 -d
+		IFS=' '; echo ${printvalue} | base64 -d
 	fi
 }
 
@@ -121,35 +123,34 @@ revisionID=$7
 # We want to convert the inputKeyValue to a base64 string, much like etcd does internally, otherwise we run into difficulty handling spacing, escape chars and other common issues.
 # This means that ALL key values are base64 now.
 
-inputKeyValue=$(echo ${inputKeyValue} | base64)
-
 case ${action} in
 	# Read an etcd value stored under a hostname - note the preceding / 
 	# Etcd does not have a hierarchical structure so we're 'simulating' directories by adding the /
 	read_etcd)					declare -A commandLine=([3]="get" [2]="/$(hostname)/${inputKeyName}" [1]="--print-value-only");
 	;;
 	# Read an etcd value set globally - may still be hostname but would be defined in inputKeyName
-	read_etcd_global)			declare -A commandLine=([3]="get" [2]="${inputKeyName}" [1]="--print-value-only");
+	read_etcd_global)			declare -A commandLine=([3]="get" [2]="${inputKeyName}" [1]="--print-value-only"); fID="clearText";
 	;;
 	# Read a set of etcd values by prefix.  I.E a list of IP addresses
 	read_etcd_prefix)   	    declare -A commandLine=([3]="get" [2]="/$(hostname)/${inputKeyName}" [1]="--prefix" [0]="--print-value-only");
 	;;
 	# For global keys, values only
-	read_etcd_prefix_global)    declare -A commandLine=([3]="get" [2]="${inputKeyName}" [1]="--prefix" [0]="--print-value-only");
+	read_etcd_prefix_global)    declare -A commandLine=([3]="get" [2]="${inputKeyName}" [1]="--prefix" [0]="--print-value-only"); fID="clearText";
 	;;
 	# For global keys + values, returned in a list key-value-key-value IFS is newline
-	read_etcd_prefix_list)    	declare -A commandLine=([3]="get" [2]="${inputKeyName}" [1]="--prefix");
+	read_etcd_prefix_list)    	declare -A commandLine=([3]="get" [2]="${inputKeyName}" [1]="--prefix"); fID="clearText";
 	;;
-	read_etcd_json_revision)	declare -A commandline=([0]="get -w json");
+	read_etcd_json_revision)	declare -A commandLine=([3]="get -w json" [1]="${inputKeyName}");
 	;;
 	read_etcd_lastrevision)		declare -A commandLine=([2]="get" [1]="${inputKeyName}" [0]="--rev=${revisionID}");
 	;;
-	read_etcd_keysonly)			declare -A commandLine=([3]="get" [2]="${inputKeyName}" [1]="--prefix" [0]="--keys-only");
+	# Want to return everything in the clear here
+	read_etcd_keysonly)			declare -A commandLine=([3]="get" [2]="${inputKeyName}" [1]="--prefix" [0]="--keys-only"); fID="clearText";
 	;;
-	# Write an etcd value under a hostname
-	write_etcd)					declare -A commandLine=([3]="put" [2]="/$(hostname)/${inputKeyName}" [1]="--" [0]="${inputKeyValue}");
+	# Write an etcd value under a hostname.  Keys here are base64
+	write_etcd)					inputKeyValue=$(echo ${inputKeyValue} | base64); declare -A commandLine=([3]="put" [2]="/$(hostname)/${inputKeyName}" [1]="--" [0]="${inputKeyValue}");
 	;;
-	# Write a global etcd value where the key is root and not considered "under" a host
+	# Write a global etcd value where the key is root and not considered "under" a host.  Keys here are clear text.
 	write_etcd_global)			declare -A commandLine=([3]="put" [2]="${inputKeyName}" [1]="--" [0]="${inputKeyValue}");
 	;;
 	# Special function for writing ip addresses under /decoderip/ 
@@ -159,15 +160,15 @@ case ${action} in
 	read_etcd_clients*)			declare -A commandLine=([3]="get" [2]="--prefix" [1]="/decoderip/" [0]="--print-value-only");
 	;;
 	# Delete a key
-	delete_etcd_key)			declare -A commandLine=([1]="del" [0]="$()hostname)/${inputKeyName}");
+	delete_etcd_key)			declare -A commandLine=([1]="del" [0]="$()hostname)/${inputKeyName}"); fID="clearText";
 	;;
 	# Delete a global key
-	delete_etcd_key_global)		declare -A commandLine=([1]="del" [0]="${inputKeyName}");
+	delete_etcd_key_global)		declare -A commandLine=([1]="del" [0]="${inputKeyName}"); fID="clearText";
 	;;
 	# Generate a user systemd watcher based off keyname and module arguments.
-	generate_service)			generate_service "${inputKeyName}" "${waveletModule}" "${additionalArg}";
+	generate_service)			generate_service "${inputKeyName}" "${waveletModule}" "${additionalArg}"; fID="clearText";
 	;;
-	check_status)				commandLine=("endpoint status"); fID="Status";
+	check_status)				commandLine=("endpoint status"); fID="clearText";
 	;;
 	# exit with error because other commands are not valid!
 	*)			echo -e "\nInvalid command\n"; exit 1;
