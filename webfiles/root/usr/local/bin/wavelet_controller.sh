@@ -37,7 +37,7 @@ UG_HOSTNAME=$(hostname)
 
 
 event_server(){
-echo -e "\nController Called, checking input key and acting accordingly..\n"
+echo -e "\n\n***Controller Called, checking input key and acting accordingly..***"
 # Now called by etcd so inputting standard values to etcd would overwrite everything every time an event happened.  
 # These are populated by wavelet_init.sh
 main
@@ -238,7 +238,7 @@ wavelet_dynamic() {
 	current_event="wavelet-dynamic"
 	KEYNAME=uv_input; read_etcd_global;	controllerInputLabel=${printvalue}
 	KEYNAME=uv_hash_select;	read_etcd_global; controllerInputHash=${printvalue}
-	echo -e "\nController notified that input hash ${controllerInputHash} has been selected from webUI with the input label ${controllerInputLabel}, encoder restart commencing..\n"
+	echo -e "Controller notified that input hash ${controllerInputHash}\nhas been selected with the input label: ${controllerInputLabel}\n encoder restart commencing..\n"
 	targetHost="${controllerInputLabel}"
 	echo -e "Target host name is ${targetHost}"
 
@@ -282,6 +282,7 @@ wavelet_dynamic() {
 	else
 		# No map file or channel data are available.
 		# Set encoder restart flag to 1 for appropriate host
+		echo -e "No device-channel mapping file is available."
 		targetHost=$(echo ${controllerInputLabel} | sed 's|\(.*\)/.*|\1|')
 		echo -e "${targetHost} encoder_restart flag set!\n"
 		KEYNAME="/${targetHost}/encoder_restart"; KEYVALUE="1"; write_etcd_global
