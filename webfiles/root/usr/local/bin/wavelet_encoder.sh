@@ -223,17 +223,18 @@ event_encoder(){
 		read_etcd_global
 		currentHostName=($hostname)
 		if [ -n "${printvalue}" ]; then
-			echo -e "found ${printvalue} in /hash/ - we have a local device\n"
+			echo -e "found ${printvalue} in /hash/ - we have a local device"
 			case ${printvalue} in
-				${currentHostName}*)		echo -e "\nThis device is attached to this encoder, proceeding\n"	; 
+				${currentHostName}*)		echo -e "This device is attached to this encoder, proceeding"	; 
 				;;
-				*)							echo -e "\nThis device is attached to a different encoder\n"		;	exit 0
+				*)							echo -e "This device is attached to a different encoder"		;	exit 0
 				;;
 			esac
 			encoderDeviceStringFull="${printvalue}"
 			echo -e "Device string ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash}\n"
-			printvalue=""
-			KEYNAME="${encoderDeviceStringFull}"; read_etcd_global; localInputvar=${printvalue}
+			unset ${printvalue}
+			KEYNAME="${encoderDeviceStringFull}"; read_etcd_global
+			localInputvar=$(echo ${printvalue} | base64 -d)
 			echo -e "Device input key $localInputvar located for this device string, proceeding to set encoder parameters \n"
 			# For Audio we will select pipewire here
 			audiovar="-s pipewire"
