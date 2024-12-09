@@ -285,7 +285,8 @@ wavelet_dynamic() {
 		echo -e "No device-channel mapping file is available."
 		targetHost=$(echo ${controllerInputLabel} | sed 's|\(.*\)/.*|\1|')
 		echo -e "${targetHost} encoder_restart flag set!\n"
-		KEYNAME="/${targetHost}/encoder_restart"; KEYVALUE="1"; write_etcd_global
+		# Note we are writing a global key to the TARGET host, so we need to base64 encode it for it to be valid.
+		KEYNAME="/${targetHost}/encoder_restart"; KEYVALUE="$(1 | base64)"; write_etcd_global
 		KEYNAME=input_update; KEYVALUE="0"; echo -e "Task completed, reset input_update key to 0.. \n"; write_etcd_global
 		sleep .25
 		# Ensure channel input is set to 3, so that we get the first switcher device which is not a static out of UG.
