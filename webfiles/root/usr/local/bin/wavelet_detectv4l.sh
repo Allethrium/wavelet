@@ -37,7 +37,6 @@ read_etcd_lastrevision(){
 }
 read_etcd_keysonly(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_keysonly" "${KEYNAME}")
-	echo -e "Key Name {$KEYNAME} read from etcd for key values: $printvalue\n"
 }
 write_etcd(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
@@ -80,7 +79,7 @@ sense_devices() {
 
 
 generate_device_info() {
-	echo -e "\n \n \n Now generating device info for each item presently located in /dev/v4l/by-id.. \n"
+	echo -e "Now generating device info for each item presently located in /dev/v4l/by-id.. \n"
 	echo -e "Working on ${device_string_long}\n"
 	device_string_short=$(echo $(hostname)/"${device_string_long}" | sed 's/.*usb-//')
 	info=$(v4l2-ctl -D -d ${v4l_device_path})
@@ -103,7 +102,7 @@ generate_device_info() {
 		echo -e "${deviceHash} not located within etcd, assuming we have a new device and continuing with process to set parameters..\n"
 		isDevice_input_or_output
 	else
-		echo -e "\n${deviceHash} located in etcd:\n\n${output_return}\n\n, terminating process.\nIf you wish for the device to be properly redetected from scratch, please move it to a different USB port.\n"
+		echo -e "${deviceHash} located in etcd:\n${output_return}\nIf you wish for the device to be properly redetected from scratch, please move it to a different USB port.\n"
 		# we run device_cleanup regardless!!
 		device_cleanup
 	fi
@@ -166,7 +165,7 @@ device_cleanup() {
 
 	# After this process is completed we will wind up with a pared down array, and hopefully nothing
 	if (( ${#interfaceLongArray[@]} == 0 )); then
-		echo -e "Array is empty, there is no discrepancy between detected device paths and available devices in Wavelet.\n"
+		echo -e "Array is empty, there is no discrepancy between detected device paths and available devices in Wavelet."
 		:
 	else
 		echo -e "Orphaned devices located:\n"
