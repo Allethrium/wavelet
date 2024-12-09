@@ -76,7 +76,7 @@ main() {
 			:
 		fi
 		echo -e "Resetting encoder restart flag to 0.."
-		KEYNAME=encoder_restart; KEYVALUE=0; write_etcd
+		KEYNAME=encoder_restart; KEYVALUE=0; write_etcd_global
 	fi
 }
 
