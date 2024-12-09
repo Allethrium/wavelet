@@ -319,7 +319,7 @@ event_encoder(){
 		[11]="-t switcher" [12]="-t testcard:pattern=blank" [13]="-t file:/var/home/wavelet/seal.mkv:loop" [14]="-t testcard:pattern=smpte_bars" \
 		[21]="${serverInputvar}" [22]="${localInputvar}" [23]="${netInputvar}" [24]=${multiInputvar} [29]="${audiovar}" \
 		[81]="-c ${encodervar}" \
-		[91]="-P ${video_port}" [92]="-m ${UGMTU}" [93]="${destinationipv4}" [94]="param control-accept-global")
+		[91]="-P ${video_port}" [92]="-m ${UGMTU}" [93]="${destinationipv4}" [94]="--param control-accept-global")
 	ugargs="${commandLine[@]}"
 	echo -e "Assembled command is:\n${ugargs}\n"
 	KEYNAME=UG_ARGS; KEYVALUE=${ugargs}; write_etcd

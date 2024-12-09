@@ -101,7 +101,7 @@ event_init_seal(){
 		[41]="-f V:rs:200:250" \
 		[51]="-t switcher:select=1:fallback" [52]="-t testcard:pattern=blank" [53]="-t file:/var/home/wavelet/seal.mkv:loop" [54]="-t testcard:pattern=smpte_bars" \
 		[61]="-c ${encodervar}" \
-		[71]="-P ${video_port}" [72]="-m ${UGMTU}" [73]="${destinationipv4}" [74]="param control-accept-global");
+		[71]="-P ${video_port}" [72]="-m ${UGMTU}" [73]="${destinationipv4}" [74]="--param control-accept-global");
 	ugargs="${commandLine[@]}"
 	# Note that UG_ARGS is NOT a global key, and is therefore base64 encoded.
 	KEYNAME=UG_ARGS; KEYVALUE=${ugargs}; write_etcd
@@ -127,7 +127,7 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage
 	systemctl --user enable UltraGrid.AppImage.service --now
 	# Sleep for a couple of seconds to allow the encoder to come up, then Select switcher input #1 which should always be the Seal image.
 	sleep 1
-	echo 'capture.data 1' | busybox nc -v 127.0.0.1 6160
+	echo 'capture.data 1' | busybox nc -v "127.0.0.1" 6160
 }
 
 
