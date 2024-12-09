@@ -102,6 +102,7 @@ event_init_seal(){
 		[61]="-c ${encodervar}" \
 		[71]="-P ${video_port}" [72]="-m ${UGMTU}" [73]="${destinationipv4}");
 	ugargs="${commandLine[@]}"
+	# Note that UG_ARGS is NOT a global key, and is therefore base64 encoded.
 	KEYNAME=UG_ARGS; KEYVALUE=${ugargs}; write_etcd
 	echo -e "Verifying stored command line:\n"
 	echo -e "${ugargs}"
