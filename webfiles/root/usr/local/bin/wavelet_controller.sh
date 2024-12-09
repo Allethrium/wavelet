@@ -241,41 +241,53 @@ wavelet_dynamic() {
 	echo -e "\nController notified that input hash ${controllerInputHash} has been selected from webUI with the input label ${controllerInputLabel}, encoder restart commencing..\n"
 	targetHost="${controllerInputLabel}"
 	echo -e "Target host name is ${targetHost}"
-	# Check to see if we're running a non-UltraGrid network input device
-	if [[ ${targetHost} == *"/network_interface/"* ]]; then
-		echo -e "\nTarget Hostname isn't a wavelet device, it's a network device.."
-		echo -e "Skipping Input update and capture channel flags..\n"
-		# Here we want to check to see if the device is already prepopulated on the switcher
-		KEYNAME="/hash/${controllerInputHash}"; read_etcd_global; deviceFullPath=${printvalue}
-		if grep -q ${deviceFullPath} device_map_entries; then
-			echo "Precise entry found in device map.."
-			channelIndex=$(grep ${deviceFullPath} device_map_entries | awk '{print $1}')
+
+	if [[ -f /var/home/wavelet/device_map_entries ]]; then
+		# First, we check for the device map file
+		echo -e "\nDevice map file has already been generated, continuing.."
+		if [[ ${targetHost} == *"/network_interface/"* ]]; then
+			# Check to see if we're running a non-UltraGrid network input device
+			echo -e "\nTarget Hostname isn't a wavelet device, it's a network device.."
+			echo -e "Skipping Input update and capture channel flags..\n"
+			# Here we want to check to see if the device is already prepopulated on the switcher
+			KEYNAME="/hash/${controllerInputHash}"; read_etcd_global; deviceFullPath=${printvalue}
+			if grep -q ${deviceFullPath} device_map_entries; then
+				echo "Precise entry found in device map.."
+				channelIndex=$(grep ${deviceFullPath} device_map_entries | awk '{print $1}')
+			else
+				# If not, we do it the old way, device map should be generated after the encoder runs once:
+				KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
+				KEYNAME=input_update; KEYVALUE="0";	echo -e "Task completed, reset input_update key to 0..\n";	write_etcd_global
+				sleep .25
+			fi
+		elif [[ ${targetHost} == *"$(hostname)"* ]]; then
+			echo -e "\nTarget hostname references the server, attempting to run locally.."
+			# Here we want to check to see if the device is already prepopulated on the switcher
+			KEYNAME="/hash/${controllerInputHash}"; read_etcd_global; deviceFullPath=${printvalue}
+			if grep -q ${deviceFullPath} device_map_entries; then
+				echo "Precise entry found in device map.."
+				channelIndex=$(grep ${deviceFullPath} device_map_entries | awk '{print $1}')
+			else
+				# If not, we do it the old way, device map should be generated after the encoder runs once:
+				KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
+				KEYNAME=input_update; KEYVALUE="0";	echo -e "Task completed, reset input_update key to 0..\n";	write_etcd_global
+				sleep .25
+			fi
+		else
+			echo -e "Device map file is generated, but we couldn't find the device entry.  Something may be wrong.\n"
+			# Is there a remedial step we can try here rather than just failing?
+			:
 		fi
-		# If not, we do it the old way:
-		echo -e "setting encoder task to restart on server..\n"
-		KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
-		KEYNAME=input_update; KEYVALUE="0";	echo -e "Task completed, reset input_update key to 0..\n";	write_etcd_global
-		sleep .25
-	elif [[ ${targetHost} == *"$(hostname)"* ]]; then
-		echo -e "\nTarget hostname references the server, attempting to run locally.."
-		# Here we want to check to see if the device is already prepopulated on the switcher
-		KEYNAME="/hash/${controllerInputHash}"; read_etcd_global; deviceFullPath=${printvalue}
-		if grep -q ${deviceFullPath} device_map_entries; then
-			echo "Precise entry found in device map, getting channel assignment.."
-			channelIndex=$(grep ${deviceFullPath} device_map_entries | awk '{print $1}')
-		fi
-		# And now all we should need to do is echo the channel selection into UltraGrid's switcher for an immediate change..
-		# This approach ought to avoid an encoder kill+restart operation, making everything faster.
 		echo 'capture.data ${channelIndex%,*}' | busybox nc -v ${targetIP} 6160
 	else
+		# No map file or channel data are available.
 		# Set encoder restart flag to 1 for appropriate host
 		targetHost=$(echo ${controllerInputLabel} | sed 's|\(.*\)/.*|\1|')
 		echo -e "${targetHost} encoder_restart flag set!\n"
 		KEYNAME="/${targetHost}/encoder_restart"; KEYVALUE="1"; write_etcd_global
-		# Ensure input is set to 3 so we get the right selection out of the switcher.
 		KEYNAME=input_update; KEYVALUE="0"; echo -e "Task completed, reset input_update key to 0.. \n"; write_etcd_global
 		sleep .25
-		# Set appropriate capture channel for running encoder
+		# Ensure channel input is set to 3, so that we get the first switcher device which is not a static out of UG.
 		KEYNAME="/hostHash/${targetHost}/ipaddr"; read_etcd_global; targetIP=${printvalue}
 		echo -e "\nAttempting to set switcher channel to new device for ${targetHost}..\n"
 		sleep 1
