@@ -35,6 +35,10 @@ read_etcd_lastrevision(){
 	# Special case used in controller
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_lastrevision")	
 }
+read_etcd_keysonly(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_keysonly" "${KEYNAME}")
+	echo -e "Key Name {$KEYNAME} read from etcd for key values: $printvalue\n"
+}
 write_etcd(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
 	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
