@@ -43,9 +43,16 @@ main() {
 		}
 	fi
 	etcdCommand
+	# Process feedback
 	if [[ ${printvalue} = "OK" ]]; then
+		# If we're performing a write, then we get OK back
 		echo -e "etcd key written successfully"
+	elif
+		# If we are processing a different no-get command, we won't want to base64 decode it
+		[[ ${fID} == "Status" ]]; then
+	 	echo ${printValue}
 	else
+		# If we are performing a get operation, we need to decode from base64
 		echo ${printvalue} | base64 -d
 	fi
 }
@@ -160,7 +167,7 @@ case ${action} in
 	# Generate a user systemd watcher based off keyname and module arguments.
 	generate_service)			generate_service "${inputKeyName}" "${waveletModule}" "${additionalArg}";
 	;;
-	check_status)				commandLine=("endpoint status");
+	check_status)				commandLine=("endpoint status"); fID="Status";
 	;;
 	# exit with error because other commands are not valid!
 	*)			echo -e "\nInvalid command\n"; exit 1;
