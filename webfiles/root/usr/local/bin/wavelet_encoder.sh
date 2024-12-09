@@ -7,23 +7,27 @@
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
-	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
+	echo -e "Key Name {$KEYNAME} read from etcd for value: $printvalue for host: $(hostname)\n"
 }
 read_etcd_global(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
-	echo -e "Key Name {$KEYNAME} read from etcd for global value $printvalue\n"
+	echo -e "Key Name {$KEYNAME} read from etcd for global value: $printvalue\n"
 }
 read_etcd_prefix(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
-	echo -e "Key Name {$KEYNAME} read from etcd for value(s) $printvalue for host $(hostname)\n"
+	echo -e "Key Name {$KEYNAME} read from etcd for value(s): $printvalue for host: $(hostname)\n"
 }
 read_etcd_prefix_global(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix_global" "${KEYNAME}")
-	echo -e "Key Name {$KEYNAME} read from etcd for global value(s) $printvalue\n"
+	echo -e "Key Name {$KEYNAME} read from etcd for global value(s): $printvalue\n"
 }
 read_etcd_prefix_list(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix_list" "${KEYNAME}")
-	echo -e "Key Name(s) {$KEYNAME} read from etcd for global value(s) $printvalue\n"
+	echo -e "Key Name(s) {$KEYNAME} read from etcd for global value(s): $printvalue\n"
+}
+read_etcd_keysonly(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_keysonly" "${KEYNAME}")
+	echo -e "Key Name {$KEYNAME} read from etcd for key values: $printvalue\n"
 }
 read_etcd_clients_ip() {
 	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
@@ -113,12 +117,12 @@ event_encoder(){
 		# Get keyvalues only for everything under inputs, this basically gives us all the valid generated command lines for our local devices.
 		
 		# First we need to know what device path matches what command line, so we need a matching array to check against:
-		KEYNAME="/svr.wavelet.local/inputs/"; read_etcd_prefix_list;
+		KEYNAME="inputs"; read_etcd_prefix;
 		readarray -t matchingArray <<< $(echo ${printvalue} | sed 's|-t|\n|g' | xargs | sed 's|[[:space:]]|\n|g')
 		echo -e "Array contents:\n${matchingArray[@]}"
 
 		# Now we read the command line values only
-		KEYNAME="/svr.wavelet.local/inputs/"; read_etcd_prefix_global;
+		KEYNAME="inputs"; read_etcd_prefix;
 		# Because we have spaces in the return value, and this value is returned as a string, we have to process everything
 		# remove -t, remove preceding space, 
 		readarray -t localInputsArray <<< $(echo ${printvalue} | sed 's|-t|\n|g' | cut -d ' ' -f 2 | sed '/^[[:space:]]*$/d')
@@ -139,6 +143,7 @@ event_encoder(){
 			localInputs[$index]=${element}
 			serverInputDevices[$index]=${element}; serverInputDevicesOrders+=( $element )
 		done
+
 		#echo -e "Final local array contents:\n"
 		#for i in ${localInputs[@]}; do
 		#	echo -e "$i"
@@ -211,32 +216,6 @@ event_encoder(){
 		# 4:video4
 		# 3:video0
 		# 6:192.168.1.xxx:5961
-
-		# Now we need to parse the indexing back to the Controller so that it knows what to select
-		# Perhaps a map file might be a good idea at this point
-		# 5:video2
-		# 4:video4
-		# 3:video0
-		# 6:192.168.1.xxx:5961
-        )
-
-        echo -e "\nGenerated switcher device list for all server local and network inputs devices is:\n${serverDevs}"
-
-        # Now we need to parse the indexing back to the Controller so that it knows what to select
-        # Perhaps a map file might be a good idea at this point
-        # 5:video2
-        # 4:video4
-        # 3:video0
-        # 6:192.168.1.xxx:5961
-
-        echo -e "\nGenerated switcher device list for all server local and network inputs devices is:\n${serverDevs}"
-
-        # Now we need to parse the indexing back to the Controller so that it knows what to select
-        # Perhaps a map file might be a good idea at this point
-        # 5:video2
-        # 4:video4
-        # 3:video0
-        # 6:192.168.1.xxx:5961
 		}
 
 	encoder_event_singleDevice(){
