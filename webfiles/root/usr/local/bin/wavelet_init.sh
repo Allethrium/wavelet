@@ -1,4 +1,5 @@
 
+
 #!/bin/bash
 
 # This forms the basis of an init script when the server starts and run_ug.sh is called to determine the system type
@@ -100,7 +101,7 @@ event_init_seal(){
 		[41]="-f V:rs:200:250" \
 		[51]="-t switcher:select=1:fallback" [52]="-t testcard:pattern=blank" [53]="-t file:/var/home/wavelet/seal.mkv:loop" [54]="-t testcard:pattern=smpte_bars" \
 		[61]="-c ${encodervar}" \
-		[71]="-P ${video_port}" [72]="-m ${UGMTU}" [73]="${destinationipv4}");
+		[71]="-P ${video_port}" [72]="-m ${UGMTU}" [73]="${destinationipv4}" [74]="param control-accept-global");
 	ugargs="${commandLine[@]}"
 	# Note that UG_ARGS is NOT a global key, and is therefore base64 encoded.
 	KEYNAME=UG_ARGS; KEYVALUE=${ugargs}; write_etcd
