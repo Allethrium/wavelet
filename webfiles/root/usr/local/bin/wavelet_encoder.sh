@@ -277,13 +277,17 @@ event_encoder(){
 	read_uv_hash_select
 	# Reads Filter settings, should be banner.pam most of the time
 	# If banner isn't enabled filtervar will be null, as the logo.c file can result in crashes with RTSP streams and some other pixel formats.
-	KEYNAME="/banner/enabled"
-	read_etcd_global
-	if [[ "${printvalue}" == "0" ]]; then
-		echo -e "\nBanner is enabled, so filtervar will be set appropriately.  Note currently the logo.c file in UltraGrid can generate errors on particular kinds of streams!..\n"
+	KEYNAME="/banner/enabled"; read_etcd_global
+	echo "${printvalue}"
+	if [[ "${printvalue}" =~ 0 ]]; then
+		echo -e "Banner is enabled, so filtervar will be set appropriately.  Note currently the logo.c file in UltraGrid can generate errors on particular kinds of streams!..\n"
 		KEYNAME=uv_filter_cmd; read_etcd_global; filtervar=${printvalue}
+		if [[ ${filtervar} =~ "--capture-filter" ]]; then
+			echo "filterVar has an illegal or incomplete command, unsetting.."
+			unset filtervar
+		fi
 	else 
-		echo -e "\nBanner is not enabled, so filtervar will be set to NULL..\n"
+		echo -e "Banner is not enabled, so filtervar will be set to NULL..\n"
 		filtervar=""
 	fi
 	# Reads Encoder codec settings, should be populated from the Controller
@@ -322,7 +326,6 @@ event_encoder(){
 		[81]="-c ${encodervar}" \
 		[91]="-P ${video_port}" [92]="-m ${UGMTU}" [93]="${destinationipv4}" [94]="--param control-accept-global")
 	ugargs="${commandLine[@]}"
-	echo -e "Assembled command is:\n${ugargs}\n"
 	KEYNAME=UG_ARGS; KEYVALUE=${ugargs}; write_etcd
 	echo -e "Verifying stored command line"
 	read_etcd; echo ${printvalue}
