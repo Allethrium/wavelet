@@ -58,8 +58,8 @@ UG_HOSTNAME=$(hostname)
 }
 
 main() {
-# main thread, checks encoder restart flag in etcd
-	KEYNAME="encoder_restart"; read_etcd_global
+	# main thread, checks encoder restart flag in etcd for this host
+	KEYNAME="encoder_restart"; read_etcd
 	if [[ "${printvalue}" -eq 1 ]]; then
 		echo -e "Encoder restart bit is set! continuing..\n"
 		detect_self
@@ -83,7 +83,7 @@ main() {
 			:
 		fi
 		echo -e "Resetting encoder restart flag to 0.."
-		KEYNAME=encoder_restart; KEYVALUE=0; write_etcd_global
+		KEYNAME=encoder_restart; KEYVALUE=0; write_etcd
 	fi
 }
 
