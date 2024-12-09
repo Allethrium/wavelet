@@ -9,15 +9,15 @@
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
-	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for value: $printvalue for host: $(hostname)\n"
 }
 read_etcd_global(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
-	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for Global Value: $printvalue\n"
 }
 read_etcd_prefix(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
-	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for value: $printvalue for host: $(hostname)\n"
 }
 read_etcd_clients_ip() {
 	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
@@ -41,17 +41,20 @@ read_etcd_keysonly(){
 }
 write_etcd(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
-	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
+	echo -e "Key Name: ${KEYNAME} set to: ${KEYVALUE} under: /$(hostname)/.\n"
 }
 write_etcd_global(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
-	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value.\n"
 }
 write_etcd_client_ip(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
 }
 delete_etcd_key(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
+}
+delete_etcd_key_global(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key_global" "${KEYNAME}"
 }
 generate_service(){
 	# Can be called with more args with "generate_servier" ${keyToWatch} 0 0 "${serviceName}"
@@ -145,27 +148,36 @@ set_device_input() {
 
 
 device_cleanup() {
-# always the last thing we do here, compares /dev/v4l/by-id to /hash/ and /interface/, removes "dead" devices
-# Generate an associative array from etcd's /hash/ and /interface/ prefixes
-# It effectively shouldn't be possible for v4lArray to be longer than interfaceLongArray, if this is the case then something has gone wrong
-# This is because we should be cleaning up unused devices, and the pruning happens every time a device is plugged in, or a button is pressed.
-KEYNAME="/long_interface/"
-declare -a interfaceLongArray=$(read_etcd_keysonly | sed 's/\/long_interface// ')
-#$(etcdctl --endpoints=${ETCDENDPOINT} get /long_interface/ --prefix --keys-only | sed 's/\/long_interface// ')
-	leftOversArray=(`printf '%s\n' "${interfaceLongArray[@]}" "${v4lArray[@]}" | sort | uniq -u`)
-	if (( ${#leftOversArray[@]} == 0 )); then
-		echo -e "Array is empty, there is no discrepancy between detected device paths and available devices in Wavelet.  Terminating process.. \n"
+	# always the last thing we do here, compares /dev/v4l/by-id to /hash/ and /interface/, removes "dead" devices.  
+	# These dead devices could also be other inputs supported by existing USB devices, but with a different interface (IE /dev/video0 and /dev/video1 might be the same device, one UVC video, one audio)
+	# Get a clean list of devices in populated etcd
+	KEYNAME="/long_interface/"
+	activeInterfaceDevices=$(read_etcd_keysonly | sed 's|/long_interface||g')
+	IFS=' ' read -a interfaceLongArray <<< ${activeInterfaceDevices}
+	unset IFS
+	#$(etcdctl --endpoints=${ETCDENDPOINT} get /long_interface/ --prefix --keys-only | sed 's|/long_interface||g')
+	# Iterate through array and try to find it in v4lArray, if found we REMOVE it from interfaceLongArray, so we end up with only devices which don't physically exist on this system
+	for i in ${interfaceLongArray[@]}; do
+		if [[ "${v4lArray[*]}" =~ "${i}" ]]; then
+			interfaceLongArray=("${interfaceLongArray[*]/$i}")
+			echo -e "$i removed"
+		fi
+	done
+
+	# After this process is completed we will wind up with a pared down array, and hopefully nothing
+	if (( ${#interfaceLongArray[@]} == 0 )); then
+		echo -e "Array is empty, there is no discrepancy between detected device paths and available devices in Wavelet.\n"
 		:
 	else
-		echo -e "Orphaned devices located: \n"
-			printf "%s\n" "${leftOversArray[@]}"
-		for i in "${leftOversArray[@]}"
+		echo -e "Orphaned devices located:\n"
+		printf "%s\n" "${interfaceLongArray[@]}"
+		for i in "${interfaceLongArray[@]}"
 			do
-				cleanupStringLong=$i
-				echo -e "\n\nCleanup device is ${cleanupStringLong}"
+				cleanupStringLong="${i}"
+				echo -e "\nCleanup device is ${cleanupStringLong}"
 				# delete the input caps key for the missing device
 				echo -e "Deleting $(hostname)/inputs${cleanupStringLong}  entry"
-				KEYNAME="/$(hostname)/inputs${cleanupStringLong}"; delete_etcd_key
+				KEYNAME="/$(hostname)/inputs${cleanupStringLong}"; delete_etcd_key_global
 				# find the device hash 
 				KEYNAME="/long_interface${cleanupStringLong}"; cleanupHash=$(read_etcd)
 				echo -e "Device hash located as ${cleanupHash}"
@@ -174,20 +186,18 @@ declare -a interfaceLongArray=$(read_etcd_keysonly | sed 's/\/long_interface// '
 				delete_etcd_key
 				# delete from hash prefix
 				echo -e "Deleting /hash/${cleanupHash} entry"
-				KEYNAME="/hash/${cleanupHash}"; delete_etcd_key
-				
+				KEYNAME="/hash/${cleanupHash}"; delete_etcd_key_global
 				# finally, find and delete from interface prefix - Guess we need ANOTHER lookup table to manage to keep all of this straight..
 				KEYNAME="/short_hash/${cleanupHash}"; read_etcd_global; cleanupInterface=${printvalue}
 				echo -e "Device UI Interface label located in /short_hash/${cleanupHash} for the value ${cleanupInterface}"
 				echo -e "Deleting /short_hash/${cleanupHash}  entry"
 				delete_etcd_key
 				echo -e "Deleting /interface/${cleanupInterface} entry"
-				KEYNAME="/interface/$${cleanupInterface}"; delete_etcd_key
+				KEYNAME="/interface/$${cleanupInterface}"; delete_etcd_key_global
 				echo -e "Device entry ${cleanupStringLong} should be removed along with all references to ${cleanupHash}\n\n"
 			done
 	fi
 }
-
 
 detect() {
 # we still need this fairly simple approach, as the Logitech screen share USB devices have no serial number, making multiple inputs is hard to handle.
@@ -214,7 +224,6 @@ detect() {
 # VIDEO output device blocks
 # each of these blocks contains specific configuration options that must be preset for each device in order for them to work.  
 # We will have to add to this over time to support more devices appropriately.
-
 event_ipevo() {
 	echo -e "IPEVO Camera detection running..\n"
 	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPG:convert=RGB:size=1920x1080:tpf=1/30:device=${v4l_device_path}"; write_etcd
@@ -252,9 +261,7 @@ event_unknowndevice() {
 	device_cleanup
 }
 
-
 #AUDIO output device block
-
 event_biamp() {
 # This should set the biAmp up as a Pipewire audio output sink by default, so Wavelet will stream any audio data the system receives into the biAmp
 	echo -e "biAmp detection running..\n"
