@@ -2,12 +2,20 @@
 # Attempts to find and join a Wavelet network if it's available
 
 get_full_bssid(){
-	sleep 1
+	sleep 3
 	wifibssid=$(nmcli -f BSSID device wifi | grep ${wifi_ap_mac} | head -n 1 | xargs)
 	echo ${wifibssid}
 }
 
 connectwifi(){
+	if [[ -f /var/prod.security.enabled ]]; then
+		connectwifi_enterprise
+	else
+		connectwifi_psk
+	fi
+}
+
+connectwifi_psk(){
 	networkssid=$(cat /var/home/wavelet/wifi_ssid)
 	wifipassword=$(cat /var/home/wavelet/wifi_pw)
 	wifi_ap_mac=$(cat /var/home/wavelet/wifi_bssid)
@@ -137,10 +145,6 @@ if [[ $1 == *"E"* ]]; then
 	connectwifi
 else
 	echo -e "no flags with module call, disabling ethernet connection."
-	if [[ -f /var/prod.security.enabled ]]; then
-		connectwifi_enterprise
-	else
-		connectwifi
-	fi
+	connectwifi
 	detect_disable_ethernet
 fi
