@@ -91,7 +91,7 @@ install_wavelet_modules(){
 	hostname=$(hostname)
 	echo -e "${hostname}" > /var/lib/dnsmasq/hostname.local
 	# Perform any further customization required in our scripts, and clean up.
-	sed -i "s/!!hostnamegoeshere!!/${hostname}/g" /usr/local/bin/wavelet_network_sense.sh
+	sed -i "s/!!hostnamegoeshere!!/$(hostname)/g" /usr/local/bin/wavelet_network_sense.sh
 	touch /var/extract.target
 }
 
@@ -103,8 +103,6 @@ generate_tarfiles(){
 	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz}
 	echo -e "Done."
 	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz}
-	mv /var/home/wavelet/wavelet-files.tar.xz /var/home/wavelet/http/ignition/ && chown wavelet:wavelet /var/home/wavelet/http/ignition/wavelet-files.tar.xz
-	cp /usr/local/bin/wavelet_installer_xf.sh /home/wavelet/http/ignition && chmod 0644 /home/wavelet/http/ignition/wavelet_installer_xf.sh
 }
 
 
@@ -125,6 +123,9 @@ FILES=("/var/home/wavelet/wavelet-files.tar.xz" \
 	"/etc/skel/.bash_profile")
 cp "${FILES[@]}" /var/home/wavelet/http/ignition/
 chmod -R 0644 /var/home/wavelet/http/ignition/* && chown -R wavelet:wavelet /var/home/wavelet/http
+# Ensure bashrc and profile have compatible filenames for decoder ignition
+mv /var/home/wavelet/http/ignition/.bashrc /var/home/wavelet/http/ignition/skel_bashrc
+mv /var/home/wavelet/http/ignition/.bash_profile /var/home/wavelet/http/ignition/skel_profile
 restorecon -Rv /var/home/wavelet/http
 #set -x
 exec >/home/wavelet/update_wavelet_modules.log 2>&1
