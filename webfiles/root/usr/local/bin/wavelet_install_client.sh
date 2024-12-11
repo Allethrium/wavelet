@@ -11,7 +11,7 @@ extract_home(){
 	tar xf /home/wavelet/wavelethome.tar.xz -C /home/wavelet
 	chown -R wavelet:wavelet /home/wavelet
 	chmod 0755 /home/wavelet/http
-	chmod -R 0755 /home/wavelet/http-php
+	#chmod -R 0755 /home/wavelet/http-php
 	echo -e "Wavelet homedir setup successfully..\n"
 }
 
