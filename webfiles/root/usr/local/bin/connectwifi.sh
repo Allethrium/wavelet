@@ -137,5 +137,10 @@ if [[ $1 == *"E"* ]]; then
 	connectwifi
 else
 	echo -e "no flags with module call, disabling ethernet connection."
+	if [[ -f /var/prod.security.enabled ]]; then
+		connectwifi_enterprise
+	else
+		connectwifi
+	fi
 	detect_disable_ethernet
 fi
