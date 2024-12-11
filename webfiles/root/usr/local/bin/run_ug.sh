@@ -251,7 +251,7 @@ get_ipValue(){
 	# Identify Ethernet interfaces by checking for "eth" in their name
 	# There HAS to be a better way of doing this?
 	primaryConnection=$(nmcli -g name con show | head -1)
-	primaryConnectionIP=$(nmcli con show "${primaryConnection}" | grep ipv4.addresses | awk '{print $2}' | head -n 1 )
+	primaryConnectionIP=$(nmcli -f IP4 con show "${primaryConnection}" | grep IP4.ADDRESS | awk '{print $2}')
 	echo -e "Detected primary connection \"${primaryConnection}\" with IP Address of \"${primaryConnectionIP}\""
 	IPVALUE=${primaryConnectionIP%/*}
 	# IP value MUST be populated or the decoder writes gibberish into the server
