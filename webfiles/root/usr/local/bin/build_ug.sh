@@ -90,7 +90,7 @@ detect_self(){
 	case $UG_HOSTNAME in
 	enc*) 					echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."			;	event_encoder
 	;;
-	decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.  Randomizing my hostname and rebooting"	;	systemctl start decoderhostname.service 
+	decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.  Client_install probably failed.."			;	systemctl start decoderhostname.service
 	;;
 	dec*)					echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."				;	event_decoder
 	;;
