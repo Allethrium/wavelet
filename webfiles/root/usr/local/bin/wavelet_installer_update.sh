@@ -103,6 +103,7 @@ generate_tarfiles(){
 	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz}
 	echo -e "Done."
 	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz}
+	mv /var/home/wavelet/wavelet-files.tar.xz /var/home/wavelet/http/ignition/ && chown wavelet:wavelet /var/home/wavelet/http/ignition/wavelet-files.tar.xz
 	cp /usr/local/bin/wavelet_installer_xf.sh /home/wavelet/http/ignition && chmod 0644 /home/wavelet/http/ignition/wavelet_installer_xf.sh
 }
 
@@ -115,9 +116,16 @@ generate_tarfiles(){
 
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 systemctl disable zincati.service --now
+# Update with the server hostname - no other device should be doing network sense.
 sed -i "s/hostnamegoeshere/$(hostname)/g" /usr/local/bin/wavelet_network_sense.sh
-FILES=("/usr/local/bin/wavelet_installer_xf.sh" "/etc/skel/.bashrc" "/etc/skel/.bash_profile")
-cp ${FILES[@]} /var/home/wavelet/http/ignition/
+FILES=("/var/home/wavelet/wavelet-files.tar.xz" \
+	"/usr/local/bin/wavelet_install_client.sh" \
+	"/usr/local/bin/wavelet_installer_xf.sh" \
+	"/etc/skel/.bashrc" \
+	"/etc/skel/.bash_profile")
+cp "${FILES[@]}" /var/home/wavelet/http/ignition/
+chmod -R 0644 /var/home/wavelet/http/ignition/* && chown -R wavelet:wavelet /var/home/wavelet/http
+restorecon -Rv /var/home/wavelet/http
 #set -x
 exec >/home/wavelet/update_wavelet_modules.log 2>&1
 detect_self
