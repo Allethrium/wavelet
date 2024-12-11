@@ -43,8 +43,8 @@ event_server(){
 }
 
 extract_base(){
-	tar xf /home/wavelet/wavelet-files.tar.xz -C /home/wavelet --no-same-owner
-	cd /home/wavelet
+	tar xf /var/home/wavelet/wavelet-files.tar.xz -C /home/wavelet --no-same-owner
+	cd /var/home/wavelet
 	mv ./usrlocalbin.tar.xz /usr/local/bin/
 }
 
@@ -55,10 +55,10 @@ extract_etc(){
 }
 
 extract_home(){
-	tar xf /home/wavelet/wavelethome.tar.xz -C /home/wavelet
+	tar xf /var/home/wavelet/wavelethome.tar.xz -C /home/wavelet
 	chown -R wavelet:wavelet /home/wavelet
-	chmod 0755 /home/wavelet/http
-	chmod -R 0755 /home/wavelet/http-php
+	chmod 0755 /var/home/wavelet/http
+	chmod -R 0755 /var/home/wavelet/http-php
 	echo -e "Wavelet homedir setup successfully..\n"
 }
 
@@ -96,13 +96,15 @@ install_wavelet_modules(){
 }
 
 generate_tarfiles(){
-	echo -e "Generating tar.xz files for upload to distribution server..\n"
+	echo -e "\nGenerating tar.xz files for upload to distribution server.."
+	cd /var/home/wavelet
 	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /var/home/wavelet/wavelet-git/webfiles/root/usr/local/bin/ .
 	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /var/home/wavelet/wavelet-git/webfiles/root/home/wavelet/ .
-	echo -e "Packaging files together..\n"
+	echo -e "Packaging files together.."
 	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz}
 	echo -e "Done."
 	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz}
+	setfactl -b wavelet-files.tar.xz
 }
 
 
@@ -111,6 +113,8 @@ generate_tarfiles(){
 # Main
 #
 #####
+
+# One rather silly thing.. if this module is what gets updated... then that won't work until it is run again the next reboot.  O_O
 
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 systemctl disable zincati.service --now
@@ -128,7 +132,7 @@ mv /var/home/wavelet/http/ignition/.bashrc /var/home/wavelet/http/ignition/skel_
 mv /var/home/wavelet/http/ignition/.bash_profile /var/home/wavelet/http/ignition/skel_profile.txt
 restorecon -Rv /var/home/wavelet/http
 #set -x
-exec >/home/wavelet/update_wavelet_modules.log 2>&1
+exec >/var/home/wavelet/update_wavelet_modules.log 2>&1
 detect_self
 echo -e "Update completed.  The system will automatically reboot in ten seconds!"
 systemctl reboot
