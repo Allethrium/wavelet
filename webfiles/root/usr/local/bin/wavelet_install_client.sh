@@ -97,5 +97,5 @@ extract_usrlocalbin
 install_security_layer
 touch /var/client_install.complete
 systemctl disable wavelet_install_client.service
-echo -e "Calling connectwifi routine"
+echo -e "Calling connectwifi module"
 /usr/local/bin/connectwifi.sh
