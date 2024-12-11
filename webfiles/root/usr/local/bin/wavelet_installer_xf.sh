@@ -423,7 +423,8 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
 	echo -e "RPM package updates completed, finishing installer task..\n"
 	echo -e "Client install service will run on next reboot to populate wavelet modules and configure networking."
 	systemctl enable wavelet_install_client.service
-	systemctl reboot
+	echo -e "Starting decoder hostname randomizer, this is the final step in the first boot, and will reboot the client machine.."
+	systemctl start decoderhostname.service
 }
 
 ####
