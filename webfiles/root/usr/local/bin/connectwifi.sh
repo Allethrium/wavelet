@@ -121,7 +121,7 @@ set_ethernet_mtu(){
 #
 #####
 
-set -x
+#set -x
 exec >/home/wavelet/connectwifi.log 2>&1
 
 if [[ $(hostname) = *"svr"* ]]; then
