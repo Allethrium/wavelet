@@ -158,7 +158,7 @@ case ${action} in
 	write_etcd_client_ip)		declare -A commandLine=([3]="put" [2]="/decoderip/$(hostname)" [1]="--" [0]="${inputKeyValue}");
 	;;
 	# returns value list of IP Addresses, special case to parse directly to command (used for read_etcd_clients and the sed variant)
-	read_etcd_clients*)			declare -A commandLine=([3]="get" [2]="--prefix" [1]="/decoderip/" [0]="--print-value-only");
+	read_etcd_clients*)			declare -A commandLine=([3]="get" [2]="--prefix" [1]="/decoderip/" [0]="--print-value-only"); fID="clearText";
 	;;
 	# Delete a key
 	delete_etcd_key)			declare -A commandLine=([1]="del" [0]="$()hostname)/${inputKeyName}"); fID="clearText";
