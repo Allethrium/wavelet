@@ -210,7 +210,7 @@ customization(){
 	users=("wavelet-root" "wavelet")
 
 	# Iterate over the array of users and set passwords for each
-	for user in ${users[@]}; do
+	for user in "${users[@]}"; do
 		if [[ $(set_pw "${user}") -ne 0 ]]; then
 			echo -e "Failed to set a password for ${user}."
 			exit 1
