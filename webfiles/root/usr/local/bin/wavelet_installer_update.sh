@@ -1,6 +1,5 @@
 #!/bin/bash
-# Updates wavelet modules automatically from Git repo.  Useful for installing updates to wavelet as long as no system services are affected.
-
+# Updates wavelet modules automatically from Git repo.  Useful for installing updates to wavelet as long as no system packages are affected.
 # Detects if we are on dev or master branch.  To switch, move that file flag someplace else.
 
 detect_self(){
