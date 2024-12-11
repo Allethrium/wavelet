@@ -124,8 +124,8 @@ FILES=("/var/home/wavelet/wavelet-files.tar.xz" \
 cp "${FILES[@]}" /var/home/wavelet/http/ignition/
 chmod -R 0644 /var/home/wavelet/http/ignition/* && chown -R wavelet:wavelet /var/home/wavelet/http
 # Ensure bashrc and profile have compatible filenames for decoder ignition
-mv /var/home/wavelet/http/ignition/.bashrc /var/home/wavelet/http/ignition/skel_bashrc
-mv /var/home/wavelet/http/ignition/.bash_profile /var/home/wavelet/http/ignition/skel_profile
+mv /var/home/wavelet/http/ignition/.bashrc /var/home/wavelet/http/ignition/skel_bashrc.txt
+mv /var/home/wavelet/http/ignition/.bash_profile /var/home/wavelet/http/ignition/skel_profile.txt
 restorecon -Rv /var/home/wavelet/http
 #set -x
 exec >/home/wavelet/update_wavelet_modules.log 2>&1
