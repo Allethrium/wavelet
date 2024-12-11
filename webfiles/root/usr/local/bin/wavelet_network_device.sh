@@ -167,6 +167,7 @@ event_ptz_ndiHX(){
 		printf "}\n")
 		deviceHostName=$(echo ${output_array[devname]})
 		# Check to see if this device is NDI enabled
+		tput -T linux setaf 2
 		ndiSource=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | cut -d '(' -f1 | awk '{print $1}')
 		if [ -n ${ndiSource} ]; then
 			echo -e "\nNDI source for this IP address not found, configuring for RTSP..\n"
