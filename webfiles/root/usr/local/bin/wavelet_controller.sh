@@ -1,4 +1,5 @@
 
+
 #!/bin/bash
 #
 # The controller is responsible for orchestrating the rest of the system
@@ -240,6 +241,7 @@ wavelet_dynamic() {
 	KEYNAME=uv_hash_select;	read_etcd_global; controllerInputHash=${printvalue}
 	echo -e "Controller notified that input hash ${controllerInputHash}\nhas been selected with the input label: ${controllerInputLabel}\nEncoder restart commencing..\n"
 	targetHost="${controllerInputLabel}"
+	targetIP=$(getent ahostsv4 "${targetHost}" | head -n 1 | awk '{print $1}')
 	echo -e "Target host name is ${targetHost}"
 
 	if [[ -f /var/home/wavelet/device_map_entries ]]; then
@@ -272,13 +274,14 @@ wavelet_dynamic() {
 				KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
 				KEYNAME=input_update; KEYVALUE="0";	echo -e "Task completed, reset input_update key to 0..\n";	write_etcd_global
 				sleep .25
+				echo 'capture.data ${channelIndex%,*}' | busybox nc -v ${targetHost} 6160
 			fi
 		else
 			echo -e "Device map file is generated, but we couldn't find the device entry.  Something may be wrong.\n"
 			# Is there a remedial step we can try here rather than just failing?
 			:
 		fi
-		echo 'capture.data ${channelIndex%,*}' | busybox nc -v ${targetIP} 6160
+		echo 'capture.data ${channelIndex%,*}' | busybox nc -v ${targetHost} 6160
 	else
 		# No map file or channel data are available.
 		# Set encoder restart flag to 1 for appropriate host
