@@ -405,8 +405,8 @@ ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
 After=multi-user.target
 [Service]
 Type=oneshot
-ExecStartPre=/usr/bin/bash -c "curl -o /usr/local/bin/wavelet_install_client.sh http://192.168.1.32:8080/ignition/wavelet_install_client.sh && chmod 0755 /usr/local/bin/wavelet_install_client.sh"
-ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_install_client.sh"
+ExecStartPre=/usr/bin/bash -c 'curl -o /usr/local/bin/wavelet_install_client.sh http://192.168.1.32:8080/ignition/wavelet_install_client.sh && chmod 0755 /usr/local/bin/wavelet_install_client.sh'
+ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_client.sh'
 [Install]
 WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
 	systemctl daemon-reload
