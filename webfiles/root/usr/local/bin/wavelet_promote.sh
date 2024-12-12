@@ -1,3 +1,4 @@
+
 #!/bin/bash 
 #
 # This script resets the appropriate flag back to 0 and then calls hostname change.
@@ -82,7 +83,7 @@ event_encoder(){
 
 exec >/home/wavelet/promote.log 2>&1
 
-KEYNAME=PROMOTE; etcd_global
+KEYNAME="/$(hostname)/PROMOTE"; read_etcd_global
 if [[ "${printvalue}" == 1 ]]; then
 	echo -e "\nPROMOTE key is set to 1, continuing with task.. \n"
 	detect_self
