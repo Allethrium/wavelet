@@ -458,9 +458,10 @@ event_generate_reflectorreload(){
 	else
 		echo -e "Unit file does not exist, generating..\n"
 		# Generate userspace reflector_reload service
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/decoderip/" 0 0 "wavelet_reflector_reload"
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/decoderip/ --prefix" 0 0 "wavelet_reflector_reload"
 	systemctl --user daemon-reload
-	systemctl --user enable wavelet_reflector_reload.service --now
+	systemctl --user enable wavelet_reflector_reload.service
+	systemctl --user start wavelet_reflector_reload.service
 	fi
 }
 
