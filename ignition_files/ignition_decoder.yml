@@ -92,8 +92,7 @@ storage:
                   polkit.log("unit="+action.lookup("unit"))
                   polkit.log("verb="+action.lookup("verb"))
             if (action.lookup("unit") == "dnsmasq.service" || 
-                action.lookup("unit") == "etcd-quadlet.service" ||
-                action.lookup("unit") == "decoderhostname.service") {
+                action.lookup("unit") == "etcd-quadlet.service") {
                  var verb = action.lookup("verb");
                  if (verb == "start" || verb == "stop" || verb == "restart" || verb == "enable" || verb == "disable") {
                   polkit.log("returning YES")
@@ -112,6 +111,28 @@ storage:
             if ((action.id == "org.freedesktop.NetworkManager.wifi.scan" &&
               subject.user == "wavelet")) {
                 return polkit.Result.YES;
+              }
+          });
+    # Hostname control
+    - path: /etc/polkit-1/rules.d/1339-wavelet-hostname.rules
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          polkit.addRule(function(action, subject) {
+            if ((action.id == "org.freedesktop.systemd1.manage-units" &&
+                 subject.user == "wavelet")) {
+                  polkit.log("action=" + action)
+                  polkit.log("subject=" + subject)
+                  polkit.log("unit="+action.lookup("unit"))
+                  polkit.log("verb="+action.lookup("verb"))
+            if (action.lookup("unit") == "decoderhostname.service") {
+                 var verb = action.lookup("verb");
+                 if (verb == "start" || verb == "stop" || verb == "restart" || verb == "enable" || verb == "disable") {
+                  polkit.log("returning YES")
+                  return polkit.Result.YES;
+                  }
+                }
               }
           });
     # SystemD resolved
