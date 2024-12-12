@@ -242,7 +242,7 @@ storage:
                   polkit.log("subject=" + subject)
                   polkit.log("unit="+action.lookup("unit"))
                   polkit.log("verb="+action.lookup("verb"))
-            if (action.lookup("unit") == "dnsmasq.service") ||
+            if (action.lookup("unit") == "dnsmasq.service" ||
                 action.lookup("unit") == "etcd-quadlet.service") {
                  var verb = action.lookup("verb");
                  if (verb == "start" || verb == "stop" || verb == "restart" || verb == "enable" || verb == "disable") {
