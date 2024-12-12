@@ -352,4 +352,11 @@ event_encoder(){
 
 # Main
 exec >/home/wavelet/encoder.log 2>&1
-event_encoder
+
+if [[ -f developerMode.enabled ]]; then
+	if [[ "$(hostname)" == *"svr"* ]]; then 
+		event_encoder_server
+	fi
+else
+	event_encoder
+fi
