@@ -130,8 +130,8 @@ wifi_connect_retry(){
 			echo -e "Active WiFi connection available! return 0"
 			return 0
 		else
-			echo -e "Attempting to connect to WiFi.  If this device is NOT planned to be on WiFi, run the command as a privileged user:\n"
-			echo -e "touch /var/no.wifi"
+			echo -e "Attempting to connect to WiFi.  If this device is NOT planned to be on WiFi, run the command as a privileged user:"
+			echo -e "touch /var/no.wifi\n"
 			while ! /usr/local/bin/connectwifi.sh; do
 				sleep 2
 			done
