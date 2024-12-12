@@ -32,6 +32,7 @@ connectwifi_psk(){
 
 	nmcli connection add type wifi con-name ${networkssid} ifname ${ifname} ssid ${networkssid}
 	nmcli connection modify ${networkssid} wifi-sec.key-mgmt wpa-psk wifi-sec.psk ${wifipassword}
+	nmcli dev set ${ifname} autoconnect yes
 	nmcli connection up ${networkssid}
 
 	
@@ -52,7 +53,8 @@ connectwifi_psk(){
 	fi
 }
 
-connectwifi_enterprise(){          
+connectwifi_enterprise(){   
+	# Won't work right now, more of a bones until we get the core stuff refactored.       
 	networkssid=$(cat /var/home/wavelet/wifi_ssid)
 	wifi_ap_mac=$(cat /var/home/wavelet/wifi_bssid)
 	# Determine wifi ifname (what a pain..)
