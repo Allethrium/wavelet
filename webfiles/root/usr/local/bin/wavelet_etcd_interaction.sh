@@ -161,7 +161,7 @@ case ${action} in
 	read_etcd_clients*)			declare -A commandLine=([3]="get" [2]="--prefix" [1]="/decoderip/" [0]="--print-value-only"); fID="clearText";
 	;;
 	# Delete a key
-	delete_etcd_key)			declare -A commandLine=([1]="del" [0]="$()hostname)/${inputKeyName}"); fID="clearText";
+	delete_etcd_key)			declare -A commandLine=([1]="del" [0]="/$(hostname)/${inputKeyName}"); fID="clearText";
 	;;
 	# Delete a global key
 	delete_etcd_key_global)		declare -A commandLine=([1]="del" [0]="${inputKeyName}"); fID="clearText";
