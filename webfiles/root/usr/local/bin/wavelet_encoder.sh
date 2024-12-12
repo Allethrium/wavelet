@@ -106,8 +106,24 @@ event_encoder(){
 		;;
 		(W)	echo "Four Panel split activated, attempting multidisplay swmix"	;	encoder_event_setfourway 
 		;;
-		*)	echo -e "single dynamic input device, run code below:\n"			;	encoder_event_singleDevice
+		*)	echo -e "single dynamic input device, run code below:\n"			;	encoder_event_checkDevMode
 		esac
+	}
+
+	encoder_event_checkDevMode(){
+		echo -e "Checking for DevMode.."
+		if [[ -f /var/developerMode.enabled ]]; then
+			if [[ "$(hostname)" == *"svr"* ]]; then 
+				echo -e "Server and DevMode enabled, generating advanced switcher.."
+				encoder_event_server
+			else
+				echo -e "not a server, falling back on single device.."
+				encoder_event_singleDevice
+			fi
+		else
+			echo -e "devmode off, falling back on single device method.."
+			encoder_event_singleDevice
+		fi
 	}
 
 	encoder_event_server(){
@@ -119,14 +135,14 @@ event_encoder(){
 		# First we need to know what device path matches what command line, so we need a matching array to check against:
 		KEYNAME="inputs"; read_etcd_prefix;
 		readarray -t matchingArray <<< $(echo ${printvalue} | sed 's|-t|\n|g' | xargs | sed 's|[[:space:]]|\n|g')
-		echo -e "Array contents:\n${matchingArray[@]}"
+		echo -e "Matching Array contents:\n${matchingArray[@]}"
 
 		# Now we read the command line values only
 		KEYNAME="inputs"; read_etcd_prefix;
 		# Because we have spaces in the return value, and this value is returned as a string, we have to process everything
 		# remove -t, remove preceding space, 
 		readarray -t localInputsArray <<< $(echo ${printvalue} | sed 's|-t|\n|g' | cut -d ' ' -f 2 | sed '/^[[:space:]]*$/d')
-		echo -e "Array contents:\n${localInputsArray[@]}\n"
+		echo -e "Local Array contents:\n${localInputsArray[@]}\n"
 
 		# Declare the master server inputs array
 		declare -A serverInputDevices=(); declare -A serverInputDevicesOrders
@@ -134,7 +150,7 @@ event_encoder(){
 		declare -A localInputs=()
 		# Index is 2 because static inputs occupy 0-2, so the local inputs will always start at index 3
 		index=2
-		for element in ${localInputsArray[@]}; do
+		for element in "${localInputsArray[@]}"; do
 			# Append "-t " to make it a valid UltraGrid command
 			if [[ "${element}" != *"-t"* ]];then
 				element="-t ${element}"
@@ -144,10 +160,10 @@ event_encoder(){
 			serverInputDevices[$index]=${element}; serverInputDevicesOrders+=( $element )
 		done
 
-		#echo -e "Final local array contents:\n"
-		#for i in ${localInputs[@]}; do
-		#	echo -e "$i"
-		#done
+		echo -e "Final local array contents:\n"
+		for i in "${localInputs[@]}"; do
+			echo -e "$i"
+		done
 		# Increment index by N devices present in the local inputs array
 		localInputsOffset=$(echo ${#localInputs[@]})
 		echo -e "\n${localInputsOffset} device(s) in array..\n"
@@ -159,17 +175,17 @@ event_encoder(){
 		read -r networkInputsArray <<< $(echo ${printvalue} | sed 's|-t|\n|g' | cut -d ' ' -f 2 | sed '/^[[:space:]]*$/d')
 		echo -e "Network array contents:\n${networkInputsArray[@]}\n"
 		# We note generate these into our networkInputs array
-		for element in ${networkInputsArray[@]}; do
+		for element in "${networkInputsArray[@]}"; do
 			((index++))
 			# Append "-t " to make it a valid UltraGrid command
 			if [[ "${element}" != *"-t"* ]];then
-				element="-t ${element}"
+				element="-t $element"
 			fi
 			networkInputs[$index]=${element}
 			serverInputDevices[$index]=${element}
 		done
 		echo -e "Final network array contents:\n"
-		for i in ${networkInputs[@]}; do
+		for i in "${networkInputs[@]}"; do
 			echo -e "$i"
 		done
 		networkInputsOffset=$(echo ${#networkInputs[@]})
@@ -208,8 +224,10 @@ event_encoder(){
 						echo "$i)${serverInputDevices[$i]}"
 				done)
 		)
-		echo -e "\nGenerated switcher device list for all server local and network inputs devices is:\n${serverDevs}"
-
+		echo -e "Generated switcher device list for all server local and network inputs devices is:\n${serverDevs}"
+		serverInputCommand="$(echo ${localInputs[@]} ${networkInputs[@]} | base64 -w 0)"
+		echo -e "Generated server input command is:\n${serverInputCommand}\n"
+		KEYNAME="/$(hostname)/serverInputs"; KEYVALUE=${serverInputCommand}; write_etcd_global
 		# Now we need to parse the indexing back to the Controller so that it knows what to select
 		# Perhaps a map file might be a good idea at this point
 		# 5:video2
@@ -277,9 +295,9 @@ event_encoder(){
 	read_uv_hash_select
 	# Reads Filter settings, should be banner.pam most of the time
 	# If banner isn't enabled filtervar will be null, as the logo.c file can result in crashes with RTSP streams and some other pixel formats.
-	KEYNAME="/banner/enabled"; read_etcd_global
-	echo "${printvalue}"
-	if [[ "${printvalue}" =~ 0 ]]; then
+	KEYNAME="/banner/enabled"; read_etcd_global; bannerStatus=${printvalue}
+	echo -e "Banner status is: ${bannerStatus}"
+	if [[ "${bannerStatus}" -eq 1 ]]; then
 		echo -e "Banner is enabled, so filtervar will be set appropriately.  Note currently the logo.c file in UltraGrid can generate errors on particular kinds of streams!..\n"
 		KEYNAME=uv_filter_cmd; read_etcd_global; filtervar=${printvalue}
 		if [[ ${filtervar} =~ "--capture-filter" ]]; then
@@ -316,6 +334,9 @@ event_encoder(){
 
 	# We can use the default UG audio port which binds to 5006, we only need to mess with that if we are sending and receiving.
 	# We use a sparse array so the decans can be utilized for additional arguments if needed.  Note this isn't associative, we need ordering here.
+
+	# Grab our inputVars
+	KEYNAME="/svr.wavelet.local/serverInputs"; read_etcd_global; serverInputvar=$(echo ${printvalue} | base64 -d)
 	commandLine=(\
 		[1]="--tool uv" \
 		[2]="${filtervar}" \
@@ -353,10 +374,4 @@ event_encoder(){
 # Main
 exec >/home/wavelet/encoder.log 2>&1
 
-if [[ -f developerMode.enabled ]]; then
-	if [[ "$(hostname)" == *"svr"* ]]; then 
-		event_encoder_server
-	fi
-else
-	event_encoder
-fi
+event_encoder
