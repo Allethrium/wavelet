@@ -2,19 +2,19 @@
 #
 # This script resets the appropriate flag back to 0 and then restarts the AppImage service.  Useful for fixing POC errors introduced by changing the codec on the encoders.
 detect_self(){
-systemctl --user daemon-reload
-UG_HOSTNAME=$(hostname)
-				echo -e "Hostname is $UG_HOSTNAME \n"
-				case $UG_HOSTNAME in
-				enc*)                                   echo -e "I am an Encoder \n"            ;       exit 0
-				;;
-				dec*)                                   echo -e "I am a Decoder \n"                     ;       event_decoder
-				;;
-				svr*)                                   echo -e "I am a Server \n"                      ;       exit 0
-				;;
-				*)                                              echo -e "This device is other \n"       ;       event_decoder
-				;;
-				esac
+	systemctl --user daemon-reload
+	UG_HOSTNAME=$(hostname)
+	echo -e "Hostname is $UG_HOSTNAME \n"
+	case $UG_HOSTNAME in
+	enc*)                                   echo -e "I am an Encoder \n"            ;       exit 0
+	;;
+	dec*)                                   echo -e "I am a Decoder \n"             ;       event_decoder
+	;;
+	svr*)                                   echo -e "I am a Server \n"              ;       exit 0
+	;;
+	*)                                      echo -e "This device is other \n"       ;       event_decoder
+	;;
+	esac
 }
 
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
@@ -56,7 +56,7 @@ delete_etcd_key(){
 event_decoder(){
 echo -e "\nDecoder Reset flag change detected, resetting flag and restarting the UltraGrid service..\n\n\n"
 systemctl --user restart UltraGrid.AppImage.service
-KEYNAME="DECODER_RESET"
+KEYNAME="/$(hostname)/DECODER_RESET"
 KEYVALUE="0"
 write_etcd
 #etcdctl --endpoints=${ETCDENDPOINT} put "$(hostname)/DECODER_RESET" -- "0"
@@ -74,8 +74,8 @@ exit 0
 set -x
 exec >/home/wavelet/wavelet_restart_decoder.log 2>&1
 
-KEYNAME=DECODER_RESET
-read_etcd
+KEYNAME="/$(hostname)/DECODER_RESET"
+read_etcd_global
 if [[ "${printvalue}" == 1 ]]; then
 	echo -e "\nReset key is set to 1, continuing with task.. \n"
 	detect_self

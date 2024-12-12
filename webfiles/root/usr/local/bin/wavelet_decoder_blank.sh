@@ -97,20 +97,20 @@ event_decoder_unblank(){
 set -x
 exec >/home/wavelet/wavelet_blank_decoder.log 2>&1
 
-KEYNAME="DECODER_BLANK_PREV"; read_etcd; oldKeyValue=${printvalue}
-KEYNAME="DECODER_BLANK"; read_etcd; newKeyValue=${printvalue}
+KEYNAME="/$(hostname)/DECODER_BLANK_PREV"; read_etcd_global; oldKeyValue=${printvalue}
+KEYNAME="/$(hostname)/DECODER_BLANK"; read_etcd_global; newKeyValue=${printvalue}
 	if [[ ${newKeyValue} == ${oldKeyValue} ]]; then
 		echo -e "\n Blank setting and previous blank setting match, the webpage has been refreshed, doing nothing..\n"
 		:
 	else
 		if [[ "${newKeyValue}" == 1 ]]; then
 				echo -e "\ninput_update key is set to 1, setting blank display for this host, and writing prevKey \n"
-				KEYNAME="DECODER_BLANK_PREV"; KEYVALUE="1";	write_etcd
+				KEYNAME="/($hostname)DECODER_BLANK_PREV"; KEYVALUE="1";	write_etcd_global
 				event_decoder_blank
 				# use a switcher, have the decoders all running a blank in the background?
 		else
 				echo -e "\ninput_update key is set to 0, reverting to previous display, and writing prevKey.. \n"
-				KEYNAME="DECODER_BLANK_PREV"; KEYVALUE="0"; write_etcd
+				KEYNAME="/$(hostname)/DECODER_BLANK_PREV"; KEYVALUE="0"; write_etcd_global
 				event_decoder_unblank
 		fi
 	fi
