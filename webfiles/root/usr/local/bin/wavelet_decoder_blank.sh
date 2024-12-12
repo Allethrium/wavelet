@@ -105,7 +105,7 @@ KEYNAME="/$(hostname)/DECODER_BLANK"; read_etcd_global; newKeyValue=${printvalue
 	else
 		if [[ "${newKeyValue}" == 1 ]]; then
 				echo -e "\ninput_update key is set to 1, setting blank display for this host, and writing prevKey \n"
-				KEYNAME="/($hostname)/DECODER_BLANK_PREV"; KEYVALUE="1";	write_etcd_global
+				KEYNAME="/$(hostname)/DECODER_BLANK_PREV"; KEYVALUE="1";	write_etcd_global
 				event_decoder_blank
 				# use a switcher, have the decoders all running a blank in the background?
 		else
