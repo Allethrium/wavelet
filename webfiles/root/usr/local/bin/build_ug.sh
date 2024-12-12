@@ -116,36 +116,9 @@ event_gateway(){
 	sleep 1
 }
 
-wifi_connect_retry(){
-	# No.wifi tag should be set on the server
-	if [[ -f /var/no.wifi ]]; then
-		echo "Device configured to ignore wifi!"
-		exit 0
-	fi
-
-	if nmcli device status | grep -a 'wifi.*connect'; then
-		echo -e "WiFi device detected, proceeding.."
-		# Look for active wifi
-		if [[ $(nmcli con show --active | grep -q 'wifi') ]]; then
-			echo -e "Active WiFi connection available! return 0"
-			return 0
-		else
-			echo -e "Attempting to connect to WiFi.  If this device is NOT planned to be on WiFi, run the command as a privileged user:"
-			echo -e "touch /var/no.wifi\n"
-			while ! /usr/local/bin/connectwifi.sh; do
-				sleep 2
-			done
-		fi
-	else
-		echo -e "This machine has no wifi connectivity, exiting..\n"
-		exit 0
-	fi
-}
-
 event_decoder(){
 	echo -e "Decoder routine started."
 	echo -e "Setting up systemd services to be a decoder, moving to run_ug"
-	wifi_connect_retry
 	event_reveal
 	event_reboot
 	event_reset
@@ -534,7 +507,7 @@ event_generateHash(){
 			KEYNAME="/hostHash/${hostHash}"; KEYVALUE="${currentHostName}"; write_etcd_global
 			KEYNAME="/hostHash/${currentHostName}/label"; write_etcd_global
 		else
-			echo -e "\nHash value exists as /hostHash/${hashExists}\n"
+			echo -e "Hash value exists as /hostHash/${hashExists}\n"
 			echo -e "This means the device is already populated, or has not been removed cleanly. Checking to see if we've been relabeled.."
 			KEYNAME="/${currentHostName}/RECENT_RELABEL"; read_etcd_global
 			if [[ "${printvalue}" == "1" ]]; then
@@ -543,6 +516,8 @@ event_generateHash(){
 				KEYNAME="/hostHash/${hostHash}"; delete_etcd_key_global
 				event_generateHash ${hashType}
 				regenerate_systemd_units="1"
+			else
+				echo -e "Device has not been relabeled, performing no further action."
 			fi
 		fi
 }
