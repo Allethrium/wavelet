@@ -203,11 +203,13 @@ event_unsupportedDevice(){
 		sleep 5
 		# Check to see if this device is NDI enabled
 		echo "Checking for NDI capability.."
+		deviceHostName=$(nslookup ${ipAddr} | awk '{print $4}')
 		ndiSource=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | cut -d '(' -f1 | awk '{print $1}')
 		if [ -n ${ndiSource} ]; then
 			echo -e "\nNDI source for this IP address not found, attempting RTSP..\n"
 			UGdeviceStreamCommand="rtsp://${ipAddr}:554/1:decompress"
-			populate_to_etcd
+			# Do a test here to see if RTSP is successful, if not, this probably isn't a video device and we don't want to go further.
+			#populate_to_etcd
 			echo -e "Device RTSP configured, however it may not work without further settings.\n"
 			# Call a new module to populate the DHCP lease into FreeIPA BIND (does nothing if security layer is off)
 			/usr/local/bin/wavelet_ddns_update.sh ${deviceHostName} ${ipAddr}
@@ -280,6 +282,8 @@ populate_to_etcd(){
 		# etcd  /network_health/${ipAddr} --  GOOD or BAD
 		# Finally, set and configure a watcher service for this device so that it will reconfigure the device hostname if the label is changed on the webUI
 		# /usr/local/bin/wavelet_network_device_relabel.sh
+	# This key often winds up with garbage, and must be deleted or it will cause issues parsing things back out.
+	KEYNAME="/network_interface/short"; delete_etcd_key
 	exit 0
 }
 
