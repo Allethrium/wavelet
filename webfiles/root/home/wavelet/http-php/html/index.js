@@ -545,7 +545,7 @@ function createRestartButton(hostName, hostHash) {
 			type: "POST",
 			url: "/set_reset_host.php",
 			data: {
-				key: hostHash,
+				key: hostName,
 				value: "1"
 			},
 		success: function(response){
