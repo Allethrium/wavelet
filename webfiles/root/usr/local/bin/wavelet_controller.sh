@@ -240,7 +240,7 @@ wavelet_dynamic() {
 	KEYNAME=uv_input; read_etcd_global;	controllerInputLabel=${printvalue}
 	KEYNAME=uv_hash_select;	read_etcd_global; controllerInputHash=${printvalue}
 	echo -e "Controller notified that input hash ${controllerInputHash}\nhas been selected with the input label: ${controllerInputLabel}\nEncoder restart commencing..\n"
-	targetHost="${controllerInputLabel}"
+	targetHost="${controllerInputLabel%/*}"
 	targetIP=$(getent ahostsv4 "${targetHost}" | head -n 1 | awk '{print $1}')
 	echo -e "Target host name is ${targetHost}"
 
@@ -274,6 +274,7 @@ wavelet_dynamic() {
 				KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
 				KEYNAME=input_update; KEYVALUE="0";	echo -e "Task completed, reset input_update key to 0..\n";	write_etcd_global
 				sleep .25
+				echo "Channel Index is ${channelIndex%,*}"
 				echo 'capture.data ${channelIndex%,*}' | busybox nc -v ${targetHost} 6160
 			fi
 		else
