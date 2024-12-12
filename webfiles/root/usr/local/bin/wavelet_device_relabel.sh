@@ -109,7 +109,7 @@ set_newLabel(){
 		echo -e "Generated FQDN hostname as ${appendedHostName}\n"
 	fi
 	echo "${appendedHostName}" > newHostName.txt
-	KEYNAME="/hostHash/${myHostHash}/newHostLabel"; delete_etcd_key
+	KEYNAME="/hostHash/${myHostHash}"; delete_etcd_key
 	KEYNAME="RECENT_RELABEL"; KEYVALUE="1"; write_etcd
 	# Generate the necessary files, then reboot.
 	set_newHostName ${appendedHostName}
@@ -187,7 +187,7 @@ remove_old_keys(){
 clean_oldEncoderHostnameSettings(){
 	# Finds and cleans up any references in etcd to the old hostname
 	# Delete all reverse lookups, labels and hashes for this device
-	KEYNAME="/encoderlabel/${oldHostName}"; delete_etcd_key
+	KEYNAME="/encoderlabel/${oldHostName}"; delete_etcd_key_global
 	KEYNAME="/hostHash/${oldHostName}"; delete_etcd_key
 	KEYNAME="/hostLabel/${oldHostName}"; delete_etcd_key
 	KEYNAME="/${oldHostName}"; delete_etcd_key
@@ -197,9 +197,9 @@ clean_oldDecoderHostnameSettings(){
 	# Finds and cleans up any references in etcd to the old hostname
 	# Delete all reverse lookups, labels and hashes for this device
 	echo -e "Attempting to remove all legacy keys for: ${oldHostName}\n"
-	KEYNAME="/hostHash/${oldHostName}"; delete_etcd_key
-	KEYNAME="/hostLabel/${oldHostName}"; delete_etcd_key
-	KEYNAME="/${oldHostName}"; delete_etcd_key
+	KEYNAME="/hostHash/${oldHostName} --prefix"; delete_etcd_key_global
+	KEYNAME="/hostLabel/${oldHostName} --prefix"; delete_etcd_key_global
+	KEYNAME="/${oldHostName} --prefix"; delete_etcd_key_global
 }
 
 clean_oldServerHostnameSettings(){
