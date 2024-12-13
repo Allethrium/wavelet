@@ -560,7 +560,7 @@ time=0
 until [[ $(/usr/local/bin/wavelet_etcd_interaction.sh "check_status" | awk '{print $6}') = "true," ]]; do
 	echo -e "Etcd still down.. waiting two seconds.."
 	sleep 2
-	time=(( ${time} + 2 ))
+	time=$(( ${time} + 2 ))
 	if [[ $time -eq "60" ]]; then
 		echo "We have been waiting sixty seconds, there is likely a network issue."
 		echo "Running the wifi connection script.."
