@@ -30,10 +30,15 @@ connectwifi_psk(){
 	wifibssid=$(get_full_bssid)
 	echo -e "\nFound WiFi BSSID match! It is: ${wifibssid}\n"
 
-	nmcli connection add type wifi con-name ${networkssid} ifname ${ifname} ssid ${networkssid}
+	# Remove any old connection UUID's with the same name
+	reponse=$()nmcli connection add type wifi con-name ${networkssid} ifname ${ifname} ssid ${networkssid})
+	olduuid=$(echo $response | awk '{print $16}' | sed "s|'||g")
+	nmcli con dev uuid ${olduuid}
 	nmcli connection modify ${networkssid} wifi-sec.key-mgmt wpa-psk wifi-sec.psk ${wifipassword}
-	nmcli dev set ${ifname} autoconnect yes
+	nmcli con mod ${networkssid} connection.autoconnect yes
+	#nmcli dev set ${ifname} autoconnect yes
 	nmcli connection up ${networkssid}
+	echo "${networkssid}" > /var/home/wavelet/wifi.${networkssid}.key
 
 	
 	if [ $? -eq 0 ]; then
@@ -110,9 +115,8 @@ detect_disable_ethernet(){
 
 set_ethernet_mtu(){
 	for interface in $(nmcli dev show | grep ethernet -B1 | head -n 1 | awk '{print $2}'); do
-		if [[ $(ip link show dev "${interface}" | grep "link/ether") ]]; then 
-			echo ${interface}
-			ip link set dev ${interface} mtu 9000
+		if [[ $(nmcli -f GENERAL dev show enp1s0 | grep "ethernet") ]]; then 
+			nmcli dev mod ${interface} GENERAL.MTU=9000
 		fi
 	done
 }
