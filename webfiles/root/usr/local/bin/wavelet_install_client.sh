@@ -99,3 +99,5 @@ touch /var/client_install.complete
 systemctl disable wavelet_install_client.service
 echo -e "Calling connectwifi module"
 /usr/local/bin/connectwifi.sh
+# Move the log file otherwise permissions is an issue and we don't get subsequent log
+mv /var/home/wavelet/connectwifi.log /var/home/wavelet/setup_old_connectwifi.log
