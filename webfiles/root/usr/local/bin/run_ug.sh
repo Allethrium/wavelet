@@ -110,7 +110,7 @@ event_encoder(){
 	# Registers self as a decoder in etcd for the reflector to query & include in its client args
 	echo -e "Calling wavelet_encoder systemd unit.."
 	# I've added a blank bit here too.. it might make more sense to call it "host blank" though..
-	KEYNAME="DECODER_BLANK"; KEYVALUE="0"; write_etcd
+	KEYNAME="/$(hostname)/DECODER_BLANK"; KEYVALUE="0"; write_etcd_global
 	systemctl --user daemon-reload
 	echo -e "Pinging wavelet_detectv4l.sh to ensure any USB devices are detected prior to start..\n"
 	/usr/local/bin/wavelet_detectv4l.sh
@@ -127,10 +127,10 @@ event_decoder(){
 	# Ensure all reset, reveal and reboot flags are set to 0 so they are
 	# 1) populated
 	# 2) not active so the new device goes into a reboot/reset/reveal loop
-	KEYNAME="DECODER_RESET"; KEYVALUE="0"; write_etcd
-	KEYNAME="DECODER_REVEAL"; write_etcd
-	KEYNAME="DECODER_REBOOT"; write_etcd
-	KEYNAME="DECODER_BLANK"; write_etcd
+	KEYNAME="/$(hostname)/DECODER_RESET"; KEYVALUE="0"; write_etcd_global
+	KEYNAME="/$(hostname)/DECOER_REVEAL"; write_etcd_global
+	KEYNAME="/$(hostname)/DECODER_REBOOT"; write_etcd_global
+	KEYNAME="/$(hostname)/DECODER_BLANK"; write_etcd_global
 	# Enable watcher services now all task activation keys are set to 0
 	systemctl --user enable wavelet_decoder_reset.service --now
 	systemctl --user enable wavelet_decoder_reveal.service --now
@@ -273,30 +273,6 @@ get_ipValue(){
 				fi
 			}
 			valid_ipv4 "${IPVALUE}"
-	fi
-}
-
-wifi_connect_retry(){
-	if [[ -f /var/no.wifi ]]; then
-		echo "Device configured to ignore wifi!"
-		exit 0
-	fi
-	
-	if nmcli con show --active | grep -q 'wifi'; then
-		echo -e "WiFi device detected, proceeding.."
-		# Look for active wifi
-		if [[ $(nmcli device status | grep -a 'wifi.*connect') ]]; then
-			echo -e "Active WiFi connection available! return 0"
-			exit 0
-		else
-			echo -e "Attempting to connect to WiFi.  If this device is NOT planned to be on WiFi, run the command:\n"
-			echo -e "touch /var/no.wifi"
-			echo -e "Ethernet connection can be enabled by running:\nconnectwifi -E\n"
-			/usr/local/bin/connectwifi.sh
-		fi
-	else
-		echo -e "This machine has no wifi connectivity, exiting..\n"
-		exit 0
 	fi
 }
 
