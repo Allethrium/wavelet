@@ -4,7 +4,7 @@
 # Note Udev calls a bootstrap script which THEN calls this script,
 # because the usb subsystem is locked until the rule execution is completed!
 # It will attempt to make sense of available v4l devices and update etcd
-# WebUI updates, and is updated from, many of these keys.
+# The WebUI updates, and is updated from, many of these keys.
 
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
@@ -141,7 +141,9 @@ set_device_input() {
 	echo -e "resetting variables to null."
 	deviceHash=""
 	device_string_short=""
-	KEYNAME=INPUT_DEVICE_PRESENT; KEYVALUE=1; write_etcd
+	KEYNAME="INPUT_DEVICE_PRESENT"; KEYVALUE="1"; write_etcd
+	# This flag is necessary to tell the wavelet_encoder module to regenerate the switcher list, the value is "consumed" I.E set back to 0 once this is done.
+	KEYNAME="INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd
 	detect
 }
 
@@ -210,7 +212,7 @@ detect() {
 	case ${device_string_long} in
 	*IPEVO*)						echo -e "IPEVO Document Camera device detected.. \n"				&& event_ipevo
 	;;
-	*"Logitech Screen Share"*)		echo -e "Logitech HDMI-USB Capture device detected.. \n"			&& event_logitech_hdmi
+	*"Logitech_Screen_Share"*)		echo -e "Logitech HDMI-USB Capture device detected.. \n"			&& event_logitech_hdmi
 	;;
 	*Magewell*)						echo -e "Magewell HDMI-USB Capture device detected.. \n"			&& event_magewell
 	;;
@@ -232,7 +234,7 @@ event_ipevo() {
 	echo -e "\nDetection completed for IPEVO device..\n"
 }
 event_logitech_hdmi() {
-	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPEG:convert=RGB:size=1920x1080:tpf=1/30:device=${v4l_device_path}"; write_etcd
+	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPG:convert=RGB:size=1920x1080:tpf=1/30:device=${v4l_device_path}"; write_etcd
 	echo -e "\nDetection completed for Logitech HDMI Capture device..\n"
 }
 event_magewell() {
@@ -247,7 +249,7 @@ event_epson() {
 }
 event_dellWB3023(){
 	echo -e "Setting up Dell WB3023 webcam..\n"
-	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPG:size=640x480:tpf=1/30:device=${v4l_device_path}"; write_etcd
+	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=NV12:size=640x480:tpf=1/30:device=${v4l_device_path}"; write_etcd
 	echo -e "\nDetection completed for device..\n"
 }
 event_unknowndevice() {
