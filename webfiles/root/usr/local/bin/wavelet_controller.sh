@@ -244,47 +244,47 @@ wavelet_dynamic() {
 	targetIP=$(getent ahostsv4 "${targetHost}" | head -n 1 | awk '{print $1}')
 	echo -e "Target host name is ${targetHost}"
 
-	if [[ -f /var/home/wavelet/device_map_entries ]]; then
-		# First, we check for the device map file
-		echo -e "\nDevice map file has already been generated, continuing.."
+	if [[ -f /var/home/wavelet/device_map_entries_verity ]]; then
+		echo -e "\nDevice map file has been generated, continuing.."
 		if [[ ${targetHost} == *"/network_interface/"* ]]; then
-			# Check to see if we're running a non-UltraGrid network input device
-			echo -e "\nTarget Hostname isn't a wavelet device, it's a network device.."
-			echo -e "Skipping Input update and capture channel flags..\n"
-			# Here we want to check to see if the device is already prepopulated on the switcher
-			KEYNAME="/hash/${controllerInputHash}"; read_etcd_global; deviceFullPath=${printvalue}
-			if grep -q ${deviceFullPath} device_map_entries; then
-				echo "Precise entry found in device map.."
-				channelIndex=$(grep ${deviceFullPath} device_map_entries | awk '{print $1}')
-			else
-				# If not, we do it the old way, device map should be generated after the encoder runs once:
-				KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
-				KEYNAME=input_update; KEYVALUE="0";	echo -e "Task completed, reset input_update key to 0..\n";	write_etcd_global
-				sleep .25
-			fi
+			echo -e "Target Hostname is a network device."
+			devicetype="N"
 		elif [[ ${targetHost} == *"$(hostname)"* ]]; then
-			echo -e "\nTarget hostname references the server, attempting to run locally.."
-			# Here we want to check to see if the device is already prepopulated on the switcher
-			KEYNAME="/hash/${controllerInputHash}"; read_etcd_global; deviceFullPath=${printvalue}
-			if grep -q ${deviceFullPath} device_map_entries; then
-				echo "Precise entry found in device map.."
-				channelIndex=$(grep ${deviceFullPath} device_map_entries | awk '{print $1}')
-			else
-				# If not, we do it the old way, device map should be generated after the encoder runs once:
-				KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
-				KEYNAME=input_update; KEYVALUE="0";	echo -e "Task completed, reset input_update key to 0..\n";	write_etcd_global
-				sleep .25
-				echo "Channel Index is ${channelIndex%,*}"
-				echo 'capture.data ${channelIndex%,*}' | busybox nc -v ${targetHost} 6160
-			fi
-		else
-			echo -e "Device map file is generated, but we couldn't find the device entry.  Something may be wrong.\n"
+			echo -e "Target hostname references the server."
+			deviceType="L"
+		else echo -e "Device map file is generated, but we couldn't find the device entry.  Something may be wrong.\n"
 			# Is there a remedial step we can try here rather than just failing?
 			:
 		fi
-		echo 'capture.data ${channelIndex%,*}' | busybox nc -v ${targetHost} 6160
+
+		# Here we want to check to see if the device is already prepopulated on the switcher
+		KEYNAME="/hash/${controllerInputHash}"; read_etcd_global; deviceFullPath=${printvalue}
+		KEYNAME=${deviceFullPath}; read_etcd_global
+		searchArg=$(echo ${printvalue} | base64 -d)
+		if grep -q ${searchArg#*-t} /var/home/wavelet/device_map_entries_verity; then
+			echo "Entry found in device map.."
+			channelIndex=$(grep "${searchArg#*-t}" /var/home/wavelet/device_map_entries_verity | cut -d ',' -f1)
+		else
+			# If not, we run the process again after having the encoder restart, then we restart the server after a 2s delay
+			KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
+			sleep 2; KEYNAME=input_update; KEYVALUE="1"; write_etcd_global
+		fi
+		# Finally we check for the appropriate device in the generated user SystemD unit
+		if ! grep -q ${searchArg#*-t} /var/home/wavelet/.config/systemd/user/UltraGrid.AppImage.service; then
+			echo "Device command line is missing! Forcing encoder restart.."
+			KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
+			sleep 2
+		# And ensure the encoder is even running...
+		if systemctl --user is-active --quiet UltraGrid.AppImage; then
+			:
+		else
+			KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
+			sleep 2
+		fi
+		echo "Channel Index is: ${channelIndex%,*}"
+		echo "capture.data ${channelIndex%,*}" | busybox nc -v ${targetHost} 6160
 	else
-		# No map file or channel data are available.
+		# No map file or channel data are available, this would generally mean it's not a network device, nor local to the server.
 		# Set encoder restart flag to 1 for appropriate host
 		echo -e "No device-channel mapping file is available."
 		targetHost=$(echo ${controllerInputLabel} | sed 's|\(.*\)/.*|\1|')
@@ -293,7 +293,7 @@ wavelet_dynamic() {
 		KEYNAME="/${targetHost}/encoder_restart"; KEYVALUE="$(echo "1" | base64)"; write_etcd_global
 		KEYNAME=input_update; KEYVALUE="0"; echo -e "Task completed, reset input_update key to 0.. \n"; write_etcd_global
 		sleep .25
-		# Ensure channel input is set to 3, so that we get the first switcher device which is not a static out of UG.
+		# Ensure channel input is set to 3, so that we get the first switcher device, which is not a static out of UG.
 		KEYNAME="/hostHash/${targetHost}/ipaddr"; read_etcd_global; targetIP=${printvalue}
 		echo -e "\nAttempting to set switcher channel to new device for ${targetHost}..\n"
 		sleep 1
