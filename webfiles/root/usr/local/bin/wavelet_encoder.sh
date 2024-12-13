@@ -127,6 +127,19 @@ event_encoder(){
 	}
 
 	encoder_event_server(){
+		# Check to see if we have a device update global flag set.  If this is not the case, we don't want to regenerate anything
+		KEYNAME="INPUT_DEVICE_NEW"; read_etcd
+		if [[ ${printvalue} -eq "0" ]];then
+			# Do nothing
+			echo -e "\nThe input device update flag is not active, no new devices are available and we do not need to perform these steps to regenerate the AppImage service unit."
+			echo -e "No further action is required, the Controller module should be able to select the appropriate channel on its own.\n"
+			exit 0
+		fi
+
+		# Consume the device flag by resetting it
+		KEYNAME="$INPUT_DEVICE_NEW"; KEYVALUE="0"; write_etcd
+
+
 		# Because the server is a special case, we want to ensure it can quickly switch between static, net and whatever local devices are populated
 		# We create a sub-array with all of these devices and parse them to the encoder as normal
 		# We do not need to worry about static inputs because they are always there, and always 0,1,2
@@ -160,10 +173,11 @@ event_encoder(){
 			serverInputDevices[$index]=${element}; serverInputDevicesOrders+=( $element )
 		done
 
-		echo -e "Final local array contents:\n"
-		for i in "${localInputs[@]}"; do
-			echo -e "$i"
-		done
+		#echo -e "Final local array contents:\n"
+		#for i in "${localInputs[@]}"; do
+		#	echo -e "$i"
+		#done
+
 		# Increment index by N devices present in the local inputs array
 		localInputsOffset=$(echo ${#localInputs[@]})
 		echo -e "\n${localInputsOffset} device(s) in array..\n"
@@ -184,49 +198,53 @@ event_encoder(){
 			networkInputs[$index]=${element}
 			serverInputDevices[$index]=${element}
 		done
-		echo -e "Final network array contents:\n"
-		for i in "${networkInputs[@]}"; do
-			echo -e "$i"
-		done
+
+		#echo -e "Final network array contents:\n"
+		#for i in "${networkInputs[@]}"; do
+		#	echo -e "$i"
+		#done
+
 		networkInputsOffset=$(echo ${#networkInputs[@]})
 		index=( ${index} + ${networkInputsOffset} )
 
 		# Now we create a new etcd key for each device with the corresponding channel ID, 
 		# controller will search this and use it to set the switcher to the appropriate index
-		echo "" > /var/home/wavelet/device_map_entries
-		for key in "${!matchingArray[@]}"; do
-			value="${matchingArray[$key]}"
-			if (( $key % 2 == 0 )); then
-				# 0 or even line, so $i is a device path
-				echo "$value" > /var/home/wavelet/part1
-			else
-				# an odd line, so $value is a command line
-				part2="${value}"
-				keys=()
-				# This walks through the list of keys in the serverInputDevices array, 
-				# and tests the value against the command line we have in matchingArray
-				for key in ${!serverInputDevices[@]}; do
-					if [[ ${serverInputDevices[$key]} == *"$part2"* ]]; then
-						keys+=( '$key' )
-						part3="$key, $(cat /var/home/wavelet/part1), ${part2}"
-						# Append to device_map_entries
-						echo "${part3}" >> /var/home/wavelet/device_map_entries
-					fi
-				done
-			fi
-		done
+		# Clear file of previous data
+		#echo "" > /var/home/wavelet/device_map_entries
+		#for key in "${!matchingArray[@]}"; do
+		#	value="${matchingArray[$key]}"
+		#	if (( $key % 2 == 0 )); then
+		#		# 0 or even line, so $i is a device path
+		#		echo "$value" > /var/home/wavelet/part1
+		#	else
+		#		# an odd line, so $value is a command line
+		#		part2="${value}"
+		#		keys=()
+		#		# This walks through the list of keys in the serverInputDevices array, 
+		#		# and tests the value against the command line we have in matchingArray
+		#		for key in ${!serverInputDevices[@]}; do
+		#			if [[ ${serverInputDevices[$key]} == *"$part2"* ]]; then
+		#				keys+=( '$key' )
+		#				part3="$key,$(cat /var/home/wavelet/part1),${part2}"
+		#				# Append to device_map_entries
+		#				echo "${part3}" >> /var/home/wavelet/device_map_entries
+		#			fi
+		#		done
+		#	fi
+		#done
 
 		# Convert the completed array back to strings
 		mapfile -d '' sortedserverInputDevices < <(printf '%s\0' "${!serverInputDevices[@]}" | sort -z)
+		echo "" > /var/home/wavelet/device_map_entries_verity
 		serverDevs=$(while IFS= read -r line; do
 				echo "$line"
-		done <<< $(for i in ${sortedserverInputDevices[@]};do
-						echo "$i)${serverInputDevices[$i]}"
+			done <<< $(for i in ${sortedserverInputDevices[@]};do
+					echo "$i)${serverInputDevices[$i]}"
+					echo "$i,${serverInputDevices[$i]}" >> /var/home/wavelet/device_map_entries_verity
 				done)
 		)
-		echo -e "Generated switcher device list for all server local and network inputs devices is:\n${serverDevs}"
+		echo -e "\nGenerated switcher device list for all server local and network inputs devices is:\n${serverDevs}"
 		serverInputCommand="$(echo ${localInputs[@]} ${networkInputs[@]} | base64 -w 0)"
-		echo -e "Generated server input command is:\n${serverInputCommand}\n"
 		KEYNAME="/$(hostname)/serverInputs"; KEYVALUE=${serverInputCommand}; write_etcd_global
 		# Now we need to parse the indexing back to the Controller so that it knows what to select
 		# Perhaps a map file might be a good idea at this point
