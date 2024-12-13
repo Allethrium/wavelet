@@ -48,6 +48,18 @@ storage:
       overwrite: true
       contents:
         source: http://192.168.1.32:8080/UltraGrid.AppImage
+    # Client installer module
+    - path: /usr/local/bin/wavelet_install_client.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/wavelet_install_client.sh
+    # Wavelet modules package (pulled down by client_install but making sure it's here..)
+    - path: /usr/local/bin/wavelet-files.tar.xz
+      mode: 0555
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/wavelet-files.tar.xz
     # Sets hostname (set randomly after bootstrap process completes.
     # Any decoder can be promoted to another device by manually changing hostname
     - path: /etc/hostname
