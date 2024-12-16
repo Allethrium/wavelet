@@ -33,7 +33,7 @@ connectwifi_psk(){
 	# Remove any old connection UUID's with the same name
 	reponse=$(nmcli connection add type wifi con-name ${networkssid} ifname ${ifname} ssid ${networkssid})
 	olduuid=$(echo $response | awk '{print $16}' | sed "s|'||g")
-	nmcli con dev uuid ${olduuid}
+	nmcli con del uuid ${olduuid}
 	nmcli connection modify ${networkssid} wifi-sec.key-mgmt wpa-psk wifi-sec.psk ${wifipassword}
 	nmcli con mod ${networkssid} connection.autoconnect yes
 	#nmcli dev set ${ifname} autoconnect yes
@@ -93,23 +93,12 @@ detect_disable_ethernet(){
 	if [[ -f /var/no.wifi ]]; then
 		echo -e "The /var/no.wifi flag is set.  Please remove this file if this host should utilize wireless connectivity."
 	else
-		# We disable ethernet preferentially if we have two active connections
-		# This prevents some of the IP detection automation from having issues.
-		# This should have been done already once the decoder provisioned and successfully connected to wifi.
-		# Add another filter to exclude veth interfaces
-		for interface in $(ip link show | awk '{print $2}' | grep ":$" | cut -d ':' -f1); do
-			if [[ $(nmcli dev show "${interface}" | grep "connected") ]] && \
-			[[ $(nmcli dev show "${interface}" | grep "ethernet") ]] && \
-			[[ $(nmcli device status | grep -a 'wifi.*connect') ]] && \
-			[[ $(nmcli dev show "${interface}") != *"veth"* ]]; then
-				echo -e "${interface} is an ethernet connection, active WiFi connection also detected..."
-				wifiFound="1"
-				ethernetFound="1"
-				ethernetInterface="${interface}"
-			fi
-		done
-		nmcli device disconnect "${ethernetInterface}"
-		echo -e "Interface ${ethernetInterface} has been disabled.\n\nTo re-enable, you can use:\nnmcli device up ${ethernetInterface}\nOr:\nnmtui\nFor a gui interface."
+		# Simplify this from the previous loop, just find ethernet interface and awk for connection UUID, then disable.
+		ethernetInterfaceUUID=$(nmcli con show | grep ethernet | awk '{print $4}')
+		nmcli con down "${ethernetInterfaceUUID}"
+		# We need to set the CONNECTION do be down, NOT the interface.
+		#nmcli device disconnect "${ethernetInterface}"
+		echo -e "The primary ethernet connection with UUID ${ethernetInterfaceUUID} has been disabled.\n\nTo re-enable, you can use:\nnmcli con up ${ethernetInterfaceUUID}\nOr:\nnmtui\nFor a gui interface."
 	fi
 }
 
