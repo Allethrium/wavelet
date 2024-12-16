@@ -274,6 +274,7 @@ wavelet_dynamic() {
 			echo "Device command line is missing! Forcing encoder restart.."
 			KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
 			sleep 2
+		fi
 		# And ensure the encoder is even running...
 		if systemctl --user is-active --quiet UltraGrid.AppImage; then
 			:
@@ -292,7 +293,7 @@ wavelet_dynamic() {
 		# Note we are writing a global key to the TARGET host, so we need to base64 encode it for it to be valid.
 		KEYNAME="/${targetHost}/encoder_restart"; KEYVALUE="$(echo "1" | base64)"; write_etcd_global
 		KEYNAME=input_update; KEYVALUE="0"; echo -e "Task completed, reset input_update key to 0.. \n"; write_etcd_global
-		sleep .25
+		sleep 2
 		# Ensure channel input is set to 3, so that we get the first switcher device, which is not a static out of UG.
 		KEYNAME="/hostHash/${targetHost}/ipaddr"; read_etcd_global; targetIP=${printvalue}
 		echo -e "\nAttempting to set switcher channel to new device for ${targetHost}..\n"
