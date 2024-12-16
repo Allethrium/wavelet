@@ -49,6 +49,219 @@ write_etcd_client_ip(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
 }
 
+encoder_event_checkDevMode(){
+	echo -e "Checking for DevMode.."
+	if [[ -f /var/developerMode.enabled ]]; then
+		if [[ "$(hostname)" == *"svr"* ]]; then 
+			echo -e "Server and DevMode enabled, generating advanced switcher.."
+			encoder_event_server
+		else
+			echo -e "not a server, falling back on single device.."
+			encoder_event_singleDevice
+		fi
+	else
+		echo -e "devmode off, falling back on single device method.."
+		encoder_event_singleDevice
+	fi
+}
+
+read_uv_hash_select() {
+	# Now, we pull uv_hash_select, which is a value passed from the webUI back into this etcd key
+	# compare the hash against available keys in /hash/$keyname, keyvalue will be the device string
+	# then search for device string in $hostname/inputs and if found, we run with that and set another key to notify that it is active
+	# if key does not exist, we do nothing and let another encoder (hopefully with the connected device) go to town.  Maybe post a "vOv" notice in log.
+	# Blank Screen and the Seal static image do not run on any encoder, they are generated on the server.
+	KEYNAME=uv_hash_select
+	read_etcd_global
+	encoderDeviceHash="${printvalue}"
+	case ${encoderDeviceHash} in
+	(1)	echo "Blank screen activated, the Server will stream this directly via controller module."				;	exit 0
+	;;
+	(2)	echo "Seal image activated, the Server will stream this directly via controller module."				;	exit 0
+	;;
+	(T)	echo "Testcard generation activated, the Server will stream this directly via controller module."		;	exit 0
+	;;
+	(W)	echo "Four Panel split activated, attempting multidisplay swmix"										;	encoder_event_setfourway 
+	;;
+	*)	echo -e "single dynamic input device, run code below:\n"												;	encoder_event_checkDevMode
+	esac
+}
+
+encoder_event_server(){
+	# Check to see if we have a device update global flag set.  If this is not the case, we don't want to regenerate anything
+	KEYNAME="INPUT_DEVICE_NEW"; read_etcd
+	if [[ ${printvalue} -eq "0" ]];then
+		# Do nothing
+		echo -e "\nThe input device update flag is not active, no new devices are available and we do not need to perform these steps to regenerate the AppImage service unit."
+		echo -e "No further action is required, the Controller module should be able to select the appropriate channel on its own.\n"
+		exit 0
+	fi
+	# Consume the device flag by resetting it
+	KEYNAME="$INPUT_DEVICE_NEW"; KEYVALUE="0"; write_etcd
+
+	# Because the server is a special case, we want to ensure it can quickly switch between static, net and whatever local devices are populated
+	# We create a sub-array with all of these devices and parse them to the encoder as normal
+	# We do not need to worry about static inputs because they are always there, and always 0,1,2
+	# Get keyvalues only for everything under inputs, this basically gives us all the valid generated command lines for our local devices.
+	
+	# First we need to know what device path matches what command line, so we need a matching array to check against:
+	KEYNAME="inputs"; read_etcd_prefix;
+	readarray -t matchingArray <<< $(echo ${printvalue} | sed 's|-t|\n|g' | xargs | sed 's|[[:space:]]|\n|g')
+	echo -e "Matching Array contents:\n${matchingArray[@]}"
+	# Now we read the command line values only
+	KEYNAME="inputs"; read_etcd_prefix;
+	# Because we have spaces in the return value, and this value is returned as a string, we have to process everything
+	# remove -t, remove preceding space, 
+	readarray -t localInputsArray <<< $(echo ${printvalue} | sed 's|-t|\n|g' | cut -d ' ' -f 2 | sed '/^[[:space:]]*$/d')
+	echo -e "Local Array contents:\n${localInputsArray[@]}\n"
+
+	# Declare the master server inputs array
+	declare -A serverInputDevices=(); declare -A serverInputDevicesOrders
+	# We now generate an array of these into our localInputs array
+	declare -A localInputs=()
+	# Index is 2 because static inputs occupy 0-2, so the local inputs will always start at index 3
+	index=2
+	for element in "${localInputsArray[@]}"; do
+		# Append "-t " to make it a valid UltraGrid command
+		if [[ "${element}" != *"-t"* ]];then
+			element="-t ${element}"
+		fi
+		((index++))
+		localInputs[$index]=${element}
+		serverInputDevices[$index]=${element}; serverInputDevicesOrders+=( $element )
+	done
+
+	#echo -e "Final local array contents:\n"
+	#for i in "${localInputs[@]}"; do
+	#	echo -e "$i"
+	#done
+
+	# Increment index by N devices present in the local inputs array
+	localInputsOffset=$(echo ${#localInputs[@]})
+	echo -e "${localInputsOffset} device(s) in array..\n"
+	index=( ${index} + ${localInputsOffset} )
+
+	# Now we do the same for net devices
+	declare -A networkInputs=()
+	KEYNAME="/network_uv_stream_command/"; read_etcd_prefix_global;
+	if [[ ${printvalue} == "" ]]; then
+		echo "Array is empty, no network devices."
+		:
+	else
+		readarray -t networkInputsArray <<< $(echo ${printvalue} | tr ' ' '\n')
+		echo -e "Network array contents:\n${networkInputsArray[@]}\n"
+		# We note generate these into our networkInputs array
+		for element in "${networkInputsArray[@]}"; do
+			((index++))
+			# Append "-t " to make it a valid UltraGrid command
+			if [[ "${element}" != *"-t"* ]];then
+				element="-t $element"
+			fi
+			networkInputs[$index]=${element}
+			serverInputDevices[$index]=${element}
+		done
+
+		#echo -e "Final network array contents:\n"
+		#for i in "${networkInputs[@]}"; do
+		#	echo -e "$i"
+		#done
+
+		networkInputsOffset=$(echo ${#networkInputs[@]})
+		echo -e "${networkInputsOffset} device(s) in array..\n"
+		index=( ${index} + ${networkInputsOffset} )
+	fi
+
+	# Convert the completed array back to strings, generate mapfile for controller and echo for verification
+	echo "" > /var/home/wavelet/device_map_entries_verity
+	mapfile -d '' sortedserverInputDevices < <(printf '%s\0' "${!serverInputDevices[@]}" | sort -z)
+	serverDevs=$(while IFS= read -r line; do
+		echo "$line"
+	done <<< $(for i in ${sortedserverInputDevices[@]};do
+		# Filter out dummy entries
+		if [[ "${i}" == "-t" ]]; then
+			:
+		fi
+		echo "$i)${serverInputDevices[$i]}"
+		echo "$i,${serverInputDevices[$i]}" >> /var/home/wavelet/device_map_entries_verity
+	done))
+	# Generate the command line proper
+	commandLine=$(while IFS= read -r line; do
+		echo "$line"
+	done <<< $(for i in ${sortedserverInputDevices[@]};do
+		echo "${serverInputDevices[$i]}"
+	done))
+	commandLine=$(echo ${commandLine} | tr -d '\n')
+	echo -e "\nGenerated switcher device list for all server local and network inputs devices is:\n${serverDevs}"
+	echo -e "\nGenerated command line input into etcd is:\n${commandLine}\nConverting to base64 and injecting to etcd.."
+	encodedCommandLine=$(echo "${commandLine}" | base64 -w 0)
+	KEYNAME="/$(hostname)/serverInputs"; KEYVALUE="${encodedCommandLine}"; write_etcd_global
+}
+
+encoder_event_setfourway(){
+	# This block will attempt various four-way panel configurations depending on available devices
+	# lists entries out of etcd, concats them to a single swmig command and stores as uv_input_cmd.
+	# This won't work on multiencoder setups, all devices used here must be local to the active encoder.
+	generatedLine=""
+	KEYNAME="$(hostname)/inputs/"; swmixVar=$(read_etcd_global | xargs -d'\n' $(echo "${generatedLine}"))
+	#swmixVar=$(etcdctl --endpoints=${ETCDENDPOINT} get "$(hostname)/inputs/" --prefix --print-value-only | xargs -d'\n' $(echo "${generatedLine}"))
+	KEYNAME=uv_input_cmd; KEYVALUE="-t swmix:1920:1080:30 ${swmixVar}"; write_etcd_global
+	echo -e "Generated command line is:\n${KEYVALUE}\n"
+	multiInputvar=${KEYVALUE}
+	/usr/local/bin/wavelet_textgen.sh
+}
+
+encoder_event_singleDevice(){
+	KEYNAME="/hash/${encoderDeviceHash}"
+	read_etcd_global
+	currentHostName=($hostname)
+	if [ -n "${printvalue}" ]; then
+		echo -e "found ${printvalue} in /hash/ - we have a local device"
+		case ${printvalue} in
+			${currentHostName}*)		echo -e "This device is attached to this encoder, proceeding"	; 
+			;;
+			*)							echo -e "This device is attached to a different encoder"		;	exit 0
+			;;
+		esac
+		encoderDeviceStringFull="${printvalue}"
+		echo -e "Device string ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash}\n"
+		unset ${printvalue}
+		KEYNAME="${encoderDeviceStringFull}"; read_etcd_global
+		localInputvar=$(echo ${printvalue} | base64 -d)
+		echo -e "Device input key $localInputvar located for this device string, proceeding to set encoder parameters \n"
+		# For Audio we will select pipewire here
+		audiovar="-s pipewire"
+	else
+		echo -e "null string found in /hash/ - this is a network device\n"
+		KEYNAME="/network_shorthash/${encoderDeviceHash}"; read_etcd_global
+		if [ -n "${printvalue}" ]; then
+			echo -e "found in /network_shorthash/, proceeding..\n"
+			encoderDeviceStringFull="${printvalue}"
+			echo -e "\nDevice String ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash}\n"
+			printvalue=""
+			# Locate device hash in network_ip folder and return the device IP address
+			KEYNAME="/network_ip/${encoderDeviceHash}"; read_etcd_global; ipAddr=${printvalue}
+			# Locate input command from the IP value retreived above
+			KEYNAME="/network_uv_stream_command/${printvalue}"; read_etcd_global
+			if [[ "${printvalue}" == *"ndi"* ]]; then
+				# We have to check the NDI device for port changes because they do not seem stable..
+				echo -e "NDI Device in play, rescanning ports on IP Address ${ipAddr}..\n"
+				ndiIPAddr=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | awk '{print $5}')
+				netInputvar="-t ndi:url=${ndiIPAddr}"
+				audiovar="-s embedded"
+			else
+				netInputvar="-t ${printvalue}"
+				# Audio is not implemented in UltraGrid's RTSP yet, so we will just utilize pipewire here or have NO audio.
+				audiovar="-s pipewire"
+			fi
+			# clear printvalue
+			printvalue=""
+		else
+			echo -e "not found in network_shorthash, we have an invalid selection, ending process..\n"
+			exit 0
+		fi
+	fi
+}
+
 event_encoder(){
 	# Before we do anything, check that we have an input device present.
 		KEYNAME=INPUT_DEVICE_PRESENT; read_etcd
@@ -75,243 +288,6 @@ event_encoder(){
 	systemctl --user enable watch_encoderflag.service --now
 	echo -e "now monitoring for encoder reset flag changes.. \n"
 	
-	encoder_event_setfourway(){
-		# This block will attempt various four-way panel configurations depending on available devices
-		# lists entries out of etcd, concats them to a single swmig command and stores as uv_input_cmd.
-		# This won't work on multiencoder setups, all devices used here must be local to the active encoder.
-		generatedLine=""
-		KEYNAME="$(hostname)/inputs/"; swmixVar=$(read_etcd_global | xargs -d'\n' $(echo "${generatedLine}"))
-		#swmixVar=$(etcdctl --endpoints=${ETCDENDPOINT} get "$(hostname)/inputs/" --prefix --print-value-only | xargs -d'\n' $(echo "${generatedLine}"))
-		KEYNAME=uv_input_cmd; KEYVALUE="-t swmix:1920:1080:30 ${swmixVar}"; write_etcd_global
-		echo -e "Generated command line is:\n${KEYVALUE}\n"
-		multiInputvar=${KEYVALUE}
-		/usr/local/bin/wavelet_textgen.sh
-	}
-
-	read_uv_hash_select() {
-	# Now, we pull uv_hash_select, which is a value passed from the webUI back into this etcd key
-	# compare the hash against available keys in /hash/$keyname, keyvalue will be the device string
-	# then search for device string in $hostname/inputs and if found, we run with that and set another key to notify that it is active
-	# if key does not exist, we do nothing and let another encoder (hopefully with the connected device) go to town.  Maybe post a "vOv" notice in log.
-	# Blank Screen and the Seal static image do not run on any encoder, they are generated on the server.
-		KEYNAME=uv_hash_select
-		read_etcd_global
-		encoderDeviceHash="${printvalue}"
-		case ${encoderDeviceHash} in
-		(1)	echo "Blank screen activated, the Server will stream this directly via controller module."				;	exit 0
-		;;
-		(2)	echo "Seal image activated, the Server will stream this directly via controller module."				;	exit 0
-		;;
-		(T)	echo "Testcard generation activated, the Server will stream this directly via controller module."		;	exit 0
-		;;
-		(W)	echo "Four Panel split activated, attempting multidisplay swmix"	;	encoder_event_setfourway 
-		;;
-		*)	echo -e "single dynamic input device, run code below:\n"			;	encoder_event_checkDevMode
-		esac
-	}
-
-	encoder_event_checkDevMode(){
-		echo -e "Checking for DevMode.."
-		if [[ -f /var/developerMode.enabled ]]; then
-			if [[ "$(hostname)" == *"svr"* ]]; then 
-				echo -e "Server and DevMode enabled, generating advanced switcher.."
-				encoder_event_server
-			else
-				echo -e "not a server, falling back on single device.."
-				encoder_event_singleDevice
-			fi
-		else
-			echo -e "devmode off, falling back on single device method.."
-			encoder_event_singleDevice
-		fi
-	}
-
-	encoder_event_server(){
-		# Check to see if we have a device update global flag set.  If this is not the case, we don't want to regenerate anything
-		KEYNAME="INPUT_DEVICE_NEW"; read_etcd
-		if [[ ${printvalue} -eq "0" ]];then
-			# Do nothing
-			echo -e "\nThe input device update flag is not active, no new devices are available and we do not need to perform these steps to regenerate the AppImage service unit."
-			echo -e "No further action is required, the Controller module should be able to select the appropriate channel on its own.\n"
-			exit 0
-		fi
-
-		# Consume the device flag by resetting it
-		KEYNAME="$INPUT_DEVICE_NEW"; KEYVALUE="0"; write_etcd
-
-
-		# Because the server is a special case, we want to ensure it can quickly switch between static, net and whatever local devices are populated
-		# We create a sub-array with all of these devices and parse them to the encoder as normal
-		# We do not need to worry about static inputs because they are always there, and always 0,1,2
-		# Get keyvalues only for everything under inputs, this basically gives us all the valid generated command lines for our local devices.
-		
-		# First we need to know what device path matches what command line, so we need a matching array to check against:
-		KEYNAME="inputs"; read_etcd_prefix;
-		readarray -t matchingArray <<< $(echo ${printvalue} | sed 's|-t|\n|g' | xargs | sed 's|[[:space:]]|\n|g')
-		echo -e "Matching Array contents:\n${matchingArray[@]}"
-
-		# Now we read the command line values only
-		KEYNAME="inputs"; read_etcd_prefix;
-		# Because we have spaces in the return value, and this value is returned as a string, we have to process everything
-		# remove -t, remove preceding space, 
-		readarray -t localInputsArray <<< $(echo ${printvalue} | sed 's|-t|\n|g' | cut -d ' ' -f 2 | sed '/^[[:space:]]*$/d')
-		echo -e "Local Array contents:\n${localInputsArray[@]}\n"
-
-		# Declare the master server inputs array
-		declare -A serverInputDevices=(); declare -A serverInputDevicesOrders
-		# We now generate an array of these into our localInputs array
-		declare -A localInputs=()
-		# Index is 2 because static inputs occupy 0-2, so the local inputs will always start at index 3
-		index=2
-		for element in "${localInputsArray[@]}"; do
-			# Append "-t " to make it a valid UltraGrid command
-			if [[ "${element}" != *"-t"* ]];then
-				element="-t ${element}"
-			fi
-			((index++))
-			localInputs[$index]=${element}
-			serverInputDevices[$index]=${element}; serverInputDevicesOrders+=( $element )
-		done
-
-		#echo -e "Final local array contents:\n"
-		#for i in "${localInputs[@]}"; do
-		#	echo -e "$i"
-		#done
-
-		# Increment index by N devices present in the local inputs array
-		localInputsOffset=$(echo ${#localInputs[@]})
-		echo -e "\n${localInputsOffset} device(s) in array..\n"
-		index=( ${index} + ${localInputsOffset} )
-
-		# Now we do the same for net devices
-		declare -A networkInputs=()
-		KEYNAME="/network_uv_stream_command/"; read_etcd_prefix_global;
-		read -r networkInputsArray <<< $(echo ${printvalue} | sed 's|-t|\n|g' | cut -d ' ' -f 2 | sed '/^[[:space:]]*$/d')
-		echo -e "Network array contents:\n${networkInputsArray[@]}\n"
-		# We note generate these into our networkInputs array
-		for element in "${networkInputsArray[@]}"; do
-			((index++))
-			# Append "-t " to make it a valid UltraGrid command
-			if [[ "${element}" != *"-t"* ]];then
-				element="-t $element"
-			fi
-			networkInputs[$index]=${element}
-			serverInputDevices[$index]=${element}
-		done
-
-		#echo -e "Final network array contents:\n"
-		#for i in "${networkInputs[@]}"; do
-		#	echo -e "$i"
-		#done
-
-		networkInputsOffset=$(echo ${#networkInputs[@]})
-		index=( ${index} + ${networkInputsOffset} )
-
-		# Now we create a new etcd key for each device with the corresponding channel ID, 
-		# controller will search this and use it to set the switcher to the appropriate index
-		# Clear file of previous data
-		#echo "" > /var/home/wavelet/device_map_entries
-		#for key in "${!matchingArray[@]}"; do
-		#	value="${matchingArray[$key]}"
-		#	if (( $key % 2 == 0 )); then
-		#		# 0 or even line, so $i is a device path
-		#		echo "$value" > /var/home/wavelet/part1
-		#	else
-		#		# an odd line, so $value is a command line
-		#		part2="${value}"
-		#		keys=()
-		#		# This walks through the list of keys in the serverInputDevices array, 
-		#		# and tests the value against the command line we have in matchingArray
-		#		for key in ${!serverInputDevices[@]}; do
-		#			if [[ ${serverInputDevices[$key]} == *"$part2"* ]]; then
-		#				keys+=( '$key' )
-		#				part3="$key,$(cat /var/home/wavelet/part1),${part2}"
-		#				# Append to device_map_entries
-		#				echo "${part3}" >> /var/home/wavelet/device_map_entries
-		#			fi
-		#		done
-		#	fi
-		#done
-
-		# Convert the completed array back to strings, generate mapfile for controller and echo for verification
-		mapfile -d '' sortedserverInputDevices < <(printf '%s\0' "${!serverInputDevices[@]}" | sort -z)
-		echo "" > /var/home/wavelet/device_map_entries_verity
-		serverDevs=$(while IFS= read -r line; do
-			echo "$line"
-		done <<< $(for i in ${sortedserverInputDevices[@]};do
-			echo "$i)${serverInputDevices[$i]}"
-			echo "$i,${serverInputDevices[$i]}" >> /var/home/wavelet/device_map_entries_verity
-		done)
-		)
-		# Generate the command line proper
-		commandLine=$(while IFS= read -r line; do
-			echo "$line"
-		done <<< $(for i in ${sortedserverInputDevices[@]};do
-			echo "${serverInputDevices[$i]}"
-		done)
-		)
-		commandLine=$(echo ${commandLine} | tr -d '\n')
-		echo -e "\nGenerated switcher device list for all server local and network inputs devices is:\n${serverDevs}"
-		echo -e "\nGenerated command line input into etcd is:\n${commandLine}\nConverting to base64 and injecting to etcd.."
-		encodedCommandLine=$(echo "${commandLine}" | base64 -w 0)
-		# This is not the sorted list, so even though it works, we aren't seeing the right devices
-		KEYNAME="/$(hostname)/serverInputs"; KEYVALUE="${encodedCommandLine}"; write_etcd_global
-		}
-
-	encoder_event_singleDevice(){
-		KEYNAME="/hash/${encoderDeviceHash}"
-		read_etcd_global
-		currentHostName=($hostname)
-		if [ -n "${printvalue}" ]; then
-			echo -e "found ${printvalue} in /hash/ - we have a local device"
-			case ${printvalue} in
-				${currentHostName}*)		echo -e "This device is attached to this encoder, proceeding"	; 
-				;;
-				*)							echo -e "This device is attached to a different encoder"		;	exit 0
-				;;
-			esac
-			encoderDeviceStringFull="${printvalue}"
-			echo -e "Device string ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash}\n"
-			unset ${printvalue}
-			KEYNAME="${encoderDeviceStringFull}"; read_etcd_global
-			localInputvar=$(echo ${printvalue} | base64 -d)
-			echo -e "Device input key $localInputvar located for this device string, proceeding to set encoder parameters \n"
-			# For Audio we will select pipewire here
-			audiovar="-s pipewire"
-		else
-			echo -e "null string found in /hash/ - this is a network device\n"
-			KEYNAME="/network_shorthash/${encoderDeviceHash}"; read_etcd_global
-			if [ -n "${printvalue}" ]; then
-				echo -e "found in /network_shorthash/, proceeding..\n"
-				encoderDeviceStringFull="${printvalue}"
-				echo -e "\nDevice String ${encoderDeviceStringFull} located for uv_hash_select hash ${encoderDeviceHash}\n"
-				printvalue=""
-				# Locate device hash in network_ip folder and return the device IP address
-				KEYNAME="/network_ip/${encoderDeviceHash}"; read_etcd_global; ipAddr=${printvalue}
-				# Locate input command from the IP value retreived above
-				KEYNAME="/network_uv_stream_command/${printvalue}"; read_etcd_global
-				if [[ "${printvalue}" == *"ndi"* ]]; then
-					# We have to check the NDI device for port changes because they do not seem stable..
-					echo -e "NDI Device in play, rescanning ports on IP Address ${ipAddr}..\n"
-					ndiIPAddr=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | awk '{print $5}')
-					netInputvar="-t ndi:url=${ndiIPAddr}"
-					audiovar="-s embedded"
-				else
-					netInputvar="-t ${printvalue}"
-					# Audio is not implemented in UltraGrid's RTSP yet, so we will just utilize pipewire here or have NO audio.
-					audiovar="-s pipewire"
-				fi
-				# clear printvalue
-				printvalue=""
-			else
-				echo -e "not found in network_shorthash, we have an invalid selection, ending process..\n"
-				exit 0
-			fi
-		fi
-	# Run common options here
-	/usr/local/bin/wavelet_textgen.sh
-	}
-
 	# Encoder SubLoop
 	# call uv_hash_select to process the provided device hash and select the input from these data
 	read_uv_hash_select
@@ -322,6 +298,7 @@ event_encoder(){
 	if [[ "${bannerStatus}" -eq 1 ]]; then
 		echo -e "Banner is enabled, so filtervar will be set appropriately.  Note currently the logo.c file in UltraGrid can generate errors on particular kinds of streams!..\n"
 		KEYNAME=uv_filter_cmd; read_etcd_global; filtervar=${printvalue}
+		/usr/local/bin/wavelet_textgen.sh
 		if [[ ${filtervar} =~ "--capture-filter" ]]; then
 			echo "filterVar has an illegal or incomplete command, unsetting.."
 			unset filtervar
@@ -345,8 +322,7 @@ event_encoder(){
 	# This command would use the switcher;
 	# --tool uv $filtervar -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mkv:loop -t testcard:pattern=smpte_bars ${inputvar} -s pipewire -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}
 	# can be used remote with this kind of tool (netcat) : echo 'capture.data 0' | busybox nc localhost <control_port>
-	# channels 0-2 are:  Blank, Static Image, Test Bars respectively.  The live video device will therefore always be channel 3.
-	# For faster switching we COULD run all video inputs at once, but then the server would be simultaneously handling 5+ 1080p channels of HEVC/AV1
+	# channels 0-2 are:  Blank, Static Image, Test Bars respectively.  The live video device will therefore always be channels >3
 	UGMTU="9000"
 
 	# Command line reference;
@@ -355,7 +331,6 @@ event_encoder(){
 	# -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4} --param control-accept-global
 
 	# We can use the default UG audio port which binds to 5006, we only need to mess with that if we are sending and receiving.
-	# We use a sparse array so the decans can be utilized for additional arguments if needed.  Note this isn't associative, we need ordering here.
 
 	# Grab our inputVars
 	KEYNAME="/svr.wavelet.local/serverInputs"; read_etcd_global; serverInputvar=$(echo "${printvalue}" | base64 -d)
@@ -390,10 +365,17 @@ event_encoder(){
 		echo "waiting 0.1 seconds for Systemd service to activate.."
 		sleep .1
 	done
+	# Always do first live input, this would be set again by the controller for a different selection.
 	echo 'capture.data 3' | busybox nc -v 127.0.0.1 6160
 }
 
+#####
+#
 # Main
+#
+#####
+
+#set -x
 exec >/home/wavelet/encoder.log 2>&1
 
 event_encoder
