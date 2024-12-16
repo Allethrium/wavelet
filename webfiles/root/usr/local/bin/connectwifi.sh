@@ -31,7 +31,7 @@ connectwifi_psk(){
 	echo -e "\nFound WiFi BSSID match! It is: ${wifibssid}\n"
 
 	# Remove any old connection UUID's with the same name
-	reponse=$()nmcli connection add type wifi con-name ${networkssid} ifname ${ifname} ssid ${networkssid})
+	reponse=$(nmcli connection add type wifi con-name ${networkssid} ifname ${ifname} ssid ${networkssid})
 	olduuid=$(echo $response | awk '{print $16}' | sed "s|'||g")
 	nmcli con dev uuid ${olduuid}
 	nmcli connection modify ${networkssid} wifi-sec.key-mgmt wpa-psk wifi-sec.psk ${wifipassword}
