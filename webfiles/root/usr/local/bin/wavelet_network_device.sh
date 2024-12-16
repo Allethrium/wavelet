@@ -201,23 +201,35 @@ event_unsupportedDevice(){
 		# We could do something here to attempt to connect to the device and parse whatever looks like a string to a proper value?
 		echo -e "Waiting for five seconds, then attempting to connect to device..\n"
 		sleep 5
-		# Check to see if this device is NDI enabled
-		echo "Checking for NDI capability.."
-		deviceHostName=$(nslookup ${ipAddr} | awk '{print $4}')
-		ndiSource=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | cut -d '(' -f1 | awk '{print $1}')
-		if [ -n ${ndiSource} ]; then
-			echo -e "\nNDI source for this IP address not found, attempting RTSP..\n"
-			UGdeviceStreamCommand="rtsp://${ipAddr}:554/1:decompress"
-			# Do a test here to see if RTSP is successful, if not, this probably isn't a video device and we don't want to go further.
-			#populate_to_etcd
-			echo -e "Device RTSP configured, however it may not work without further settings.\n"
-			# Call a new module to populate the DHCP lease into FreeIPA BIND (does nothing if security layer is off)
-			/usr/local/bin/wavelet_ddns_update.sh ${deviceHostName} ${ipAddr}
+		# Check to see if this device is a wavelet decoder or encoder
+		read_etcd_clients_ip_sed
+		if [[ "${printvalue}" == *"${ipAddr}"* ]]; then
+			echo "This IP is registered in the reflectors list, so it is a wavelet encoder/decoder device. Ignoring."
 			exit 0
 		else
-			echo -e "\nNDI is available for this device, querying for NDI ports and defaulting to NDI..\n"
-			ndiIPAddr=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep "${ipAddr}" | awk '{print $5}')
-			UGdeviceStreamCommand="ndi:url=${ndiIPAddr}"
+			# Check to see if this device is NDI enabled
+			echo "Checking for NDI capability.."
+			deviceHostName=$(nslookup ${ipAddr} | awk '{print $4}')
+			ndiSource=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | cut -d '(' -f1 | awk '{print $1}')
+			if [ -n ${ndiSource} ]; then
+				echo -e "\nNDI source for this IP address: ${ipAddr}\nnot found, attempting RTSP.."
+				UGdeviceStreamCommand="rtsp://${ipAddr}:554/1:decompress"
+				# Do a test here to see if RTSP is successful, if not, this probably isn't a video device and we don't want to go further.
+				if [[ $(ffprobe -v quiet -show_streams ${UGdeviceStreamCommand}) ]]; then
+  					populate_to_etcd
+					echo -e "Device RTSP configured, however it may not work without further settings.\n"
+					# Call a new module to populate the DHCP lease into FreeIPA BIND (does nothing if security layer is off)
+					/usr/local/bin/wavelet_ddns_update.sh ${deviceHostName} ${ipAddr}
+					exit 0
+				else
+					echo "ffmpeg could not probe this device for a valid video stream! RTSP is not valid for this device"
+  					exit 0
+				fi
+			else
+				echo -e "\nNDI is available for this device, querying for NDI ports and defaulting to NDI..\n"
+				ndiIPAddr=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep "${ipAddr}" | awk '{print $5}')
+				UGdeviceStreamCommand="ndi:url=${ndiIPAddr}"
+			fi
 		fi
 }
 
