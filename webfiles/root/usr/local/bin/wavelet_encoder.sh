@@ -233,25 +233,29 @@ event_encoder(){
 		#	fi
 		#done
 
-		# Convert the completed array back to strings
+		# Convert the completed array back to strings, generate mapfile for controller and echo for verification
 		mapfile -d '' sortedserverInputDevices < <(printf '%s\0' "${!serverInputDevices[@]}" | sort -z)
 		echo "" > /var/home/wavelet/device_map_entries_verity
 		serverDevs=$(while IFS= read -r line; do
-				echo "$line"
-			done <<< $(for i in ${sortedserverInputDevices[@]};do
-					echo "$i)${serverInputDevices[$i]}"
-					echo "$i,${serverInputDevices[$i]}" >> /var/home/wavelet/device_map_entries_verity
-				done)
+			echo "$line"
+		done <<< $(for i in ${sortedserverInputDevices[@]};do
+			echo "$i)${serverInputDevices[$i]}"
+			echo "$i,${serverInputDevices[$i]}" >> /var/home/wavelet/device_map_entries_verity
+		done)
 		)
+		# Generate the command line proper
+		commandLine=$(while IFS= read -r line; do
+			echo "$line"
+		done <<< $(for i in ${sortedserverInputDevices[@]};do
+			echo "${serverInputDevices[$i]}"
+		done)
+		)
+		commandLine=$(echo ${commandLine} | tr -d '\n')
 		echo -e "\nGenerated switcher device list for all server local and network inputs devices is:\n${serverDevs}"
-		serverInputCommand="$(echo ${localInputs[@]} ${networkInputs[@]} | base64 -w 0)"
-		KEYNAME="/$(hostname)/serverInputs"; KEYVALUE=${serverInputCommand}; write_etcd_global
-		# Now we need to parse the indexing back to the Controller so that it knows what to select
-		# Perhaps a map file might be a good idea at this point
-		# 5:video2
-		# 4:video4
-		# 3:video0
-		# 6:192.168.1.xxx:5961
+		echo -e "\nGenerated command line input into etcd is:\n${commandLine}\nConverting to base64 and injecting to etcd.."
+		encodedCommandLine=$(echo "${commandLine}" | base64 -w 0)
+		# This is not the sorted list, so even though it works, we aren't seeing the right devices
+		KEYNAME="/$(hostname)/serverInputs"; KEYVALUE="${encodedCommandLine}"; write_etcd_global
 		}
 
 	encoder_event_singleDevice(){
@@ -354,7 +358,7 @@ event_encoder(){
 	# We use a sparse array so the decans can be utilized for additional arguments if needed.  Note this isn't associative, we need ordering here.
 
 	# Grab our inputVars
-	KEYNAME="/svr.wavelet.local/serverInputs"; read_etcd_global; serverInputvar=$(echo ${printvalue} | base64 -d)
+	KEYNAME="/svr.wavelet.local/serverInputs"; read_etcd_global; serverInputvar=$(echo "${printvalue}" | base64 -d)
 	commandLine=(\
 		[1]="--tool uv" \
 		[2]="${filtervar}" \
