@@ -16,7 +16,6 @@ kernel_arguments:
     - nameserver=192.168.1.1
     # - net.ifnames=0
     # - biosdevname=0
-# UltraGrid AppImage
 storage:
   files:
     # Setup Ignition Files
