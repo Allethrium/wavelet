@@ -339,7 +339,7 @@ event_encoder(){
 		[2]="${filtervar}" \
 		[3]="--control-port 6160" \
 		[4]="-f V:rs:200:250" \
-		[11]="-t switcher" [12]="-t testcard:pattern=blank" [13]="-t file:/var/home/wavelet/seal.mkv:loop" [14]="-t testcard:pattern=smpte_bars" \
+		[11]="-t switcher:excl_init" [12]="-t testcard:pattern=blank" [13]="-t file:/var/home/wavelet/seal.mkv:loop" [14]="-t testcard:pattern=smpte_bars" \
 		[21]="${serverInputvar}" [22]="${localInputvar}" [23]="${netInputvar}" [24]=${multiInputvar} [29]="${audiovar}" \
 		[81]="-c ${encodervar}" \
 		[91]="-P ${video_port}" [92]="-m ${UGMTU}" [93]="${destinationipv4}" [94]="--param control-accept-global")
