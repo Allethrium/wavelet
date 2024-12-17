@@ -262,34 +262,33 @@ wavelet_dynamic() {
 		fi
 		echo -e "Target host name is ${targetHost}"
 		targetIP=$(getent ahostsv4 "${targetHost}" | head -n 1 | awk '{print $1}')
-		
 		# Here we want to check to see if the device is already prepopulated on the switcher
 		# Find the command line in the device_map_entries file
 		if grep -q ${searchArg#*-t} /var/home/wavelet/device_map_entries_verity; then
 			echo "Entry found in device map.."
 			channelIndex=$(grep "${searchArg#*-t}" /var/home/wavelet/device_map_entries_verity | cut -d ',' -f1)
-			:
 		else
-			# If not, we run the process again after having the encoder restart, then we restart the server after a 2s delay
+			# If not, we run the process again after having the encoder restart, then we restart the controller process after a 3s delay
 			echo "Entry missing from device map file! Forcing encoder restart."
 			KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
-			sleep 2; KEYNAME=input_update; KEYVALUE="1"; write_etcd_global
+			sleep 3; KEYNAME=input_update; KEYVALUE="1"; write_etcd_global
 		fi
-		
 		# Finally we check for the appropriate device in the generated user SystemD unit
 		if ! grep -q ${searchArg#*-t} /var/home/wavelet/.config/systemd/user/UltraGrid.AppImage.service; then
 			echo "Device command line is missing! Forcing encoder restart.."
 			KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
-			sleep 2
+			sleep 3; KEYNAME=input_update; KEYVALUE="1"; write_etcd_global
 		fi
 
 		# And ensure the encoder is even running...
-		if systemctl --user is-active --quiet UltraGrid.AppImage; then
-			:
+		if systemctl --user is-active --quiet UltraGrid.AppImage.service; then
+			# Do nothing
 		else
+			# Restart the encoder, sleep 3 and run this again.
 			KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
-			sleep 5
+			sleep 3; KEYNAME=input_update; KEYVALUE="1"; write_etcd_global
 		fi
+		# And now set the appropriate channel
 		echo "Channel Index is: ${channelIndex%,*}"
 		echo "capture.data ${channelIndex%,*}" | busybox nc -v ${targetHost} 6160
 	else
