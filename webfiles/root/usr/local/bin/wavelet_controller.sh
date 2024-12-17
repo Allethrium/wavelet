@@ -169,6 +169,9 @@ delete_etcd_key(){
 delete_etcd_key_global(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key_global" "${KEYNAME}"
 }
+delete_etcd_key_prefix(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key_prefix" "${KEYNAME}"
+}
 generate_service(){
 	# Can be called with more args with "generate_servier" ${keyToWatch} 0 0 "${serviceName}"
 	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
@@ -239,52 +242,59 @@ wavelet_dynamic() {
 	current_event="wavelet-dynamic"
 	KEYNAME=uv_input; read_etcd_global;	controllerInputLabel=${printvalue}
 	KEYNAME=uv_hash_select;	read_etcd_global; controllerInputHash=${printvalue}
-	echo -e "Controller notified that input hash ${controllerInputHash}\nhas been selected with the input label: ${controllerInputLabel}\nEncoder restart commencing..\n"
-	targetHost="${controllerInputLabel%/*}"
-	targetIP=$(getent ahostsv4 "${targetHost}" | head -n 1 | awk '{print $1}')
-	echo -e "Target host name is ${targetHost}"
-
+	echo -e "Controller notified that input hash ${controllerInputHash}\nhas been selected with the input label: ${controllerInputLabel}\n"
+	# Check for device map file
 	if [[ -f /var/home/wavelet/device_map_entries_verity ]]; then
-		echo -e "\nDevice map file has been generated, continuing.."
-		if [[ ${targetHost} == *"/network_interface/"* ]]; then
+		echo -e "\nDevice map file has been generated on this host, continuing.."
+		targetHost="${controllerInputLabel%/*}"
+		if [[ ${targetHost} == *"network_interface"* ]]; then
 			echo -e "Target Hostname is a network device."
-			devicetype="N"
-		elif [[ ${targetHost} == *"$(hostname)"* ]]; then
-			echo -e "Target hostname references the server."
-			deviceType="L"
-		else echo -e "Device map file is generated, but we couldn't find the device entry.  Something may be wrong.\n"
-			# Is there a remedial step we can try here rather than just failing?
-			:
+			deviceType="N"; targetHost="$(hostname)"; KEYNAME="/network_ip/${controllerInputHash}"; read_etcd_global; deviceFullPath=${printvalue}
+			KEYNAME="/network_uv_stream_command/${deviceFullPath}"; read_etcd_global; searchArg="${printvalue}"
+		elif [[ "${targetHost}" == *"$(hostname)"* ]]; then
+			echo -e "Target hostname references this server."
+			deviceType="L"; targetHost="$(hostname)"; KEYNAME="/hash/${controllerInputHash}"; read_etcd_global; deviceFullPath=${printvalue}
+			KEYNAME="${deviceFullPath}"; read_etcd_global; searchArg="$(echo ${printvalue} | base64 -d)"
+		else 
+			echo -e "Device is hosted from a remote encoder.\n"
+			deviceType="R"; targetHost="${controllerInputLabel%/*}"; KEYNAME="/hash/${controllerInputHash}"; read_etcd_global; deviceFullPath=${printvalue}
+			KEYNAME="${deviceFullPath}"; read_etcd_global; searchArg="$(${printvalue} | base64 -d)"
 		fi
-
+		echo -e "Target host name is ${targetHost}"
+		targetIP=$(getent ahostsv4 "${targetHost}" | head -n 1 | awk '{print $1}')
+		
 		# Here we want to check to see if the device is already prepopulated on the switcher
-		KEYNAME="/hash/${controllerInputHash}"; read_etcd_global; deviceFullPath=${printvalue}
-		KEYNAME=${deviceFullPath}; read_etcd_global
-		searchArg=$(echo ${printvalue} | base64 -d)
+		# Find the command line in the device_map_entries file
 		if grep -q ${searchArg#*-t} /var/home/wavelet/device_map_entries_verity; then
 			echo "Entry found in device map.."
 			channelIndex=$(grep "${searchArg#*-t}" /var/home/wavelet/device_map_entries_verity | cut -d ',' -f1)
+			:
 		else
 			# If not, we run the process again after having the encoder restart, then we restart the server after a 2s delay
+			echo "Entry missing from device map file! Forcing encoder restart."
 			KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
 			sleep 2; KEYNAME=input_update; KEYVALUE="1"; write_etcd_global
 		fi
+		
 		# Finally we check for the appropriate device in the generated user SystemD unit
 		if ! grep -q ${searchArg#*-t} /var/home/wavelet/.config/systemd/user/UltraGrid.AppImage.service; then
 			echo "Device command line is missing! Forcing encoder restart.."
 			KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
 			sleep 2
 		fi
+
 		# And ensure the encoder is even running...
 		if systemctl --user is-active --quiet UltraGrid.AppImage; then
 			:
 		else
 			KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
-			sleep 2
+			sleep 5
 		fi
 		echo "Channel Index is: ${channelIndex%,*}"
 		echo "capture.data ${channelIndex%,*}" | busybox nc -v ${targetHost} 6160
 	else
+		# This part of the module is a mess.  We need to decide if we are going to support multiple devices on remote encoder
+		# Or only a single device.
 		# No map file or channel data are available, this would generally mean it's not a network device, nor local to the server.
 		# Set encoder restart flag to 1 for appropriate host
 		echo -e "No device-channel mapping file is available."
@@ -292,10 +302,14 @@ wavelet_dynamic() {
 		echo -e "${targetHost} encoder_restart flag set!\n"
 		# Note we are writing a global key to the TARGET host, so we need to base64 encode it for it to be valid.
 		KEYNAME="/${targetHost}/encoder_restart"; KEYVALUE="$(echo "1" | base64)"; write_etcd_global
-		KEYNAME=input_update; KEYVALUE="0"; echo -e "Task completed, reset input_update key to 0.. \n"; write_etcd_global
+		KEYNAME="input_update"; KEYVALUE="0"; echo -e "Task completed, reset input_update key to 0.. \n"; write_etcd_global
 		sleep 2
 		# Ensure channel input is set to 3, so that we get the first switcher device, which is not a static out of UG.
 		KEYNAME="/hostHash/${targetHost}/ipaddr"; read_etcd_global; targetIP=${printvalue}
+		if [[ ${deviceType} == "N" ]]; then
+			# targetHost is Server, else it's popoulated already from the device key
+			targetHost="$(hostname)"
+		fi
 		echo -e "\nAttempting to set switcher channel to new device for ${targetHost}..\n"
 		sleep 1
 		echo 'capture.data 3' | busybox nc -v ${targetHost} 6160
@@ -490,13 +504,14 @@ wavelet_clear_inputs() {
 # Until I fix the detection/removal stuff so that it works perfectly, this will effectively clean out any cruft from 'stuck'
 # source devices which no longer exist, but still populate on the UI.
 # bad solution
-	keysArray=("interface" "/interface" "/hash" "/short_hash" "long" "/$(hostname)/inputs" "/network_long" "/network_short" "/network_interface" "/network_ip" "/network_uv_stream_command")
+	hostname="$(hostname)"
+	keysArray=("/interface/" "/hash/" "/short_hash/" "/long_interface/" "/${hostname}/inputs/" "/network_long/" "/network_short/" "/network_interface/" "/network_ip/" "/network_uv_stream_command/")
 	for key in ${keysArray[@]}; do
-		KEYNAME=$key
-		delete_etcd_key_global
+		KEYNAME="${key}"
+		echo "Deleting: ${key}"
+		delete_etcd_key_prefix
 	done
-	echo -e "All interface devices and their configuration data, as well as labels have been deleted\n
-	Plugging in a new device will cause the detection module to run again.\n"
+	echo -e "All interface devices and their configuration data, as well as labels have been deleted\nPlugging in a new device will cause the detection module to run again.\n"
 }
 
 wavelet_detect_inputs() {
@@ -508,9 +523,10 @@ wavelet_detect_inputs() {
 
 ###
 #
-# execute main function
+# Main
 #
 ###
 
+#set -x
 exec >/home/wavelet/controller.log 2>&1
 detect_self
