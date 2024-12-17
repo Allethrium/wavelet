@@ -119,6 +119,10 @@ function sendPHPID(buttonElement) {
 	// Because javascript inexplicably can access everythign EXCEPT the value??
 	const postValue				=		(buttonElement.id);
 	const postLabel				=		($(this).innerText);
+	if ("postLabel" in window) {
+		console.log("postLabel is not defined! Setting a dummy value..");
+		postLabel	=	"dummyValue";
+	}
 	console.log("Sending Value: " + postValue + "\nAnd Label: " + postLabel);
 	$.ajax({
 		type: "POST",
@@ -130,7 +134,8 @@ function sendPHPID(buttonElement) {
 			success: function(response){
 				console.log(response);
 				if (postValue == "RD" || "CL") {
-					setTimeout(() => window.location.reload(), 750);
+					// Perhaps we also want to set the button inactive
+					setTimeout(() => window.location.reload(), 1250);
 				}
 			}
 	});
@@ -232,10 +237,15 @@ function handlePageLoad() {
 	var audioStatus					=		getAudioStatus(audioValue);
 	// Adding classes and attributes to the prepopulated 'static' buttons on the webUI
 	const staticInputElements		=		document.querySelectorAll(".btn");
-	var confirmElements = document.getElementsByClassName('serious');
-	var confirmIt = function (e) {
-		if (!confirm('Are you sure?')) e.preventDefault();
-	};
+	var confirmElements 			= 		document.getElementsByClassName('serious');
+	var confirmIt					= 		function (e) {
+			var answer=confirm('Are you sure?');
+			if(answer){
+				alert('OK!');
+			} else {
+				e.preventDefault();
+			}
+		};
 	for (var i = 0, l = confirmElements.length; i < l; i++) {
 		confirmElements[i].addEventListener('click', confirmIt, false);
 	}
