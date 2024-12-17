@@ -116,8 +116,18 @@ set_ethernet_mtu(){
 #
 #####
 
+
+logName="connectwifi.log"
+if [[ -e $logName || -L $logName ]] ; then
+	i=0
+	while [[ -e $logName-$i || -L $logName-$i ]] ; do
+		let i++
+	done
+	logName=$logName-$i
+fi
 #set -x
-exec >/home/wavelet/connectwifi.log 2>&1
+exec >${logName} 2>&1
+
 
 if [[ $(hostname) = *"svr"* ]]; then
 	echo -e "This script enables wifi and disables other networking devices.  It is highly recommended to have the server running on a wired link."

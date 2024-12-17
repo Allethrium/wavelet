@@ -526,6 +526,16 @@ wavelet_detect_inputs() {
 #
 ###
 
+logName="controller.log"
+if [[ -e $logName || -L $logName ]] ; then
+	i=0
+	while [[ -e $logName-$i || -L $logName-$i ]] ; do
+		let i++
+	done
+	logName=$logName-$i
+fi
 #set -x
-exec >/home/wavelet/controller.log 2>&1
+exec >${logName} 2>&1
+
+
 detect_self
