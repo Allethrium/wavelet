@@ -102,4 +102,4 @@ echo -e "Calling connectwifi module"
 # Move the log file otherwise permissions is an issue and we don't get subsequent log
 # Also reset permissions on wavelet home folder so that any other files generated whilst running under root are writable by the wavelet user
 mv /var/home/wavelet/connectwifi.log /var/home/wavelet/setup_old_connectwifi.log
-chown wavelet:wavelet /var/home/wavelet
+chown -R wavelet:wavelet /var/home/wavelet
