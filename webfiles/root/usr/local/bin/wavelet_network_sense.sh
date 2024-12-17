@@ -68,7 +68,16 @@ event_inactive_networkDevice(){
 ###
 
 #set -x
-exec >/var/tmp/network_sense.log 2>&1
+logName=/var/tmp/network_sense.log
+if [[ -e $logName || -L $logName ]] ; then
+	i=0
+	while [[ -e $logName-$i || -L $logName-$i ]] ; do
+		let i++
+	done
+	logName=$logName-$i
+fi
+
+exec > "${logName}" 2>&1
 # check to see if I'm a server or an encoder
 echo -e "\n\n********Begin network detection and registration process...********\n\n"
 detect_self
