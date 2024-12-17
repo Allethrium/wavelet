@@ -172,6 +172,17 @@ event_ptz_ndiHX(){
 		if [ -n ${ndiSource} ]; then
 			echo -e "\nNDI source for this IP address not found, configuring for RTSP..\n"
 			UGdeviceStreamCommand="rtsp://${ipAddr}:554/1:decompress"
+			if [[ $(ffprobe -v quiet -show_streams ${UGdeviceStreamCommand}) ]]; then
+
+				populate_to_etcd
+				echo -e "Device RTSP configured, however it may not work without further settings.\n"
+				# Call a new module to populate the DHCP lease into FreeIPA BIND (does nothing if security layer is off)
+				/usr/local/bin/wavelet_ddns_update.sh ${deviceHostName} ${ipAddr}
+				exit 0
+			else
+				echo "ffmpeg could not probe this device for a valid video stream! RTSP is not valid for this device"
+				exit 0
+			fi
 			populate_to_etcd
 			echo -e "Device successfully configured, finishing up..\n"
 			# Call a new module to populate the DHCP lease into FreeIPA BIND (does nothing if security layer is off)
@@ -307,6 +318,15 @@ populate_to_etcd(){
 #
 ####
 
+logName=/var/tmp/network_device.log
+if [[ -e $logName || -L $logName ]] ; then
+	i=0
+	while [[ -e $logName-$i || -L $logName-$i ]] ; do
+		let i++
+	done
+	logName=$logName-$i
+fi
+
 #set -x
-exec >/var/tmp/network_device.log 2>&1
+exec >${logName} 2>&1
 read_leasefile
