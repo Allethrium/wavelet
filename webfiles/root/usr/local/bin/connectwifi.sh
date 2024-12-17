@@ -31,7 +31,7 @@ connectwifi_psk(){
 	echo -e "\nFound WiFi BSSID match! It is: ${wifibssid}\n"
 
 	# Remove any old connection UUID's with the same name
-	reponse=$(nmcli connection add type wifi con-name ${networkssid} ifname ${ifname} ssid ${networkssid})
+	response=$(nmcli connection add type wifi con-name ${networkssid} ifname ${ifname} ssid ${networkssid})
 	olduuid=$(echo $response | awk '{print $16}' | sed "s|'||g")
 	nmcli con del uuid ${olduuid}
 	nmcli connection modify ${networkssid} wifi-sec.key-mgmt wpa-psk wifi-sec.psk ${wifipassword}
@@ -40,9 +40,9 @@ connectwifi_psk(){
 	nmcli connection up ${networkssid}
 	echo "${networkssid}" > /var/home/wavelet/wifi.${networkssid}.key
 
-	
+	sleep 2
 	if [ $? -eq 0 ]; then
-		echo -e "\nConnection successful!  Continuing..\n"
+		echo -e "Connection successful!  Continuing..\n"
 	else
 		if [[ $? = *"Error: bssid argument is missing"* ]]; then
 			echo -e "SSID is broadcast, retrying without BSSID argument..\n"
@@ -98,7 +98,7 @@ detect_disable_ethernet(){
 		nmcli con down "${ethernetInterfaceUUID}"
 		# We need to set the CONNECTION do be down, NOT the interface.
 		#nmcli device disconnect "${ethernetInterface}"
-		echo -e "The primary ethernet connection with UUID ${ethernetInterfaceUUID} has been disabled.\n\nTo re-enable, you can use:\nnmcli con up ${ethernetInterfaceUUID}\nOr:\nnmtui\nFor a gui interface."
+		echo -e "The primary ethernet connection with UUID ${ethernetInterfaceUUID} has been disabled.\nTo re-enable, you can use:\nnmcli con up ${ethernetInterfaceUUID}\nOr:\nnmtui\nFor a gui interface."
 	fi
 }
 
