@@ -70,7 +70,7 @@ sense_devices() {
 	for i in "${v4lArray[@]}"; do
 		device_string_long=$i
 		v4l_device_path="/dev/$(ls -Artl $i* | awk '{print $11}' | awk -F/ '{print $3}')"
-		echo -e "Device path ${v4l_device_path} located for ${device_string_long} \n"
+		echo -e "Device path ${v4l_device_path} located for ${device_string_long}"
 		# generate device hashes and proceed to next step
 		generate_device_info
 	done
@@ -79,8 +79,8 @@ sense_devices() {
 
 
 generate_device_info() {
-	echo -e "Now generating device info for each item presently located in /dev/v4l/by-id.. \n"
-	echo -e "Working on ${device_string_long}\n"
+	echo -e "Now generating device info for each item presently located in /dev/v4l/by-id.."
+	echo -e "Working on ${device_string_long}"
 	device_string_short=$(echo $(hostname)/"${device_string_long}" | sed 's/.*usb-//')
 	info=$(v4l2-ctl -D -d ${v4l_device_path})
 	# here we parse this information
@@ -99,10 +99,10 @@ generate_device_info() {
 	# Let's look for the device hash in the /interface prefix to make sure it doesn't already exist!
 	KEYNAME="/hash/${deviceHash}"; read_etcd_global; output_return=${printvalue}
 	if [[ $output_return == "" ]] then
-		echo -e "${deviceHash} not located within etcd, assuming we have a new device and continuing with process to set parameters..\n"
+		echo -e "${deviceHash} not located within etcd, assuming we have a new device and continuing with process to set parameters.."
 		isDevice_input_or_output
 	else
-		echo -e "${deviceHash} located in etcd:\n${output_return}\nIf you wish for the device to be properly redetected from scratch, please move it to a different USB port.\n"
+		echo -e "${deviceHash} located in etcd:\n${output_return}\nIf you wish for the device to be properly redetected from scratch, please move it to a different USB port."
 		# we run device_cleanup regardless!!
 		device_cleanup
 	fi
@@ -210,17 +210,17 @@ detect() {
 # If we need to support audio output devices, we need to do it via a different path branching from isDevice_input_or_output
 	echo -e "Device string is ${device_string_long} \n"
 	case ${device_string_long} in
-	*IPEVO*)						echo -e "IPEVO Document Camera device detected.. \n"				&& event_ipevo
+	*IPEVO*)						echo -e "IPEVO Document Camera device detected.."				&& event_ipevo
 	;;
-	*"Logitech_Screen_Share"*)		echo -e "Logitech HDMI-USB Capture device detected.. \n"			&& event_logitech_hdmi
+	*"Logitech_Screen_Share"*)		echo -e "Logitech HDMI-USB Capture device detected.."			&& event_logitech_hdmi
 	;;
-	*Magewell*)						echo -e "Magewell HDMI-USB Capture device detected.. \n"			&& event_magewell
+	*Magewell*)						echo -e "Magewell HDMI-USB Capture device detected.."			&& event_magewell
 	;;
-	*EPSON*)						echo -e "EPSON Capture device detected.. \n"						&& event_epson
+	*EPSON*)						echo -e "EPSON Capture device detected.."						&& event_epson
 	;;
-	*Dell_Webcam_WB3023*)			echo -e "Dell WB3023 Webcam	device detected.. \n"					&& event_dellWB3023
+	*Dell_Webcam_WB3023*)			echo -e "Dell WB3023 Webcam	device detected.."					&& event_dellWB3023
 	;;
-	*)								echo -e "Unknown device detected, attempting to process..\n"		&& event_unknowndevice
+	*)								echo -e "Unknown device detected, attempting to process.."		&& event_unknowndevice
 	;;
 	esac
 }
@@ -229,34 +229,35 @@ detect() {
 # each of these blocks contains specific configuration options that must be preset for each device in order for them to work.  
 # We will have to add to this over time to support more devices appropriately.
 event_ipevo() {
-	echo -e "IPEVO Camera detection running..\n"
+	echo -e "IPEVO Camera detection running.."
 	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPG:convert=RGB:size=1920x1080:tpf=1/30:device=${v4l_device_path}"; write_etcd
-	echo -e "\nDetection completed for IPEVO device..\n"
+	echo -e "Detection completed for IPEVO device..\n"
 }
 event_logitech_hdmi() {
+	echo -e "Setting up Logitech USB capture card.."
 	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPG:convert=RGB:size=1920x1080:tpf=1/30:device=${v4l_device_path}"; write_etcd
-	echo -e "\nDetection completed for Logitech HDMI Capture device..\n"
+	echo -e "Detection completed for Logitech HDMI Capture device..\n"
 }
 event_magewell() {
-	echo -e "Setting up Magewell USB capture card..\n"
+	echo -e "Setting up Magewell USB capture card.."
 	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"; write_etcd
-	echo -e "\nDetection completed for device..\n"
+	echo -e "Detection completed for device..\n"
 }
 event_epson() {
-	echo -e "Setting up EPSON Document camera device...\n"
+	echo -e "Setting up EPSON Document camera device..."
 	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/24:device=${v4l_device_path}"; write_etcd
-	echo -e "\nDetection completed for device..\n"
+	echo -e "Detection completed for device..\n"
 }
 event_dellWB3023(){
-	echo -e "Setting up Dell WB3023 webcam..\n"
+	echo -e "Setting up Dell WB3023 webcam.."
 	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=NV12:size=640x480:tpf=1/30:device=${v4l_device_path}"; write_etcd
-	echo -e "\nDetection completed for device..\n"
+	echo -e "Detection completed for device..\n"
 }
 event_unknowndevice() {
 # 30fps is a compatibility setting, catch all for other devices we will leave at 30.  Try YUYV with RGB conversion..
-	echo -e "The connected device has not been previously assigned an input ID for the UI component.  Storing hash.\n"
+	echo -e "The connected device has not been previously assigned an input ID for the UI component.  Storing hash."
 	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=YUYV:size=1920x1080:tpf=1/30:convert=RGB:device=${v4l_device_path}"; write_etcd
-	echo -e "\n Detection completed for device..\n"
+	echo -e "Detection completed for device..\n"
 }
 
 #AUDIO output device block
@@ -328,7 +329,8 @@ if [[ "${1}" = "RD" ]]; then
 	systemctl --user enable wavelet_device_redetect.service --now
 fi
 
+device_cleanup
+
 # check to see if I'm a server or an encoder
 echo -e "\n********Begin device detection and registration process...********"
 detect_self
-device_cleanup
