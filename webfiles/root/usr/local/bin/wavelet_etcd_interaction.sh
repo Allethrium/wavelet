@@ -166,6 +166,9 @@ case ${action} in
 	# Delete a global key
 	delete_etcd_key_global)		declare -A commandLine=([1]="del" [0]="${inputKeyName}"); fID="clearText";
 	;;
+	# Delete keys on prefix
+	delete_etcd_key_prefix)		declare -A commandLine=([2]="del" [1]="${inputKeyName}" [0]="prefix"); fID="clearText";
+	;;
 	# Generate a user systemd watcher based off keyname and module arguments.
 	generate_service)			generate_service "${inputKeyName}" "${waveletModule}" "${additionalArg}"; fID="clearText";
 	;;
