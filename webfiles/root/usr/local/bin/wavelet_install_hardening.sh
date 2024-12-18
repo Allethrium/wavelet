@@ -61,7 +61,7 @@ configure_idm(){
 	echo "${domain}" > /var/secrets/wavelet.domain
 	echo "dc1.${domain}" > /var/secrets/wavelet.server
 	ip=$(hostname -I | cut -d " " -f 1)
-	directoryManagerPassword=$(cat /var/secrets/ipadmpw.secure)
+	local directoryManagerPassword=$(cat /var/secrets/ipadmpw.secure)
 	KRBDOMAIN=${domain^^}
 	gateway=$(read _ _ gateway _ < <(ip route list match 0/0); echo "$gateway")
 	# note - password must be at least 8 chars long and should be prepopulated via install_wavelet_server.sh
@@ -131,6 +131,7 @@ configure_idm(){
 	mkdir -p /var/freeipa-data
 	# This sets up the QUADLET to run freeipa, but it does not set the server itself up.
 	# Port 953 needed for dynamic DNS updates
+	#	Run iplink_up.sh to activate the generated shim to that we can talk to the container from the server.
 	echo -e "[Container]
 Image=quay.io/freeipa/freeipa-server:almalinux-9
 ContainerName=freeipa
@@ -159,6 +160,7 @@ NoNewPrivileges=true
 Restart=always
 RestartSec=5
 TimeoutStartSec=600
+ExecStartPost=-/usr/bin/bash -c "/usr/local/bin/iplink_up.sh"
 
 [Install]
 WantedBy=multi-user.target" > /etc/containers/systemd/freeipa.container
@@ -185,17 +187,50 @@ WantedBy=multi-user.target" > /etc/containers/systemd/freeipa.container
 	#		We might want to actually do this with macvlan after all.  
 	podman network create -d ipvlan --subnet ${currentIPCIDR} --gateway ${gateway} --ip-range ${ipaSubnetArg} ipa_ipvlan -o parent=${active_networkInterface}
 
-	# Can't use nmcli - no ipvlan support?
-	ip link add ipa_ipvlan_shim link ${active_networkInterface} type ipvlan mode l2
-	ip addr add ${hostLinkIP}/32 dev ipa_ipvlan_shim 
-	ip link set ipa_ipvlan_shim up
-	ip route add ${ipaSubnetArg} dev ipa_ipvlan_shim
+	# Can't use nmcli - no ipvlan support until patch: https://gitlab.freedesktop.org/NetworkManager/NetworkManager/-/commit/d238ff487b29a50ca346f906b2a158c692ff8864
+
+	iplink_create_ipvlan(){
+		# So problem.. on reboot, the link doesn't work and therefore the server is unpingable.  We would have to perform this every reboot..
+		ip link add ipa_ipvlan_shim link ${active_networkInterface} type ipvlan mode l2
+		ip addr add ${hostLinkIP}/32 dev ipa_ipvlan_shim 
+		ip link set ipa_ipvlan_shim up
+		ip route add ${ipaSubnetArg} dev ipa_ipvlan_shim
+		if ping dc1; then
+			echo "ip link add ipa_ipvlan_shim link ${active_networkInterface} type ipvlan mode l2
+		ip addr add ${hostLinkIP}/32 dev ipa_ipvlan_shim 
+		ip link set ipa_ipvlan_shim up
+		ip route add ${ipaSubnetArg} dev ipa_ipvlan_shim" > /usr/local/bin/iplink_up.sh; chmod +x /usr/local/bin/iplink_up.sh
+	}
+
+	nmcli_create_macvlan(){
+		podman network create -d macvlan -o parent=enp1s0f0np0 ipa_macvlan
+		# Doesn't seem to work
+		nmcli con add type macvlan dev ${active_networkInterface} mode bridge tap yes ifname ipa con-name ipa ip4 0.0.0.0/24
+		nmcli con mod macvlan-ipa ipv6.method "disabled"
+		nmcli con mod macvlan-ipa ipv4.method "disabled"
+		nmcli con mod macvlan-ipa	+ipv4.routes "${hostLinkIP}/32"
+		nmcli con up macvlan-ipa
+	}
+ 
 
 	# Quick container command to test this, just try to ping the svr.wavelet.local host:
 	# podman run -it --network=ipa_ipvlan alpine:latest /bin/sh
 	# If ping successful (and vice versa) the IPA container should now have no problem communicating with host.
 
 	echo -e "${IPAServerHostIP}	dc1.ipa.${domain} dc1" >> /etc/hosts
+
+	# Generate host record for dc1 in /etc/hosts, because until FreeIPA is up, we don't have any dns right now!
+	echo -e "192.168.1.32 dc1.${domain} dc1" >> /etc/hosts
+
+	# Even though the files in /etc/systemd/resolved.conf.d SHOULD override systemd's behavior... it ignores them.
+	# We do this to stop systemd-resolved binding on port 53, which will prevent freeipa.service from coming up.
+	systemctl disable dnsmasq.service --now
+	# Switch dnsmasq DNS off and re-enable dnsmasq so that it now does NOT handle DNS at all.  May not be needed with allow-zone-overlap on IPA.
+	sed -i 's|#port=0|port=0|g' /etc/dnsmasq.conf
+	# systemctl enable dnsmasq.service --now
+	systemctl daemon-reload
+
+	# We might want to run this in a subshell because it doesn't seem to terminate after completion.
 	podman run -h "dc1.ipa.${domain}" \
 		--read-only \
 		--ip=${IPAServerHostIP} \
@@ -208,22 +243,7 @@ WantedBy=multi-user.target" > /etc/containers/systemd/freeipa.container
 		--ntp-pool=3.us.pool.ntp.org --setup-dns --no-hbac-allow --auto-forwarder --allow-zone-overlap --auto-reverse --setup-adtrust
 
 		# We don't need port arguments now that the container has its own IP address via ipvlan, right?
- 		#-p 53:53/udp \
-		#-p 53:53 \
-		#-p 389:389 -p 636:636 \
-		#-p 88:88/udp -p 464:464/udp -p 464:464 -p 123:123/udp \
-
-
-	# Generate host record for dc1 in /etc/hosts, because until FreeIPA is up, we don't have any dns right now!
-	echo -e "192.168.1.32 dc1.${domain} dc1" >> /etc/hosts
-
-	# Even though the files in /etc/systemd/resolved.conf.d SHOULD override systemd's behavior... it ignores them.
-	# We do this to stop systemd-resolved binding on port 53, which will prevent freeipa.service from coming up.
-	#systemctl disable dnsmasq.service --now
-	# Switch dnsmasq DNS off and re-enable dnsmasq so that it now does NOT handle DNS at all.  May not be needed with allow-zone-overlap on IPA.
-	#sed -i 's|#port=0|port=0|g' /etc/dnsmasq.conf
-	#systemctl enable dnsmasq.service --now
-	systemctl daemon-reload
+ 		# -p 53:53/udp -p 53:53 -p 389:389 -p 636:636 -p 88:88/udp -p 464:464/udp -p 464:464 -p 123:123/udp
 
 	echo -e "
 acl "wavelet_network" {
@@ -279,12 +299,16 @@ install_server_security_layer(){
 
 	# The preferred method would be to run the ipa-client in a container, however there's no good (recent) documentation on this.
 	# I opted to replace the nfs-utils-coreos package that was blocking freeipa-client installation so we are running this in the package overlay
+	# Package does not seem to create directories, so we do it manually
+	mkdir -p /var/lib/ipa-client/{pki,sysrestore,certmonger}
 	ipa-client-install --unattended --principal=admin --password=${administratorPassword} --enable-dns-updates --ssh-trust-dns --server=${waveletDCServer} --domain=${waveletDomain}
 	# These additional options might be needed but it would mean that DNS was broken on the system, we probably don't want them here.
 	# --server ${waveletServer} --domain ${waveletDomain} --realm ${waveletDomain^^}
 	# We are doing the following;  creating an initial user who has domain join privileges
 	# These credentials will be distributed during the initialization process on PXE boot and subsequently removed.
 	echo ${administratorPassword} | kinit admin
+
+
 	ipa user-add domain_join --random --first=domain --last=join > /var/secrets/domainEnrollment.password
 
 	# Generate a tsig file for zone transfer from the dnsmasq/DHCPD server to IPA's internal BIND.
@@ -339,17 +363,72 @@ configure_etcd_certs(){
 	# Configure ETCD service principal within freeIPA and tell ETCD to monitor for the appropriate certificate
 	ipa service-add etcd/`hostname`
 	ipa service-add-host --hosts=dc1.ipa.$(dnsdomainname) etcd/`hostname`
+	# Configure the system certificate store for the ETCD service principal
 	ipa-getcert request \
 		-f /etc/pki/tls/certs/etcd.crt \
 		-k /etc/pki/tls/private/etcd.key \
 		-K etcd/svr.wavelet.local \
 		-D wavelet.local
 	echo -e "TLS Certificate for Etcd generated.\n"
+
+	#	We now need to generate some certificates which the wavelet user should be able to access in order to use etcdctl
+	# OR DO WE?
+	# Ref; https://frasertweedale.github.io/blog-redhat/posts/2015-08-06-freeipa-custom-certprofile.html
+	# Do we need to mess with profiles to get this working?
+	ipa group-add etcd_users;	ipa caacl-add etcd_users_acl;	ipa caacl-add-user etcd_users_acl --group etcd_users
+	ipa group-add-member etcd_users --user wavelet_domain
+
+	# Generate a user certificate locally, and request it to be signed via the FreeIPA CA
+	# This example would require a wavelet_domain FreeIPA user
+	echo "[ req ]
+prompt = no
+encrypt_key = no
+
+distinguished_name = dn
+req_extensions = exts
+
+[ dn ]
+commonName = "wavelet_domain"
+
+[ exts ]
+subjectAltName=email:wavelet_domain@$(dnsdomainname)" > /var/home/wavelet/config/wavelet_openssl.config
+	# Generate user key and request the certificate
+	openssl genrsa -out key.pem 2048
+	ipa cert-request wavelet_domain.req --principal wavelet_domain #--profile-id smime
+
 	echo -e "Reconfiguring Etcd to utilize certificate...\n"
 	# Client devices should be requesting an etcd service certificate on their end, for that specific host once they are properly provisioned
 	# The client AND server cert is required to communicate with the etcd cluster, this prevents unauthorized clients from accessing etcd.
 	# Note that the PHP modules will now also need to provide a valid client certificate to successfully deal with etcd
 	# This might be a good time to roll them all up into a single file with a single curl function that operates appropriately.
+	
+	# Configure etcd root user, we will sync this with IPA because.. why not?
+	ipa user-add etcd_root --random --first=etcd --last=rootUser > /var/secrets/etcdRoot.password
+	local etcdRootPW=$(cat /var/secrets/etcdRoot.password); echo "${etcdRootPW}" | etcdctl user add root
+
+	# Define roles
+	# First role is for the server, which should be able to do everything
+	role="server"
+	etcdctl role add "${role}"
+	etcdctl role grant-permission "${role}" readwrite --prefix ""
+
+	# Add the user which will be allowed to access etcd from the server localhost via the webUI
+	ipa user-add etcd_webui --random --first=etcd --last=webui > /var/secrets/etcdwebui.password
+	local etcdWebUIPW=$(cat /var/secrets/etcdwebui.password); echo "${etcdWebUIPW}" | etcdctl user add etcd_webui
+	role="etcd_webui"
+	etcdctl role add "${role}"
+	# We wish to grant the WebUI only permissions to readwrite keys which it ought to be interacting with.  You'll need to walk through this.
+	# This is also why we've put everything webUI related under /interface/ or similar prefixes..
+	etcdctl role grant-permission "${role}" readwrite --prefix ""
+
+	# We may wish to add a different etcd client user for each client which joins
+	# This will enable us to restrict clients from interfering with any keys other than their own.
+	# This would be done on the client spinup and.. probably leave a mess when clients leave the network and need to be cleaned up on the regular?
+	# Let us test with the server and go from there..
+	local userName="etcd_host_$(hostname)"
+	ipa user-add ${userName} --random --first=etcd --last=webui > /var/secrets/etcd_host_$(hostname).password
+	local etcdHostPW=$(cat /var/secrets/${userName}); echo "${etcdHostPW}" | etcdctl user add ${userName}
+	etcdctl user grant-role "${userName}" "server"
 }
 
 configure_httpd_sp(){
