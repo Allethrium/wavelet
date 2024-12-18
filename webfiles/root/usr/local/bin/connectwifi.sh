@@ -103,10 +103,8 @@ detect_disable_ethernet(){
 }
 
 set_ethernet_mtu(){
-	for interface in $(nmcli dev show | grep ethernet -B1 | head -n 1 | awk '{print $2}'); do
-		if [[ $(nmcli -f GENERAL dev show enp1s0 | grep "ethernet") ]]; then 
-			nmcli dev mod ${interface} GENERAL.MTU=9000
-		fi
+	for interface in $(nmcli con show | grep ethernet | awk '{print $3}'); do
+			nmcli con mod ${interface} mtu 9000
 	done
 }
 
