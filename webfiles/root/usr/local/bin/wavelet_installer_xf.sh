@@ -37,13 +37,20 @@ event_decoder(){
 	esac
 }
 
+set_ethernet_mtu(){
+	# Always want jumbo packets on server
+	for interface in $(nmcli con show | grep ethernet | awk '{print $3}'); do
+			nmcli con mod ${interface} mtu 9000
+	done
+}
+
 event_server(){
 	#	Server can only be x86.  I haven't had access to another platform with video hardware support + enough number crunching power to do the task.
 	#	Suggestions which aren't too exotic are welcome!
 	# Generate RPM Container overlay
 	cp /usr/local/bin/wavelet_install_ug_depends.sh	/home/wavelet/containerfiles/
 	cp /usr/local/bin/wavelet_pxe_grubconfig.sh		/home/wavelet/containerfiles/
-
+	set_ethernet_mtu
 	# old etcd setup previously in build_ug.sh
 	#echo -e "Pulling etcd and generating systemd services.."
 	#cd /home/wavelet/.config/systemd/user/
