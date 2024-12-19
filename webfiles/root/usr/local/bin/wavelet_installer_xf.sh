@@ -38,7 +38,7 @@ event_decoder(){
 }
 
 set_ethernet_mtu(){
-	# Always want jumbo packets on server
+	# Jumbo packets would be nice, but this breaks UG on the wireless clients.
 	for interface in $(nmcli con show | grep ethernet | awk '{print $3}'); do
 			nmcli con mod ${interface} mtu 9000
 	done
@@ -50,7 +50,6 @@ event_server(){
 	# Generate RPM Container overlay
 	cp /usr/local/bin/wavelet_install_ug_depends.sh	/home/wavelet/containerfiles/
 	cp /usr/local/bin/wavelet_pxe_grubconfig.sh		/home/wavelet/containerfiles/
-	set_ethernet_mtu
 	# old etcd setup previously in build_ug.sh
 	#echo -e "Pulling etcd and generating systemd services.."
 	#cd /home/wavelet/.config/systemd/user/
