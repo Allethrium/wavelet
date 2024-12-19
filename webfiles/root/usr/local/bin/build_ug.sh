@@ -291,7 +291,7 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 	systemctl --user enable wavelet_reflector.service --now
 	# uncomment a firefox exec command into sway config, this will bring up the management console on the server in a new sway window, as a backup control surface.
 	# - note we need to work on a firefox policy/autoconfig.
-	sed -i '/#exec /usr/local/bin/wavelet_start_UI.sh/s/^# *//' /var/home/wavelet/.config/sway/config
+	sed -i 's|#exec /usr/local/bin/wavelet_start_UI.sh|exec /usr/local/bin/wavelet_start_UI.sh|g' /var/home/wavelet/.config/sway/config
 
 	# Next, we build the reflector prune function.  This is necessary for removing streams for old decoders and maintaining the long term health of the system
 		# Get decoderIP list
