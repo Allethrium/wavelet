@@ -45,11 +45,12 @@ event_server(){
 			configure_additional_service
 		else
 			echo -e "Domain controller is not responding to kerberos ticket requests, something may have gone wrong with installation!\n"
+			echo "This is likely going to be a complex issue that is not easily resolvable."
 			echo -e "Check /var/freeipa-data/var/log files for more information, but this is likely something for the developer to look into.\n"
 			exit 1
 		fi
 	else
-		echo -e "\nThe domain controller has not yet been configured, proceeding..\n"
+		echo -e "\nThe domain controller has not yet been configured, proceeding to spin up the container..\n"
 		configure_idm
 	fi
 }
@@ -187,19 +188,35 @@ WantedBy=multi-user.target" > /etc/containers/systemd/freeipa.container
 	#		We might want to actually do this with macvlan after all.  
 	podman network create -d ipvlan --subnet ${currentIPCIDR} --gateway ${gateway} --ip-range ${ipaSubnetArg} ipa_ipvlan -o parent=${active_networkInterface}
 
-	# Can't use nmcli - no ipvlan support until patch: https://gitlab.freedesktop.org/NetworkManager/NetworkManager/-/commit/d238ff487b29a50ca346f906b2a158c692ff8864
-
 	iplink_create_ipvlan(){
+		# Can't use nmcli - no ipvlan support until patch lands in fedora repo: 
+		# https://gitlab.freedesktop.org/NetworkManager/NetworkManager/-/commit/d238ff487b29a50ca346f906b2a158c692ff8864
 		# So problem.. on reboot, the link doesn't work and therefore the server is unpingable.  We would have to perform this every reboot..
 		ip link add ipa_ipvlan_shim link ${active_networkInterface} type ipvlan mode l2
 		ip addr add ${hostLinkIP}/32 dev ipa_ipvlan_shim 
 		ip link set ipa_ipvlan_shim up
 		ip route add ${ipaSubnetArg} dev ipa_ipvlan_shim
 		if ping dc1; then
+			echo -e "Container up and ping is successful, generating rootful service to create ip link shim on every reboot..\n"
 			echo "ip link add ipa_ipvlan_shim link ${active_networkInterface} type ipvlan mode l2
-		ip addr add ${hostLinkIP}/32 dev ipa_ipvlan_shim 
-		ip link set ipa_ipvlan_shim up
-		ip route add ${ipaSubnetArg} dev ipa_ipvlan_shim" > /usr/local/bin/iplink_up.sh; chmod +x /usr/local/bin/iplink_up.sh
+ip addr add ${hostLinkIP}/32 dev ipa_ipvlan_shim 
+ip link set ipa_ipvlan_shim up
+ip route add ${ipaSubnetArg} dev ipa_ipvlan_shim" > /usr/local/bin/iplink_up.sh; chmod +x /usr/local/bin/iplink_up.sh
+			echo "[Unit]
+Description=Run IP Routing to ipvlan container on boot
+After=network-online.target
+Wants=freeipa.service
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash -c "/usr/local/bin/iplink_up.sh"
+[Install]
+WantedBy=multi-user.target" > /etc/systemd/system/wavelet_ipvlan_shim.service
+			systemctl daemon-reload
+			systemctl enable wavelet_ipvlan_shim.service
+		else
+			echo -e "Container is unpingable, there may be an error."
+			# Do remedial stuff here
+		fi
 	}
 
 	nmcli_create_macvlan(){
@@ -231,7 +248,9 @@ WantedBy=multi-user.target" > /etc/containers/systemd/freeipa.container
 	systemctl daemon-reload
 
 	# We might want to run this in a subshell because it doesn't seem to terminate after completion.
+	podman pull quay.io/freeipa/freeipa-server:almalinux-9
 	podman run -h "dc1.ipa.${domain}" \
+		--name freeipa_dc1_install \
 		--read-only \
 		--ip=${IPAServerHostIP} \
 		--network=ipa_ipvlan \
@@ -240,11 +259,12 @@ WantedBy=multi-user.target" > /etc/containers/systemd/freeipa.container
 		-v /var/freeipa-data:/data:Z \
 		-e PASSWORD=${administratorPassword} \
 		quay.io/freeipa/freeipa-server:almalinux-9 ipa-server-install -U --domain=ipa.${domain} -r IPA.${domain^^} \
-		--ntp-pool=3.us.pool.ntp.org --setup-dns --no-hbac-allow --auto-forwarder --allow-zone-overlap --auto-reverse --setup-adtrust
+		--ntp-pool=3.us.pool.ntp.org --setup-dns --no-hbac-allow --auto-forwarder --allow-zone-overlap --auto-reverse --setup-adtrust &
 
 		# We don't need port arguments now that the container has its own IP address via ipvlan, right?
  		# -p 53:53/udp -p 53:53 -p 389:389 -p 636:636 -p 88:88/udp -p 464:464/udp -p 464:464 -p 123:123/udp
-
+ 	# It takes approximately five minutes to spin up the container
+ 	sleep 300
 	echo -e "
 acl "wavelet_network" {
   127.0.0.1;
@@ -301,7 +321,9 @@ install_server_security_layer(){
 	# I opted to replace the nfs-utils-coreos package that was blocking freeipa-client installation so we are running this in the package overlay
 	# Package does not seem to create directories, so we do it manually
 	mkdir -p /var/lib/ipa-client/{pki,sysrestore,certmonger}
-	ipa-client-install --unattended --principal=admin --password=${administratorPassword} --enable-dns-updates --ssh-trust-dns --server=${waveletDCServer} --domain=${waveletDomain}
+	# Run in a subshell or it gets a little stuck..
+	# We define the server's IP address here during install, or we waste a lot of time with DNS queries
+	ipa-client-install --unattended --principal=admin --ip-address=$(hostname -I | cut -d " " -f 1) --password=${administratorPassword} --enable-dns-updates --ssh-trust-dns --server=${waveletDCServer} --domain=${waveletDomain} &
 	# These additional options might be needed but it would mean that DNS was broken on the system, we probably don't want them here.
 	# --server ${waveletServer} --domain ${waveletDomain} --realm ${waveletDomain^^}
 	# We are doing the following;  creating an initial user who has domain join privileges
