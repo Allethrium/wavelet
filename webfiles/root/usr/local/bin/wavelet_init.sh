@@ -169,5 +169,5 @@ systemctl --user enable wavelet_controller.service --now
 /usr/local/bin/wavelet_set_bluetooth_connect.sh
 # Ping detectv4l so that we populate devices
 /usr/local/bin/wavelet_detectv4l.sh
-
+touch /var/home/wavelet/encoder.firstrun
 event_init_seal
