@@ -28,7 +28,7 @@ connectwifi_psk(){
 	done
 	# We need to do this once more, or the variable isn't populated.
 	wifibssid=$(get_full_bssid)
-	echo -e "\nFound WiFi BSSID match! It is: ${wifibssid}\n"
+	echo -e "Found WiFi BSSID match! It is: ${wifibssid}\n"
 
 	# Remove any old connection UUID's with the same name
 	response=$(nmcli connection add type wifi con-name ${networkssid} ifname ${ifname} ssid ${networkssid})
