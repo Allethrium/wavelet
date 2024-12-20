@@ -8,6 +8,10 @@ get_full_bssid(){
 }
 
 connectwifi(){
+	if [[ $- == *"x"* ]]; then
+		# Spit out a list of wifi networks so we have something to refer to
+	fi
+		nmcli con show
 	if [[ -f /var/prod.security.enabled ]]; then
 		connectwifi_enterprise
 	else
