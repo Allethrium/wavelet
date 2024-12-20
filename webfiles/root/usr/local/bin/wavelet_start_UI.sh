@@ -16,6 +16,10 @@ main(){
 #
 #####
 
+if [[ "$EUID" -eq 0 ]]; then echo "Cannot run as root"
+  exit 1
+fi
+
 logName=/var/home/wavelet/webui.log
 if [[ -e $logName || -L $logName ]] ; then
         i=0
