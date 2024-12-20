@@ -27,3 +27,5 @@ fi
 
 #set -x
 exec > "${logName}" 2>&1
+
+main
