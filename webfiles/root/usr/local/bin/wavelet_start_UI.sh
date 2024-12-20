@@ -16,11 +16,14 @@ main(){
 #
 #####
 
+logName=/var/home/wavelet/webui.log
+set -x
+exec > "${logName}" 2>&1
+
 if [[ "$EUID" -eq 0 ]]; then echo "Cannot run as root"
   exit 1
 fi
 
-logName=/var/home/wavelet/webui.log
 if [[ -e $logName || -L $logName ]] ; then
         i=0
         while [[ -e $logName-$i || -L $logName-$i ]] ; do
@@ -31,7 +34,5 @@ fi
 
 PARENT_COMMAND=$(ps -o comm= $PPID)
 echo -e "Called from ${PARENT_COMMAND}"
-set -x
-exec > "${logName}" 2>&1
 
 main
