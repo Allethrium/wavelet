@@ -196,6 +196,7 @@ event_server(){
 	event_reset
 	event_device_redetect
 	event_generate_watch_encoderflag
+	event_generate_wavelet_ui_service
 }
 
 server_bootstrap(){
@@ -426,7 +427,7 @@ event_generate_controller(){
 
 event_generate_reflectorreload(){
 	if [[ -f ~/.config/systemd/user/wavelet_reflector_reload.service ]]; then
-		echo -e "Unit file already generated, moving on\n"
+		echo -e "Unit file already generated, moving on."
 		:
 	else
 		echo -e "Unit file does not exist, generating..\n"
@@ -438,9 +439,31 @@ event_generate_reflectorreload(){
 	fi
 }
 
+event_generate_wavelet_ui_service(){
+	if [[ -f /var/home/wavelet/.config/systemd/user/wavelet_ui.service ]]; then
+		echo -e "Unit file already generated, moving on."
+		:
+	else
+		echo -e '[Unit]
+Description=Wavelet UI service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStartPre=/bin/sleep 8
+ExecStart=/bin/bash -c "/usr/local/bin/wavelet_start_UI.sh"
+Restart=always
+
+[Install]
+WantedBy=default.target' > /var/home/wavelet/.config/systemd/user/wavelet_ui.service
+	# Boots after first boot since the systemd unit is enabled here
+	systemctl --user daemon-reload
+	systemctl --user enable wavelet_ui.service
+}
+
 event_generate_encoder_service(){
 	if [[ -f ~/.config/systemd/user/wavelet_encoder.service ]]; then
-		echo -e "Unit file already generated, moving on\n"
+		echo -e "Unit file already generated, moving on."
 		:
 	else
 		echo -e "Unit file does not exist, generating..\n"
