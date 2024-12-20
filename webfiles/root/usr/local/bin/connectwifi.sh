@@ -53,7 +53,7 @@ connectwifi_psk(){
 	nmcli -f uuid con mod ${currentuuid} wifi-sec.key-mgmt wpa-psk wifi-sec.psk ${wifipassword}
 	nmcli -f uuid con mod ${currentuuid} connection.autoconnect yes
 	#nmcli dev set ${ifname} autoconnect yes
-	nmcli -f con up ${currentuuid}
+	nmcli -f uuid con up ${currentuuid}
 	echo "${currentuuid}" > /var/home/wavelet/wifi.${networkssid}.key
 
 	sleep 2
