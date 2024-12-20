@@ -115,7 +115,7 @@ set_ethernet_mtu(){
 #####
 
 
-logName="connectwifi.log"
+logName="/var/home/wavelet/connectwifi.log"
 if [[ -e $logName || -L $logName ]] ; then
 	i=0
 	while [[ -e $logName-$i || -L $logName-$i ]] ; do
@@ -123,7 +123,7 @@ if [[ -e $logName || -L $logName ]] ; then
 	done
 	logName=$logName-$i
 fi
-#set -x
+set -x
 exec >${logName} 2>&1
 
 
