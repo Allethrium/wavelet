@@ -6,8 +6,14 @@
 
 main(){
 	serverIP=$(nslookup svr | awk '/^Address: / { print $2 }')
-	sleep 3
+	sleep 5
 	exec firefox http://${serverIP}:9080
+}
+
+get_authtoken(){
+        # This function would be used to get an auth token so the server could support a local web console
+        # in the event that the UI were password protected.
+        echo "Right now we don't do anything here."
 }
 
 #####
@@ -17,7 +23,7 @@ main(){
 #####
 
 logName=/var/home/wavelet/webui.log
-set -x
+#set -x
 exec > "${logName}" 2>&1
 
 if [[ "$EUID" -eq 0 ]]; then echo "Cannot run as root"
@@ -34,5 +40,4 @@ fi
 
 PARENT_COMMAND=$(ps -o comm= $PPID)
 echo -e "Called from ${PARENT_COMMAND}"
-
 main
