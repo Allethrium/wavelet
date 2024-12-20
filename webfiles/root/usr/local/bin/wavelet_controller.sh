@@ -328,6 +328,7 @@ wavelet_dynamic() {
 			rm -rf /var/home/wavelet/encoder.firstrun
 		else
 			set_singleDevice "${controllerInputLabel}"
+		fi
 	fi
 }
 
