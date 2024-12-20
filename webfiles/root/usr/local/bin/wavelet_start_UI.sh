@@ -29,7 +29,9 @@ if [[ -e $logName || -L $logName ]] ; then
         logName=$logName-$i
 fi
 
-#set -x
+PARENT_COMMAND=$(ps -o comm= $PPID)
+echo -e "Called from ${PARENT_COMMAND}"
+set -x
 exec > "${logName}" 2>&1
 
 main
