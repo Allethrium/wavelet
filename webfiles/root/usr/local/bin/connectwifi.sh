@@ -44,16 +44,16 @@ connectwifi_psk(){
 			if [[ ${connection} == ${currentuuid} ]]; then
 				echo "connection is the active UUID, ignoring"
 			else
-				nmcli con del uuid ${olduuid}
+				nmcli -f uuid con del ${olduuid}
 			fi
 		else
 			echo "Not a wavelet configured wifi connection, ignoring"
 		fi
 	done		
-	nmcli connection modify ${currentuuid} wifi-sec.key-mgmt wpa-psk wifi-sec.psk ${wifipassword}
-	nmcli con mod ${currentuuid} connection.autoconnect yes
+	nmcli -f uuid con mod ${currentuuid} wifi-sec.key-mgmt wpa-psk wifi-sec.psk ${wifipassword}
+	nmcli -f uuid con mod ${currentuuid} connection.autoconnect yes
 	#nmcli dev set ${ifname} autoconnect yes
-	nmcli connection up ${currentuuid}
+	nmcli -f con up ${currentuuid}
 	echo "${currentuuid}" > /var/home/wavelet/wifi.${networkssid}.key
 
 	sleep 2
@@ -111,7 +111,7 @@ detect_disable_ethernet(){
 	else
 		# Simplify this from the previous loop, just find ethernet interface and awk for connection UUID, then disable.
 		ethernetInterfaceUUID=$(nmcli con show | grep ethernet | awk '{print $4}')
-		nmcli con down "${ethernetInterfaceUUID}"
+		nmcli -f uuid con down "${ethernetInterfaceUUID}"
 		# We need to set the CONNECTION do be down, NOT the interface.
 		#nmcli device disconnect "${ethernetInterface}"
 		echo -e "The primary ethernet connection with UUID ${ethernetInterfaceUUID} has been disabled.\nTo re-enable, you can use:\nnmcli con up ${ethernetInterfaceUUID}\nOr:\nnmtui\nFor a gui interface."
