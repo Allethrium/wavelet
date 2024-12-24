@@ -257,7 +257,7 @@ event_dellWB3023(){
 }
 event_dellIntFHD(){
 	echo -e "Setting up Dell Integrated Laptop Webcam.."
-	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=MJPG:size=1920x1080:tpf=1/30:device=${v4l_device_path}"; write_etcd
+	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=YUYV:size=640x480:tpf=1/30:device=${v4l_device_path}"; write_etcd
 	echo -e "Detection completed for device..\n"
 }
 event_unknowndevice() {
