@@ -2,41 +2,54 @@
 # Called from the relabel watcher service
 # Generates an oldHostName file in /home/wavelet and restarts run_ug.sh to start detection process
 
-#Etcd Interaction
-ETCDURI=http://192.168.1.32:2379/v2/keys
-ETCDENDPOINT=192.168.1.32:2379
+# This script will need modifications to support the security layer:
+#	1) It will need to be moved to root along with the watcher service
+#			Flow:
+#					Etcd relabel notification
+#					IPA Server generates one-use password or krb5 keytab
+#					Host changes hostname and initiates reboot
+#					Host re-enrolls to freeIPA with new hostname and single-use password
+#					Host regenerates certificates
+#					Host moves to userspace (run_ug.sh etc.)
+
+#	2) It will need to re-enroll itself after the hostname change in FreeIPA
+#	3) It will need to regenerate any service principals so it will maintain the capability to talk to the etcd cluster as a valid client
+#	4) test connectivity and write change completed in etcd if good.
+
+# Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
-	ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME} --print-value-only)
-	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
-
-read_etcd_prefix(){
-	ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix /$(hostname)/${KEYNAME} --print-value-only)
-	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
-}
-
 read_etcd_global(){
-	ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
-	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for Global value"
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
+	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
 }
-
-write_etcd(){
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
-	echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
-}
-
-write_etcd_global(){
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
-	echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
-}
-
-write_etcd_clientip(){
-	# Variable changed to IPVALUE because the module was picking up incorrect variables and applying them to /decoderip !
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /decoderip/$(hostname) "${IPVALUE}"
-	echo -e "decoderip/$(hostname) set to ${IPVALUE} for Global value"
+read_etcd_prefix(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
 read_etcd_clients_ip() {
-	ETCDCTL_API=3 return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix /decoderip/ --print-value-only)
+	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
+}
+read_etcd_clients_ip_sed() {
+	# We need this to manage the \n that is returned from etcd.
+	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
+	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
+}
+write_etcd(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
+}
+write_etcd_global(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
+}
+write_etcd_client_ip(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
+}
+delete_etcd_key(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
 }
 
 detect_self(){
@@ -60,22 +73,14 @@ check_label(){
 	# Finds our current hash and gets the new label from Etcd as set from UI
 	oldHostName=$(hostname)
 	echo "${oldHostName}" > /home/wavelet/oldHostName.txt
-	KEYNAME="/hostHash/$(hostname)/relabel_active"
-	KEYVALUE="1"
-	write_etcd_global
-	KEYNAME="/$(hostname)/Hash"
-	read_etcd_global
-	myHostHash="${printvalue}"
+	KEYNAME="/hostHash/$(hostname)/relabel_active"; KEYVALUE="1"; write_etcd_global
+	KEYNAME="Hash"; read_etcd; myHostHash="${printvalue}"
 	echo -e "My hash is ${myHostHash}, attempting to find a my new device label..\n"
-	KEYNAME="/hostHash/${myHostHash}/newHostLabel"
-	read_etcd_global
-	myNewHostLabel="${printvalue}"
+	KEYNAME="/hostHash/${myHostHash}/newHostLabel"; read_etcd_global; myNewHostLabel="${printvalue}"
 	echo -e "My *New* host label is ${myNewHostLabel}!\n"
 	if [[ "$(hostname)" == "${myNewHostLabel}" ]]; then
 		echo -e "New label and current hostname are identical, doing nothing..\n"
-		KEYNAME="/hostHash/$(hostname)/relabel_active"
-		KEYVALUE="0"
-		write_etcd_global
+		KEYNAME="/hostHash/$(hostname)/relabel_active"; KEYVALUE="0"; write_etcd_global
 		exit 0
 	else
 		echo -e "New label and current hostname are different, proceding to initiate change.."
@@ -104,12 +109,8 @@ set_newLabel(){
 		echo -e "Generated FQDN hostname as ${appendedHostName}\n"
 	fi
 	echo "${appendedHostName}" > newHostName.txt
-	KEYNAME="/hostHash/${myHostHash}/newHostLabel"
-	# remove the newHostLabel value
-	etcdctl --endpoints=${ETCDENDPOINT} del ${KEYNAME}
-	KEYNAME="${currentHostName}/RECENT_RELABEL"
-	KEYVALUE="1"
-	write_etcd_global
+	KEYNAME="/hostHash/${myHostHash}"; delete_etcd_key
+	KEYNAME="RECENT_RELABEL"; KEYVALUE="1"; write_etcd
 	# Generate the necessary files, then reboot.
 	set_newHostName ${appendedHostName}
 }
@@ -124,11 +125,8 @@ event_prefix_set(){
 	systemctl --user disable wavelet_monitor_decoder_reveal.service --now
 	systemctl --user disable wavelet_monitor_decoder_reset.service --now
 	systemctl --user disable wavelet_device_relabel.service --now
-	KEYNAME="/$(hostname)/Hash"
-	read_etcd_global
-	myHostHash="${printvalue}"
-	KEYNAME="/hostHash/${myHostHash}"
-	read_etcd_global
+	KEYNAME="/$(hostname)/Hash"; read_etcd_global; myHostHash="${printvalue}"
+	KEYNAME="/hostHash/${myHostHash}"; read_etcd_global
 	myHostLabel="${printvalue}"
 	echo -e "My host label is ${myHostLabel}!\n"
 	FQDN=$(nslookup $(hostname) -i | grep $(hostname) | head -n 1)
@@ -179,10 +177,6 @@ remove_old_keys(){
 	;;
 	dec*)					echo -e "\nI was a Decoder \n"					; clean_oldDecoderHostnameSettings ${oldHostname}
 	;;
-	livestream*)			echo -e "\nI was a Livestreamer \n"				; clean_oldLivestreamHostnameSettings ${oldHostname}
-	;;
-	gateway*)				echo -e "\nI was an input Gateway\n"  			; clean_oldGatewayHostnameSettings ${oldHostname}
-	;;
 	svr*)					echo -e "\nI was a Server. Proceeding..."			; clean_oldServerHostnameSettings ${oldHostname}
 	;;
 	*) 						echo -e "\nThis device Hostname was not set appropriately, exiting \n" && exit 0
@@ -193,40 +187,19 @@ remove_old_keys(){
 clean_oldEncoderHostnameSettings(){
 	# Finds and cleans up any references in etcd to the old hostname
 	# Delete all reverse lookups, labels and hashes for this device
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /encoderlabel/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName} --prefix
+	KEYNAME="/encoderlabel/${oldHostName}"; delete_etcd_key_global
+	KEYNAME="/hostHash/${oldHostName}"; delete_etcd_key
+	KEYNAME="/hostLabel/${oldHostName}"; delete_etcd_key
+	KEYNAME="/${oldHostName}"; delete_etcd_key
 }
 
 clean_oldDecoderHostnameSettings(){
 	# Finds and cleans up any references in etcd to the old hostname
 	# Delete all reverse lookups, labels and hashes for this device
 	echo -e "Attempting to remove all legacy keys for: ${oldHostName}\n"
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName} --prefix
-}
-
-clean_oldLivestreamHostnameSettings(){
-	# Finds and cleans up any references in etcd to the old hostname
-	# We'd be doing livestream specific stuff here, but since we haven't developed that feature this is just here as a placeholder
-	echo -e "\nRemoving and disabling services referring to his host's previous role as a livestreamer..\n"
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /livestreamlabel/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName} --prefix
-}
-
-clean_oldGatewayHostnameSettings(){
-	# Finds and cleans up any references in etcd to the old hostname
-	# We'd be doing gateway specific stuff here, but since we haven't developed that feature this is just here as a placeholder
-	# Delete all reverse lookups, labels and hashes for this device
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /gatewaylabel/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostHash/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /hostLabel/${oldHostName} --prefix
-	ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} del /${oldHostName} --prefix
+	KEYNAME="/hostHash/${oldHostName} --prefix"; delete_etcd_key_global
+	KEYNAME="/hostLabel/${oldHostName} --prefix"; delete_etcd_key_global
+	KEYNAME="/${oldHostName} --prefix"; delete_etcd_key_global
 }
 
 clean_oldServerHostnameSettings(){
@@ -254,27 +227,19 @@ set_newHostName(){
 }
 
 event_hostNameChange() {
-# Check to see if hostname has changed since last session
-if [[ -f /home/wavelet/oldhostname.txt ]]; then
-		check_hostname
-fi
-
-
-KEYNAME="/$(hostname)/RELABEL"
-read_etcd_global
-if [[ "${printvalue}" -eq "0" ]]; then
-	echo -e "Relabel task bit for this hostname is set to 0, doing nothing.."
-	exit 0
-fi
-
-echo -e "Relabel bits active, resetting them to 0 prior to starting task.."
-KEYNAME="/hostHash/$(hostname)/relabel_active"
-KEYVALUE="0"
-write_etcd_global
-KEYNAME="/$(hostname)/RELABEL"
-KEYVALUE="0"
-write_etcd_global
-detect_self
+	# Check to see if hostname has changed since last session
+	if [[ -f /home/wavelet/oldhostname.txt ]]; then
+			check_hostname
+	fi
+	KEYNAME="/$(hostname)/RELABEL"; read_etcd_global
+	if [[ "${printvalue}" -eq "0" ]]; then
+		echo -e "Relabel task bit for this hostname is set to 0, doing nothing.."
+		exit 0
+	fi
+	echo -e "Relabel bits active, resetting them to 0 prior to starting task.."
+	KEYNAME="/hostHash/$(hostname)/relabel_active"; KEYVALUE="0"; write_etcd_global
+	KEYNAME="RELABEL"; KEYVALUE="0"; write_etcd
+	detect_self
 }
 
 ###

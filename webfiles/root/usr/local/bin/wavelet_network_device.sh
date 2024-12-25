@@ -11,42 +11,46 @@
 # 2) if we need to add a previously existing and leased device
 # So this only currently works for NEW devices, and we can't even delete the old lease files.  
 
-#Etcd Interaction
-ETCDURI=http://192.168.1.32:2379/v2/keys
-ETCDENDPOINT=192.168.1.32:2379
-ETCDCTL_API=3
+# Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
-		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME} --print-value-only)
-		echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
-
 read_etcd_global(){
-		printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
-		echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for Global value"
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
+	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
 }
-
-write_etcd(){
-		etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
-		echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
-}
-
-write_etcd_global(){
-		etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
-		echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
-}
-
-write_etcd_clientip(){
-		etcdctl --endpoints=${ETCDENDPOINT} put /decoderip/$(hostname) "${KEYVALUE}"
-		echo -e "$(hostname) set to ${KEYVALUE} for Global value"
+read_etcd_prefix(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
 read_etcd_clients_ip() {
-		return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix "/decoderip/" --print-value-only)
+	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
+}
+read_etcd_clients_ip_sed() {
+	# We need this to manage the \n that is returned from etcd.
+	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
+	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
+}
+write_etcd(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
+}
+write_etcd_global(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
+}
+write_etcd_client_ip(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
+}
+delete_etcd_key(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
 }
 
 parse_macaddr() {
 	echo -e "argument 1: ${1}\n"
 	echo -e "argument 2: ${2}\n"
-	echo -e "Detect network device function called with the following data:\nMAC: ${2},\nIP Address: ${1}\n"
+	echo -e "Detect network device function called with the following data:\nMAC: ${2}\nIP Address: ${1}\n"
 	# We put ^^ after the var to convert to uppercase!
 	case ${2^^} in
 		# Convert input to all uppercase with ^^i
@@ -63,7 +67,7 @@ parse_macaddr() {
 		;;
 		whateverAnothersupportDevIs)    echo -e "Device matched, proceeding to attempt configuration"                                                   ;       event_vendorDevice3
 		;;
-		*)                              echo -e "Device not supported at current time, doing nothing."                                                  ;       exit 0
+		*)                              echo -e "Device not supported at current time, attempting to configure anyway.."                                ;       event_unsupportedDevice
 		;;
 		esac
 }
@@ -75,14 +79,18 @@ parse_macaddr() {
 
 event_magewell_ndi(){
 	# Interrogates Magewell device, attempts preconfigured username and password, then tries to set appropriate settings for streaming into UltraGrid.
-	echo -e "Waiting for two seconds, then attempting to connect to device..\n"
+	# We assume the preconfigured username/pass combo of admin/Admin here.  If this is different, you should set it here ( might need a credentials file for this )
+	
+	defaultAdminUsername="Admin"
+	defaultAdminPassword="Admin"
+
+	echo -e "Waiting for two seconds, then attempting to connect to device on ${ipAddr}..\n"
 	sleep 2
 	echo -e "\nCalling curl with GET request for Default Username and Password..\n"
-	defaultPassword="Admin"
-	md5sumAdminPassword=$(echo -n "${defaultPassword}" | md5sum | cut -d' ' -f1)
-	curl --cookie-jar /var/tmp/sid.txt "http://${ipAddr}/mwapi?method=login&id=Admin&pass=${md5sumAdminPassword}"
+	md5sumAdminPassword=$(echo -n "${defaultAdminPassword}" | md5sum | cut -d' ' -f1)
+	curl --cookie-jar /var/tmp/sid.txt "http://${ipAddr}/mwapi?method=login&id=${defaultAdminUsername}&pass=${md5sumAdminPassword}"
 	if [ $? -ne 0 ]; then
-	echo "\nConnection to MageWell device failed!  Reset the device to FACTORY DEFAULTS and try again!\n"
+	echo -e "\nConnection to MageWell device failed!  Reset the device to FACTORY DEFAULTS and try again!\n"
 	exit 1
 	fi
 	# Perhaps we should autogen an admin password and store it in etcd here for security purposes?
@@ -90,26 +98,49 @@ event_magewell_ndi(){
 	# This network device username and password should be generated by the wavelet installer script
 	# at the same time as the wavelet_root and wavelet user passwords, mod ignition and installer scripts
 	# Mental watts are low, so I couldn't think of another elegant way to set it up beyond generating rando and storing it in etcd..
-	waveletUserPass=$(echo /home/wavelet/networkdevice_userpass)
-	echo -e "\nAttempting to add Wavelet user..\n"
-	md5sumWaveletPassword=$(echo -n "${waveletUserPass}" | md5sum | cut -d' ' -f1)
-	curl --cookie /var/tmp/sid.txt "http://${ipAddr}/mwapi?method=add-user&id=Wavelet&pass=${md5sumWaveletPassword}"
-	# Now we login with the Wavelet User to save the cookie
-	curl --cookie-jar /var/tmp/wavelet_sid.txt "http://${ipAddr}/mwapi?method=login&id=Admin&pass=${md5sumAdminPassword}"
-	# LibNDI should be installed on wavelet by default (DEPENDENCY)
-	ndiSource=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | cut -d '(' -f1 | awk '{print $1}')
-	ndiIPAddr=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | awk '{print $5}')
+	# Check for existing user
+	result=$(curl -b /var/tmp/sid.txt "http://${ipAddr}/mwapi?method=get-users")
+	if 	[[ $result = *"wavelet"* ]] && \
+		[[ -f /var/tmp/wavelet_sid.txt ]]; then
+		echo "Wavelet user already generated, skipping.."
+ 	else
+ 		# Delete wavelet user if already exists
+ 		curl -b /var/tmp/sid.txt "http://${ipAddr}/mwapi?method=del-user&id=wavelet"
+		waveletUserPass=$(echo /home/wavelet/networkdevice_userpass)
+		echo "Attempting to add Wavelet user.."
+		md5sumWaveletPassword=$(echo -n "${waveletUserPass}" | md5sum | cut -d' ' -f1)
+		curl -b /var/tmp/sid.txt "http://${ipAddr}/mwapi?method=add-user&id=wavelet&pass=${md5sumWaveletPassword}"
+		# Now we login with the Wavelet User to save the cookie
+		curl --cookie-jar /var/tmp/wavelet_sid.txt "http://${ipAddr}/mwapi?method=login&id=wavelet&pass=${md5sumAdminPassword}"
+		# Further security settings for these devices are really the responsibility of the installation engineer
+		echo -e "\nRecommend changing the device default Admin password for security reasons.\n"
+	fi
+
+	# LibNDI should be installed on wavelet by default along with avahi mDNS (DEPENDENCY)
+	# This needs to be run because NDI ports are often not stable, and can change resulting in unsuccessful streaming.
+	echo -e "\nAttempting to match with NDI devices found by UltraGrid..\n"
+	ndiSource=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep "${ipAddr}" | cut -d '(' -f1 | awk '{print $1}')
+	ndiIPAddr=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep "${ipAddr}" | awk '{print $5}')
+	
 	# We need to set the magewell card to raw framerate 30fps, AV1 compression had pauses at 60FPS!
-	declare -a magewellCommands=('mwapi?method=set-video-config&out-fr-convertion=frame-rate-half',	'mwapi?method=set-video-config&out-raw-resolution=false&out-cx=1920&out-cy=1080', 'mwapi?method=set-video-config&in-auto-quant-range=false&in-quant-range=full', 'mwapi?method=set-video-config&in-auto-color-fmt=false&in-color-fmt=rgb', 'mwapi?method=set-video-config&bit-rate-ratio=150', 'mwapi?method=out-quant-range=full', 'http://ip/mwapi?method=set-ndi-config&enable=true')
+	magewellCommands=(	"mwapi?method=set-video-config&out-fr-convertion=frame-rate-half" \
+						"mwapi?method=set-video-config&out-raw-resolution=false&out-cx=1920&out-cy=1080" \
+						"mwapi?method=set-video-config&in-auto-quant-range=false&in-quant-range=full" \
+						"mwapi?method=set-video-config&in-auto-color-fmt=false&in-color-fmt=rgb" \
+						"mwapi?method=set-video-config&bit-rate-ratio=150" \
+						"mwapi?method=set-ndi-config&enable=true")
 	for i in "${magewellCommands[@]}"
 	do
-		curl --cookie /var/tmp/wavelet_sid.txt http://"${ipAddr}"/"$i"
+		echo "Command: curl -b /var/tmp/wavelet_sid.txt http://${ipAddr}/$i"
+		curl -b /var/tmp/wavelet_sid.txt "http://${ipAddr}/$i"
 	done
-	echo -e "\nMageWell ProConvert device should now be fully configured..\n"
+	echo -e "MageWell ProConvert device should now be fully configured..\n"
 	# Generate UG Stream command from the appropriate NDI Source
-	deviceHostName="Magewell Proconvert HDMI $(curl --cookie /var/tmp/wavelet_sid.txt 'http://192.168.1.27/mwapi?method=get-summary-info' | jq '.ndi.name' | tr -d '"')"
+	deviceHostName="Magewell_Proconvert_HDMI_$(curl -b /var/tmp/wavelet_sid.txt http://${ipAddr}/mwapi?method=get-summary-info | jq '.ndi.name' | tr -d '"')"
 	UGdeviceStreamCommand="ndi:url=${ndiIPAddr}"
 	populate_to_etcd
+	# Call a new module to populate the DHCP lease into FreeIPA BIND (does nothing if security layer is off)
+	/usr/local/bin/wavelet_ddns_update.sh ${deviceHostName} ${ipAddr}
 }
 
 event_ptz_ndiHX(){
@@ -136,21 +167,32 @@ event_ptz_ndiHX(){
 		printf "}\n")
 		deviceHostName=$(echo ${output_array[devname]})
 		# Check to see if this device is NDI enabled
+		tput -T linux setaf 2
 		ndiSource=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | cut -d '(' -f1 | awk '{print $1}')
 		if [ -n ${ndiSource} ]; then
 			echo -e "\nNDI source for this IP address not found, configuring for RTSP..\n"
 			UGdeviceStreamCommand="rtsp://${ipAddr}:554/1:decompress"
+			if [[ $(ffprobe -v quiet -show_streams ${UGdeviceStreamCommand}) ]]; then
+
+				populate_to_etcd
+				echo -e "Device RTSP configured, however it may not work without further settings.\n"
+				# Call a new module to populate the DHCP lease into FreeIPA BIND (does nothing if security layer is off)
+				/usr/local/bin/wavelet_ddns_update.sh ${deviceHostName} ${ipAddr}
+				exit 0
+			else
+				echo "ffmpeg could not probe this device for a valid video stream! RTSP is not valid for this device"
+				exit 0
+			fi
 			populate_to_etcd
 			echo -e "Device successfully configured, finishing up..\n"
+			# Call a new module to populate the DHCP lease into FreeIPA BIND (does nothing if security layer is off)
+			/usr/local/bin/wavelet_ddns_update.sh ${deviceHostName} ${ipAddr}
 			exit 0
 		else
 			echo -e "\nNDI is available for this device, defaulting to NDI..\n"
 			UGdeviceStreamCommand="ndi:url=${ndiIPAddr}"
 		fi
 }
-
-
-
 
 event_vendorDevice3(){
 	# Interrogates Example device, attempts preconfigured username and password, then tries to set appropriate settings for streaming into UltraGrid.
@@ -161,12 +203,50 @@ event_vendorDevice3(){
 		# stuff to generate the webUI interface components, stream will only be enabled when device is selected!!
 		# NDI cameras may have focus data in addition to other stuff, we may want to eventually add a config box on the webUI to input useful settings and store them!
 	echo -e "Device successfully configured, finishing up..\n"
+	# Call a new module to populate the DHCP lease into FreeIPA BIND (does nothing if security layer is off)
+	/usr/local/bin/wavelet_ddns_update.sh ${deviceHostName} ${ipAddr}
 	exit 0
+}
+
+event_unsupportedDevice(){
+		# We could do something here to attempt to connect to the device and parse whatever looks like a string to a proper value?
+		echo -e "Waiting for five seconds, then attempting to connect to device..\n"
+		sleep 5
+		# Check to see if this device is a wavelet decoder or encoder
+		read_etcd_clients_ip_sed
+		if [[ "${printvalue}" == *"${ipAddr}"* ]]; then
+			echo "This IP is registered in the reflectors list, so it is a wavelet encoder/decoder device. Ignoring."
+			exit 0
+		else
+			# Check to see if this device is NDI enabled
+			echo "Checking for NDI capability.."
+			deviceHostName=$(nslookup ${ipAddr} | awk '{print $4}')
+			ndiSource=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | cut -d '(' -f1 | awk '{print $1}')
+			if [ -n ${ndiSource} ]; then
+				echo -e "\nNDI source for this IP address: ${ipAddr}\nnot found, attempting RTSP.."
+				UGdeviceStreamCommand="rtsp://${ipAddr}:554/1:decompress"
+				# Do a test here to see if RTSP is successful, if not, this probably isn't a video device and we don't want to go further.
+				if [[ $(ffprobe -v quiet -show_streams ${UGdeviceStreamCommand}) ]]; then
+  					populate_to_etcd
+					echo -e "Device RTSP configured, however it may not work without further settings.\n"
+					# Call a new module to populate the DHCP lease into FreeIPA BIND (does nothing if security layer is off)
+					/usr/local/bin/wavelet_ddns_update.sh ${deviceHostName} ${ipAddr}
+					exit 0
+				else
+					echo "ffmpeg could not probe this device for a valid video stream! RTSP is not valid for this device"
+  					exit 0
+				fi
+			else
+				echo -e "\nNDI is available for this device, querying for NDI ports and defaulting to NDI..\n"
+				ndiIPAddr=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep "${ipAddr}" | awk '{print $5}')
+				UGdeviceStreamCommand="ndi:url=${ndiIPAddr}"
+			fi
+		fi
 }
 
 generate_device_info() {
 	# This is all that's left after moving the hashing functions to each device block.. perhaps we want that stuff here as its portable..
-	output_return=$(etcdctl --endpoints=http://192.168.1.32:2379 get "/network_hash/${deviceHash}")
+	KEYNAME="/network_hash/${deviceHash}"; output_return=$(read_etcd_global)
 	if [[ $output_return == "" ]] then
 		echo -e "\n${deviceHash} not located within etcd's /network_hash/* keyspace, assuming we have a new device and continuing with process to set parameters..\n"
 	else
@@ -176,6 +256,11 @@ generate_device_info() {
 	fi
 }
 
+#read_commandfile(){
+	# WIP
+	# Commandfile generated from dnsmasq to update NS records.
+	# cat $(basename $(ls -t /var/tmp/*.command | head -n1)) | `xargs`
+#}
 
 read_leasefile(){
 	# Here we read in the leasefile and generate a devicehash from the IP:MAC combination.
@@ -202,25 +287,15 @@ read_leasefile(){
 
 populate_to_etcd(){
 	# Now we populate the appropriate keys for webUI labeling and tracking:
-	echo -e "\nPopulating ETCD with discovery data..\n"
-	KEYNAME="/network_interface/short/${deviceHostName}"
-	KEYVALUE="${deviceHash}"
-	write_etcd_global
-	KEYNAME="/network_shorthash/${deviceHash}"
-	KEYVALUE="${deviceHostName}"
-	write_etcd_global
+	echo -e "Populating ETCD with discovery data..\n"
+	KEYNAME="/network_interface/short/${deviceHostName}"; KEYVALUE="${deviceHash}"; write_etcd_global
+	KEYNAME="/network_shorthash/${deviceHash}"; KEYVALUE="${deviceHostName}"; write_etcd_global
 	#KEYNAME="/network_long/${leasefile}"
 	#KEYVALUE="${devicehash}"
 	#write_etcd_global
-	KEYNAME="/network_longhash/${deviceHash}"
-	KEYVALUE="${leasefile}"
-	write_etcd_global
-	KEYNAME="/network_ip/${deviceHash}"
-	KEYVALUE="${ipAddr}"
-	write_etcd_global
-	KEYNAME="/network_uv_stream_command/${ipAddr}"
-	KEYVALUE="${UGdeviceStreamCommand}"
-	write_etcd_global
+	KEYNAME="/network_longhash/${deviceHash}"; KEYVALUE="${leasefile}"; write_etcd_global
+	KEYNAME="/network_ip/${deviceHash}"; KEYVALUE="${ipAddr}"; write_etcd_global
+	KEYNAME="/network_uv_stream_command/${ipAddr}"; KEYVALUE="${UGdeviceStreamCommand}"; write_etcd_global
 	echo -e "Device successfully configured, finishing up..\n"
 	# since we now have a network device active on the system, we need to setup an IP ping watcher to autoremove it or note it as bad
 		# Read current IP subscription list
@@ -230,6 +305,8 @@ populate_to_etcd(){
 		# etcd  /network_health/${ipAddr} --  GOOD or BAD
 		# Finally, set and configure a watcher service for this device so that it will reconfigure the device hostname if the label is changed on the webUI
 		# /usr/local/bin/wavelet_network_device_relabel.sh
+	# This key often winds up with garbage, and must be deleted or it will cause issues parsing things back out.
+	KEYNAME="/network_interface/short"; delete_etcd_key
 	exit 0
 }
 
@@ -241,6 +318,15 @@ populate_to_etcd(){
 #
 ####
 
-set -x
-exec >/var/tmp/network_device.log 2>&1
+logName=/var/tmp/network_device.log
+if [[ -e $logName || -L $logName ]] ; then
+	i=0
+	while [[ -e $logName-$i || -L $logName-$i ]] ; do
+		let i++
+	done
+	logName=$logName-$i
+fi
+
+#set -x
+exec >${logName} 2>&1
 read_leasefile

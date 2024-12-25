@@ -119,6 +119,10 @@ function sendPHPID(buttonElement) {
 	// Because javascript inexplicably can access everythign EXCEPT the value??
 	const postValue				=		(buttonElement.id);
 	const postLabel				=		($(this).innerText);
+	if ("postLabel" in window) {
+		console.log("postLabel is not defined! Setting a dummy value..");
+		postLabel	=	"dummyValue";
+	}
 	console.log("Sending Value: " + postValue + "\nAnd Label: " + postLabel);
 	$.ajax({
 		type: "POST",
@@ -130,7 +134,8 @@ function sendPHPID(buttonElement) {
 			success: function(response){
 				console.log(response);
 				if (postValue == "RD" || "CL") {
-					setTimeout(() => window.location.reload(), 750);
+					// Perhaps we also want to set the button inactive
+					setTimeout(() => window.location.reload(), 1250);
 				}
 			}
 	});
@@ -232,10 +237,15 @@ function handlePageLoad() {
 	var audioStatus					=		getAudioStatus(audioValue);
 	// Adding classes and attributes to the prepopulated 'static' buttons on the webUI
 	const staticInputElements		=		document.querySelectorAll(".btn");
-	var confirmElements = document.getElementsByClassName('serious');
-	var confirmIt = function (e) {
-		if (!confirm('Are you sure?')) e.preventDefault();
-	};
+	var confirmElements 			= 		document.getElementsByClassName('serious');
+	var confirmIt					= 		function (e) {
+			var answer=confirm('Are you sure?');
+			if(answer){
+				alert('OK!');
+			} else {
+				e.preventDefault();
+			}
+		};
 	for (var i = 0, l = confirmElements.length; i < l; i++) {
 		confirmElements[i].addEventListener('click', confirmIt, false);
 	}
@@ -433,7 +443,7 @@ function getBluetoothMAC(bluetoothMACValue) {
 
 function getBlankHostStatus(hostName, hostHash) {
 	// this function gets the host blank bit status from etcd, and sets the banner toggle button on/off upon page load
-	console.log('Attempting to retrieve host blank bit for: ' + hostName + "," +hostHash);
+	console.log('Attempting to get host blank bit for: ' + hostName + ", hash:" +hostHash);
 	let retValue = null;
 	var blankHostName = hostName;
 	$.ajax({
@@ -545,7 +555,7 @@ function createRestartButton(hostName, hostHash) {
 			type: "POST",
 			url: "/set_reset_host.php",
 			data: {
-				key: hostHash,
+				key: hostName,
 				value: "1"
 			},
 		success: function(response){
@@ -585,21 +595,20 @@ function sleep(ms) {
 	return new Promise(resolve => setTimeout(resolve, ms || DEF_DELAY));
 }
 
-function createBlankButton(hostName, hostHash, thisHostBlankStatus) {
-	console.log("Called to create Blank Host button for:" + hostName + ", hash " + hostHash + ", with status" + thisHostBlankStatus);
+function createBlankButton(hostName, hostHash, initialHostBlankStatus) {
 	var blankHostName			=		hostName;
 	var blankHostHash			=		hostHash;
-	var thisHostBlankStatus		=		(getBlankHostStatus(hostName, hostHash));
 	var blankHostText			=		"pending status";
+	console.log("Called to create Blank Host button for:" + hostName + ", hash " + hostHash );
 	var $btn 					= 		$('<button/>', {
-		type:           'button',
-		text:           blankHostText,
+		type:					'button',
+		text:					blankHostText,
 		'data-blankHostName':   blankHostName,
-		'data_hover':       'Blank Display',
-		data_label:     `${blankHostText}`,
-		class:          'btn',
-		title:          'Set host to Blank Screen',
-		id:         'btn_blank'
+		'data_hover':			'Blank Display',
+		data_label:				`${blankHostText}`,
+		class:					'btn',
+		title:					'Set host to Blank Screen',
+		id:						'btn_blank'
 		}).click(function(){
 			let matchedElement = $('body').find(`[data-blankHostName="${blankHostName}"]`);
 			if ($(matchedElement).text() == "Blank Host") {
@@ -609,7 +618,7 @@ function createBlankButton(hostName, hostHash, thisHostBlankStatus) {
 					url: "/set_blank_host.php",
 					data: {
 						key: blankHostName,
-						value: 1
+						value: "1"
 						},
 						success: function(response){
 							console.log(response);
@@ -625,7 +634,7 @@ function createBlankButton(hostName, hostHash, thisHostBlankStatus) {
 					url: "/set_blank_host.php",
 					data: {
 						key: hostName,
-						value: 0
+						value: "0"
 						},
 					success: function(response){
 						console.log(response);
@@ -856,6 +865,7 @@ function createNewHost(key, type, hostName, hostHash, functionIndex) {
 	var divEntry					=		document.createElement("Div");
 	var type						=		type;
 	const id						=		document.createTextNode(counter + 1);
+	var initialHostBlankStatus		=		getBlankHostStatus(hostName, hostHash);
 	divEntry.setAttribute("id", id);
 	divEntry.setAttribute("divHost", hostHash);
 	divEntry.setAttribute("data-fulltext", key);
@@ -895,9 +905,8 @@ function createNewHost(key, type, hostName, hostHash, functionIndex) {
 					}
 				});
 			}});
-		var thisHostBlankStatus	=	(getBlankHostStatus(hostName, hostHash));
 		getHostIPAJAX(hostName, divEntry);
-		$(divEntry).append(createBlankButton(hostName, hostHash, thisHostBlankStatus));
+		$(divEntry).append(createBlankButton(hostName, hostHash, initialHostBlankStatus));
 		$(divEntry).append(createDetailMenu(hostName, hostHash, type, divEntry));
 		counter ++;
 	}
@@ -926,7 +935,7 @@ function createNewHost(key, type, hostName, hostHash, functionIndex) {
 		});
 		var thisHostBlankStatus = (getBlankHostStatus(hostName, hostHash));
 		getHostIPAJAX(hostName, divEntry);
-		$(divEntry).append(createBlankButton(hostName, hostHash, thisHostBlankStatus));
+		$(divEntry).append(createBlankButton(hostName, hostHash, initialHostBlankStatus));
 		$(this).addClass('host_divider');
 		$(divEntry).append(createDetailMenu(hostName, hostHash, type, divEntry));
 	}
@@ -1100,7 +1109,7 @@ function getActiveInputHash(activeInputHash) {
 						this.setAttribute("data-active", "1");
 						}
 					} else {
-						console.log("No button with value: " + activeInputHash + " found.");
+						//console.log("No button with value: " + activeInputHash + " found.");
 					}
 				});
 			},

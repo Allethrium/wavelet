@@ -17,65 +17,75 @@ UG_HOSTNAME=$(hostname)
 				esac
 }
 
-
-
-#Etcd Interaction
-ETCDURI=http://192.168.1.32:2379/v2/keys
-ETCDENDPOINT=192.168.1.32:2379
-ETCDCTL_API=3
-
+# Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
+read_etcd(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
+}
 read_etcd_global(){
-		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
-		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for Global value"
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
+	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
 }
-
-read_etcd_oldkeyname(){
-		ETCDCTL_API=3 oldprintvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${OLDKEYNAME} --print-value-only)
-		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for Global value"
+read_etcd_prefix(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
-
-write_etcd_oldkeyname(){
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put ${OLDKEYNAME} -- ${VALUE}
-		echo -e "Key Name {$OLDKEYNAME} set to value ${VALUE} for state tracking.."
+read_etcd_clients_ip() {
+	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
 }
-
-
+read_etcd_clients_ip_sed() {
+	# We need this to manage the \n that is returned from etcd.
+	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
+	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
+}
+write_etcd(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
+}
+write_etcd_global(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
+}
+write_etcd_client_ip(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
+}
+delete_etcd_key(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
+}
 
 event_decoder_blank(){
-# Kill the systemd monitor task for a few moments
-systemctl --user stop wavelet_decoder_blank.service
-echo -e "\nDecoder Blank flag change detected, switching to blank input...\n\n\n"
-systemctl --user stop UltraGrid.AppImage.service
-mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.blank
-# set ug_args to generate and display smpte testcard
-ug_args="--tool uv -t testcard:pattern=blank -d vulkan_sdl2:fs:keep-aspect:nocursor:nodecorate"
-echo -e "
-[Unit]
-Description=UltraGrid AppImage executable
-After=network-online.target
-Wants=network-online.target
-[Service]
-ExecStartPre=-swaymsg workspace 2
-ExecStart=/usr/local/bin/UltraGrid.AppImage ${ug_args}
-Restart=always
-[Install]
-WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
-systemctl --user daemon-reload
-systemctl --user start UltraGrid.AppImage.service
-echo -e "\nTask Complete.\n"
-exit 0
+	echo -e "\nDecoder Blank flag change detected, switching host to blank input...\n\n\n"
+	systemctl --user stop UltraGrid.AppImage.service
+	mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.blank
+	# set ug_args to generate and display smpte testcard
+	ug_args="--tool uv -t testcard:pattern=blank -d vulkan_sdl2:fs:keep-aspect:nocursor:nodecorate"
+	echo -e "
+	[Unit]
+	Description=UltraGrid AppImage executable
+	After=network-online.target
+	Wants=network-online.target
+	[Service]
+	ExecStartPre=-swaymsg workspace 2
+	ExecStart=/usr/local/bin/UltraGrid.AppImage ${ug_args}
+	Restart=always
+	[Install]
+	WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
+	systemctl --user daemon-reload
+	systemctl --user start UltraGrid.AppImage.service
+	systemctl --user restart wavelet_decoder_blank.service
+	echo -e "\nTask Complete.\n"
+	exit 0
 }
 
 event_decoder_unblank(){
-# Kill the systemd monitor task for a few moments
-systemctl --user stop wavelet-decoder-blank.service
-echo -e "\nDecoder Blank flag change detected, restoring previous input...\n\n\n"
-systemctl --user stop UltraGrid.AppImage.service
-mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.blank /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
-systemctl --user daemon-reload
-systemctl --user start UltraGrid.AppImage.service
-echo -e "\nTask Complete.\n"
-exit 0
+	echo -e "\nDecoder Blank flag change detected, restoring host to previous input...\n\n\n"
+	systemctl --user stop UltraGrid.AppImage.service
+	mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.blank /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
+	systemctl --user daemon-reload
+	systemctl --user start UltraGrid.AppImage.service
+	systemctl --user restart wavelet_decoder_blank.service
+	echo -e "\nTask Complete.\n"
+	exit 0
 }
 
 ###
@@ -84,29 +94,23 @@ exit 0
 #
 ###
 
-set -x
+#set -x
 exec >/home/wavelet/wavelet_blank_decoder.log 2>&1
 
-KEYNAME=/$(hostname)/DECODER_BLANK
-read_etcd_global
-OLDKEYNAME=/$(hostname)/DECODER_BLANK_PREV
-read_etcd_oldkeyname
-	if [[ ${printvalue} == ${oldprintvalue} ]]; then
+KEYNAME="/$(hostname)/DECODER_BLANK_PREV"; read_etcd_global; oldKeyValue=${printvalue}
+KEYNAME="/$(hostname)/DECODER_BLANK"; read_etcd_global; newKeyValue=${printvalue}
+	if [[ ${newKeyValue} == ${oldKeyValue} ]]; then
 		echo -e "\n Blank setting and previous blank setting match, the webpage has been refreshed, doing nothing..\n"
 		:
 	else
-		if [[ "${printvalue}" == 1 ]]; then
-				echo -e "\ninput_update key is set to 1, setting blank display for this host.. \n"
-				VALUE="1"
-				write_etcd_oldkeyname
+		if [[ "${newKeyValue}" == 1 ]]; then
+				echo -e "\ninput_update key is set to 1, setting blank display for this host, and writing prevKey \n"
+				KEYNAME="/$(hostname)/DECODER_BLANK_PREV"; KEYVALUE="1";	write_etcd_global
 				event_decoder_blank
-				# add ifexists to do nothing if service.old.blank exists, because we don't want the decoders blanking on EVERY web refresh!
-				# orr.. just work out something better here because this won't work well.
 				# use a switcher, have the decoders all running a blank in the background?
 		else
-				echo -e "\ninput_update key is set to 0, reverting to previous display.. \n"
-				VALUE="0"
-				write_etcd_oldkeyname
+				echo -e "\ninput_update key is set to 0, reverting to previous display, and writing prevKey.. \n"
+				KEYNAME="/$(hostname)/DECODER_BLANK_PREV"; KEYVALUE="0"; write_etcd_global
 				event_decoder_unblank
 		fi
 	fi

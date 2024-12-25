@@ -12,16 +12,10 @@ kernel_arguments:
     - mitigations=off
     - cpufreq.default_governor=performance
     - ip=192.168.1.32::192.168.1.1:255.255.255.0:svr.wavelet.local::on
+    - nameserver=192.168.1.32
     - nameserver=192.168.1.1
-    - nameserver=9.9.9.9
     # - net.ifnames=0
     # - biosdevname=0
-# Configure static networking. LAB IP is always 192.168.1.32
-# GW always 192.168.1.1
-# The DNSMasq.conf file is set for same values
-# Changing these will break the install process for everything
-# A bootstrap script may be written to preconfig this.
-# UltraGrid AppImage
 storage:
   files:
     # Setup Ignition Files
@@ -37,6 +31,12 @@ storage:
       contents:
         inline: |
           enabled
+    # Flag to set security layer for production deployment - off by default!
+    - path: /var/prod.security.disabled
+      mode: 0644
+      contents:
+        inline: |
+          Flag tells wavelet to utilize security layer on setup.
     # Client device storage detection script
     - path: /home/wavelet/http/ignition/automated_coreos_deployment.sh
       mode: 0644
@@ -53,7 +53,7 @@ storage:
       mode: 0755
       overwrite: true
       contents:
-        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.7/UltraGrid-1.9.7-x86_64.AppImage
+        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.8/UltraGrid-1.9.8-x86_64.AppImage
     # Inhibit systemd suspend
     - path: /etc/systemd/logind.conf.d/inhibit-suspend.conf
       mode: 0644
@@ -61,12 +61,17 @@ storage:
         inline: |
           [Login]
           HandleLidSwitch=ignore
-    # WiFi WiFi Name
+    # Domain administrator password
+    - path: /var/secrets/ipaadmpw.secure
+      overwrite: true
+      contents:
+        inline: DomainAdminPasswordGoesHere
+    # WiFi Name
     - path: /var/home/wavelet/wifi_ssid
       overwrite: true
       contents:
         inline: SEDwaveletssid
-    # WiFi WiFi Name
+    # WiFi BSSID
     - path: /var/home/wavelet/wifi_bssid
       mode: 0600
       overwrite: true
@@ -78,11 +83,25 @@ storage:
       overwrite: true
       contents:
         inline: SEDwaveletwifipassword
+    # The password Wavelet will use when attempting to configure network devices
+    - path: /var/home/wavelet/networkdevice_userpass
+      mode: 0600
+      overwrite: true
+      contents:
+        inline: SEDwaveletnetworkdevicepassword
     # Devloper Mode
     - path: /var/developerMode.enabled
       overwrite: true
       contents:
         inline: DeveloperModeEnabled - will pull from working branch (default behavior)
+    # Add a resolv.conf, self, gateway & quad9
+    - path: /etc/resolv.conf
+      overwrite: true
+      contents:
+        inline: |
+          nameserver 192.168.1.32
+          nameserver 192.168.1.1
+          nameserver 9.9.9.9
     # Detect NetworkManager name and set as static script
     - path: /usr/local/bin/configure_ethernet.sh
       mode: 0755
@@ -160,12 +179,18 @@ storage:
       overwrite: true
       contents:
         source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/usr/local/bin/wavelet_pxe_grubconfig.sh
-    # Containerfile for Ostree overlay
-    - path: /home/wavelet/containerfiles/Containerfile.coreos.overlay
+    # Containerfile for Ostree overlay client
+    - path: /home/wavelet/containerfiles/Containerfile.coreos.overlay.client
       mode: 0644
       overwrite: true
       contents:
-        source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/home/wavelet/containerfiles/Containerfile.coreos.overlay
+        source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/home/wavelet/containerfiles/Containerfile.coreos.overlay.client
+    # Containerfile for Ostree overlay server
+    - path: /home/wavelet/containerfiles/Containerfile.coreos.overlay.server
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://github.com/Allethrium/wavelet/raw/master/webfiles/root/home/wavelet/containerfiles/Containerfile.coreos.overlay.server
     # Enable proxy for dnf.conf for all the good it may do us..
     - path: /etc/dnf/dnf.conf
       mode: 0664
@@ -180,13 +205,15 @@ storage:
          skip_if_unavailable=True
          fastestmirror=1
          max_parallel_downloads=2
-    # Ensure ipa server is enabled in hosts
+    # Generate hosts file
     - path: /etc/hosts
       mode: 0664
       overwrite: true
       contents:
         inline: |
-         192.168.1.32   ipa.wavelet.local ipa
+         127.0.0.1      localhost localhost.localdomain localhost4 localhost4.localdomain4
+         ::1            localhost localhost.localdomain localhost6 localhost6.localdomain6
+         192.168.1.32   svr.wavelet.local svr
     # Intel OneAPI RPM Repository
     - path: /etc/yum.repos.d/oneAPI.repo
       mode: 0664
@@ -208,33 +235,41 @@ storage:
       contents:
         inline: |
           polkit.addRule(function(action, subject) {
-          if (action.id == "org.freedesktop.systemd1.manage-units") {
-              polkit.log("action=" + action)
-              polkit.log("subject=" + subject)
-              polkit.log("unit="+action.lookup("unit"))
-              polkit.log("verb="+action.lookup("verb"))
-              if (action.lookup("unit") == "systemd-resolved.service" ||
-                  action.lookup("unit") == "dnsmasq.service") {
-                  var verb = action.lookup("verb");
-                  if (verb == "start" || verb == "stop" || verb == "restart" || verb == "enable" || verb == "disable") {
-                      polkit.log("returning YES")
-                      return polkit.Result.YES;
+            if ((action.id == "org.freedesktop.systemd1.manage-units" &&
+                 subject.user == "wavelet")) {
+                  polkit.log("action=" + action)
+                  polkit.log("subject=" + subject)
+                  polkit.log("unit="+action.lookup("unit"))
+                  polkit.log("verb="+action.lookup("verb"))
+            if (action.lookup("unit") == "dnsmasq.service" ||
+                action.lookup("unit") == "etcd-quadlet.service") {
+                 var verb = action.lookup("verb");
+                 if (verb == "start" || verb == "stop" || verb == "restart" || verb == "enable" || verb == "disable") {
+                  polkit.log("returning YES")
+                  return polkit.Result.YES;
                   }
+                }
               }
-          }
-          polkit.log("returning NO") });
+          });
     # Wifi control
     - path: /etc/polkit-1/rules.d/1338-wavelet-wifi.rules
       mode: 0644
       overwrite: true
       contents:
         inline: |
-          [Allow wi-fi scans for all users]
-          Identity=unix-user:*
-          Action=org.freedesktop.NetworkManager.wifi.scan
-          ResultAny=yes
-          ResultInactive=yes
-          ResultActive=yes
+          polkit.addRule(function(action, subject) {
+            if (( action.id == "org.freedesktop.NetworkManager.wifi.scan" ||
+                  action.id == "org.freedesktop.NetworkManager.settings.modify.hostname" ||
+                  action.id == "org.freedesktop.NetworkManager.settings.modify.own" ||
+                  action.id == "org.freedesktop.NetworkManager.settings.modify.system" ||
+                  action.id == "org.freedesktop.NetworkManager.network-control" ||
+                  action.id == "org.freedesktop.NetworkManager.reload" ||
+                  action.id == "org.freedesktop.NetworkManager.enable-disable-wifi" ||
+                  action.id == "org.freedesktop.NetworkManager.enable-disable-network" ) &&
+                  subject.user == "wavelet" ) {
+                return polkit.Result.YES;
+              }
+          });
     # SystemD resolved
     - path: /etc/polkit-1/rules.d/51-systemd-resolved.rules
       mode: 0644
@@ -242,12 +277,22 @@ storage:
       contents:
         inline: |
           polkit.addRule(function(action, subject) {
-          if (action.id == "org.freedesktop.resolve1") {
-              if (subject.user == "wavelet") {
+            if ((action.id == "org.freedesktop.resolve1") &&
+                 subject.user == "wavelet") {
                   return polkit.Result.YES;
-              }
-          }
-          polkit.log("returning NO") });
+                  }
+          });
+    # Reboot
+    - path: /etc/polkit-1/rules.d/1336-systemd-reboot.rules
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          polkit.addRule(function(action, subject) {
+            if ((action.id == "org.freedesktop.reboot" &&
+                 subject.user == "wavelet")) {
+                  return polkit.Result.YES;
+                }
           });
     # Wavelet user does NOT have access to change hostname on the server
     # hence missing the polkit entry that's in the decoder ignition file!
@@ -259,12 +304,43 @@ storage:
         inline: |
           [Resolve]
           DNSStubListener=no
+    # disable systemd-resolved to free up port 53 and allow dnsmasq to launch
+    # This also has to be set here, because resolved appears to ignore the drop-ins.
+    - path: /etc/systemd/resolved.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          [Resolve]
+          DNSStubListener=no
+    # Same will affect freeIPA.. so we want to create that file too.
+    - path: /etc/systemd/resolved.conf.d/20-freeipa.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          [Resolve]
+          DNSStubListener=no
+          DNS={nameservers}
+          Domains=~. {searchdomains}
     # dnsmasq.conf to define local DNS server environment
     - path: /etc/dnsmasq.conf
       mode: 0644
       overwrite: true
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/dnsmasq.conf
+    # etcd.conf file for nonsecure access
+    - path: /etc/etcd/etcd.yaml.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/etcd.yaml.conf
+    # etcd.conf file for nonsecure access
+    - path: /etc/etcd/etcd.yaml.conf.secure
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/etcd.yaml.conf.secure
     # Automation to spin up and install dnsmasq as a SYSTEM service
     - path: /usr/local/bin/build_dnsmasq.sh
       mode: 0755
@@ -363,12 +439,12 @@ storage:
       overwrite: true
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/home/wavelet/.config/waybar/time.sh
-    # Firefox policies.json to precustomize the firefox UI
+    # Firefox policies.json to precustomize the firefox UI - which it still ignores somehow.
     - path: /etc/firefox/policies/policies.json
       mode: 0644
       overwrite: true
       contents:
-        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/firefox/policies.json
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/firefox/policies/policies.json
 # Systemd user units
     # systemD user unit for wavelet initialization
     # Called with other initializations when Sway is executed from;
@@ -380,95 +456,13 @@ storage:
         inline: |
          [Unit]
          Description=Wavelet Controller Service
-         After=network-online.target etcd-member.service
+         After=network-online.target etcd-quadlet.service
          Wants=network-online.target
          [Service]
          Type=simple
          ExecStart=/usr/bin/sh -c "/usr/local/bin/wavelet_init.sh"
          [Install]
          WantedBy=default.target
-      user:
-        name: wavelet
-      group:
-        name: wavelet
-    # Etcd watch controller input channel service
-    - path: /home/wavelet/.config/systemd/user/wavelet_controller.service
-      mode: 0644
-      overwrite: true
-      contents:
-        inline: |
-          [Unit]
-          Description=Wavelet Controller - etcd input triggers orchestration
-          After=network-online.target etcd-member.service
-          Wants=network-online.target
-          [Service]
-          Environment=ETCDCTL_API=3
-          RemainAfterExit=yes
-          ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch input_update -w simple -- sh -c "/usr/local/bin/wavelet_controller.sh"
-          Restart=on-failure
-          RestartSec=1
-          [Install]
-          WantedBy=default.target
-      user:
-        name: wavelet
-      group:
-        name: wavelet
-    # Etcd watch reflectorflag service
-    - path: /home/wavelet/.config/systemd/user/watch_reflectorreload.service
-      mode: 0644
-      overwrite: true
-      contents:
-        inline: |
-          [Unit]
-          Description=Watches etcd for reflector restart
-          After=network-online.target etcd-member.service
-          Wants=network-online.target
-          [Service]
-          Environment=ETCDCTL_API=3
-          ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch --prefix /decoderip/ -w simple -- sh -c "/usr/local/bin/wavelet_client_poll.sh"
-          Restart=on-failure
-          [Install]
-          WantedBy=default.target
-      user:
-        name: wavelet
-      group:
-        name: wavelet
-    # Etcd watch encoderflag service
-    - path: /home/wavelet/.config/systemd/user/watch_encoderflag.service
-      mode: 0644
-      overwrite: true
-      contents:
-        inline: |
-          [Unit]
-          Description=Watches etcd for encoder restart
-          After=network-online.target etcd-member.service
-          Wants=network-online.target
-          [Service]
-          Environment=ETCDCTL_API=3
-          ExecStart=etcdctl --endpoints=192.168.1.32:2379 watch /"%H"/encoder_restart -w simple -- sh -c "/usr/local/bin/monitor_encoderflag.sh"
-          Restart=on-failure
-          RestartSec=1
-          [Install]
-          WantedBy=default.target
-      user:
-        name: wavelet
-      group:
-        name: wavelet
-    # UltraGrid AppImage Launcher - this is a placeholder unit file, it's always overwritten by the script calling it.
-    - path: /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
-      mode: 0644
-      overwrite: true
-      contents:
-        inline: |
-          [Unit]
-          Description=UltraGrid AppImage executable
-          After=network-online.target etcd-member.service
-          Wants=network-online.target
-          [Service]
-          Environment=ETCDENDPOINT=192.168.1.32:2379
-          ExecStart=/usr/local/bin/UltraGrid.AppImage $(etcdctl --endpoints=${ETCDENDPOINT} get $(hostname)/UG_ARGS --print-value-only)
-          [Install]
-          WantedBy=default.target
       user:
         name: wavelet
       group:
@@ -481,7 +475,7 @@ storage:
         inline: |
           [Unit]
           Description=Encoder service
-          After=network-online.target etcd-member.service
+          After=network-online.target etcd-quadlet.service
           Wants=network-online.target
           [Service]
           ExecStart=/usr/local/bin/wavelet_encoder.sh
@@ -499,29 +493,10 @@ storage:
         inline: |
           [Unit]
           Description=UltraGrid AppImage executable
-          After=network-online.target etcd-member.service
+          After=network-online.target etcd-quadlet.service
           Wants=network-online.target
           [Service]
           ExecStart=/usr/local/bin/wavelet_reflector.sh
-          [Install]
-          WantedBy=default.target
-      user:
-        name: wavelet
-      group:
-        name: wavelet
-    # UltraGrid reflector - placeholder, it's overwritten in the reflector script, like the AppImage unit file!
-    - path: /home/wavelet/.config/systemd/user/UltraGrid.Reflector.service
-      mode: 0644
-      overwrite: true
-      contents:
-        inline: |
-          [Unit]
-          Description=UltraGrid AppImage executable
-          After=network-online.target etcd-member.service
-          Wants=network-online.target
-          [Service]
-          Environment=ETCDENDPOINT=192.168.1.32:2379
-          ExecStart=/usr/local/bin/UltraGrid.AppImage $(etcdctl --endpoints=${ETCDENDPOINT} get REFLECTOR_ARGS --print-value-only)
           [Install]
           WantedBy=default.target
       user:
@@ -536,7 +511,7 @@ storage:
         inline: |
           [Unit]
           Description=Wavelet Encoder/Decoder runner
-          After=network-online.target etcd-member.service
+          After=network-online.target etcd-quadlet.service
           Wants=network-online.target
           [Service]
           ExecStart=/usr/local/bin/run_ug.sh
@@ -555,7 +530,7 @@ storage:
         inline: |
           [Unit]
           Description=Wavelet Initial Setup Service
-          After=network-online.target etcd-member.service
+          After=network-online.target etcd-quadlet.service
           Wants=network-online.target
           [Service]
           Type=oneshot
@@ -691,7 +666,7 @@ systemd:
       enabled: true
       contents: |
         [Unit]
-        Description=Install Overlay packages, and generate second-boot systemd units
+        Description=Install packages, generate second-boot systemd rootful units
         ConditionFirstBoot=yes
         After=multi-user.target
         [Service]

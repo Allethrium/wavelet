@@ -1,5 +1,6 @@
 #!/bin/bash
-# Updates wavelet modules automatically from Git repo.
+# Updates wavelet modules automatically from Git repo.  Useful for installing updates to wavelet as long as no system packages are affected.
+# Detects if we are on dev or master branch.  To switch, move that file flag someplace else.
 
 detect_self(){
 systemctl --user daemon-reload
@@ -42,8 +43,8 @@ event_server(){
 }
 
 extract_base(){
-	tar xf /home/wavelet/wavelet-files.tar.xz -C /home/wavelet --no-same-owner
-	cd /home/wavelet
+	tar xf /var/home/wavelet/wavelet-files.tar.xz -C /home/wavelet --no-same-owner
+	cd /var/home/wavelet
 	mv ./usrlocalbin.tar.xz /usr/local/bin/
 }
 
@@ -54,10 +55,10 @@ extract_etc(){
 }
 
 extract_home(){
-	tar xf /home/wavelet/wavelethome.tar.xz -C /home/wavelet
+	tar xf /var/home/wavelet/wavelethome.tar.xz -C /home/wavelet
 	chown -R wavelet:wavelet /home/wavelet
-	chmod 0755 /home/wavelet/http
-	chmod -R 0755 /home/wavelet/http-php
+	chmod 0755 /var/home/wavelet/http
+	chmod -R 0755 /var/home/wavelet/http-php
 	echo -e "Wavelet homedir setup successfully..\n"
 }
 
@@ -90,19 +91,20 @@ install_wavelet_modules(){
 	hostname=$(hostname)
 	echo -e "${hostname}" > /var/lib/dnsmasq/hostname.local
 	# Perform any further customization required in our scripts, and clean up.
-	sed -i "s/!!hostnamegoeshere!!/${hostname}/g" /usr/local/bin/wavelet_network_sense.sh
+	sed -i "s/!!hostnamegoeshere!!/$(hostname)/g" /usr/local/bin/wavelet_network_sense.sh
 	touch /var/extract.target
 }
 
 generate_tarfiles(){
-	echo -e "Generating tar.xz files for upload to distribution server..\n"
+	echo -e "\nGenerating tar.xz files for upload to distribution server.."
+	cd /var/home/wavelet
 	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /var/home/wavelet/wavelet-git/webfiles/root/usr/local/bin/ .
 	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /var/home/wavelet/wavelet-git/webfiles/root/home/wavelet/ .
-	echo -e "Packaging files together..\n"
+	echo -e "Packaging files together.."
 	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz}
 	echo -e "Done."
 	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz}
-	cp /usr/local/bin/wavelet_installer_xf.sh /home/wavelet/http/ignition && chmod 0644 /home/wavelet/http/ignition/wavelet_installer_xf.sh
+	setfactl -b wavelet-files.tar.xz
 }
 
 
@@ -112,8 +114,25 @@ generate_tarfiles(){
 #
 #####
 
+# One rather silly thing.. if this module is what gets updated... then that won't work until it is run again the next reboot.  O_O
+
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 systemctl disable zincati.service --now
+# Update with the server hostname - no other device should be doing network sense.
+sed -i "s/hostnamegoeshere/$(hostname)/g" /usr/local/bin/wavelet_network_sense.sh
+FILES=("/var/home/wavelet/wavelet-files.tar.xz" \
+	"/usr/local/bin/wavelet_install_client.sh" \
+	"/usr/local/bin/wavelet_installer_xf.sh" \
+	"/etc/skel/.bashrc" \
+	"/etc/skel/.bash_profile")
+cp "${FILES[@]}" /var/home/wavelet/http/ignition/
+chmod -R 0644 /var/home/wavelet/http/ignition/* && chown -R wavelet:wavelet /var/home/wavelet/http
+# Ensure bashrc and profile have compatible filenames for decoder ignition
+mv /var/home/wavelet/http/ignition/.bashrc /var/home/wavelet/http/ignition/skel_bashrc.txt
+mv /var/home/wavelet/http/ignition/.bash_profile /var/home/wavelet/http/ignition/skel_profile.txt
+restorecon -Rv /var/home/wavelet/http
 #set -x
-exec >/home/wavelet/update_wavelet_modules.log 2>&1
+exec >/var/home/wavelet/update_wavelet_modules.log 2>&1
 detect_self
+echo -e "Update completed.  The system will automatically reboot in ten seconds!"
+systemctl reboot

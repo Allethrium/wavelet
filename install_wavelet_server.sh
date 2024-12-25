@@ -145,7 +145,7 @@ set_pw(){
 
 	while [[ ${success} -ne 1 ]] && [[ ${attempts} -gt 0 ]]; do
 		echo -e >&2 "			${GREEN}Remaining attempts: ${attempts}${NC}"
-		read -srp "		Please input a password for ${user}:`echo $'\n-'`" tmp_pw
+		read -srp "		Please input a password for ${user}:`echo $'\n	-'`" tmp_pw
 		if [[ "${tmp_pw}" == "" ]]; then
 			echo -e >&2 "		Password may not be empty."
 			if [[ ${attempts} -eq 0 ]]; then
@@ -159,16 +159,16 @@ set_pw(){
 
 		local matchattempts=3
 		while [[ ${success} -ne 1 ]] && [[ ${matchattempts} -gt 0 ]]; do
-			read -srp "`echo $'\n-'`		Please input the password again to verify for ${user}:`echo $'\n-'`" tmp_pw2
+			read -srp "`echo $'\n'`	Please input the password again to verify for ${user}:`echo $'\n	-'`" tmp_pw2
 			if [[ "${tmp_pw}" == "${tmp_pw2}" ]]; then
-				echo -e >&2 "`echo $'\n---'`		${GREEN}Passwords match!  Continuing..${NC}"
+				echo -e >&2 "`echo $'\n-------->'`		${GREEN}Passwords match!  Continuing..${NC}"
 				mkpasswd --method=yescrypt ${tmp_pw} > ${user}.pw.secure
 				success=1
 				break 2
 			else
 				echo -e >&2 "\n		Passwords do not match! Trying again..\n"
 				((matchattempts--))
-				echo -e >&2 "			Remaining attempts: ${matchattempts}"
+				echo -e >&2 "			${RED}Remaining attempts: ${matchattempts}${NC}"
 				if [[ ${success} -ne 1 ]] && [[ ${matchattempts} -eq 0 ]]; then
 					echo -e >&2 "		${RED}Maximum attempts exceeded.  Please start again to set this user's password.${NC}"
 					success=0
@@ -185,6 +185,17 @@ set_pw(){
 	fi
 }
 
+enable_security(){
+	echo -e "\nEnabling security layer flag in server ignition..\n"
+	echo -e "Note: Security layer implies the following:\nLocal Domain Controller to handle authentication and certificates\nEAP-TTLS for WiFi\nTLS certificates on web server issued from Domain Controller\nEtcd secured with domain certificates\n"
+	echo -e "These additional features may complicate troubleshooting and should only be used in a stable production build.  If you're running Wavelet in a lab, you may wish to disable them during your testing."
+	repl="prod.security.enabled"
+	sed -i "s|/var/prod.security.disabled|${repl}|g" ${INPUTFILES}
+	echo -e "\nThe FreeIPA domain will control services and certificates.  Please ensure you store the password for the domain controller in a safe place, and in an organized fashion.\n"
+	read -p "\nSet a password for the freeIPA Administrator account.  If you set less than 8 characters, the domain controller process will fail!!!" domain_pw
+	sed -i "s|DomainAdminPasswordGoesHere|${domain_pw}|g" ${INPUTFILES}
+}
+
 customization(){
 	echo -e "Generating ignition files with appropriate settings.."
 	INPUTFILES="server_custom.yml decoder_custom.yml"
@@ -199,27 +210,27 @@ customization(){
 	users=("wavelet-root" "wavelet")
 
 	# Iterate over the array of users and set passwords for each
-	for user in ${users[@]}; do
+	for user in "${users[@]}"; do
 		if [[ $(set_pw "${user}") -ne 0 ]]; then
 			echo -e "Failed to set a password for ${user}."
 			exit 1
 		else
-			echo -e "Set password for ${user}"
-			echo -e "Generating SSH public key for ${user}..\n"
+			echo -e "	Set password for ${user}"
+			echo -e "	Generating SSH public key for ${user}..\n"
 			ssh-keygen -t ed25519 -C "${user}@wavelet.local" -f ${user}-ssh
-			echo -e "Generating YAML block for user..\n"
+			echo -e "	Generating YAML block for user..\n"
 			cp users_yaml ${user}_yaml.yml
 			generate_user_yaml ${user}
 			# Now we add the user YAML block to the server ignition, preserving the tag as we go..
-			echo -e "Adding generated YAML block to ignition file for ${user}..\n"
+			echo -e "	Adding generated YAML block to ignition file for ${user}..\n"
 			f2="$(<${user}_yaml.yml)"
 			input_files_arr=($INPUTFILES)
 			for file in "${input_files_arr[@]}"; do
 				if [ -f "$file" ]; then
 					awk -vf2="$f2" '/#ADD_USER_YAML_HERE/{print f2;print;next}1' "${file}" > tmp && mv tmp "${file}"
-					echo -e "YAML block for ${user} added to ignition file ${file}..\n"
+					echo -e "	YAML block for ${user} added to ignition file ${file}..\n"
 				else
-					echo "Warning: ${file} does not exist or is inacessible!"
+					echo "	Warning: ${file} does not exist or is inacessible!"
 				fi
 			done
 		fi
@@ -243,8 +254,8 @@ customization(){
 	fi
 
 	if [[ $(cat dev_flag) == "DEV" ]]; then
-		echo -e "\n${RED}   Targeting UltraGrid continuous build for initial startup.\n   Please bear in mind that although this comes with additional features.\n The continuous build might introduce experimental features, or less predictable behavior.\n${NC}"
-		sed -i "s|CESNET/UltraGrid/releases/download/v1.9.7/UltraGrid-1.9.7-x86_64.AppImage|CESNET/UltraGrid/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage|g" ${INPUTFILES}
+		echo -e "\n${RED}	Targeting UltraGrid continuous build for initial startup.\n	Please bear in mind that although this comes with additional features,\n	The continuous build might introduce experimental features, or less predictable behavior.\n${NC}"
+		sed -i "s|CESNET/UltraGrid/releases/download/v1.9.8/UltraGrid-1.9.8-x86_64.AppImage|CESNET/UltraGrid/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage|g" ${INPUTFILES}
 	else
 		echo -e "\n${GREEN}Tracking UltraGrid release build.\n${NC}"
 	fi
@@ -252,11 +263,20 @@ customization(){
 	# WiFi settings
 	# changed to mod ignition files w/ inline data for the scripts to call, this way I don't publish wifi secrets to github.
 	INPUTFILES="server_custom.yml decoder_custom.yml"
+	# Include flag to enable security layer
+	echo -e "\n${RED}Enable security layer?${NC}"
+	read -p "(Y/N)" confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || secActive=0; echo -e "\nSecurity layer not active.  This is NOT recommended for a production deployment!" || enable_security
 	echo -e "Moving on to WiFi settings"
+	echo -e "Security layer bit set to: ${secActive}"
 	echo -e "\nIf your Wifi AP hasn't yet been configured, please do so now, as the installer will wait for your input\n"
 	read -p "		Please input the SSID of your configured wireless network:  " wifi_ssid
 	read -p "		Please input the first three elements of the WiFi BSSID / MAC address, colon delimited like so AA:BB:CC:  " wifi_bssid
+	# We won't want to set a wifi PSK if we are using enterprise security on our devices.
+	if [[ ${secActive} = 0 ]]; then
 	read -p "		Please input the configured password for your WiFi SSID:  " wifi_password
+	else
+		wifi_password="Not used, security handled via RADIUS."
+	fi
 
 		repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_ssid}")
 		sed -i "s/SEDwaveletssid/${repl}/g" ${INPUTFILES}
@@ -267,7 +287,7 @@ customization(){
 		repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_password}")
 		sed -i "s/SEDwaveletwifipassword/${repl}/g" ${INPUTFILES}
 
-		echo -e "\n\n ${GREEN} ***Customization complete, moving to injecting configurations to CoreOS images for initial installation..*** \n\n${NC}"
+		echo -e "\n${GREEN} ***Customization complete, moving to injecting configurations to CoreOS images for initial installation..*** \n${NC}"
 }
 
 

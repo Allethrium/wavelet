@@ -1,17 +1,14 @@
 Wavelet - An Integrated Video Distribution System
 =================================================
 
-Redistribution and use in any form is permitted provided that the following conditions are met:
+Wavelet is available for use under the SSPL
 
-1. Attribution of original source to the author
+https://en.wikipedia.org/wiki/Server_Side_Public_License
 
-2. All materials based on this project must include the below license agreements
 
-3. Use of this system in a commercial or for-profit context requires written permission
 
-# Determine licensing restrictions for CoreOS, etcd, vaapi/oneAPI and other core dependencies
-# Credit hardware platform stuff once we scope it in.
 
+Component Licenses Below:
 
 UltraGrid - A High Definition Collaboratory
 ===========================================

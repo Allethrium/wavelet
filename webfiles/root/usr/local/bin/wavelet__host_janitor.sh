@@ -4,40 +4,40 @@
 # It runs a short foreach loop pinging every IP in the reflector clients list, best of three attempts of three pings each.
 # Then removes them from the reflector subscription list if dead.
 
-#Etcd Interaction
-ETCDURI=http://192.168.1.32:2379/v2/keys
-ETCDENDPOINT=192.168.1.32:2379
+# Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
-	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME})
-	echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
-
 read_etcd_global(){
-	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get "${KEYNAME}")
-	echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for Global value"
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
+	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
 }
-
-write_etcd(){
-	etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
-	echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
-}
-
-write_etcd_global(){
-	etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
-	echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
-}
-
-write_etcd_clientip(){
-	etcdctl --endpoints=${ETCDENDPOINT} put /decoderip/$(hostname) "${KEYVALUE}"
-	echo -e "$(hostname) set to ${KEYVALUE} for Global value"
+read_etcd_prefix(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
 read_etcd_clients_ip() {
-	return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get "/decoderip/" --prefix --print-value-only)
+	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
 }
 read_etcd_clients_ip_sed() {
-	# We need this to manage the \n that etcd returns, 
-	# the above is useful for generating the reference text file but this is better for immediate processing.
-	processed_clients_ip=$(ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} get "/decoderip/" --prefix --print-value-only | sed ':a;N;$!ba;s/\n/ /g')
+	# We need this to manage the \n that is returned from etcd.
+	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
+	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
+}
+write_etcd(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
+}
+write_etcd_global(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
+}
+write_etcd_client_ip(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
+}
+delete_etcd_key(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
 }
 
 
@@ -54,11 +54,12 @@ main(){
 
    remove_client(){
 		echo -e "Ping failed three times for ${i}!  Removing host from list!\n"
-		deletevalue=$(etcdctl --endpoints=${ETCDENDPOINT} get "/decoderip/" --prefix | grep -i -B 1 "${i}" | sed 's/192.168.1.*//g' | sed 's/--//g' | sed '/^[[:space:]]*$/d')
+		KEYNAME="/decoderip/"; read_etcd_prefix
+		deletevalue=$(${printvalue} | grep -i -B 1 "${i}" | sed 's/192.168.1.*//g' | sed 's/--//g' | sed '/^[[:space:]]*$/d')
 		echo -e "Found ${deletevalue}"
 		deleteArr=(${deletevalue})
 		for i in ${deleteArr[@]}; do
-			dosomething=$(etcdctl --endpoints=${ETCDENDPOINT} del "${i}")
+			dosomething=$(delete_etcd_key ${i})
 		done
 		echo -e "Deleted ${dosomething}!"
 	}

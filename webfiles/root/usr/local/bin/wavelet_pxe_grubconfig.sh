@@ -16,6 +16,8 @@ generate_tftpboot() {
 	# The Containerfile will generate an output direct to /var/lib/tftpboot with a populated set of UEFI secure boot files.
 	sudo podman build --tag shim -f /home/wavelet/containerfiles/Containerfile.tftpboot
 	podman run --privileged --security-opt label=disable -v /var/lib:/tmp/ shim
+	# Grub aarch64 boot option (just here as placeholder)
+	curl http://ports.ubuntu.com/ubuntu-ports/dists/focal/main/uefi/grub2-arm64/current/grubnetaa64.efi.signed -o /var/lib/tftpboot/grubnetaa64.efi.signed
 }
 
 generate_coreos_image() {
@@ -186,6 +188,7 @@ restorecon -Rv /var/lib/tftpboot
 cp -R /var/lib/tftpboot/*.efi /home/wavelet/http/pxe
 cp -R /var/lib/tftpboot/boot /home/wavelet/http/pxe
 cp -R /var/lib/tftpboot/efi /home/wavelet/http/pxe
+cp /var/home/wavelet/etcd_ip /home/wavelet/http/ignition
 # Ensure the wavelet user owns the http folder, and set +x and read perms on http folder and subfolders
 chmod -R 0755 /home/wavelet/http
 chown -R wavelet /home/wavelet/
@@ -196,4 +199,11 @@ echo -e "\nPXE bootable images completed and populated in http serverdir, client
 touch /var/pxe.complete
 # we disable the service so it won't attempt to start on next boot
 systemctl disable wavelet_install_pxe.service 
-systemctl reboot
+
+# Check to see if the security layer is enabled, if not, we are done and should reboot..
+if [[ -f /var/prod.security/enabled ]]; then
+	systemctl start wavelet_install_hardening.service
+	exit 0
+else
+	systemctl reboot
+fi

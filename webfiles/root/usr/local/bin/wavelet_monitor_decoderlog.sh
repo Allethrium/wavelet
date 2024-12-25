@@ -12,4 +12,3 @@ while read line ; do
                 ... do something ...
         fi
 done
-

@@ -1,38 +1,42 @@
 #!/bin/bash
 
 # This script is launched from systemd and acts as a detection sense for alive/dead hosts.  Originally part of the reflector logic in the controller,
-# moved to systemd-basis for better job control.   The systemd unit will run once, it's up to another event to call it as often as needed.
 # Currently as of 8/1/23 it's called by a systemd etcdctl watch unit every time the IP list changes.
 
-#Etcd Interaction
-ETCDURI=http://192.168.1.32:2379/v2/keys
-ETCDENDPOINT=192.168.1.32:2379
+# Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
-        printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME} --print-value-only)
-        echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
-
 read_etcd_global(){
-        printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
-        echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for Global value"
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
+	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
 }
-
-write_etcd(){
-        etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
-        echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
-}
-
-write_etcd_global(){
-        etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
-        echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
-}
-
-write_etcd_clientip(){
-        etcdctl --endpoints=${ETCDENDPOINT} put /decoderip/$(hostname) "${KEYVALUE}"
-        echo -e "$(hostname) set to ${KEYVALUE} for Global value"
+read_etcd_prefix(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
 read_etcd_clients_ip() {
-        return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix /decoderip/ --print-value-only)
+	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
+}
+read_etcd_clients_ip_sed() {
+	# We need this to manage the \n that is returned from etcd.
+	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
+	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
+}
+write_etcd(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
+}
+write_etcd_global(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
+}
+write_etcd_client_ip(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
+}
+delete_etcd_key(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
 }
 
 
@@ -42,39 +46,37 @@ reflector_monitor() {
 # Combined with the self-registration/connection logic on the subordinate devices, it forms a limited self-healing capability within the system
 	reflector_generate_lists() {
 	# CURL's reflector list every second and updates client list if inconsistent with existing IPs
-			FILE=/home/wavelet/reflector_clients_ip.txt
-			if test -f "$FILE"; then
-				echo "$FILE Exists, reflector is running and proceeding to test against monitor_list.txt..."
-	        	diff=$(diff /home/wavelet/monitor_list.txt /home/wavelet/reflector_clients_ip.txt)
-        		read_etcd_clients_ip
-        		echo ${return_etcd_clients_ip} > /home/wavelet/monitor_list.txt &>/dev/null
-        		reflector_testisalive
-        	else
-        		echo "$FILE does not exist.  Reflector is not running, or something went wrong.  Doing nothing..."
-        		:
-        	fi
+		FILE=/home/wavelet/reflector_clients_ip.txt
+		if test -f "$FILE"; then
+			echo "$FILE Exists, reflector is running and proceeding to test against monitor_list.txt..."
+	       	diff=$(diff /home/wavelet/monitor_list.txt /home/wavelet/reflector_clients_ip.txt)
+        	read_etcd_clients_ip
+        	echo ${return_etcd_clients_ip} > /home/wavelet/monitor_list.txt &>/dev/null
+        	reflector_testisalive
+        else
+        	echo "$FILE does not exist.  Reflector is not running, or something went wrong.  Doing nothing..."
+        	:
+        fi
 	}
+
 	reflector_testisalive() {
 	# This runs every n seconds as define by "while sleep $;"" above.  It doesn't need to happen too fast because this is just for housekeeping to avoid the reflector generating too many unicast streams.
 	# First, tests whether the etcd flag is already set, if so does nothing because the reflector will be reloaded the next time the system state changes.
 	# It tests the etcd master list with the monitor list, if there's a discrepancy it will set an etcd flag for the wavelet_kill_all routine to restart the reflector to reflect the client IP pool changes
 	# Otherwise, this component sends a single ping with a 2 second TTL, returns an alive or dead value.
-				KEYNAME="reload_reflector"
-				read_etcd_global
-				if [[ "$printvalue" -eq 1 ]]; then
-					:
-					else
-	        			if [[ "$diff" != '' ]] ; then
-                			echo -e "IP Address(es) have changed, setting reflector reload flag.  Stream may be momentarily interrupted."
-                			KEYNAME="reload_reflector"
-                			KEYVALUE="1"
-                			write_etcd_global
-                		else 
-                			reflector_pingme
-                		fi
-                fi
-
+		KEYNAME="reload_reflector"; read_etcd_global
+		if [[ "$printvalue" -eq 1 ]]; then
+			:
+		else
+	    	if [[ "$diff" != '' ]] ; then
+        		echo -e "IP Address(es) have changed, setting reflector reload flag.  Stream may be momentarily interrupted."
+        		KEYNAME="reload_reflector"; KEYVALUE="1"; write_etcd_global
+            else 
+            	reflector_pingme
+            fi
+        fi
 	}
+
 	reflector_pingme() {
 	# Pings the current list of IP addresses associated with Decoders, Livestreams or other clients.
 	# If a ping comes back unreachable, it deletes the host registration key from ETCD and the next generate_lists pass will register it as dead,
@@ -93,8 +95,7 @@ reflector_monitor() {
         	echo "$line=DEAD"
         	# Get hostname from $line value by querying against DNS
         	deadhostkeyname=$(dig +short -x $line | cut -d"." -f1)
-        	KEYNAME=$deadkeyhostname
-        	delete_etcd_clients_ip
+        	KEYNAME="/decoderip/$deadkeyhostname"; delete_etcd_key
         	echo -e "${deadhostkeyname} has been deleted from /decoderip/ list in etcd \n"
         	sleep 2
         	systemctl --user restart wavelet_reflector.service
@@ -103,17 +104,6 @@ reflector_monitor() {
 	done
 	}
 reflector_generate_lists
-}
-
-reflector_capturefilter_monitor() {
-# Monitors rapidly for capturefilter changes and sets reloads the reflector if detected
-	captureFilterFlag=$(etcdctl --endpoints=${ETCDENDPOINT} watch reload_reflector)
-	if [[ "$captureFilterFlag" -eq 1 ]] ; then
-		systemctl --user restart wavelet_reflector.service
-		echo -e "Capture Filter change detected, restarting reflector to pick up changes"
-	else
-		:
-	fi
 }
 
 service_exists() {
@@ -127,10 +117,10 @@ service_exists() {
 
 # Main - test for reload flag before we do anything else!
 set -x
-exec >/home/wavelet/wavelet_reflector_polling.log 2>&1
+exec >/home/wavelet/wavelet_reflector_reload.log 2>&1
+
 if service_exists wavelet_reflector; then
-    KEYNAME="reload_reflector"
-    read_etcd_global
+    KEYNAME="reload_reflector"; read_etcd_global
     if [[ "$printvalue" -eq 1 ]]; then
     	echo -e "Reflector reload key is already set!  Restarting reflector service"
     	systemctl --user restart wavelet_reflector.service

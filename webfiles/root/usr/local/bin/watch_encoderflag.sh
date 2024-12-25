@@ -1,5 +1,5 @@
 #!/bin/bash
-# Monitors etcd for input device changes over the prefix and updates as necessary
+# Monitors etcd for output and restarts the encoder as necessary
 #
 
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
@@ -39,34 +39,41 @@ delete_etcd_key(){
 }
 
 detect_self(){
-	# We only care if this host is provisioned as an encoder or a server here.
-	UG_HOSTNAME=$(hostname)
+UG_HOSTNAME=$(hostname)
 	echo -e "Hostname is $UG_HOSTNAME \n"
 	case $UG_HOSTNAME in
-	enc*)				echo -e "I am an Encoder \n"; 										self="encoder"
+	enc*) 					echo -e "I am an Encoder \n" 													&& self="encoder"
 	;;
-	svr*)				echo -e "I am a Server.  Launching encoder detection \n";			self="server"
+	dec*)					echo -e "I am a Decoder \n"														&& self="decoder"
 	;;
-	*) 					echo -e "This device is not an encoder or a server. Exiting \n";	exit 0
+	livestream*)			echo -e "I am a Livestreamer \n"												&& self="livestream"
+	;;
+	gateway*)				echo -e "I am an input Gateway for another video streaming system \n" 			&& self="input_gateway"
+	;;
+	svr*)					echo -e "I am a Server.  Launching encoder detection \n" 						&& self="server"
+	;;
+	*) 						echo -e "This device Hostname is not set approprately, exiting \n"				&& exit 0
 	;;
 	esac
 }
 
 main() {
-# main thread, checks new_device_attached flag in etcd
-	# New device available is a GLOBAL flag that notifies the entire system.
-	KEYNAME=new_device_attached; read_etcd_global
-	if [[ "$printvalue" -eq 1 ]]; then
+	# main thread, checks encoder restart flag in etcd for this host
+	KEYNAME="encoder_restart"; read_etcd
+	if [[ "${printvalue}" -eq 1 ]]; then
+		echo -e "Encoder restart bit is set! continuing..\n"
 		detect_self
 		if [[ "${self}" = "encoder" ]]; then		
-			echo -e "This is an encoder, so it is valid for us to proceed.  Regenerating input list.."
-			event_inputdevice_update
+			systemctl --user disable UltraGrid.AppImage.service --now
+			systemctl --user restart run_ug.service
+			echo -e "Encoder restart flag is enabled, restarting encoder process on this host.."
 		elif [[ "${self}" = "server" ]]; then
 			# we check whether an input device has been added via detectv4l.sh to this host
 			KEYNAME=INPUT_DEVICE_PRESENT; read_etcd
 				if [[ "$printvalue" -eq 1 ]]; then
-					echo -e "An input device is present on this server, and it is running as an encoder, regenerating input list.."
-					event_inputdevice_update
+					systemctl --user disable UltraGrid.AppImage.service --now
+					echo -e "An input device is present on this server, and it is running as an encoder, restarting encoder component.."
+					systemctl --user restart run_ug.service
 				else
 					echo "I am not running an encoder, doing nothing"
 					:
@@ -76,16 +83,10 @@ main() {
 			:
 		fi
 		echo -e "Resetting encoder restart flag to 0.."
-		KEYNAME=encoder_restart; KEYVALUE=0; write_etcd_global
+		KEYNAME=encoder_restart; KEYVALUE=0; write_etcd
 	fi
 }
 
-
-event_inputdevice_update() {
-	# Run detectV4l.sh to properly register new device with the system
-	/usr/local/bin/wavelet_detectv4l.sh
-}
-
 #set -x
-exec >/home/wavelet/monitor_encoderflag.log 2>&1
+exec >/home/wavelet/watch_encoderflag.log 2>&1
 main

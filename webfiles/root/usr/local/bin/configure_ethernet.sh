@@ -16,7 +16,6 @@ UG_HOSTNAME=$(hostname)
 	esac
 }
 
-
 detect_self
 
 

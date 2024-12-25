@@ -30,6 +30,7 @@ hostnamectl hostname dec$newhostname.wavelet.local
 echo "All set, rebooting decoder.."
 systemctl reboot
 }
-set -x
+
+#set -x
 exec >/home/wavelet/decoderhostname.log 2>&1
 detect_self

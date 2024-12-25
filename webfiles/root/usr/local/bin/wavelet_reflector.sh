@@ -1,46 +1,45 @@
 #!/bin/bash
 # This file concatenates appropriate command line values and passes them to a systemd environment file
 # Directly launches and terminates the reflector as a service.
-# User permissions for this service are handled via Polkit, as the service is installed via Inition.
+# User permissions for this service are handled via Polkit, as the service is installed via Ignition.
 
-#Etcd Interaction
-ETCDURI=http://192.168.1.32:2379/v2/keys
-ETCDENDPOINT=192.168.1.32:2379
+# Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
-	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME})
-	echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for host $(hostname)"
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
-
 read_etcd_global(){
-	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get "${KEYNAME}")
-	echo -e "Key Name {$KEYNAME} read from etcd for value ${printvalue} for Global value"
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
+	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
 }
-
-write_etcd(){
-	etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
-	echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
-}
-
-write_etcd_global(){
-	etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
-	echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
-}
-
-write_etcd_clientip(){
-	etcdctl --endpoints=${ETCDENDPOINT} put /decoderip/$(hostname) "${KEYVALUE}"
-	echo -e "$(hostname) set to ${KEYVALUE} for Global value"
+read_etcd_prefix(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
 read_etcd_clients_ip() {
-	return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get "/decoderip/" --prefix --print-value-only)
+	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
 }
 read_etcd_clients_ip_sed() {
-	# We need this to manage the \n that etcd returns, 
-	# the above is useful for generating the reference text file but this is better for immediate processing.
-	processed_clients_ip=$(ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} get "/decoderip/" --prefix --print-value-only | sed ':a;N;$!ba;s/\n/ /g')
+	# We need this to manage the \n that is returned from etcd.
+	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
+	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
+}
+write_etcd(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
+}
+write_etcd_global(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
+}
+write_etcd_client_ip(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
 }
 
 wavelet_reflector() {
 # queries etcd for list of registered decoders
+	# Write the reflector IP address to an etcd key so we can find it from other hosts.
+	KEYNAME="REFLECTOR_IP"; KEYVALUE=$(hostname -I | cut -d " " -f 1); write_etcd_global
 	read_etcd_clients_ip
 	read_etcd_clients_ip_sed
 	echo ${return_etcd_clients_ip} > /home/wavelet/reflector_clients_ip.txt
@@ -62,7 +61,6 @@ wavelet_reflector() {
 		# this removes duplicate IP's from the subscription
 		deDupReturnClientsIP=$(echo "${return_etcd_clients_ip}" | tr ' ' '\n' | nl | sort -u -k2 | sort -n | cut -f2- | tr '\n' ' ')
 		deDupProcessedIP=$(echo "${processed_clients_ip}" | tr ' ' '\n' | nl | sort -u -k2 | sort -n | cut -f2-)
-		# KEYNAME=uv_filter_cmd
 		echo -e "Systemd will execute hd-rum-transcode with commandline:\nhd-rum-transcode 2M 5004 ${return_etcd_clients_ip}"
 		KEYNAME=REFLECTOR_ARGS
 		# Reduce HD-RUM buffer to 2M
@@ -90,17 +88,10 @@ wavelet_reflector() {
 		Restart=always
 		[Install]
 		WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.Reflector.service
-		systemctl --user daemon-reload
-		systemctl --user restart UltraGrid.Reflector.service
 		echo -e "Reload_reflector flag is being set to 0.."
-		KEYNAME=reload_reflector
-		KEYVALUE=0
-		write_etcd_global
+		KEYNAME=reload_reflector; KEYVALUE=0; write_etcd_global
 		# Audio reflector, IP settings identical to video reflector so we don't need to do all that again
-		KEYNAME=AUDIO_REFLECTOR_ARGS
-		ugargs="--tool hd-rum-transcode 2M 5006 ${deDupReturnClientsIP}"
-		KEYVALUE="${ugargs}"
-		write_etcd_global
+		KEYNAME=AUDIO_REFLECTOR_ARGS; ugargs="--tool hd-rum-transcode 2M 5006 ${deDupReturnClientsIP}"; KEYVALUE="${ugargs}"; write_etcd_global
 		echo -e "[Unit]
 		Description=UltraGrid AppImage Audio Reflector
 		After=network-online.target
@@ -111,6 +102,7 @@ wavelet_reflector() {
 		WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.Audio.Reflector.service
 		systemctl --user daemon-reload
 		systemctl --user restart UltraGrid.Audio.Reflector.service
+		systemctl --user restart UltraGrid.Reflector.service
 		echo -e "Reload_reflector flag is being set to 0.."
 
 		# setup Reflector cleanup service
@@ -130,8 +122,8 @@ wavelet_reflector() {
 		After=network-online.target
 		Wants=network-online.target
 		[Timer]
-		OnBootSec=300s
-		OnUnitActiveSec=300s
+		OnBootSec=500s
+		OnUnitActiveSec=500s
 		[Install]
 		WantedBy=default.target
 		" > /home/wavelet/.config/systemd/user/Wavelet_reflector_janitor.timer

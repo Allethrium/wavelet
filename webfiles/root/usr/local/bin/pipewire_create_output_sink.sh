@@ -1,81 +1,73 @@
 #!/bin/bash
 # Ref Arch Linux Wiki - https://wiki.archlinux.org/title/WirePlumber
+# The issues this module addresses will require some amount of work.
 
-#Etcd Interaction
-ETCDURI=http://192.168.1.32:2379/v2/keys
-ETCDENDPOINT=192.168.1.32:2379
+# Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
-		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get /$(hostname)/${KEYNAME} --print-value-only)
-		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
-
-read_etcd_prefix(){
-		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix /$(hostname)/${KEYNAME} --print-value-only)
-		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)"
-}
-
 read_etcd_global(){
-		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
-		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for Global value"
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
+	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
 }
-
-write_etcd(){
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/${KEYNAME}" -- "${KEYVALUE}"
-		echo -e "${KEYNAME} set to ${KEYVALUE} for $(hostname)"
-}
-
-write_etcd_global(){
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put "${KEYNAME}" -- "${KEYVALUE}"
-		echo -e "${KEYNAME} set to ${KEYVALUE} for Global value"
-}
-
-write_etcd_clientip(){
-		# Variable changed to IPVALUE because the module was picking up incorrect variables and applying them to /decoderip !
-		ETCDCTL_API=3 etcdctl --endpoints=${ETCDENDPOINT} put /decoderip/$(hostname) "${IPVALUE}"
-		echo -e "decoderip/$(hostname) set to ${IPVALUE} for Global value"
+read_etcd_prefix(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
 }
 read_etcd_clients_ip() {
-		ETCDCTL_API=3 return_etcd_clients_ip=$(etcdctl --endpoints=${ETCDENDPOINT} get --prefix "/decoderip/" --print-value-only)
+	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
+}
+read_etcd_clients_ip_sed() {
+	# We need this to manage the \n that is returned from etcd.
+	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
+	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
+}
+write_etcd(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
+}
+write_etcd_global(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
+}
+write_etcd_client_ip(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
+}
+delete_etcd_key(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
 }
 
+magewell(){
+	#grep for serial number
+	#return search string
+}
+
+ipevo(){
+	#find any audio that's sqawking at all and select it
+	#return search string
+}
+
+lgCapture(){
+	#find any lg device we can
+	#return search string
+}
 
 main(){
 	# Create a new sink called Simultaneous Output
-	pw-cli create-node adapter '{ factory.name=support.null-audio-sink node.name="SimultaneousOutput" \
-								node.description="SimultaneousOutput" media.class=Audio/Sink object.linger=true \
-								audio.position=[FL FR] }'
-	
+	pw-cli create-node adapter '{ factory.name=support.null-audio-sink node.name="SimultaneousOutput" node.description="SimultaneousOutput" media.class=Audio/Sink object.linger=true audio.position=[FL FR] }'
 	# etcdctl find current video source
-	KEYNAME="uv_hash_select"
-	read_etcd_global
-	currentVideoInputHash=${printvalue}
-	KEYNAME="/short_hash/${currentVideoInputHash}"
-	read_etcd_global
-	currentVideoPath=${printvalue}
+	KEYNAME="uv_hash_select"; read_etcd_global; currentVideoInputHash="${printvalue}"
+	KEYNAME="/short_hash/${currentVideoInputHash}"; read_etcd_global; currentVideoPath="${printvalue}"
 
-	case in ${currentVideoPath}
-		if we have a magewell device we probably have a serial number
-			;;
-		if we have an IPEVO device, we probably won't want audio from it 
-			;;
-		if we have an LG capture card, we will just pick one and hope for the best..
-			;;
-	esac
-
-	magewell(){
-		grep for serial number
-		return search string
-	}
-
-	ipevo(){
-		find any audio that's sqawking at all and select it
-		return search string
-	}
-
-	lgCapture(){
-		find any lg device we can
-		return search string
-	}
+	#case in ${currentVideoPath}
+		#if we have a magewell device we probably have a serial number
+		#	;;
+		#if we have an IPEVO device, we probably won't want audio from it 
+		#	;;
+		#if we have an LG capture card, we will just pick one and hope for the best..
+		#	;;
+	#esac
 
 	# compare current video source to available audio inputs, start w/ Vendor and then run through serial# etc..
 	# if ${searchstring} match; then
@@ -100,4 +92,12 @@ main(){
 	wpctl set-default `wpctl status | grep "\. SimultaneousOutput" | egrep '^ │( )*[0-9]*' -o | cut -c6-55 | egrep -o '[0-9]*'`wpctl}
 
 set -x
+logName=/home/wavelet/pipewire_input.log
+if [[ -e $logName || -L $logName ]] ; then
+	i=0
+	while [[ -e $logName-$i || -L $logName-$i ]] ; do
+		let i++
+	done
+	logName=$logName-$i
+fi
 main

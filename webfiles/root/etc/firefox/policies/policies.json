@@ -29,7 +29,7 @@
 		],
 		"CaptivePortal": false,
 		"Certificates": {
-			"Install": ["cert1.der", "/home/wavelet/svrCert.pem"],
+			"Install": ["cert1.der", "/home/wavelet/svrCert.pem"]
 		},
 		"DefaultDownloadDirectory": "${home}/Downloads",
 		"DisableBuiltinPDFViewer": true,
@@ -59,7 +59,7 @@
 		"DisplayMenuBar": "never",
 		"DNSOverHTTPS": {
 			"Enabled":  false,
-			"Locked": true,
+			"Locked": true
 		},
 		"DontCheckDefaultBrowser": true,
 		"DownloadDirectory": "${home}/Downloads",
@@ -68,7 +68,7 @@
 			"Locked": true,
 			"Cryptomining": true,
 			"Fingerprinting": true,
-			"EmailTracking": true,
+			"EmailTracking": true
 		},
 		"EncryptedMediaExtensions": {
 			"Enabled": true,
@@ -164,7 +164,7 @@
 			"FTPProxy": "hostname",
 			"SOCKSProxy": "hostname",
 			"Passthrough": "<local>",
-			"AutoConfigURL": "URL_TO_AUTOCONFIG",
+			"AutoConfigURL": "URL_TO_AUTOCONFIG"
 		},
 		"RequestedLocales": "de,en-US",
 		"SanitizeOnShutdown": {

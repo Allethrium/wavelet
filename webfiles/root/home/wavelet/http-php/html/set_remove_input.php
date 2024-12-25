@@ -65,6 +65,8 @@ if (str_contains ($value, '/network_ip/')) {
                 del_etcd($key);
                 del_etcd("/hash/$value");
                 del_etcd("/short_hash/$value");
-                del_etcd("/long_interface/$value");
+                del_etcd("/long_interface/dev/v4l/by-id/$value");
+                // we need to get the target hostname and apply it here.
+                // del_etcd("$hostName/inputs/dev/v4l/by-id/$value");
 }
 ?>

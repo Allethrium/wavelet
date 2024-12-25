@@ -20,17 +20,18 @@ install_ug_depends(){
 		# removed mkdir build && cd build too
 		cmake -DBUILD_TOOLS=OFF
 		cmake --build . --parallel "$(nproc)"
-		sudo cmake --install .
+		cmake --install .
 		cd /var/home/wavelet
 	}
 	install_libaja(){
 		#Install libAJA Library
+		# Setting driver=ON breaks because I think it expects a card with valid S/N to be present.
 		git clone https://github.com/aja-video/libajantv2.git && \
-		cmake -DAJANTV2_DISABLE_DEMOS=ON  -DAJANTV2_DISABLE_DRIVER=OFF \
+		cmake -DAJANTV2_DISABLE_DEMOS=ON  -DAJANTV2_DISABLE_DRIVER=ON \
 		-DAJANTV2_DISABLE_TOOLS=ON  -DAJANTV2_DISABLE_TESTS=ON \
 		-DAJANTV2_BUILD_SHARED=ON \
 		-DCMAKE_BUILD_TYPE=Release -Blibajantv2/build -Slibajantv2 && \
-		cmake --build libajantv2/build --config Release -j "1" && \
+		cmake --build libajantv2/build --config Release -j "$(nproc)" && \
 		sleep 2 && \
 		sudo cmake --install libajantv2/build
 		cd /var/home/wavelet
@@ -39,6 +40,8 @@ install_ug_depends(){
 		# Live555
 		git clone https://github.com/xanview/live555/
 		cd live555
+		# Ensure DNO_STD_LIB is set otherwise compilation will fail
+		sed -i 's|-D_FILE_OFFSET_BITS=64 -fPIC|-D_FILE_OFFSET_BITS=64 -fPIC -DNO_STD_LIB|g' /var/home/wavelet/live555/config.linux-with-shared-libraries
 		./genMakefiles linux-with-shared-libraries
 		make -j "$(nproc)"
 		make install
@@ -69,20 +72,32 @@ install_ug_depends(){
 		echo -e "\nLibNDI Installed..\n"
 		cd /var/home/wavelet
 	}
-	#install_libaja
+	install_libaja
 	install_cineform
 	install_live555
 	install_libndi
 	touch /var/ug_depends.complete
+	# This ought to be some kind of useful process for MOK signing but so far... not working.
+	# kmodgenca -a
+	# openssl passwd wavelet123 > /var/home/wavelet/mok_pw
+	# Found sbctl, perhaps this would work?
+	cd /var/home/wavelet/
+	git clone https://github.com/foxboron/sbctl.git
+  	cd /var/home/wavelet/sbctl
+  	git config --global --add safe.directory /var/home/wavelet/sbctl
+  	make
+  	make install
+  	cd ..
+	#sbctl create-keys
+	#sbctl enroll-keys
+	#mokutil --hash-file /var/home/wavelet/mok_pw --import /etc/pki/akmods/certs/public_key.der
+
 }
 
 rpm_ostree_install_git(){
 	# Needed because otherwise sway launches the userspace setup before everything is ready
 	# Some other packages which do not install properly in the ostree container build are also included here
 	/usr/bin/rpm-ostree install -y -A git
-	# We have to install avahi this way because the ostree overlay does NOT install dependencies correctly, and it's REQUIRED for NDI to function.
-	# --from repo='updates' necessary, otherwise rpm-ostree complains about non-local overrides not being implemented.
-	#/usr/bin/rpm-ostree override replace avahi --experimental --from repo='updates'
 }
 
 rpm_ostree_install(){
@@ -123,30 +138,27 @@ generate_decoder_iso(){
 
 install_wavelet_modules(){
 	gitcommand="/usr/bin/git"
-	cd /var/home/wavelet
-	if [[ -f /var/developerMode.enabled ]]; then
-		echo -e "\n\n***WARNING***\n\nDeveloper Mode is ON\n\nCloning from development repository..\n"
-		GH_USER="armelvil"
-		GH_BRANCH="armelvil-working"
-	else
-		echo -e "\nDeveloper mode off, cloning main branch..\n"
-		GH_USER="ALLETHRIUM"
-	fi
-	GH_REPO="https://github.com/Allethrium/wavelet"
 	# Git complains about the directory already existing so we'll just work in a tmpdir for now..
 	rm -rf /var/home/wavelet/wavelet-git
 	mkdir -p /var/home/wavelet/wavelet-git
-	echo -e "\nCommand is; ${gitcommand} clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/wavelet-git\n"
-	git clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/wavelet-git && echo -e "Cloning git repository..\n"
+	cd /var/home/wavelet
+	GH_REPO="https://github.com/Allethrium/wavelet"
+	if [[ -f /var/developerMode.enabled ]]; then
+		echo -e "\n\n***WARNING***\n\nDeveloper Mode is ON\n\nCloning from development repository..\n"
+		GH_BRANCH="armelvil-working"
+		git clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/wavelet-git && echo -e "Cloning git Dev repository..\n"
+	else
+		echo -e "\nDeveloper mode off, cloning main branch..\n"
+		git clone https://github.com/ALLETHRIUM/wavelet /var/home/wavelet/wavelet-git && echo -e "Cloning git Master repository..\n"
+	fi
 	generate_tarfiles
 	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
 	extract_base
 	extract_home
 	extract_usrlocalbin
-	hostname=$(hostname)
-	echo -e "${hostname}" > /var/lib/dnsmasq/hostname.local
+	echo -e "$(hostname)" > /var/lib/dnsmasq/hostname.local
 	# Perform any further customization required in our scripts, and clean up.
-	sed -i "s/!!hostnamegoeshere!!/${hostname}/g" /usr/local/bin/wavelet_network_sense.sh
+	sed -i "s/hostnamegoeshere/$(hostname)/g" /usr/local/bin/wavelet_network_sense.sh
 	touch /var/extract.target
 }
 
@@ -213,6 +225,19 @@ fun_with_dkms(){
 #
 ####
 
+
+# Set server hostname for network sense.  
+sed -i "s|hostnamegoeshere|\"$(hostname)\"|g" /usr/local/bin/wavelet_network_sense.sh
+
+# Fix AVAHI otherwise NDI won't function correctly, amongst other things;  https://www.linuxfromscratch.org/blfs/view/svn/basicnet/avahi.html
+# Runs first because it doesn't matter what kind of server/client device, it'll need this.
+groupadd -fg 84 avahi && useradd -c "Avahi Daemon Owner" -d /run/avahi-daemon -u 84 -g avahi -s /bin/false avahi
+groupadd -fg 86 netdev
+systemctl enable avahi-daemon.service --now
+
+# Fix gssproxy SElinux bug
+ausearch -c '(gssproxy)' --raw | audit2allow -M my-gssproxy
+semodule -X 300 -i my-gssproxy.pp
 
 exec >/home/wavelet/ug_depends.log 2>&1
 rpm_ostree_install_git

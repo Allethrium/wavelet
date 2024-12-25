@@ -18,30 +18,52 @@ UG_HOSTNAME=$(hostname)
 				esac
 }
 
-
-
-#Etcd Interaction
-ETCDURI=http://192.168.1.32:2379/v2/keys
-ETCDENDPOINT=192.168.1.32:2379
-ETCDCTL_API=3
-
+# Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
+read_etcd(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
+}
 read_etcd_global(){
-		ETCDCTL_API=3 printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} get ${KEYNAME} --print-value-only)
-		echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for Global value"
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
+	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
+}
+read_etcd_prefix(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
+	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
+}
+read_etcd_clients_ip() {
+	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
+}
+read_etcd_clients_ip_sed() {
+	# We need this to manage the \n that is returned from etcd.
+	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
+	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
+}
+write_etcd(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
+}
+write_etcd_global(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
+}
+write_etcd_client_ip(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
+}
+delete_etcd_key(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
 }
 
-
 event_decoder(){
-# Kill the systemd monitor task for a few moments
-systemctl --user stop wavelet-decoder-reveal.service
-echo -e "\nDecoder Reveal flag change detected, resetting flag and displaying reveal card for 15 seconds..\n\n\n"
-etcdctl --endpoints=${ETCDENDPOINT} put "/$(hostname)/DECODER_REVEAL" -- "0"
-systemctl --user stop UltraGrid.AppImage.service
-mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.reveal
-# set ug_args to generate and display smpte testcard
-ug_args="--tool uv -t testcard:pattern=smpte_bars -d vulkan_sdl2:fs --param use-hw-accel"
-echo -e "
-[Unit]
+	# Kill the systemd monitor task for a few moments
+	systemctl --user stop wavelet-decoder-reveal.service
+	echo -e "\nDecoder Reveal flag change detected, resetting flag and displaying reveal card for 10 seconds..\n"
+	KEYNAME="/$(hostname)/DECODER_REVEAL"; KEYVALUE="0"; write_etcd_global
+	systemctl --user stop UltraGrid.AppImage.service
+	mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.reveal
+	# set ug_args to generate and display smpte testcard
+	ug_args="--tool uv -t testcard:pattern=smpte_bars -d vulkan_sdl2:fs --param use-hw-accel"
+echo -e "[Unit]
 Description=UltraGrid AppImage executable
 After=network-online.target
 Wants=network-online.target
@@ -51,15 +73,15 @@ ExecStart=/usr/local/bin/UltraGrid.AppImage ${ug_args}
 Restart=always
 [Install]
 WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
-systemctl --user daemon-reload
-systemctl --user start UltraGrid.AppImage.service
-sleep 10
-systemctl --user stop UltraGrid.AppImage.service
-mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.reveal /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
-systemctl --user daemon-reload
-systemctl --user start UltraGrid.AppImage.service
-echo -e "\nTask Complete.\n"
-exit 0
+	systemctl --user daemon-reload
+	systemctl --user start UltraGrid.AppImage.service
+	sleep 10
+	systemctl --user stop UltraGrid.AppImage.service
+	mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.reveal /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
+	systemctl --user daemon-reload
+	systemctl --user start UltraGrid.AppImage.service
+	echo -e "\nTask Complete.\n"
+	exit 0
 }
 
 ###
@@ -68,11 +90,10 @@ exit 0
 #
 ###
 
-set -x
+#set -x
 exec >/home/wavelet/wavelet_reveal_decoder.log 2>&1
 
-KEYNAME=/$(hostname)/DECODER_REVEAL
-		read_etcd_global
+KEYNAME="/$(hostname)/DECODER_REVEAL"; read_etcd_global
 		if [[ "${printvalue}" == 1 ]]; then
 				echo -e "\ninput_update key is set to 1, continuing with task.. \n"
 				detect_self
