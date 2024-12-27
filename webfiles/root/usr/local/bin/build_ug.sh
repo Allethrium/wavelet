@@ -175,7 +175,7 @@ event_server(){
 		echo -e "\nPXE service up and running, continuing..\n"
 	else
 		echo -e "\nPXE service has not completed setup, exiting until the next reboot..\n"
-		exit 1
+		exit 0
 	fi
 
 	if [[ -f /var/home/wavelet/server_bootstrap_completed ]]; then
@@ -186,7 +186,8 @@ event_server(){
 		echo -e "Server bootstrap not completed\n"
 		server_bootstrap
 	fi
-	# The server runs a superset of most of the client machines units, however it shouldn't be renamed.
+	# The server runs a superset of most of the client machines units, however it shouldn't support renaming.
+	event_clear_devicemap
 	event_generateHash svr
 	event_generate_reflector
 	event_generate_controller
@@ -555,6 +556,12 @@ event_host_relabel_watcher(){
 	# Watches for a device relabel flag, then runs wavelet_device_relabel.sh
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/RELABEL 0 0 "wavelet_device_relabel" \'relabel\'
 	systemctl --user enable wavelet_device_relabel.service --now
+}
+event_clear_devicemap(){
+	# Clears the device map file so it will be regenerated.  Since the paths under v4l2 aren't stable, 
+	# we need to do this to avoid the channel indexing becoming incorrect
+	rm -rf /var/home/wavelet/device_map_entries_verity
+	echo -e "Device map file removed, will be regenerated on input device selection."
 }
 
 
