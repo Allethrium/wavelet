@@ -220,6 +220,8 @@ detect() {
 	;;
 	*Dell_Webcam_WB3023*)			echo -e "Dell WB3023 Webcam	device detected.."					&& event_dellWB3023
 	;;
+	*Integrated_Webcam_FHD*)		echo -e "Dell Integrated FHD device detected.."					&& event_dellIntFHD
+	;;
 	*)								echo -e "Unknown device detected, attempting to process.."		&& event_unknowndevice
 	;;
 	esac
@@ -251,6 +253,11 @@ event_epson() {
 event_dellWB3023(){
 	echo -e "Setting up Dell WB3023 webcam.."
 	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=NV12:size=640x480:tpf=1/30:device=${v4l_device_path}"; write_etcd
+	echo -e "Detection completed for device..\n"
+}
+event_dellIntFHD(){
+	echo -e "Setting up Dell Integrated Laptop Webcam.."
+	KEYNAME="inputs${device_string_long}"; KEYVALUE="-t v4l2:codec=YUYV:size=640x480:tpf=1/30:device=${v4l_device_path}"; write_etcd
 	echo -e "Detection completed for device..\n"
 }
 event_unknowndevice() {
