@@ -449,9 +449,9 @@ Description=Wavelet UI service
 After=network-online.target
 Wants=network-online.target
 [Service]
+Type=oneshot
 ExecStartPre=/bin/sleep 8
 ExecStart=/bin/bash -c "/usr/local/bin/wavelet_start_UI.sh"
-Restart=always
 [Install]
 WantedBy=default.target' > /var/home/wavelet/.config/systemd/user/wavelet_ui.service
 		# Boots after first boot since the systemd unit is enabled here
