@@ -108,13 +108,15 @@ connectwifi_enterprise(){
 detect_disable_ethernet(){
 	if [[ -f /var/no.wifi ]]; then
 		echo -e "The /var/no.wifi flag is set.  Please remove this file if this host should utilize wireless connectivity."
+		exit 0
 	else
-		# Simplify this from the previous loop, just find ethernet interface and awk for connection UUID, then disable.
 		ethernetInterfaceUUID=$(nmcli con show | grep ethernet | awk '{print $4}')
-		nmcli -f uuid con down "${ethernetInterfaceUUID}"
-		# We need to set the CONNECTION do be down, NOT the interface.
-		#nmcli device disconnect "${ethernetInterface}"
-		echo -e "The primary ethernet connection with UUID ${ethernetInterfaceUUID} has been disabled.\nTo re-enable, you can use:\nnmcli con up ${ethernetInterfaceUUID}\nOr:\nnmtui\nFor a gui interface."
+		if [[ $(nmcli -g ipv4.addresses con show uuid ${ethernetInterfaceUUID}) == "" ]]; then
+			# Simplify this from the previous loop, just find ethernet interface and awk for connection UUID, then disable.
+			echo "Ethernet connection detected with no IPV4 address.  Ethernet disconnected or disabled, doing nothing."
+		else
+			nmcli -f uuid con down "${ethernetInterfaceUUID}"
+			echo -e "The primary ethernet connection with UUID ${ethernetInterfaceUUID} has been disabled.\nTo re-enable, you can use:\nnmcli con up ${ethernetInterfaceUUID}\nOr:\nnmtui\nFor a gui interface."
 	fi
 }
 
@@ -165,5 +167,5 @@ if [[ $1 == *"E"* ]]; then
 else
 	echo -e "no flags with module call, disabling ethernet connection."
 	connectwifi
-	#detect_disable_ethernet
+	detect_disable_ethernet
 fi
