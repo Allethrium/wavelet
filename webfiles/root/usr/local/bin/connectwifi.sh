@@ -35,23 +35,22 @@ connectwifi_psk(){
 	echo -e "Found WiFi BSSID match! It is: ${wifibssid}\n"
 
 	# Remove any old connection UUID's with the same name
+	nmcli con del ${networkssid}
+	# Create new connection
 	response=$(nmcli connection add type wifi con-name ${networkssid} ifname ${ifname} ssid ${networkssid})
 	currentuuid=$(echo $response | awk '{print $3}' | sed 's|(||g' | sed 's|)||g')
+	echo "Created Wavelet network connection with UUID: ${currentuuid}"
+	echo -e "Available network connections:\n$(nmcli con show)"
 	for connection in $(nmcli -g NAME con show); do
 		if [[ ${connection} == ${networkssid} ]]; then
-			echo "Is a wavelet-configured wifi connection, proceeding.."
+			echo "${connection} is a wavelet-configured WiFi connection, proceeding.."
 			uuid=$(nmcli -g connection.uuid con show "${connection}")
-			if [[ ${uuid} == ${currentuuid} ]]; then
-				echo "connection is the active UUID, configuring and setting as ON"
-				nmcli con mod ${connection} wifi-sec.key-mgmt wpa-psk wifi-sec.psk ${wifipassword}
-				nmcli con mod ${connection} connection.autoconnect yes
-				#nmcli dev set ${ifname} autoconnect yes
-				nmcli con up ${connection}
-				echo "${currentuuid}" > /var/home/wavelet/wifi.${networkssid}.key
-			else
-				echo "UUID does not match the new WiFi connection, removing."
-				nmcli con del ${connection}
-			fi
+			echo "connection is the active UUID, configuring and setting as ON"
+			nmcli -g connection.uuid con mod ${uuid} wifi-sec.key-mgmt wpa-psk wifi-sec.psk ${wifipassword}
+			nmcli -g connection.uuid con mod ${uuid} connection.autoconnect yes
+			#nmcli dev set ${ifname} autoconnect yes
+			nmcli -g connection.uuid con up ${uuid}
+			echo "${currentuuid}" > /var/home/wavelet/wifi.${networkssid}.key
 		else
 			echo "Not a wavelet configured wifi connection, ignoring"
 		fi
@@ -166,5 +165,5 @@ if [[ $1 == *"E"* ]]; then
 else
 	echo -e "no flags with module call, disabling ethernet connection."
 	connectwifi
-	detect_disable_ethernet
+	#detect_disable_ethernet
 fi
