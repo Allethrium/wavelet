@@ -172,7 +172,7 @@ event_ptz_ndiHX(){
 		if [ -n ${ndiSource} ]; then
 			echo -e "\nNDI source for this IP address not found, configuring for RTSP..\n"
 			UGdeviceStreamCommand="rtsp://${ipAddr}:554/1:decompress"
-			if [[ $(ffprobe -v quiet -show_streams ${UGdeviceStreamCommand}) ]]; then
+			if [[ $(ffprobe -v quiet -show_streams rtsp://${ipAddr}:554/1) ]]; then
 
 				populate_to_etcd
 				echo -e "Device RTSP configured, however it may not work without further settings.\n"
