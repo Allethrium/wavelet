@@ -118,6 +118,7 @@ event_gateway(){
 
 event_decoder(){
 	echo -e "Decoder routine started."
+	event_connectwifi
 	echo -e "Setting up systemd services to be a decoder, moving to run_ug"
 	event_reveal
 	event_reboot
@@ -133,12 +134,12 @@ event_decoder(){
 }
 
 event_encoder(){
-	echo -e "reloading systemctl user daemon, moving to run_ug"
+	echo -e "Encoder routine started.."
 	if [[ -f /var/no.wifi ]]; then
 		echo "wifi disabled on this host.."
 		:
-	else		
-		wifi_connect_retry
+	else
+		event_connectwifi
 	fi
 	systemctl --user daemon-reload
 	/usr/local/bin/run_ug.sh
@@ -564,6 +565,28 @@ event_clear_devicemap(){
 	echo -e "Device map file removed, will be regenerated on input device selection."
 }
 
+event_connectwifi(){
+	# Does not configure wifi, but attempts to list and connect a wavelet WiFi connection
+	# Assumes valid polkit rules allowing wavelet user to manage network connections
+	nmcli r wifi on
+	if [[ $(hostname) = *"svr"* ]]; then
+		echo -e "This script enables wifi and disables other networking devices.  It is highly recommended to have the server running on a wired link."
+		echo -e "If you want to run the server via a WiFi connection, this should be configured and enabled manually via nmtui or nmcli."
+		echo -e "Performance will likely suffer as a result."
+	fi
+	if [[ -f /var/no.wifi ]]; then
+		echo -e "The /var/no.wifi flag is set.  Please remove this file if this host should utilize wireless connectivity."
+	fi
+
+	if [[ ! -f /var/home/wavelet/wifi.*.key ]]; then
+		echo "No file found for network configuration, connectwifi has failed, there is no available wireless connection.  Attempting to re-run connectwifi.."
+		/usr/local/bin/connectwifi.sh
+	fi
+	networkUUID=$(cat /var/home/wavelet/wifi.*.key)
+	# Set autoconnection again and ensure wifi is up
+	nmcli -g connection.uuid con mod ${networkUUID} connection.autoconnect yes
+	nmcli -g connection.uuid con up ${networkUUID}
+}
 
 #####
 #
