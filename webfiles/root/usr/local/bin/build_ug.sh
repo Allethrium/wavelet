@@ -577,8 +577,10 @@ event_connectwifi(){
 	if [[ -f /var/no.wifi ]]; then
 		echo -e "The /var/no.wifi flag is set.  Please remove this file if this host should utilize wireless connectivity."
 	fi
-
-	if [[ ! -f /var/home/wavelet/wifi.*.key ]]; then
+	files=$(find /var/home/wavelet -maxdepth 1 -name "wifi.*.key")
+	if [[ ${#files[@]} -gt 0 ]]; then
+		echo "Network configuration file found, continuing and getting UUID for connection.."
+	else
 		echo "No file found for network configuration, connectwifi has failed, there is no available wireless connection.  Attempting to re-run connectwifi.."
 		/usr/local/bin/connectwifi.sh
 	fi
