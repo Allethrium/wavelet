@@ -47,7 +47,7 @@ parse_input_opts(){
 event_detect_networkDevice(){
 	# We write out a lease file to /var/tmp/
 	# Inotifywait will monitor this directory and process the most recent .lease file.  The actual device setup will be launched as the wavelet user.
-	if [[ -f /var/tmp/${dnsmasq_ipAddr_${dnsmasq_mac}} ]]; then
+	if [[ -f "/var/tmp/${dnsmasq_ipAddr}_${dnsmasq_mac}" ]]; then
 		echo "Lease file for this IP/MAC already generated, doing nothing."
 		exit 0
 	else

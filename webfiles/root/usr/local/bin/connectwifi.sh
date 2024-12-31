@@ -117,6 +117,7 @@ detect_disable_ethernet(){
 		else
 			nmcli -f uuid con down "${ethernetInterfaceUUID}"
 			echo -e "The primary ethernet connection with UUID ${ethernetInterfaceUUID} has been disabled.\nTo re-enable, you can use:\nnmcli con up ${ethernetInterfaceUUID}\nOr:\nnmtui\nFor a gui interface."
+		fi	
 	fi
 }
 
