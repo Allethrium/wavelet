@@ -130,17 +130,10 @@ encoder_event_server(){
 		localInputs[$index]=${element}
 		serverInputDevices[$index]=${element}; serverInputDevicesOrders+=( $element )
 	done
-
-	#echo -e "Final local array contents:\n"
-	#for i in "${localInputs[@]}"; do
-	#	echo -e "$i"
-	#done
-
 	# Increment index by N devices present in the local inputs array
 	localInputsOffset=$(echo ${#localInputs[@]})
 	echo -e "${localInputsOffset} device(s) in array..\n"
 	index=( ${index} + ${localInputsOffset} )
-
 	# Now we do the same for net devices
 	declare -A networkInputs=()
 	KEYNAME="/network_uv_stream_command/"; read_etcd_prefix_global;
@@ -160,17 +153,10 @@ encoder_event_server(){
 			networkInputs[$index]=${element}
 			serverInputDevices[$index]=${element}
 		done
-
-		#echo -e "Final network array contents:\n"
-		#for i in "${networkInputs[@]}"; do
-		#	echo -e "$i"
-		#done
-
 		networkInputsOffset=$(echo ${#networkInputs[@]})
 		echo -e "${networkInputsOffset} device(s) in array..\n"
 		index=( ${index} + ${networkInputsOffset} )
 	fi
-
 	# Convert the completed array back to strings, generate mapfile for controller and echo for verification
 	echo "" > /var/home/wavelet/device_map_entries_verity
 	mapfile -d '' sortedserverInputDevices < <(printf '%s\0' "${!serverInputDevices[@]}" | sort -z)
@@ -195,6 +181,7 @@ encoder_event_server(){
 	echo -e "\nGenerated command line input into etcd is:\n${commandLine}\nConverting to base64 and injecting to etcd.."
 	encodedCommandLine=$(echo "${commandLine}" | base64 -w 0)
 	KEYNAME="/$(hostname)/serverInputs"; KEYVALUE="${encodedCommandLine}"; write_etcd_global
+	read_banner_status
 }
 
 encoder_event_setfourway(){
@@ -263,6 +250,7 @@ encoder_event_singleDevice(){
 }
 
 event_encoder(){
+	# This is for an additional encoder, however it will probably eventually be migrated to the server routine above once I'm satisfied it's solid.
 	# Before we do anything, check that we have an input device present.
 		KEYNAME=INPUT_DEVICE_PRESENT; read_etcd
 				if [[ "$printvalue" -eq 1 ]]; then
@@ -291,22 +279,7 @@ event_encoder(){
 	# Encoder SubLoop
 	# call uv_hash_select to process the provided device hash and select the input from these data
 	read_uv_hash_select
-	# Reads Filter settings, should be banner.pam most of the time
-	# If banner isn't enabled filtervar will be null, as the logo.c file can result in crashes with RTSP streams and some other pixel formats.
-	KEYNAME="/banner/enabled"; read_etcd_global; bannerStatus=${printvalue}
-	echo -e "Banner status is: ${bannerStatus}"
-	if [[ "${bannerStatus}" -eq 1 ]]; then
-		echo -e "Banner is enabled, so filtervar will be set appropriately.  Note currently the logo.c file in UltraGrid can generate errors on particular kinds of streams!..\n"
-		KEYNAME=uv_filter_cmd; read_etcd_global; filtervar=${printvalue}
-		/usr/local/bin/wavelet_textgen.sh
-		if [[ ${filtervar} =~ "--capture-filter" ]]; then
-			echo "filterVar has an illegal or incomplete command, unsetting.."
-			unset filtervar
-		fi
-	else 
-		echo -e "Banner is not enabled, so filtervar will be set to NULL..\n"
-		filtervar=""
-	fi
+	read_banner_status
 	# Reads Encoder codec settings, should be populated from the Controller
 	KEYNAME=uv_encoder; read_etcd_global; encodervar=${printvalue}
 	# Videoport is always 5004 unless we are doing some strange future project requiring bidirectionality or conference modes
@@ -315,28 +288,12 @@ event_encoder(){
 	KEYNAME=uv_audioport; read_etcd_global; audio_port=${printvalue}
 	# Destination IP is the IP address of the UG Reflector, usually the server IP or it could also be an overflow reflector for externalization.
 	KEYNAME=REFLECTOR_IP; read_etcd_global; destinationipv4=${printvalue}
-
-	# Currently -f V:rs:200:240 on the end specifies reed-solomon forward error correction 
-	# For higher btirate streams, we can use "-f LDGM:40%" - must be >2mb frame size - so probably useless unless WiFi 8+ is MUCH faster and has jumbo packets..
-	# Audio runs as a multiplied stream, there are issues ensuring Pipewire autoselects the appropriate device however.
-	# This command would use the switcher;
-	# --tool uv $filtervar -f V:rs:200:250 -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mkv:loop -t testcard:pattern=smpte_bars ${inputvar} -s pipewire -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4}
-	# can be used remote with this kind of tool (netcat) : echo 'capture.data 0' | busybox nc localhost <control_port>
-	# channels 0-2 are:  Blank, Static Image, Test Bars respectively.  The live video device will therefore always be channels >3
 	UGMTU="9000"
-
-	# Command line reference;
-	# --tool uv $filtervar--control-port 6160 -f V:rs:200:250 \
-	# -t switcher -t testcard:pattern=blank -t file:/home/wavelet/seal.mp4:loop -t testcard:pattern=smpte_bars ${audiovar} ${inputvar} \
-	# -c ${encodervar} -P ${video_port} -m ${UGMTU} ${destinationipv4} --param control-accept-global
-
-	# We can use the default UG audio port which binds to 5006, we only need to mess with that if we are sending and receiving.
-
 	# Grab our inputVars
 	KEYNAME="/svr.wavelet.local/serverInputs"; read_etcd_global; serverInputvar=$(echo "${printvalue}" | base64 -d)
 	commandLine=(\
 		[1]="--tool uv" \
-		[2]="${filtervar}" \
+		[2]="${filterVar}" \
 		[3]="--control-port 6160" \
 		[4]="-f V:rs:200:250" \
 		[11]="-t switcher:excl_init" [12]="-t testcard:pattern=blank" [13]="-t file:/var/home/wavelet/seal.mkv:loop" [14]="-t testcard:pattern=smpte_bars" \
@@ -368,6 +325,27 @@ event_encoder(){
 	# Always do first live input, this would be set again by the controller for a different selection.
 	echo 'capture.data 3' | busybox nc -v 127.0.0.1 6160
 }
+
+read_banner_status(){
+	# Reads Filter settings, should be banner.pam most of the time
+	# If banner isn't enabled filterVar will be null, as the logo.c file can result in crashes with RTSP streams and some other pixel formats.
+	KEYNAME="/banner/enabled"; read_etcd_global; bannerStatus=${printvalue}
+	echo -e "Banner status is: ${bannerStatus}"
+	if [[ "${bannerStatus}" -eq 1 ]]; then
+		echo -e "Banner is enabled, so filterVar will be set appropriately.  Note currently the logo.c file in UltraGrid can generate errors on particular kinds of streams!..\n"
+		/usr/local/bin/wavelet_textgen.sh
+		KEYNAME=uv_filter_cmd; read_etcd_global; filterVar=$(echo ${printvalue} | base64 -d)
+		echo "filterVar is: ${filterVar}"
+		if [[ ${filterVar} == "--capture-filter" ]]; then
+			echo "filterVar has an illegal or incomplete command, unsetting.."
+			unset filterVar
+		fi
+	else 
+		echo -e "Banner is not enabled, so filterVar will be set to NULL..\n"
+		unset filterVar
+	fi
+}
+
 
 #####
 #
