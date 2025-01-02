@@ -79,10 +79,10 @@ read_uv_filter() {
 generate_image(){
 	# We MUST generate a BMP - generating a PNG or other format does horrible things when converted to PAM.
 	# working colorspace sRGB
-	convert -size 600x50 --pointsize 30 -background "${color}" -bordercolor "${backgroundcolor}" -border 1 -gravity West -fill white label:"%-  ${filter}" -colorspace sRGB /home/wavelet/banner.bmp
+	magick convert -size 600x50 --pointsize 30 -background "${color}" -bordercolor "${backgroundcolor}" -border 1 -gravity West -fill white label:"%-  ${filter}" -colorspace sRGB /home/wavelet/banner.bmp
 	mogrify -format pam /home/wavelet/banner.bmp
 	echo -e "\n banner.pam generated for value ${filter}. \n"
-	KEYNAME=uv_filter_cmd; KEYVALUE="--capture-filter logo:/home/wavelet/banner.pam:25:25"; write_etcd_global
+	KEYNAME=uv_filter_cmd; KEYVALUE=$(echo "--capture-filter logo:/home/wavelet/banner.pam:25:25" | base64); write_etcd_global
 	exit 0
 }
 
