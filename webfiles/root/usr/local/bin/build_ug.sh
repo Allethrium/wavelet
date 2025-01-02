@@ -611,6 +611,7 @@ fi
 exec > "${logName}" 2>&1
 
 time=0
+event_connectwifi
 until [[ $(/usr/local/bin/wavelet_etcd_interaction.sh "check_status" | awk '{print $6}') = "true," ]]; do
 	echo -e "Etcd still down.. waiting two seconds.."
 	sleep 2
