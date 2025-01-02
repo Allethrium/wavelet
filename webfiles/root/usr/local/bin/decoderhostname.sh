@@ -27,6 +27,8 @@ event_decoder(){
 newhostname=$(LC_ALL=C tr -dc A-Z-0-9 </dev/urandom | head -c 4)
 hostnamectl hostname dec$newhostname.wavelet.local
 /usr/local/bin/connectwifi.sh
+# remember to reset permissions or we get root logfiles
+chown wavelet:wavelet -R /var/home/wavelet
 echo "All set, rebooting decoder.."
 systemctl reboot
 }
