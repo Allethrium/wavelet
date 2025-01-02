@@ -82,7 +82,7 @@ ExecStart=etcdctl --endpoints=${ETCDENDPOINT} \
 --cert-file ${clientCertificateFile} \
 --key-file ${clientKeyFile} \
 --ca-file ${certificateAuthorityFile} \
-watch ${inputKeyName} -w simple -- sh -c "/usr/local/bin/${waveletModule}.sh ${additionalArg}"
+watch ${inputKeyName} -w simple -- /usr/bin/bash -c \"/usr/local/bin/${waveletModule}.sh ${additionalArg}\"
 Restart=always
 
 [Install]
@@ -95,7 +95,7 @@ Wants=network-online.target
 
 [Service]
 ExecStart=etcdctl --endpoints=${ETCDENDPOINT} \
-watch ${inputKeyName} -w simple -- sh -c "/usr/local/bin/${waveletModule}.sh ${additionalArg}"
+watch ${inputKeyName} -w simple -- /usr/bin/bash -c \"/usr/local/bin/${waveletModule}.sh ${additionalArg}\"
 Restart=always
 
 [Install]
