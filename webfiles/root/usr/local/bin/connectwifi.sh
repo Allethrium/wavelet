@@ -45,12 +45,11 @@ connectwifi_psk(){
 		if [[ ${connection} == ${networkssid} ]]; then
 			echo "${connection} is a wavelet-configured WiFi connection, proceeding.."
 			uuid=$(nmcli -g connection.uuid con show "${connection}")
-			echo "connection is the active UUID, configuring and setting as ON"
+			echo "connection is the active UUID of:${uuid}\nConfiguring and setting as ON"
 			nmcli -g connection.uuid con mod ${uuid} wifi-sec.key-mgmt wpa-psk wifi-sec.psk ${wifipassword}
 			nmcli -g connection.uuid con mod ${uuid} connection.autoconnect yes
-			#nmcli dev set ${ifname} autoconnect yes
 			nmcli -g connection.uuid con up ${uuid}
-			echo "${currentuuid}" > /var/home/wavelet/wifi.${networkssid}.key
+			echo "${uuid}" > /var/home/wavelet/wifi.${networkssid}.key
 		else
 			echo "Not a wavelet configured wifi connection, ignoring"
 		fi
