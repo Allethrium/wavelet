@@ -555,7 +555,7 @@ event_device_redetect(){
 
 event_host_relabel_watcher(){
 	# Watches for a device relabel flag, then runs wavelet_device_relabel.sh
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/RELABEL 0 0 "wavelet_device_relabel" \"relabel\""
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /%H/RELABEL 0 0 "wavelet_device_relabel" \"relabel\"
 	systemctl --user enable wavelet_device_relabel.service --now
 }
 event_clear_devicemap(){
