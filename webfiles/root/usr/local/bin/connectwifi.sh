@@ -8,10 +8,18 @@ get_full_bssid(){
 }
 
 connectwifi(){
+	# Check for debug flag
 	if [[ $- == *"x"* ]]; then
 		# Spit out a list of wifi networks so we have something to refer to
 		nmcli con show
 	fi
+
+	# Attempt to connect to the configured wifi before proceeding
+	if nmcli con up $(cat /var/home/wavelet/wifi_ssid); then
+		echo "Configured connection established, exiting."
+		exit 0
+	fi
+
 	if [[ -f /var/prod.security.enabled ]]; then
 		connectwifi_enterprise
 	else
@@ -32,6 +40,8 @@ connectwifi_psk(){
 	done
 	# We need to do this once more, or the variable isn't populated.
 	wifibssid=$(get_full_bssid)
+	# Spit this out for notation purposes
+	nmcli con show
 	echo -e "Found WiFi BSSID match! It is: ${wifibssid}\n"
 
 	# Remove any old connection UUID's with the same name
@@ -45,7 +55,7 @@ connectwifi_psk(){
 		if [[ ${connection} == ${networkssid} ]]; then
 			echo "${connection} is a wavelet-configured WiFi connection, proceeding.."
 			uuid=$(nmcli -g connection.uuid con show "${connection}")
-			echo "connection is the active UUID of:${uuid}\nConfiguring and setting as ON"
+			echo -e "connection is the active UUID of:${uuid}\nConfiguring and setting as ON"
 			nmcli -g connection.uuid con mod ${uuid} wifi-sec.key-mgmt wpa-psk wifi-sec.psk ${wifipassword}
 			nmcli -g connection.uuid con mod ${uuid} connection.autoconnect yes
 			nmcli -g connection.uuid con up ${uuid}
