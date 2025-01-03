@@ -119,11 +119,13 @@ detect_disable_ethernet(){
 		echo -e "The /var/no.wifi flag is set.  Please remove this file if this host should utilize wireless connectivity."
 		exit 0
 	else
+		sleep 2
 		ethernetInterfaceUUID=$(nmcli con show | grep ethernet | awk '{print $4}')
 		echo -e "Ethernet Interface UUID discovered: ${ethernetInterfaceUUID}"
-		if [[ $(nmcli -g ip4.address con show uuid ${ethernetInterfaceUUID}) == "" ]]; then
+		nmcli con show ${ethernetInterfaceUUID}
+		if [[ $(nmcli -f GENERAL.STATE con show uuid ${ethernetInterfaceUUID}) == "*activated*" ]]; then
 			# Simplify this from the previous loop, just find ethernet interface and awk for connection UUID, then disable.
-			echo "Ethernet connection detected with no IPV4 address.  Ethernet is disconnected or disabled, doing nothing."
+			echo "Ethernet connection detected as inactive.  No further action necessary."
 		else
 			nmcli -f uuid con down "${ethernetInterfaceUUID}"
 			echo -e "The primary ethernet connection with UUID ${ethernetInterfaceUUID} has been disabled.\nTo re-enable, you can use:\nnmcli con up ${ethernetInterfaceUUID}\nOr:\nnmtui\nFor a gui interface."
@@ -137,12 +139,12 @@ set_ethernet_mtu(){
 	done
 }
 
+
 #####
 #
 # Main
 #
 #####
-
 
 logName="/var/home/wavelet/connectwifi.log"
 if [[ -e $logName || -L $logName ]] ; then
@@ -154,7 +156,6 @@ if [[ -e $logName || -L $logName ]] ; then
 fi
 #set -x
 exec >${logName} 2>&1
-
 
 if [[ $(hostname) = *"svr"* ]]; then
 	echo -e "This script enables wifi and disables other networking devices.  It is highly recommended to have the server running on a wired link."
