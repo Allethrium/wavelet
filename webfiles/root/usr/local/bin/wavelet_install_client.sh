@@ -58,17 +58,7 @@ install_security_layer(){
 		echo -e "Reconfiguring etcd client..\n"
 		# Here
 
-		# Reconfigure WiFi to utilize EAP-TTLS
-		echo -e "Reconfiguring WiFi supplicant..\n"
-
-		nmcli con mod ${wifiConnection} \
-		802-11-wireless.ssid 'My Wifi' \
-		802-11-wireless-security.key-mgmt wpa-eap \
-		802-1x.eap tls \
-		802-1x.identity identity@example.com \
-		802-1x.ca-cert /etc/ipa/ca.crt \
-		802-1x.client-cert /etc/nssdb/ \
-		802-1x.private-key /etc/nssdb/
+		# WiFi configuration is handled via connectwifi module
 	else
 		echo -e "security layer is not enabled, not configuring"
 	fi
@@ -82,24 +72,27 @@ install_security_layer(){
 #
 ####
 
+#set -x
+exec > /home/wavelet/client_installer.log 2>&1
 
 # Fix AVAHI otherwise NDI won't function correctly, amongst other things;  https://www.linuxfromscratch.org/blfs/view/svn/basicnet/avahi.html
 # Runs first because it doesn't matter what kind of server/client device, it'll need this.
 groupadd -fg 84 avahi && useradd -c "Avahi Daemon Owner" -d /run/avahi-daemon -u 84 -g avahi -s /bin/false avahi
 groupadd -fg 86 netdev
 systemctl enable avai-daemon.service --now
-
 nmcli dev wifi rescan
-exec > /home/wavelet/client_installer.log 2>&1
 extract_base
 extract_home
 extract_usrlocalbin
 install_security_layer
-touch /var/client_install.complete
-systemctl disable wavelet_install_client.service
 echo -e "Calling connectwifi module"
 /usr/local/bin/connectwifi.sh
 # Move the log file otherwise permissions is an issue and we don't get subsequent log
 # Also reset permissions on wavelet home folder so that any other files generated whilst running under root are writable by the wavelet user
 mv /var/home/wavelet/connectwifi.log /var/home/wavelet/setup_old_connectwifi.log
 chown -R wavelet:wavelet /var/home/wavelet
+# Disable self so we don't run again on the next boot.
+systemctl disable wavelet_install_client.service
+touch /var/client_install.complete
+echo -e "Starting decoder hostname randomizer, this is the final step in the second boot, and will reboot the client machine.."
+systemctl start decoderhostname.service
