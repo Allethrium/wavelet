@@ -173,7 +173,7 @@ storage:
       contents:
         inline: |
           polkit.addRule(function(action, subject) {
-          if (action.id == "org.freedesktop.hostname1.set-hostname") {
+          if (action.id == "org.freedesktop.hostname1.set-static-hostname") {
             if (subject.user == "wavelet") {
               return polkit.Result.YES;
               }
