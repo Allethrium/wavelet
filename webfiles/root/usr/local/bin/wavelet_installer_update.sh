@@ -37,9 +37,23 @@ event_decoder(){
 }
 
 event_server(){
+	# The server requires some additional steps.
 	install_wavelet_modules
 	extract_base
 	extract_home && extract_usrlocalbin
+	# Update with the server hostname - no other device should be doing network sense.
+	sed -i "s/hostnamegoeshere/$(UG_HOSTNAME)/g" /usr/local/bin/wavelet_network_sense.sh
+	FILES=("/var/home/wavelet/wavelet-files.tar.xz" \
+		"/usr/local/bin/wavelet_install_client.sh" \
+		"/usr/local/bin/wavelet_installer_xf.sh" \
+		"/etc/skel/.bashrc" \
+		"/etc/skel/.bash_profile")
+	cp "${FILES[@]}" /var/home/wavelet/http/ignition/
+	chmod -R 0644 /var/home/wavelet/http/ignition/* && chown -R wavelet:wavelet /var/home/wavelet/http
+	# Ensure bashrc and profile have compatible filenames for decoder ignition
+	mv /var/home/wavelet/http/ignition/.bashrc /var/home/wavelet/http/ignition/skel_bashrc.txt
+	mv /var/home/wavelet/http/ignition/.bash_profile /var/home/wavelet/http/ignition/skel_profile.txt
+	restorecon -Rv /var/home/wavelet/http
 }
 
 extract_base(){
@@ -98,6 +112,8 @@ install_wavelet_modules(){
 generate_tarfiles(){
 	echo -e "\nGenerating tar.xz files for upload to distribution server.."
 	cd /var/home/wavelet
+	echo "Removing old archive.."
+	rm -rf wavelet-files.tar.xz
 	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /var/home/wavelet/wavelet-git/webfiles/root/usr/local/bin/ .
 	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /var/home/wavelet/wavelet-git/webfiles/root/home/wavelet/ .
 	echo -e "Packaging files together.."
@@ -114,25 +130,15 @@ generate_tarfiles(){
 #
 #####
 
-# One rather silly thing.. if this module is what gets updated... then that won't work until it is run again the next reboot.  O_O
+# One rather silly thing.. if this module is what gets updated... then that won't work until it is run again the next reboot.
 
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 systemctl disable zincati.service --now
-# Update with the server hostname - no other device should be doing network sense.
-sed -i "s/hostnamegoeshere/$(hostname)/g" /usr/local/bin/wavelet_network_sense.sh
-FILES=("/var/home/wavelet/wavelet-files.tar.xz" \
-	"/usr/local/bin/wavelet_install_client.sh" \
-	"/usr/local/bin/wavelet_installer_xf.sh" \
-	"/etc/skel/.bashrc" \
-	"/etc/skel/.bash_profile")
-cp "${FILES[@]}" /var/home/wavelet/http/ignition/
-chmod -R 0644 /var/home/wavelet/http/ignition/* && chown -R wavelet:wavelet /var/home/wavelet/http
-# Ensure bashrc and profile have compatible filenames for decoder ignition
-mv /var/home/wavelet/http/ignition/.bashrc /var/home/wavelet/http/ignition/skel_bashrc.txt
-mv /var/home/wavelet/http/ignition/.bash_profile /var/home/wavelet/http/ignition/skel_profile.txt
-restorecon -Rv /var/home/wavelet/http
+
 #set -x
 exec >/var/home/wavelet/update_wavelet_modules.log 2>&1
 detect_self
-echo -e "Update completed.  The system will automatically reboot in ten seconds!"
+
+echo -e "Update completed.  The system will automatically reboot in three seconds!"
+sleep 3
 systemctl reboot
