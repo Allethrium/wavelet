@@ -127,7 +127,8 @@ detect_disable_ethernet(){
 			# Simplify this from the previous loop, just find ethernet interface and awk for connection UUID, then disable.
 			echo "Ethernet connection detected as inactive.  No further action necessary."
 		else
-			nmcli -f uuid con down "${ethernetInterfaceUUID}"
+			target=$(nmcli con show --active | grep ethernet | awk '{print $4}')
+			nmcli con down "${target}"
 			echo -e "The primary ethernet connection with UUID ${ethernetInterfaceUUID} has been disabled.\nTo re-enable, you can use:\nnmcli con up ${ethernetInterfaceUUID}\nOr:\nnmtui\nFor a gui interface."
 		fi	
 	fi
