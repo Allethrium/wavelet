@@ -226,7 +226,7 @@ set_channelIndex(){
 	else 
 		echo -e "Device is hosted from a remote encoder.\n"
 		deviceType="R"; targetHost="${controllerInputLabel%/*}"; KEYNAME="/hash/${controllerInputHash}"; read_etcd_global; deviceFullPath=${printvalue}
-		KEYNAME="${deviceFullPath}"; read_etcd_global; searchArg="$(${printvalue} | base64 -d)"
+		KEYNAME="${deviceFullPath}"; read_etcd_global; searchArg="$(echo ${printvalue} | base64 -d)"
 	fi
 
 	echo -e "Target host name is ${targetHost}"
