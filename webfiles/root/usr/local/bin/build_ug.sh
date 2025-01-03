@@ -570,7 +570,6 @@ event_connectwifi(){
 	# Assumes valid polkit rules allowing wavelet user to manage network connections
 	nmcli r wifi on
 	if [[ $(hostname) = *"svr"* ]]; then
-		echo -e "This script enables wifi and disables other networking devices.  It is highly recommended to have the server running on a wired link."
 		echo -e "If you want to run the server via a WiFi connection, this should be configured and enabled manually via nmtui or nmcli."
 		echo -e "Performance will likely suffer as a result."
 	fi
@@ -586,8 +585,10 @@ event_connectwifi(){
 	fi
 	networkUUID=$(cat /var/home/wavelet/wifi.*.key)
 	# Set autoconnection again and ensure wifi is up
-	nmcli -g connection.uuid con mod ${networkUUID} connection.autoconnect yes
-	nmcli -g connection.uuid con up ${networkUUID}
+	# Attempt to connect to the configured wifi before proceeding
+	if nmcli con up $(cat /var/home/wavelet/wifi_ssid); then
+		echo "Configured connection established, continuing."
+	fi
 }
 
 #####
