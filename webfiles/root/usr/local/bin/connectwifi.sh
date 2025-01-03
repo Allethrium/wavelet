@@ -120,9 +120,10 @@ detect_disable_ethernet(){
 		exit 0
 	else
 		ethernetInterfaceUUID=$(nmcli con show | grep ethernet | awk '{print $4}')
-		if [[ $(nmcli -g ipv4.addresses con show uuid ${ethernetInterfaceUUID}) == "" ]]; then
+		echo -e "Ethernet Interface UUID discovered: ${ethernetInterfaceUUID}"
+		if [[ $(nmcli -g ip4.address con show uuid ${ethernetInterfaceUUID}) == "" ]]; then
 			# Simplify this from the previous loop, just find ethernet interface and awk for connection UUID, then disable.
-			echo "Ethernet connection detected with no IPV4 address.  Ethernet disconnected or disabled, doing nothing."
+			echo "Ethernet connection detected with no IPV4 address.  Ethernet is disconnected or disabled, doing nothing."
 		else
 			nmcli -f uuid con down "${ethernetInterfaceUUID}"
 			echo -e "The primary ethernet connection with UUID ${ethernetInterfaceUUID} has been disabled.\nTo re-enable, you can use:\nnmcli con up ${ethernetInterfaceUUID}\nOr:\nnmtui\nFor a gui interface."
