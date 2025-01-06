@@ -200,7 +200,7 @@ event_decoder(){
 	# - other possible failure modes
 	#	???
 	get_ipValue
-	# Resolved is necessary on decoders, encoders, or is?
+	# Systemd-resolved seems very broken on the server, but might be necessary for encoders/decoders.
 	}
 
 event_livestream(){
