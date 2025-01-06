@@ -89,7 +89,7 @@ read_uv_hash_select() {
 
 encoder_event_server(){
 	# Check to see if we have a device update global flag set.  If this is not the case, we don't want to regenerate anything
-	KEYNAME="INPUT_DEVICE_NEW"; read_etcd
+	KEYNAME="/$(hostname)/INPUT_DEVICE_NEW"; read_etcd_global
 	if [[ ${printvalue} -eq "0" ]];then
 		# Do nothing
 		echo -e "\nThe input device update flag is not active, no new devices are available and we do not need to perform these steps to regenerate the AppImage service unit."
@@ -97,7 +97,7 @@ encoder_event_server(){
 		exit 0
 	fi
 	# Consume the device flag by resetting it
-	KEYNAME="$INPUT_DEVICE_NEW"; KEYVALUE="0"; write_etcd
+	KEYNAME="/$(hostname)/INPUT_DEVICE_NEW"; KEYVALUE="0"; write_etcd
 
 	# Because the server is a special case, we want to ensure it can quickly switch between static, net and whatever local devices are populated
 	# We create a sub-array with all of these devices and parse them to the encoder as normal
@@ -252,7 +252,7 @@ encoder_event_singleDevice(){
 event_encoder(){
 	# This is for an additional encoder, however it will probably eventually be migrated to the server routine above once I'm satisfied it's solid.
 	# Before we do anything, check that we have an input device present.
-		KEYNAME=INPUT_DEVICE_PRESENT; read_etcd
+		KEYNAME="/$(hostname)/INPUT_DEVICE_PRESENT"; read_etcd_global
 				if [[ "$printvalue" -eq 1 ]]; then
 						echo -e "An input device is present on this host, continuing.. \n"
 						:
