@@ -1,0 +1,47 @@
+#!/bin/bash
+# Monitors etcd for output and restarts the encoder as necessary
+#
+
+# Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
+read_etcd_global(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
+	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
+}
+write_etcd_global(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
+}
+
+main() {
+	# Checks to see if this host is referenced
+	KEYNAME="ENCODER_QUERY";	read_etcd_global;	hashValue=${printvalue}
+	KEYNAME=uv_input;			read_etcd_global;	controllerInputLabel=${printvalue}
+	targetHost="${controllerInputLabel%/*}"
+	# Determine what kind of device we are dealing with
+	if [[ ${targetHost} == *"network_interface"* ]]; then
+		echo -e "Target Hostname is a network device."
+		detect_self
+	elif [[ "${targetHost}" == *"$(hostname)"* ]]; then
+		echo -e "Target hostname references this host!"
+		systemctl --user restart run_ug.service
+	else 
+		echo -e "Device is hosted on another host"
+		echo -e "Stopping any running encoder services.."
+		detect_self
+		exit 0
+	fi
+}
+
+detect_self(){
+	HOSTNAME=$(hostname)
+	case $HOSTNAME in
+	svr*)					echo -e "I am a Server. Proceeding..."									;	systemctl --user restart run_ug.service
+	;;
+	*) 						echo -e "This isn't a server, terminating process"						;	systemctl --user disable UltraGrid.AppImage.service --now; exit 0
+	;;
+	esac
+}
+
+#set -x
+exec >/home/wavelet/watch_encoderflag.log 2>&1
+main
