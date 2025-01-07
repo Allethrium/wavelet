@@ -94,8 +94,6 @@ detect_self(){
 	;;
 	dec*)					echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."				;	event_decoder
 	;;
-	gateway*)				echo -e "I am an input Gateway for another video streaming system \n" 							;	event_gateway
-	;;
 	svr*)					echo -e "I am a Server. Proceeding..."															;	event_server
 	;;
 	*) 						echo -e "This device Hostname is not set approprately, exiting \n"								;	exit 0
@@ -149,12 +147,12 @@ event_encoder(){
 	event_reset
 	event_device_redetect
 	event_host_relabel_watcher
-	event_generate_watch_encoderflag
+	event_generate_wavelet_encoder_query
 	event_promote
 	# We do not perform run_ug for the encoder as that is enabled if it receives an encoderflag change.  It will be idle until then.
 }
 
-event_generate_watch_encoderflag(){
+event_generate_wavelet_encoder_query(){
 	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
 	hostname=$(hostname)
 	# We need to add this switch here to ensure if we're a server we don't populate ourselves to the encoders DOM in the webUI..
@@ -164,11 +162,10 @@ event_generate_watch_encoderflag(){
 		# generateHash was already called from the server event function.
 		:
 	fi
-	systemctl --user stop watch_encoderflag.service
 	# Can be called directly, remember to escape quotes if we want to preserve them as per bash standards.
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/encoder_restart 0 0 "watch_encoderflag"
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "ENCODER_QUERY" 0 0 "wavelet_encoder_query"
 	systemctl --user daemon-reload
-	systemctl --user enable watch_encoderflag.service --now
+	systemctl --user enable wavelet_encoder_query.service --now
 }
 
 event_server(){
