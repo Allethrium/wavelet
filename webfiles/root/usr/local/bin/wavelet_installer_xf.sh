@@ -420,7 +420,12 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
 	# This is the slowest part of the process, can we speed it up by compressing the overlay?
 	echo -e "Installing via container and applying as ostree overlay..\n"
 	# We need to pull the container from the server registry first, apparently manually?  Probably https issue here.
-	podman pull 192.168.1.32:5000/coreos_overlay_client --tls-verify=false 
+	if podman pull 192.168.1.32:5000/coreos_overlay_client --tls-verify=false ; then
+		echo "Container pulled successfully.."
+	else
+		echo "Container pull failed! Check server spinup and ensure network connectivity is reliable.  Failing install process!"
+		exit 1
+	fi
 	rpm-ostree rebase ostree-unverified-image:containers-storage:192.168.1.32:5000/coreos_overlay_client
 	touch /var/rpm-ostree-overlay.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
