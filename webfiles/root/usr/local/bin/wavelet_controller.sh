@@ -219,10 +219,8 @@ wavelet_testcard() {
 
 wavelet_refresh() {
 	# This is only called by the RD, refresh-devices button, and it finds the previous hash and resets to it.
-	revisions=$(read_etcd_json_revision)
-	lastrev=$((${revisions} - 1))
-	KEYNAME=uv_hash_select; read_etcd_lastrevision; previousHash=${printvalue}
-	KEYVALUE=${previousHash}; write_etcd_global
+	KEYNAME="uv_hash_select_old"; read_etcd_global; previousHash=${printvalue}
+	KEYNAME="uv_hash_select"; KEYVALUE=${previousHash}; write_etcd_global
 	echo -e "Previous hash value reset, running detectv4l to redetect local sources on all hosts.."
 	wavelet_detect_inputs
 }
