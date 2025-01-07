@@ -1,24 +1,19 @@
 #!/bin/bash
-# Checks device hostname to define behavior and launches ultragrid from AppImage as appropriate
-# Script runs as a user service, calls other user services.  Nothing here should be asking for root.
+# Checks device hostname to define behavior and launches services as appropriate
 
 detect_self(){
 	UG_HOSTNAME=$(hostname)
 	echo -e "Hostname is $UG_HOSTNAME \n"
 	case $UG_HOSTNAME in
-	enc*) 					echo -e "I am an Encoder \n"; event_encoder
+	enc*) 					echo -e "I am an Encoder\n"; event_encoder
 	;;
-	decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.\nAn error has occurred at some point, and needs troubleshooting.\n Terminating process. \n"; exit 0
+	decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.\nAn error has occurred at some point, and needs troubleshooting.\nTerminating process. \n"; exit 0
 	;;
-	dec*)					echo -e "I am a Decoder \n"; event_decoder
-	;;
-	livestream*)			echo -e "I am a Livestream ouput gateway \n"; event_livestream
-	;;
-	gateway*)				echo -e "I am an input Gateway for another video streaming system \n"; event_gateway
+	dec*)					echo -e "I am a Decoder\n"; event_decoder
 	;;
 	svr*)					echo -e "I am a Server."; event_server
 	;;
-	*) 						echo -e "This device Hostname is not set appropriately, exiting \n"; exit 0
+	*) 						echo -e "This device Hostname is not set appropriately, exiting\n"; exit 0
 	;;
 	esac
 }
@@ -74,35 +69,33 @@ generate_service(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
 }
 
+event_server(){
+	# The server is a special case because it serves blanks screen, static image and test bars.
+	# As a result, instead of run_ug it calls wavelet_init.service
+	# Ensure web interface is up
+	systemctl --user start http-php-pod.service
+	# Check for input devices
+	KEYNAME="/$(hostname)/INPUT_DEVICE_PRESENT"; read_etcd_global
+	if [[ "$printvalue" -eq 1 ]]; then
+		echo -e "An input device is present on this server, proceeding\n"
+		event_encoder_server
+	else 
+		echo -e "No input devices are present on this server.  System will serve static image/blank/SMPTE bars by default.\n"
+		systemctl --user start wavelet_init.service
+	fi
+}
+
 event_encoder_server() {
 # Runs the server, then calls the encoder event.
 	if systemctl --user is-active --quiet wavelet_controller; then
 		echo -e "wavelet_controller service is running and watching for input events, continuing..."
 		event_encoder
 	else
-		echo -e "\n bringing up Wavelet controller service, and sleeping for one second to allow config to settle..."
+		echo -e "\nController is inactive!  Bringing up Wavelet controller service, and sleeping for one second to allow config to settle..."
 		systemctl --user start wavelet_init.service
 		sleep 1
 		echo -e "\n Running encoder..."
 		event_encoder
-	fi
-}
-
-event_server(){
-	# The server is a special case because it serves blanks screen, static image and test bars.
-	# As a result, instead of run_ug it calls wavelet_init.service
-	# Generate a catch-all audio sink for simultaneous output to transient devices
-	# /usr/local/bin/pipewire_create_output_sink.sh
-	# Ensure web interface is up
-	KEYNAME=INPUT_DEVICE_PRESENT; read_etcd
-	systemctl --user start http-php-pod.service
-	if [[ "$printvalue" -eq 1 ]]; then
-		echo -e "An input device is present on this host, assuming we want an encoder running on the server..\n"
-		event_encoder_server
-	else 
-		echo -e "No input devices are present on this server, assuming the encoder is running on a separate device..\n"
-		echo -e "Note this routine calls wavelet_init.service which sets default video settings and clears previous settings!\n"
-		systemctl --user start wavelet_init.service
 	fi
 }
 
@@ -111,9 +104,9 @@ event_encoder(){
 	echo -e "Calling wavelet_encoder systemd unit.."
 	# I've added a blank bit here too.. it might make more sense to call it "host blank" though..
 	KEYNAME="/$(hostname)/DECODER_BLANK"; KEYVALUE="0"; write_etcd_global
-	systemctl --user daemon-reload
-	echo -e "Pinging wavelet_detectv4l.sh to ensure any USB devices are detected prior to start..\n"
-	/usr/local/bin/wavelet_detectv4l.sh
+	# Telling Wavelet that this host will be actively streaming
+	KEYNAME="ENCODER_ACTIVE"; KEYVALUE="$(hostname)"; write_etcd_global
+	# Call wavelet_encoder.service which will provision and start the AppImage proper
 	systemctl --user start wavelet_encoder.service
 }
 
@@ -202,49 +195,6 @@ event_decoder(){
 	get_ipValue
 	# Systemd-resolved seems very broken on the server, but might be necessary for encoders/decoders.
 	}
-
-event_livestream(){
-	rm -rf /home/wavelet/.config/systemd/user/wavelet_livestream.service
-	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "wavelet_livestream"
-	systemctl --user start wavelet_livestream.service
-	echo -e "Livestream watcher systemd unit instructed to start..\n"
-	return=$(systemctl --user is-active --quiet wavelet_livestream.service)
-	if [[ ${return} -eq !0 ]]; then
-		echo "Livestream watcher failed to start, there may be something wrong with the system."
-	else
-		:
-	fi
-
-	# Alternatively, we can use ffmpeg to extract UV uncompressed and transcode it to YouTube or another CDN with appropriate settings.  
-	# Would require dual homing to an internet connection.
-
-	# API Key would be set by a simple read -p script or by the installation engineer.
-
-	# FFMPEG commands:
-	#				KEYNAME=wavelet_livestream_apikey
-	#				read_etcd
-	#				MYAPIKEY=${printvalue}
-	#				ffmpeg -protocol_whitelist tcp,udp,http,rtp,file -i http://127.0.0.1:8554/ug.sdp \
-	#				-re -f lavdi -i anullsrc -c:v libx264 -preset veryfast -b:v 1024k -maxrate 1024k -bufsize 4096k \
-	#				-vf 'format=yuv420p' -g 60 \
-	#				flv rtmp://a.rtmp.youtube.com/live2/${MYAPIKEY}
-	KEYNAME="livestreaming_cmd"; KEYVALUE="${generatedCommand}"; write_etcd_global
-}
-
-event_gateway_in(){
-	# this will require the other systems to be setup appropriately.
-	# This will probably wind up being an FFMPEG --> Ultragrid pipe 
-	# or stream copy with minimal conversion so as to avoid latency.
-	echo "This feature is not yet implemented"
-}
-
-event_reflector(){
-	# This doesn't run UltraGrid at all, it runs only a reflector
-	# It will need its own ETCD container in order to stream to its own client pool.  
-	# Useful for overflow rooms or adding additional decoders with minimal latency considerations
-	# Basically, some kind of impoverished multicast
-	echo "This feature is not yet implemented"
-}
 
 get_ipValue(){
 	# Gets the current IP address for this host to register into server etcd.
