@@ -188,7 +188,8 @@ wavelet_blank() {
 # 1
 # Displays a black jpg to blank the screen fully
 	current_event="wavelet-blank"
-	KEYNAME=uv_input; KEYVALUE="BLANK";	write_etcd_global
+	KEYNAME=uv_input; KEYVALUE="blank"			;	write_etcd_global
+	KEYNAME="ENCODER_QUERY"; KEYVALUE="1"		;	write_etcd_global
 	# The server should not require any restarts as the UltraGrid.AppImage service should still be running from wavelet_init
 	echo 'capture.data 0' | busybox nc -v 127.0.0.1 6160
 	echo -e "Blank screen for all hosts activated."
@@ -199,7 +200,8 @@ wavelet_seal() {
 # Serves a static image in .jpg format in a loop to the encoder.
 	cd /home/wavelet/
 	current_event="wavelet-seal"
-	KEYNAME=uv_input; KEYVALUE="SEAL"; write_etcd_global
+	KEYNAME=uv_input; KEYVALUE="seal"			;	write_etcd_global
+	KEYNAME="ENCODER_QUERY"; KEYVALUE="2"		;	write_etcd_global
 	# We now use the switcher for simple things
 	echo 'capture.data 1' | busybox nc -v 127.0.0.1 6160
 	echo -e "Static image activated."
@@ -209,7 +211,8 @@ wavelet_testcard() {
 # T
 # Test Card
 	current_event="wavelet-testcard"
-	KEYNAME=uv_input; KEYVALUE="BLANK";	write_etcd_global
+	KEYNAME="uv_input"; KEYVALUE="smpte_bars"	;	write_etcd_global
+	KEYNAME="ENCODER_QUERY"; KEYVALUE="T"		;	write_etcd_global
 	echo 'capture.data 2' | busybox nc -v 127.0.0.1 6160
 	echo "Testcard image activated."
 }

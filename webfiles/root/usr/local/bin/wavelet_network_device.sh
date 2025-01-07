@@ -307,6 +307,8 @@ populate_to_etcd(){
 		# /usr/local/bin/wavelet_network_device_relabel.sh
 	# This key often winds up with garbage, and must be deleted or it will cause issues parsing things back out.
 	KEYNAME="/network_interface/short"; delete_etcd_key
+	# Finally we tell wavelet there is a new input device in town so the server encoder task will regenerate next click..
+	KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
 	exit 0
 }
 

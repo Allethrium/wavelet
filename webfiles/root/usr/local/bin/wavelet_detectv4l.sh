@@ -136,14 +136,18 @@ set_device_input() {
 	KEYNAME="/hash/${deviceHash}"
 	# Stores the device data under hostname/inputs/device_string_long
 	KEYVALUE="/$(hostname)/inputs${device_string_long}"; write_etcd_global
+	# Hash - short path lookup
+	KEYNAME="/$(hostname)/devpath_lookup/${deviceHash}"; KEYVALUE="${v4l_device_path}"; write_etcd_global
 	# notify watcher that input device configuration has changed
 	KEYNAME=new_device_attached; KEYVALUE=1; write_etcd_global
 	echo -e "resetting variables to null."
 	deviceHash=""
 	device_string_short=""
 	KEYNAME="/$(hostname)/INPUT_DEVICE_PRESENT"; KEYVALUE="1"; write_etcd_global
-	# This flag is necessary to tell the wavelet_encoder module to regenerate the switcher list, the value is "consumed" I.E set back to 0 once this is done.
+	# This flag is necessary to tell the wavelet_encoder module to regenerate the switcher list, the value is "consumed"
+	# I.E set back to 0 once this is done.
 	KEYNAME="/$(hostname)/INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
+	KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
 	detect
 }
 

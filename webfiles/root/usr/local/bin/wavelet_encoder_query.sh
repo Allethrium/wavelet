@@ -15,7 +15,7 @@ write_etcd_global(){
 main() {
 	# Checks to see if this host is referenced
 	KEYNAME="ENCODER_QUERY";	read_etcd_global;	hashValue=${printvalue}
-	KEYNAME=uv_input;			read_etcd_global;	controllerInputLabel=${printvalue}
+	KEYNAME="uv_input";			read_etcd_global;	controllerInputLabel=${printvalue}
 	targetHost="${controllerInputLabel%/*}"
 	# Determine what kind of device we are dealing with
 	if [[ ${targetHost} == *"network_interface"* ]]; then
@@ -25,8 +25,7 @@ main() {
 		echo -e "Target hostname references this host!"
 		systemctl --user restart run_ug.service
 	else 
-		echo -e "Device is hosted on another host"
-		echo -e "Stopping any running encoder services.."
+		echo -e "Device is hosted on another host, checking to see if I'm the server.."
 		detect_self
 		exit 0
 	fi
@@ -35,9 +34,9 @@ main() {
 detect_self(){
 	HOSTNAME=$(hostname)
 	case $HOSTNAME in
-	svr*)					echo -e "I am a Server. Proceeding..."									;	systemctl --user restart run_ug.service
+	svr*)					echo -e "I am a Server. Restarting run_ug.service."						;	systemctl --user restart run_ug.service
 	;;
-	*) 						echo -e "This isn't a server, terminating process"						;	systemctl --user disable UltraGrid.AppImage.service --now; exit 0
+	*) 						echo -e "This isn't a server, stopping encoder task."					;	systemctl --user disable UltraGrid.AppImage.service --now; exit 0
 	;;
 	esac
 }
