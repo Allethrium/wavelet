@@ -126,20 +126,10 @@ generate_server_args(){
 	fi
 	# Consume the global device flag by resetting it
 	KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="0"; write_etcd
-	# First we need to know what device path matches what command line, so we need a matching array to check against:
-	KEYNAME="inputs"; read_etcd_prefix;
-	readarray -t matchingArray <<< $(echo ${printvalue} | sed 's|-t|\n|g' | xargs | sed 's|[[:space:]]|\n|g')
-	echo -e "Matching Array contents:\n${matchingArray[@]}"
-	# Now we read the command line values only
-	KEYNAME="inputs"; read_etcd_prefix;
-	# Because we have spaces in the return value, and this value is returned as a string, we have to process everything
-	# remove -t, remove preceding space, 
-	readarray -t localInputsArray <<< $(echo ${printvalue} | sed 's|-t|\n|g' | cut -d ' ' -f 2 | sed '/^[[:space:]]*$/d')
-	echo -e "Local Array contents:\n${localInputsArray[@]}\n"
+	echo "" > /var/home/wavelet/device_map_entries_verity
 
 	# Declare the master server inputs array
 	declare -A serverInputDevices=()
-
 	# Declare our static inputs
 	declare serverStaticInputs=(\
 		[0]="-t testcard:pattern=blank" \
@@ -199,8 +189,8 @@ generate_server_args(){
 		echo "${serverInputDevices[$i]}"
 	done))
 	commandLine=$(echo ${commandLine} | tr -d '\n')
-	echo -e "\nGenerated switcher device list for all server and network inputs devices is:\n${serverDevs}"
-	echo -e "\nGenerated command line input into etcd is:\n${commandLine}\nConverting to base64 and injecting to etcd.."
+	echo -e "\nGenerated switcher device list for all server and network inputs devices is:\n ${serverDevs}"
+	echo -e "\nGenerated command line input into etcd is:\n${commandLine}\n\nConverting to base64 and injecting to etcd.."
 	encodedCommandLine=$(echo "${commandLine}" | base64 -w 0)
 	# Store generated server input var as base64 and assign to variable within this shell
 	KEYNAME="/$(hostname)/server_commands"; KEYVALUE="${encodedCommandLine}"; write_etcd_global
@@ -224,13 +214,11 @@ generate_local_args(){
 		terminateProcess
 		exit 0
 	fi
-
+	echo "Parsed index from server block (if run) is: $1"
 	# First we need to know what device path matches what command line, so we need a matching array to check against:
 	KEYNAME="inputs"; read_etcd_prefix;
 	readarray -t matchingArray <<< $(echo ${printvalue} | sed 's|-t|\n|g' | xargs | sed 's|[[:space:]]|\n|g')
 	echo -e "Matching Array contents:\n${matchingArray[@]}"
-	# Now we read the command line values only
-	KEYNAME="inputs"; read_etcd_prefix;
 	# Because we have spaces in the return value, and this value is returned as a string, we have to process everything
 	# remove -t, remove preceding space, 
 	readarray -t localInputsArray <<< $(echo ${printvalue} | sed 's|-t|\n|g' | cut -d ' ' -f 2 | sed '/^[[:space:]]*$/d')
@@ -239,7 +227,7 @@ generate_local_args(){
 	# Declare the master local inputs array
 	declare -A localInputDevices=(); declare -A localInputs=()
 	# Index is parsed from the server block depending on how many netdevices or is 0 for local stuff.
-	index=$1
+	index=${1}
 	if [[ -z index ]]; then
 		# Clear device map file so we start with a blank slate
 		echo "" > /var/home/wavelet/device_map_entries_verity
@@ -261,25 +249,25 @@ generate_local_args(){
 
 	# Note that here we are appending entries to device_map_entries_verity!
 	mapfile -d '' sortedLocalInputDevices < <(printf '%s\0' "${!localInputDevices[@]}" | sort -z)
-	serverDevs=$(while IFS= read -r line; do
+	localDevs=$(while IFS= read -r line; do
 		echo "$line"
 	done <<< $(for i in ${sortedLocalInputDevices[@]};do
 		# Filter out dummy entries
 		if [[ "${i}" == "-t" ]]; then
 			:
 		fi
-		echo "$i)${clientInputDevices[$i]}"
-		echo "$i,${clientInputDevices[$i]},$(hostname)" >> /var/home/wavelet/device_map_entries_verity
+		echo "$i)${localInputDevices[$i]}"
+		echo "$i,${localInputDevices[$i]},$(hostname)" >> /var/home/wavelet/device_map_entries_verity
 	done))
 	# Generate the command line proper
 	commandLine=$(while IFS= read -r line; do
 		echo "$line"
-	done <<< $(for i in ${sortedClientInputDevices[@]};do
-		echo "${clientInputDevices[$i]}"
+	done <<< $(for i in ${sortedLocalInputDevices[@]};do
+		echo "${localInputDevices[$i]}"
 	done))
 	commandLine=$(echo ${commandLine} | tr -d '\n')
-	echo -e "Generated switcher device list for all local input devices is:${serverDevs}"
-	echo -e "Generated command line input into etcd is:${commandLine}\nConverting to base64 and injecting to etcd.."
+	echo -e "Generated switcher device list for all local input devices is:\n${localDevs}"
+	echo -e "Generated command line input into etcd is:\n${commandLine}\nConverting to base64 and injecting to etcd.."
 	encodedCommandLine=$(echo "${commandLine}" | base64 -w 0)
 	KEYNAME="/$(hostname)/local_encoder_command"; KEYVALUE="${encodedCommandLine}"; write_etcd_global
 	clientInputvar=${commandLine}
@@ -303,7 +291,7 @@ generate_systemd_unit(){
 	# N.B This isn't the same as ethernet MTU.
 	UGMTU="9000"
 	# Grab our inputVars.  
-	if [[ $(hostname) = "*svr*" ]]; then
+	if [[ $(hostname) = *"svr"* ]]; then
 		KEYNAME="/$(hostname)/server_commands"; read_etcd_global; serverInputvar=$(echo ${printvalue} | base64 -d)
 	else
 		# Zero that out so nothing will be populated
@@ -321,19 +309,18 @@ generate_systemd_unit(){
 		[91]="-P ${video_port}" [92]="-m ${UGMTU}" [93]="${destinationipv4}" [94]="--param control-accept-global")
 	ugargs="${commandLine[@]}"
 	KEYNAME=UG_ARGS; KEYVALUE=${ugargs}; write_etcd
-	echo -e "Verifying stored command line"
-	read_etcd; echo ${printvalue}
-	echo "
-	[Unit]
-	Description=UltraGrid AppImage executable
-	After=network-online.target
-	Wants=network-online.target
-	[Service]
-	ExecStart=/usr/local/bin/UltraGrid.AppImage ${ugargs}
-	KillMode=control-group
-	TimeoutStopSec=0.25
-	[Install]
-	WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
+	echo -e "Verifying stored command line:"
+	read_etcd; echo -e "\n\n${printvalue}\n"
+	echo "[Unit]
+Description=UltraGrid AppImage executable
+After=network-online.target
+Wants=network-online.target
+[Service]
+ExecStart=/usr/local/bin/UltraGrid.AppImage ${ugargs}
+KillMode=control-group
+TimeoutStopSec=0.33
+[Install]
+WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 	# Tell Wavelet I am the active encoder
 	KEYNAME="ACTIVE_ENCODER"; KEYVALUE="$(hostname)"; write_etcd_global
 	# Tell wavelet my encoder IP address
@@ -341,7 +328,7 @@ generate_systemd_unit(){
 	activeConnectionIP=$(nmcli dev show ${activeConnection#*:} | grep ADDRESS | awk '{print $2}' | head -n 1)
 	KEYNAME=encoder_ip_address; KEYVALUE=${activeConnectionIP%/*}; write_etcd
 	systemctl --user daemon-reload
-	systemctl --user start UltraGrid.AppImage.service
+	systemctl --user restart UltraGrid.AppImage.service
 	echo -e "Encoder systemd units instructed to start..\n"
 	until systemctl --user is-active UltraGrid.AppImage.service; do
 		echo "waiting for Systemd service to activate.."
@@ -365,6 +352,33 @@ set_channelIndex(){
 	# Final step is to look for the uv_input label in device_map_entries_verity
 	# Module should ONLY be called on a system which possesses the device in question, so this shouldn't pose any challenges;
 	KEYNAME="/$(hostname)/devpath_lookup/${hashValue}"; read_etcd_global; searchArg="${printvalue}"
+	
+	# check for UG arg
+	if grep -q ${searchArg} /var/home/wavelet/.config/systemd/user/UltraGrid.AppImage.service; then
+		echo "Entry found in AppImage systemD unit, continuing.."
+	else
+		echo "Entry missing from systemD unit!  Forcing re-enumeration of devices.."
+		KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
+		KEYNAME="/$(hostname)/INPUT_DEVICE_NEW"; write_etcd_global
+		rm -rf /var/home/wavelet/device_map_entries_verity
+		systemctl --user restart run_ug.service
+		exit 0
+	fi
+	# check for device_map presence
+	if grep -q ${searchArg} /var/home/wavelet/device_map_entries_verity; then
+		echo "Entry found in device map.."
+		channelIndex=$(grep "${searchArg#*-t}" /var/home/wavelet/device_map_entries_verity | cut -d ',' -f1)
+	else
+		# If not, we run the process again after having the encoder restart
+		# Then we restart the controller process after a 3s delay
+		echo "Entry missing from device map file! Forcing re-enumeration of devices.."
+		KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
+		KEYNAME="/$(hostname)/INPUT_DEVICE_NEW"; write_etcd_global
+		rm -rf /var/home/wavelet/device_map_entries_verity
+		systemctl --user restart run_ug.service
+		exit 0
+	fi
+
 	channelIndex=$(grep "${searchArg}" /var/home/wavelet/device_map_entries_verity | cut -d ',' -f1)
 	echo -e "Attempting to set switcher channel to new device.."
 	echo "Channel Index is: ${channelIndex%,*}"
