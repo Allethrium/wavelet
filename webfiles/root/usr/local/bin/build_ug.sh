@@ -194,7 +194,7 @@ event_server(){
 	event_reboot
 	event_reset
 	event_device_redetect
-	event_generate_watch_encoderflag
+	event_generate_wavelet_encoder_query
 	event_generate_wavelet_ui_service
 }
 

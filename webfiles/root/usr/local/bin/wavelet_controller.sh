@@ -29,9 +29,9 @@ main
 main() {
 	KEYNAME=input_update; read_etcd_global
 	if [[ "${printvalue}" == 1 ]]; then
-		echo -e "\ninput_update key is set to 1, continuing with task..\n"
+		echo -e "input_update key is set to 1, continuing with task..\n"
 	else
-		echo -e "\ninput_update key is set to 0, doing nothing..\n"
+		echo -e "input_update key is set to 0, doing nothing..\n"
 		exit 0
 	fi
 	KEYNAME="uv_hash_select"; read_etcd_global; event="${printvalue}"
@@ -59,7 +59,8 @@ main() {
 		waveletcontroller
 	else 
 		echo "Server Encoder process is not running, attempting to start before proceeding.."
-		systemctl --user start wavelet_encoder.service
+		systemctl --user start run_ug.service
+		waveletcontroller
 	fi
 }
 

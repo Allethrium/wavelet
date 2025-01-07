@@ -129,7 +129,7 @@ generate_server(){
 	done
 	# Increment index by N devices present in the local inputs array
 	localInputsOffset=$(echo ${#localInputs[@]})
-	echo -e "${localInputsOffset} device(s) in array..\n"
+	echo -e "${localInputsOffset} device(s) in array"
 	index=( ${index} + ${localInputsOffset} )
 	# Now we do the same for net devices
 	declare -A networkInputs=()
@@ -195,7 +195,7 @@ generate_client(){
 	# Consume the device flag by resetting it
 	KEYNAME="/$(hostname)/INPUT_DEVICE_NEW"; KEYVALUE="0"; write_etcd
 	KEYNAME="ENCODER_ACTIVE"; read_etcd_global; primeElection=${printvalue}
-	if [[ "${printvalue}" !== "$(hostname)" ]];then
+	if [[ "${printvalue}" != "$(hostname)" ]];then
 		echo "I am not set as the prime encoder by the controller, terminating active encoding processes and exiting."
 		terminateProcess
 		exit 0
@@ -305,7 +305,7 @@ event_encoder_server(){
 	# Handles the server-specific encoder functions, including static images and network devices
 	# Here we want to check to see if the device is already prepopulated on the switcher.
 	KEYNAME=uv_input;		read_etcd_global; controllerInputLabel=${printvalue}
-	KEYNAME=ENCODER_QUERY;	read_etcd_global; hashValue=${printvalue}
+	KEYNAME=ENCODER_QUERY;	read_etcd_global; controllerInputHash=${printvalue}
 	targetHost="${controllerInputLabel%/*}"
 	if [[ ${targetHost} == *"network_interface"* ]]; then
 		echo -e "Target Hostname is a network device."
@@ -336,7 +336,7 @@ event_encoder_server(){
 		echo "Entry missing from device map file!"
 		echo "Remove device map file and force encoder restart to regenerate.."
 		rm -rf /var/home/wavelet/device_map_entries_verify
-		systemctl --user restart run_ug.sh
+		#systemctl --user restart run_ug.service
 		exit 0
 	fi
 	# We check for the appropriate device in the generated user SystemD unit
@@ -344,7 +344,7 @@ event_encoder_server(){
 		echo "Entry missing from pregenerated UG Service file!"
 		echo "Remove device map file and force encoder restart to regenerate.."
 		rm -rf /var/home/wavelet/device_map_entries_verify
-		systemctl --user restart run_ug.sh
+		#systemctl --user restart run_ug.service
 		exit 0
 	else
 		echo "Device entry found in systemD unit, continuing.."
