@@ -117,7 +117,7 @@ generate_server_args(){
 		echo "We should not need to perform steps to regenerate the AppImage service unit."
 		if systemctl --user is-active --quiet UltraGrid.AppImage.service; then
 			echo "UG AppImage Systemd unit is running, continuing."
-			generate_systemd_unit
+			set_channelIndex
 		else
 			echo "UG AppImage Systemd unit is NOT running, starting it and continuing."
 			systemctl --user start UltraGrid.AppImage.service
@@ -125,7 +125,7 @@ generate_server_args(){
 		fi
 	fi
 	# Consume the global device flag by resetting it
-	KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="0"; write_etcd
+	KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="0"; write_etcd_global
 	echo "" > /var/home/wavelet/device_map_entries_verity
 
 	# Declare the master server inputs array
@@ -135,16 +135,18 @@ generate_server_args(){
 		[0]="-t testcard:pattern=blank" \
 		[1]="-t file:/var/home/wavelet/seal.mkv:loop" \
 		[2]="-t testcard:pattern=smpte_bars")
+	# Ensure index starts at 0
+	index=0
 	for element in "${serverStaticInputs[@]}"; do
-		((index++))
 		# Append "-t " to make it a valid UltraGrid input argument
 		if [[ "${element}" != *"-t"* ]];then
 			element="-t $element"
 		fi
 		serverInputDevices[$index]=${element}
+		((index++))
 	done
 	# Set network devices
-	index=3
+	# Index starts at 3 for netDevs
 	declare -A networkInputs=()
 	KEYNAME="/network_uv_stream_command/"; read_etcd_prefix_global;
 	if [[ ${printvalue} == "" ]]; then
@@ -155,13 +157,13 @@ generate_server_args(){
 		echo -e "Network array contents:\n${networkInputsArray[@]}\n"
 		# We inject these into our networkInputs array
 		for element in "${networkInputsArray[@]}"; do
-			((index++))
 			# Append "-t " to make it a valid UltraGrid input argument
 			if [[ "${element}" != *"-t"* ]];then
 				element="-t $element"
 			fi
 			networkInputs[$index]=${element}
 			serverInputDevices[$index]=${element}
+			((index++))
 		done
 		networkInputsOffset=$(echo ${#networkInputs[@]})
 		echo -e "${networkInputsOffset} device(s) in array..\n"
@@ -238,9 +240,9 @@ generate_local_args(){
 		if [[ "${element}" != *"-t"* ]];then
 			element="-t ${element}"
 		fi
-		((index++))
 		localInputs[$index]=${element}
 		localInputDevices[$index]=${element}
+		((index++))
 	done
 	# Increment index by N devices present in the local inputs array
 	localInputsOffset=$(echo ${#localInputs[@]})
@@ -273,6 +275,7 @@ generate_local_args(){
 	clientInputvar=${commandLine}
 	# We should now have all local input variables populated correctly
 	generate_systemd_unit
+	retry=0
 }
 
 generate_systemd_unit(){
@@ -309,8 +312,6 @@ generate_systemd_unit(){
 		[91]="-P ${video_port}" [92]="-m ${UGMTU}" [93]="${destinationipv4}" [94]="--param control-accept-global")
 	ugargs="${commandLine[@]}"
 	KEYNAME=UG_ARGS; KEYVALUE=${ugargs}; write_etcd
-	echo -e "Verifying stored command line:"
-	read_etcd; echo -e "\n\n${printvalue}\n"
 	echo "[Unit]
 Description=UltraGrid AppImage executable
 After=network-online.target
@@ -326,15 +327,16 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage
 	# Tell wavelet my encoder IP address
 	activeConnection=$(nmcli -t -f NAME,DEVICE c s -a | head -n 1)
 	activeConnectionIP=$(nmcli dev show ${activeConnection#*:} | grep ADDRESS | awk '{print $2}' | head -n 1)
-	KEYNAME=encoder_ip_address; KEYVALUE=${activeConnectionIP%/*}; write_etcd
+	KEYNAME=encoder_ip_address; KEYVALUE=${activeConnectionIP%/*}; write_etcd_global
 	systemctl --user daemon-reload
 	systemctl --user restart UltraGrid.AppImage.service
-	echo -e "Encoder systemd units instructed to start..\n"
+	echo -e "Encoder systemd unit instructed to start.."
 	until systemctl --user is-active UltraGrid.AppImage.service; do
 		echo "waiting for Systemd service to activate.."
-		sleep .5
+		sleep .75
 	done
 	echo "UG Process generated and task started, moving on to setting channel index.."
+	sleep 1
 	set_channelIndex
 }
 
@@ -353,36 +355,42 @@ set_channelIndex(){
 	# Module should ONLY be called on a system which possesses the device in question, so this shouldn't pose any challenges;
 	KEYNAME="/$(hostname)/devpath_lookup/${hashValue}"; read_etcd_global; searchArg="${printvalue}"
 	
+	# check for device_map presence
+	echo "Looking for device path ${searchArg} in local device map file.."
+	if grep -q ${searchArg} /var/home/wavelet/device_map_entries_verity; then
+		echo "Entry found in device map.."
+		channelIndex=$(grep "${searchArg}" /var/home/wavelet/device_map_entries_verity | cut -d ',' -f1)
+	else
+		# If not, we run the process again after having the encoder restart
+		echo "Entry missing from device map file! Forcing re-enumeration of devices.."
+		sleep 1
+		KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
+		KEYNAME="/$(hostname)/INPUT_DEVICE_NEW"; write_etcd_global
+		rm -rf /var/home/wavelet/device_map_entries_verity
+		exit 0
+	fi
 	# check for UG arg
+	echo "Looking for device path ${searchArg} in UltraGrid appImage systemD unit.."
 	if grep -q ${searchArg} /var/home/wavelet/.config/systemd/user/UltraGrid.AppImage.service; then
 		echo "Entry found in AppImage systemD unit, continuing.."
 	else
-		echo "Entry missing from systemD unit!  Forcing re-enumeration of devices.."
-		KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
-		KEYNAME="/$(hostname)/INPUT_DEVICE_NEW"; write_etcd_global
-		rm -rf /var/home/wavelet/device_map_entries_verity
-		systemctl --user restart run_ug.service
+		if [[ ${retry} == 3 ]]; then
+			echo "Retries exceeded, starting process from scratch."
+			rm -rf /var/home/wavelet/device_map_entries_verity
+			KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
+			KEYNAME="/$(hostname)/INPUT_DEVICE_NEW"; write_etcd_global
+		fi
+		echo "Entry missing from systemD unit! Attempting to regenerate three times before re-enumerating entire device tree.."
+		((retry++))
+		generate_systemd_unit
 		exit 0
 	fi
-	# check for device_map presence
-	if grep -q ${searchArg} /var/home/wavelet/device_map_entries_verity; then
-		echo "Entry found in device map.."
-		channelIndex=$(grep "${searchArg#*-t}" /var/home/wavelet/device_map_entries_verity | cut -d ',' -f1)
-	else
-		# If not, we run the process again after having the encoder restart
-		# Then we restart the controller process after a 3s delay
-		echo "Entry missing from device map file! Forcing re-enumeration of devices.."
-		KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
-		KEYNAME="/$(hostname)/INPUT_DEVICE_NEW"; write_etcd_global
-		rm -rf /var/home/wavelet/device_map_entries_verity
-		systemctl --user restart run_ug.service
-		exit 0
-	fi
-
 	channelIndex=$(grep "${searchArg}" /var/home/wavelet/device_map_entries_verity | cut -d ',' -f1)
 	echo -e "Attempting to set switcher channel to new device.."
 	echo "Channel Index is: ${channelIndex%,*}"
 	echo "capture.data ${channelIndex%,*}" | busybox nc -v 127.0.0.1 6160	
+	echo "Task complete, exiting."
+	exit 0
 }
 
 read_banner_status(){
@@ -423,7 +431,7 @@ terminateProcess(){
 #
 #####
 
-set -x
+#set -x
 exec >/home/wavelet/encoder.log 2>&1
 
 read_uv_hash_select

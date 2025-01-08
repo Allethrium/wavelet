@@ -39,8 +39,6 @@ event_decoder(){
 event_server(){
 	# The server requires some additional steps.
 	install_wavelet_modules
-	extract_base
-	extract_home && extract_usrlocalbin
 	# Update with the server hostname - no other device should be doing network sense.
 	sed -i "s/hostnamegoeshere/$(UG_HOSTNAME)/g" /usr/local/bin/wavelet_network_sense.sh
 	FILES=("/var/home/wavelet/wavelet-files.tar.xz" \

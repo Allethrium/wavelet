@@ -136,14 +136,6 @@ read_etcd_clients_ip_sed() {
 	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
 	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
 }
-read_etcd_json_revision(){
-	# Special case used in controller
-	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_json_revision" uv_hash_select | jq -r '.header.revision')
-}
-read_etcd_lastrevision(){
-	# Special case used in controller
-	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_lastrevision")	
-}
 write_etcd(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
 	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
@@ -188,8 +180,9 @@ wavelet_blank() {
 # 1
 # Displays a black jpg to blank the screen fully
 	current_event="wavelet-blank"
-	KEYNAME=uv_input; KEYVALUE="blank"			;	write_etcd_global
-	KEYNAME="ENCODER_QUERY"; KEYVALUE="1"		;	write_etcd_global
+	KEYNAME=uv_input; KEYVALUE="blank"					;	write_etcd_global
+	KEYNAME="ENCODER_QUERY"; KEYVALUE="1"				;	write_etcd_global
+	KEYNAME="uv_hash_select_old"; KEYVALUE="blank"		;	write_etcd_global
 	# The server should not require any restarts as the UltraGrid.AppImage service should still be running from wavelet_init
 	echo 'capture.data 0' | busybox nc -v 127.0.0.1 6160
 	echo -e "Blank screen for all hosts activated."
@@ -200,8 +193,9 @@ wavelet_seal() {
 # Serves a static image in .jpg format in a loop to the encoder.
 	cd /home/wavelet/
 	current_event="wavelet-seal"
-	KEYNAME=uv_input; KEYVALUE="seal"			;	write_etcd_global
-	KEYNAME="ENCODER_QUERY"; KEYVALUE="2"		;	write_etcd_global
+	KEYNAME=uv_input; KEYVALUE="seal"					;	write_etcd_global
+	KEYNAME="ENCODER_QUERY"; KEYVALUE="2"				;	write_etcd_global
+	KEYNAME="uv_hash_select_old"; KEYVALUE="seal"		;	write_etcd_global
 	# We now use the switcher for simple things
 	echo 'capture.data 1' | busybox nc -v 127.0.0.1 6160
 	echo -e "Static image activated."
@@ -211,8 +205,9 @@ wavelet_testcard() {
 # T
 # Test Card
 	current_event="wavelet-testcard"
-	KEYNAME="uv_input"; KEYVALUE="smpte_bars"	;	write_etcd_global
-	KEYNAME="ENCODER_QUERY"; KEYVALUE="T"		;	write_etcd_global
+	KEYNAME="uv_input"; KEYVALUE="smpte_bars"			;	write_etcd_global
+	KEYNAME="ENCODER_QUERY"; KEYVALUE="T"				;	write_etcd_global
+	KEYNAME="uv_hash_select_old"; KEYVALUE="smpte_bars"	;	write_etcd_global
 	echo 'capture.data 2' | busybox nc -v 127.0.0.1 6160
 	echo "Testcard image activated."
 }
@@ -435,12 +430,12 @@ wavelet_clear_inputs() {
 # Removes all input devices from their appropriate prefixes.
 # Until I fix the detection/removal stuff so that it works perfectly, this will effectively clean out any cruft from 'stuck'
 # source devices which no longer exist, but still populate on the UI.
-# bad solution
+# bad solution, because it appears to be deleting things it should not..
 	hostname="$(hostname)"
-	keysArray=("/interface/" "/hash/" "/short_hash/" "/long_interface/" "/${hostname}/inputs/" "/network_long/" "/network_short/" "/network_interface/" "/network_ip/" "/network_uv_stream_command/")
+	keysArray=("/interface/", "/hash/", "/short_hash/", "/long_interface/", "/${hostname}/inputs/", "/network_long/", "/network_short/", "/network_interface/", "/network_ip/", "/network_uv_stream_command/")
 	for key in ${keysArray[@]}; do
 		KEYNAME="${key}"
-		echo "Deleting: ${key}"
+		echo "Deleting keys under prefix: ${key}"
 		delete_etcd_key_prefix
 	done
 	echo -e "All interface devices and their configuration data, as well as labels have been deleted\nPlugging in a new device will cause the detection module to run again.\n"
