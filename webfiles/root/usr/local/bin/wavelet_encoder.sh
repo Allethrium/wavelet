@@ -352,9 +352,17 @@ set_channelIndex(){
 		exit 0
 	fi
 	# Final step is to look for the uv_input label in device_map_entries_verity
-	# Module should ONLY be called on a system which possesses the device in question, so this shouldn't pose any challenges;
-	KEYNAME="/$(hostname)/devpath_lookup/${hashValue}"; read_etcd_global; searchArg="${printvalue}"
-	
+	# Module should ONLY be called on a system which possesses the device in question
+	# If we are the server, we should test for network device:
+	echo "Test for network device"
+	if [[ ${controllerInputLabel} == *"/network_interface/"* ]]; then
+		KEYNAME="/network_ip/${hashValue}"; read_etcd_global
+		KEYNAME="/network_uv_stream_command/${printvalue}"; read_etcd_global
+		searchArg=${printvalue}
+	else
+		KEYNAME="/$(hostname)/devpath_lookup/${hashValue}"; read_etcd_global; searchArg="${printvalue}"
+	fi
+
 	# check for device_map presence
 	echo "Looking for device path ${searchArg} in local device map file.."
 	if grep -q ${searchArg} /var/home/wavelet/device_map_entries_verity; then
