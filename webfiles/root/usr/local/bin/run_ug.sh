@@ -5,15 +5,15 @@ detect_self(){
 	UG_HOSTNAME=$(hostname)
 	echo -e "Hostname is $UG_HOSTNAME \n"
 	case $UG_HOSTNAME in
-	enc*) 					echo -e "I am an Encoder\n"; event_encoder
+	enc*) 					echo -e "I am an Encoder"; event_encoder
 	;;
-	decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.\nAn error has occurred at some point, and needs troubleshooting.\nTerminating process. \n"; exit 0
+	decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.\nAn error has occurred at some point, and needs troubleshooting.\nTerminating process."; exit 0
 	;;
-	dec*)					echo -e "I am a Decoder\n"; event_decoder
+	dec*)					echo -e "I am a Decoder"; event_decoder
 	;;
 	svr*)					echo -e "I am a Server."; event_server
 	;;
-	*) 						echo -e "This device Hostname is not set appropriately, exiting\n"; exit 0
+	*) 						echo -e "This device Hostname is not set appropriately, exiting"; exit 0
 	;;
 	esac
 }
