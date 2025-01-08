@@ -491,7 +491,7 @@ Wants=network-online.target
 [Service]
 ExecStart=/bin/bash -c "/usr/local/bin/run_ug.sh"
 StartLimitIntervalSec=3
-StartLimitBurst=12
+StartLimitBurst=30
 
 [Install]
 WantedBy=default.target" > /var/home/wavelet/.config/systemd/user/run_ug.service
