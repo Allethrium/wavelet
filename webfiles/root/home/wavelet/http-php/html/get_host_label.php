@@ -27,5 +27,5 @@ function curl_etcd($key) {
 // curl etcd uv_hash_select for the value of the device hash we want to see streaming on the system
 // please note how we have to call the function twice to set the reverse lookup values as well as the fwd values!
 echo "posted data are: \n New Label: $value\n Host: $key \n";
-curl_etcd("$key", "$value");
+curl_etcd("$key");
 ?>
