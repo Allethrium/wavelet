@@ -451,7 +451,7 @@ wavelet_detect_inputs() {
 #
 ###
 
-logName="controller.log"
+logName="/var/home/wavelet/logs/controller.log"
 if [[ -e $logName || -L $logName ]] ; then
 	i=0
 	while [[ -e $logName-$i || -L $logName-$i ]] ; do

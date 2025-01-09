@@ -86,6 +86,8 @@ read_uv_hash_select() {
 
 check_ugAppImage(){
 	# Checks for UG process and attempts to start it if dead.
+	echo "System hostname is: ${hostNameSys}"
+	echo "Pretty hostname is: ${hostNamePretty}"
 	if systemctl --user is-active --quiet UltraGrid.AppImage.service; then
 		echo "UG AppImage Systemd unit is running, continuing."
 		echo "Controller should be able to select basic static inputs from channel update cmd."
@@ -445,6 +447,6 @@ terminateProcess(){
 hostNameSys=$(hostname)
 hostNamePretty=$(hostnamectl --pretty)
 #set -x
-exec >/home/wavelet/encoder.log 2>&1
+exec >/var/home/wavelet/logs/encoder.log 2>&1
 
 read_uv_hash_select

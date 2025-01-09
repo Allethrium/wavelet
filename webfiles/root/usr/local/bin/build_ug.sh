@@ -586,7 +586,7 @@ hostNameSys=$(hostname)
 hostNamePretty=$(hostnamectl --pretty)
 # Check for pre-existing log file
 # This is necessary because of system restarts, the log will get overwritten, and we need to see what it's doing across reboots.
-logName=/var/home/wavelet/build_ug.log
+logName=/var/home/wavelet/logs/build_ug.log
 if [[ -e $logName || -L $logName ]] ; then
 	i=0
 	while [[ -e $logName-$i || -L $logName-$i ]] ; do
@@ -618,7 +618,9 @@ while [[ $# -gt 0 ]] && [[ "$1" == "--"* ]] ;
     shift;              #expose next argument
     case "$opt" in
     	"--R")			echo >&2 "Host has had a new pretty hostname set via Wavelet Label.. continuing"; set_pretty
-        *)				echo >&2 "Invalid option: $@"; exit 1;;
+		;;
+        *)				echo >&2 "Invalid option: $@"; exit 1
+		;;
    esac
 
 detect_self
