@@ -213,7 +213,7 @@ wavelet_testcard() {
 }
 
 wavelet_refresh() {
-	# This is only called by the RD, refresh-devices button, and it finds the previous hash and resets to it.
+	# This is only called by the RD, refresh-devices button.  It finds the previous hash and resets to it.
 	KEYNAME="uv_hash_select_old"; read_etcd_global; previousHash=${printvalue}
 	KEYNAME="uv_hash_select"; KEYVALUE=${previousHash}; write_etcd_global
 	echo -e "Previous hash value reset, running detectv4l to redetect local sources on all hosts.."
@@ -251,7 +251,6 @@ wavelet_foursplit() {
 	systemctl --user stop UltraGrid.AppImage.service
 	# Set encoder restart flag to 1
 	KEYNAME=encoder_restart; KEYVALUE="1"; write_etcd_global
-	KEYNAME=input_update; KEYVALUE="0"; echo -e "\n Task completed, resetting input_update key to 0.. \n"; write_etcd_global
 }
 
 
