@@ -22,7 +22,7 @@ get_authtoken(){
 #
 #####
 
-logName=/var/home/wavelet/webui.log
+logName=/var/home/wavelet/logs/webui.log
 #set -x
 exec > "${logName}" 2>&1
 
