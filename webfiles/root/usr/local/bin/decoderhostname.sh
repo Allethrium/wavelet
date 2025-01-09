@@ -17,12 +17,14 @@ UG_HOSTNAME=$(hostname)
 }
 
 event_decoder(){
-newhostname=$(LC_ALL=C tr -dc A-Z-0-9 </dev/urandom | head -c 4)
-hostnamectl hostname dec$newhostname.wavelet.local
-# remember to reset permissions or we get root logfiles
-chown wavelet:wavelet -R /var/home/wavelet
-echo "All set, rebooting decoder.."
-systemctl reboot
+	echo "Setting decoder hostname as well as 'Pretty' label"
+	newhostname=$(LC_ALL=C tr -dc A-Z-0-9 </dev/urandom | head -c 4)
+	hostnamectl hostname dec$newhostname.wavelet.local
+	hostnamectl --pretty hostname dec$newhostname.wavelet.local
+	# remember to reset permissions or we get root logfiles
+	chown wavelet:wavelet -R /var/home/wavelet
+	echo "All set, rebooting decoder.."
+	systemctl reboot
 }
 
 #set -x
