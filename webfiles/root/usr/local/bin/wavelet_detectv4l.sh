@@ -28,6 +28,9 @@ read_etcd_clients_ip_sed() {
 	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
 	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
 }
+read_etcd_keysonly(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_keysonly" "${KEYNAME}")
+}
 write_etcd(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
 	echo -e "Key Name: ${KEYNAME} set to ${KEYVALUE} under /${hostNameSys}/\n"
@@ -138,7 +141,7 @@ set_device_input() {
 	KEYNAME="/${hostNameSys}/INPUT_DEVICE_PRESENT"; KEYVALUE="1"; write_etcd_global
 	# This flag is necessary to tell the wavelet_encoder module to regenerate the switcher list, the value is "consumed"
 	# I.E set back to 0 once this is done.
-	KEYNAME="${hostNameSys}/INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
+	KEYNAME="/${hostNameSys}/INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
 	KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
 	detect
 }
