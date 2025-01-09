@@ -137,7 +137,7 @@ event_magewell_ndi(){
 	echo -e "MageWell ProConvert device should now be fully configured..\n"
 	# Generate UG Stream command from the appropriate NDI Source
 	deviceHostName="Magewell_Proconvert_HDMI_$(curl -b /var/tmp/wavelet_sid.txt http://${ipAddr}/mwapi?method=get-summary-info | jq '.ndi.name' | tr -d '"')"
-	UGdeviceStreamCommand="ndi:url=${ndiIPAddr}"
+	UGdeviceStreamCommand="ndi:url=${ndiIPAddr}:color=100"
 	populate_to_etcd
 	# Call a new module to populate the DHCP lease into FreeIPA BIND (does nothing if security layer is off)
 	/usr/local/bin/wavelet_ddns_update.sh ${deviceHostName} ${ipAddr}
