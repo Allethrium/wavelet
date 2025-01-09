@@ -54,11 +54,11 @@ generate_service(){
 
 detect_input_present(){
 	# Before we do anything, once again we check that we have an input device present.
-	KEYNAME="/${hostnameSys}/INPUT_DEVICE_PRESENT"; read_etcd_global
+	KEYNAME="/${hostNameSys}/INPUT_DEVICE_PRESENT"; read_etcd_global
 		if [[ "$printvalue" -eq 1 ]]; then
 			echo -e "An input device is present on this host, continuing.. \n"
 		else
-			if [[ ${hostnameSys} == *"svr"* ]]; then
+			if [[ ${hostNameSys} == *"svr"* ]]; then
 				echo -e "This is the wavelet server, continuing.."
 			else
 				echo -e "No input devices, and not a server, encoder shouldn't be running on this host."
@@ -98,7 +98,7 @@ check_ugAppImage(){
 }
 
 encoder_check_server(){
-	if [[ "${hostnameSys}" == *"svr"* ]]; then 
+	if [[ "${hostNameSys}" == *"svr"* ]]; then 
 		echo -e "This is the server, generating expanded switcher."
 		generate_server_args
 	else
@@ -199,23 +199,23 @@ generate_server_args(){
 	echo -e "\nGenerated command line input into etcd is:\n${commandLine}\n\nConverting to base64 and injecting to etcd.."
 	encodedCommandLine=$(echo "${commandLine}" | base64 -w 0)
 	# Store generated server input var as base64 and assign to variable within this shell
-	KEYNAME="/${hostnameSys}/server_commands"; KEYVALUE="${encodedCommandLine}"; write_etcd_global
+	KEYNAME="/${hostNameSys}/server_commands"; KEYVALUE="${encodedCommandLine}"; write_etcd_global
 	generate_local_args "${index}"
 }
 
 generate_local_args(){
 	# This is called after the server portion has completed, or it will be called directly if running on a client device
 	echo "Running UG service assembly for local devices."
-	KEYNAME="/${hostnameSys}/INPUT_DEVICE_NEW"; read_etcd_global
+	KEYNAME="/${hostNameSys}/INPUT_DEVICE_NEW"; read_etcd_global
 	if [[ ${printvalue} -eq "0" ]];then
 		# Do nothing
 		echo -e "\nThe input device update flag is not active, no new devices are available."
 		generate_systemd_unit
 	fi
 	# Consume the device flag by resetting it
-	KEYNAME="/${hostnameSys}/INPUT_DEVICE_NEW"; KEYVALUE="0"; write_etcd_global
+	KEYNAME="/${hostNameSys}/INPUT_DEVICE_NEW"; KEYVALUE="0"; write_etcd_global
 	KEYNAME="ENCODER_ACTIVE"; read_etcd_global
-	if [[ "${printvalue}" != "${hostnamePretty}" ]];then
+	if [[ "${printvalue}" != "${hostNamePretty}" ]];then
 		echo "I am not set as the prime encoder by the controller, terminating active encoding processes and exiting."
 		terminateProcess
 		exit 0
@@ -263,7 +263,7 @@ generate_local_args(){
 			:
 		fi
 		echo "$i)${localInputDevices[$i]}"
-		echo "$i,${localInputDevices[$i]},${hostnameSys}" >> /var/home/wavelet/device_map_entries_verity
+		echo "$i,${localInputDevices[$i]},${hostNameSys}" >> /var/home/wavelet/device_map_entries_verity
 	done))
 	# Generate the command line proper
 	commandLine=$(while IFS= read -r line; do
@@ -275,7 +275,7 @@ generate_local_args(){
 	echo -e "Generated switcher device list for all local input devices is:\n${localDevs}"
 	echo -e "Generated command line input into etcd is:\n${commandLine}\nConverting to base64 and injecting to etcd.."
 	encodedCommandLine=$(echo "${commandLine}" | base64 -w 0)
-	KEYNAME="/${hostnameSys}/local_encoder_command"; KEYVALUE="${encodedCommandLine}"; write_etcd_global
+	KEYNAME="/${hostNameSys}/local_encoder_command"; KEYVALUE="${encodedCommandLine}"; write_etcd_global
 	clientInputvar=${commandLine}
 	# We should now have all local input variables populated correctly
 	generate_systemd_unit
@@ -298,13 +298,13 @@ generate_systemd_unit(){
 	# N.B This isn't the same as ethernet MTU.
 	UGMTU="9000"
 	# Grab our inputVars.  
-	if [[ ${hostnameSys} = *"svr"* ]]; then
-		KEYNAME="/${hostnameSys}/server_commands"; read_etcd_global; serverInputvar=$(echo ${printvalue} | base64 -d)
+	if [[ ${hostNameSys} = *"svr"* ]]; then
+		KEYNAME="/${hostNameSys}/server_commands"; read_etcd_global; serverInputvar=$(echo ${printvalue} | base64 -d)
 	else
 		# Zero that out so nothing will be populated
 		unset serverInputvar
 	fi
-	KEYNAME="/${hostnameSys}/local_encoder_command"; read_etcd_global; localInputvar=$(echo ${printvalue} | base64 -d)
+	KEYNAME="/${hostNameSys}/local_encoder_command"; read_etcd_global; localInputvar=$(echo ${printvalue} | base64 -d)
 	# This is a sparse array, not all values need to be set.
 	commandLine=(\
 		[1]="--tool uv" \
@@ -327,7 +327,7 @@ TimeoutStopSec=0.33
 [Install]
 WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 	# Tell Wavelet I am the active encoder
-	KEYNAME="ACTIVE_ENCODER"; KEYVALUE="${hostnameSys}"; write_etcd_global
+	KEYNAME="ACTIVE_ENCODER"; KEYVALUE="${hostNameSys}"; write_etcd_global
 	# Tell wavelet my encoder IP address
 	activeConnection=$(nmcli -t -f NAME,DEVICE c s -a | head -n 1)
 	activeConnectionIP=$(nmcli dev show ${activeConnection#*:} | grep ADDRESS | awk '{print $2}' | head -n 1)
@@ -364,7 +364,7 @@ set_channelIndex(){
 		KEYNAME="/network_uv_stream_command/${printvalue}"; read_etcd_global
 		searchArg=${printvalue}
 	else
-		KEYNAME="/${hostnamePretty}/devpath_lookup/${hashValue}"; read_etcd_global; searchArg="${printvalue}"
+		KEYNAME="/${hostNamePretty}/devpath_lookup/${hashValue}"; read_etcd_global; searchArg="${printvalue}"
 	fi
 
 	# check for device_map presence
@@ -377,7 +377,7 @@ set_channelIndex(){
 		echo "Entry missing from device map file! Forcing re-enumeration of devices.."
 		sleep 1
 		KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
-		KEYNAME="/${hostnameSys}/INPUT_DEVICE_NEW"; write_etcd_global
+		KEYNAME="/${hostNameSys}/INPUT_DEVICE_NEW"; write_etcd_global
 		rm -rf /var/home/wavelet/device_map_entries_verity
 		exit 0
 	fi
@@ -390,7 +390,7 @@ set_channelIndex(){
 			echo "Retries exceeded, starting process from scratch."
 			rm -rf /var/home/wavelet/device_map_entries_verity
 			KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
-			KEYNAME="/${hostnameSys}/INPUT_DEVICE_NEW"; write_etcd_global
+			KEYNAME="/${hostNameSys}/INPUT_DEVICE_NEW"; write_etcd_global
 		fi
 		echo "Entry missing from systemD unit! Attempting to regenerate three times before re-enumerating entire device tree.."
 		((retry++))
@@ -431,7 +431,7 @@ terminateProcess(){
 	# If this is not the currently active encoder hostname, it will set itself off for the prime bit here.
 	# Therefore, everything generally behaves in a reticent manner and must be appointed by the controller.
 	echo "Setting encoder_prime key to 0 for this device, and terminating the encoder service."
-	KEYNAME="/${hostnameSys}/encoder_prime"; KEYVALUE="0"; write_etcd_global
+	KEYNAME="/${hostNameSys}/encoder_prime"; KEYVALUE="0"; write_etcd_global
 	systemctl --user disable wavelet_encoder.service --now
 	systemctl --user UltraGrid.AppImage.service --now
 }

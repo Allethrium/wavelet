@@ -543,14 +543,14 @@ event_connectwifi(){
 	# Does not configure wifi, but attempts to list and connect a wavelet WiFi connection
 	# Assumes valid polkit rules allowing wavelet user to manage network connections
 	nmcli r wifi on
-	if [[ $(hostname) = *"svr"* ]]; then
+	if [[ ${hostNameSys} = *"svr"* ]]; then
 		echo -e "If you want to run the server via a WiFi connection, this should be configured and enabled manually via nmtui or nmcli."
 		echo -e "Performance will likely suffer as a result."
 	fi
 
 	if [[ -f /var/no.wifi ]]; then
 		echo -e "The /var/no.wifi flag is set.  Please remove this file if this host should utilize wireless connectivity."
-		KEYNAME="/${hostname}/WIFI"; KEYVALUE="0"; write_etcd_global
+		KEYNAME="/${hostNameSys}/WIFI"; KEYVALUE="0"; write_etcd_global
 	fi
 	files=$(find /var/home/wavelet -maxdepth 1 -name "wifi.*.key")
 	if [[ ${#files[@]} -gt 0 ]]; then
@@ -565,13 +565,8 @@ event_connectwifi(){
 	if nmcli con up $(cat /var/home/wavelet/wifi_ssid); then
 		echo "Configured connection established, continuing."
 		# We'll use this flag for future UI improvements to help determine if a host is wired or wireless
-		KEYNAME="/${hostname}/WIFI"; KEYVALUE="1"; write_etcd_global
+		KEYNAME="/${hostNameSys}/WIFI"; KEYVALUE="1"; write_etcd_global
 	fi
-}
-set_pretty_hostname(){
-	# Get the new hostname from etcd and set the pretty hostname.
-	# This way we can avoid expensive reboots and domain re-enrollments
-	hostnamectl set-hostname "${hostLabel}" --pretty
 }
 
 
@@ -613,7 +608,7 @@ until [[ $(/usr/local/bin/wavelet_etcd_interaction.sh "check_status" | awk '{pri
 	fi
 done
 
-while [[ $# -gt 0 ]] && [[ "$1" == "--"* ]] ;
+while [[ $# -gt 0 ]] && [[ "$1" == "--"* ]] ;do
   opt="$1";
     shift;              #expose next argument
     case "$opt" in
@@ -622,5 +617,6 @@ while [[ $# -gt 0 ]] && [[ "$1" == "--"* ]] ;
         *)				echo >&2 "Invalid option: $@"; exit 1
 		;;
    esac
+done
 
 detect_self
