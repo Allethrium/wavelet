@@ -627,11 +627,17 @@ until [[ $(/usr/local/bin/wavelet_etcd_interaction.sh "check_status" | awk '{pri
 		echo "We have been waiting sixty seconds, there is likely a network issue."
 		echo "Running the wifi connection script.."
 		until /usr/local/bin/connectwifi.sh; do
-			sleep 2
+			sleep .5
 		done
 	fi
 done
 
-sleep 1
+while [[ $# -gt 0 ]] && [[ "$1" == "--"* ]] ;
+  opt="$1";
+    shift;              #expose next argument
+    case "$opt" in
+    	"--R")			echo >&2 "Host has had a new pretty hostname set via Wavelet Label.. continuing"
+        *)				echo >&2 "Invalid option: $@"; exit 1;;
+   esac
 
 detect_self
