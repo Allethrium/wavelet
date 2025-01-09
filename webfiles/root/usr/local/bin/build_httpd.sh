@@ -85,6 +85,8 @@ fail(){
 #
 #####
 
+#set -x
+
 if [[ -f /var/prod.security.enabled ]]; then
 	echo -e "Security layer enabled, generating apache with TLS configuration.."
 	newmethod
