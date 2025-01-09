@@ -72,8 +72,10 @@ install_security_layer(){
 #
 ####
 
+mkdir -p /var/home/wavelet/logs
+
 #set -x
-exec > /home/wavelet/client_installer.log 2>&1
+exec > /var/home/wavelet/logs/client_installer.log 2>&1
 
 # Fix AVAHI otherwise NDI won't function correctly, amongst other things;  https://www.linuxfromscratch.org/blfs/view/svn/basicnet/avahi.html
 # Runs first because it doesn't matter what kind of server/client device, it'll need this.
@@ -89,7 +91,7 @@ echo -e "Calling connectwifi module"
 /usr/local/bin/connectwifi.sh
 # Move the log file otherwise permissions is an issue and we don't get subsequent log
 # Also reset permissions on wavelet home folder so that any other files generated whilst running under root are writable by the wavelet user
-mv /var/home/wavelet/connectwifi.log /var/home/wavelet/setup_old_connectwifi.log
+mv /var/home/wavelet/connectwifi.log /var/home/wavelet/logs/setup_old_connectwifi.log
 chown -R wavelet:wavelet /var/home/wavelet
 # Disable self so we don't run again on the next boot.
 systemctl disable wavelet_install_client.service

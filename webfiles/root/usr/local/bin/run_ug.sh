@@ -2,34 +2,34 @@
 # Checks device hostname to define behavior and launches services as appropriate
 
 detect_self(){
-	UG_HOSTNAME=$(hostname)
-	echo -e "Hostname is $UG_HOSTNAME \n"
-	case $UG_HOSTNAME in
-	enc*) 					echo -e "I am an Encoder"; event_encoder
-	;;
-	decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.\nAn error has occurred at some point, and needs troubleshooting.\nTerminating process."; exit 0
-	;;
-	dec*)					echo -e "I am a Decoder"; event_decoder
-	;;
-	svr*)					echo -e "I am a Server."; event_server
-	;;
-	*) 						echo -e "This device Hostname is not set appropriately, exiting"; exit 0
-	;;
+	echo -e "Hostname is ${hostNamePretty}\n"
+	case ${hostNamePretty} in
+		enc*) 					echo -e "I am an Encoder"; event_encoder
+		;;
+		decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.\nAn error has occurred at some point, and needs troubleshooting.\nTerminating process."; exit 0
+		;;
+		dec*)					echo -e "I am a Decoder"; event_decoder
+		;;
+		svr*)					echo -e "I am a Server."; event_server
+		;;
+		*) 						echo -e "This device Hostname is not set appropriately, exiting"; exit 0
+		;;
 	esac
 }
+
 
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
-	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for value: $printvalue for host: ${hostNameSys}\n"
 }
 read_etcd_global(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
-	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for Global Value: $printvalue\n"
 }
 read_etcd_prefix(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
-	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for value $printvalue for host: ${hostNameSys}\n"
 }
 read_etcd_clients_ip() {
 	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
@@ -39,21 +39,13 @@ read_etcd_clients_ip_sed() {
 	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
 	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
 }
-read_etcd_json_revision(){
-	# Special case used in controller
-	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_json_revision" uv_hash_select | jq -r '.header.revision')
-}
-read_etcd_lastrevision(){
-	# Special case used in controller
-	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_lastrevision")	
-}
 write_etcd(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
-	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
+	echo -e "Key Name: ${KEYNAME} set to ${KEYVALUE} under /${hostNameSys}/\n"
 }
 write_etcd_global(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
-	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
+	echo -e "Key Name: ${KEYNAME} set to: ${KEYVALUE} for Global value\n"
 }
 write_etcd_client_ip(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
@@ -63,6 +55,9 @@ delete_etcd_key(){
 }
 delete_etcd_key_global(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key_global" "${KEYNAME}"
+}
+delete_etcd_key_prefix(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key_prefix" "${KEYNAME}"
 }
 generate_service(){
 	# Can be called with more args with "generate_servier" ${keyToWatch} 0 0 "${serviceName}"
@@ -75,7 +70,7 @@ event_server(){
 	# Ensure web interface is up
 	systemctl --user start http-php-pod.service
 	# Check for input devices
-	KEYNAME="/$(hostname)/INPUT_DEVICE_PRESENT"; read_etcd_global
+	KEYNAME="/${hostNameSys}/INPUT_DEVICE_PRESENT"; read_etcd_global
 	if [[ "$printvalue" -eq 1 ]]; then
 		echo -e "An input device is present on this server, proceeding\n"
 		event_encoder_server
@@ -103,9 +98,9 @@ event_encoder(){
 	# Registers self as a decoder in etcd for the reflector to query & include in its client args
 	echo -e "Calling wavelet_encoder systemd unit.."
 	# I've added a blank bit here too.. it might make more sense to call it "host blank" though..
-	KEYNAME="/$(hostname)/DECODER_BLANK"; KEYVALUE="0"; write_etcd_global
+	KEYNAME="/${hostNameSys}/DECODER_BLANK"; KEYVALUE="0"; write_etcd_global
 	# Telling Wavelet that this host will be actively streaming
-	KEYNAME="ENCODER_ACTIVE"; KEYVALUE="$(hostname)"; write_etcd_global
+	KEYNAME="ENCODER_ACTIVE"; KEYVALUE="${hostNamePretty}"; write_etcd_global
 	# Call wavelet_encoder.service which will provision and start the AppImage proper
 	systemctl --user start wavelet_encoder.service
 }
@@ -120,17 +115,18 @@ event_decoder(){
 	# Ensure all reset, reveal and reboot flags are set to 0 so they are
 	# 1) populated
 	# 2) not active so the new device goes into a reboot/reset/reveal loop
-	KEYNAME="/$(hostname)/DECODER_RESET"; KEYVALUE="0"; write_etcd_global
-	KEYNAME="/$(hostname)/DECOER_REVEAL"; write_etcd_global
-	KEYNAME="/$(hostname)/DECODER_REBOOT"; write_etcd_global
-	KEYNAME="/$(hostname)/DECODER_BLANK"; write_etcd_global
+	KEYNAME="/${hostNameSys}/DECODER_RESET"; KEYVALUE="0"; write_etcd_global
+	KEYNAME="/${hostNameSys}/DECOER_REVEAL"; write_etcd_global
+	KEYNAME="/${hostNameSys}/DECODER_REBOOT"; write_etcd_global
+	KEYNAME="/${hostNameSys}/DECODER_BLANK"; write_etcd_global
 	# Enable watcher services now all task activation keys are set to 0
-	systemctl --user enable wavelet_decoder_reset.service --now
-	systemctl --user enable wavelet_decoder_reveal.service --now
-	systemctl --user enable wavelet_decoder_reboot.service --now
-	systemctl --user enable wavelet_decoder_blank.service --now
-	systemctl --user enable wavelet_device_relabel.service --now
-	systemctl --user enable wavelet_promote.service --now
+	systemctl --user enable \
+		wavelet_decoder_reset.service \
+		wavelet_decoder_reveal.service \
+		wavelet_decoder_reboot.service \
+		wavelet_decoder_blank.service \
+		wavelet_device_relabel.service \
+		wavelet_promote.service --now
 	# Note - ExecStartPre=-swaymsg workspace 2 is a failable command 
 	# It will always send the UG output to a second display.  
 	# If not connected the primary display will be used.
@@ -175,26 +171,8 @@ event_decoder(){
 		else
 			:
 		fi
-	# Perhaps add an etcd watch or some kind of server "isalive" function here
-	# Decoder should display:
-	# - No incoming video
-	#	if POC REF = 0 bytes received for > 1m; then
-	#	wavelet_errorgen.sh build imagemagick / "Host isn't receiving video data from server, check the reflector process on the server."
-	# - Consistent POC errors, codec issue
-	#		if POC errors or FEC errors > 1m; then
-	#		test ping
-	#		if ping fine
-			#	wavelet_errorgen.sh build imagemagick / "Host is experiencing high levels of corrupted frames.  Check network integrity, MTU Value and encoder settings."
-	# 		if ping bad
-			# - consistent packet loss, network issue
-			# wavelet_errorgen.sh build imagemagick / "Host is experiencing	network connectivity issues, please check network settings.
-	#		if ping DEAD
-			# wavelet_errorgen.sh build imagemagick / "Host has no network connectivity
-	# - other possible failure modes
-	#	???
 	get_ipValue
-	# Systemd-resolved seems very broken on the server, but might be necessary for encoders/decoders.
-	}
+}
 
 get_ipValue(){
 	# Gets the current IP address for this host to register into server etcd.
@@ -216,7 +194,7 @@ get_ipValue(){
 				local ip=$1 regex='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
 				if [[ $ip =~ $regex ]]; then
 					echo -e "\nIP Address is valid as ${ip}, continuing.."
-					KEYNAME="/hostHash/$(hostname)/ipaddr"; KEYVALUE="${ip}"; write_etcd_global
+					KEYNAME="/hostHash/${hostNameSys}/ipaddr"; KEYVALUE="${ip}"; write_etcd_global
 				else
 					echo -e "IP Address is not valid, sleeping and calling function again\n"
 					get_ipValue
@@ -232,7 +210,11 @@ get_ipValue(){
 #
 #####
 
+
+
+hostNameSys=$(hostname)
+hostNamePretty=$(hostnamectl --pretty)
 #set -x
-exec >/home/wavelet/run_ug.log 2>&1
+exec >/var/home/wavelet/logs/run_ug.log 2>&1
 get_ipValue
 detect_self

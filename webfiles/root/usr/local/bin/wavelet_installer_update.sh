@@ -4,19 +4,18 @@
 
 detect_self(){
 systemctl --user daemon-reload
-UG_HOSTNAME=$(hostname)
-	echo -e "Hostname is $UG_HOSTNAME \n"
-	case $UG_HOSTNAME in
-	enc*) 					echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."			;	event_encoder
-	;;
-	decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.  Randomizing my hostname, and rebooting"	;	event_decoder 
-	;;
-	dec*)					echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."				;	event_decoder
-	;;
-	svr*)					echo -e "I am a Server. Proceeding..."  														;	event_server
-	;;
-	*) 						echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
-	;;
+	echo -e "Hostname is ${hostNamePretty} \n"
+	case ${hostNamePretty} in
+		enc*) 					echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."			;	event_encoder
+		;;
+		decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.  Randomizing my hostname, and rebooting"	;	event_decoder 
+		;;
+		dec*)					echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."				;	event_decoder
+		;;
+		svr*)					echo -e "I am a Server. Proceeding..."  														;	event_server
+		;;
+		*) 						echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
+		;;
 	esac
 }
 
@@ -129,12 +128,14 @@ generate_tarfiles(){
 #####
 
 # One rather silly thing.. if this module is what gets updated... then that won't work until it is run again the next reboot.
+hostNameSys=$(hostname)
+hostNamePretty=$(hostnamectl --pretty)
 
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 systemctl disable zincati.service --now
 
 #set -x
-exec >/var/home/wavelet/update_wavelet_modules.log 2>&1
+exec >/var/home/wavelet/logs/update_wavelet_modules.log 2>&1
 detect_self
 
 echo -e "Update completed.  The system will automatically reboot in three seconds!"

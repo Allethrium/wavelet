@@ -6,10 +6,11 @@
 # It will attempt to make sense of available v4l devices and update etcd
 # The WebUI updates, and is updated from, many of these keys.
 
+
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
-	echo -e "Key Name: {$KEYNAME} read from etcd for value: $printvalue for host: $(hostname)\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for value: $printvalue for host: ${hostNameSys}\n"
 }
 read_etcd_global(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
@@ -17,7 +18,7 @@ read_etcd_global(){
 }
 read_etcd_prefix(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
-	echo -e "Key Name: {$KEYNAME} read from etcd for value: $printvalue for host: $(hostname)\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for value $printvalue for host: ${hostNameSys}\n"
 }
 read_etcd_clients_ip() {
 	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
@@ -27,24 +28,13 @@ read_etcd_clients_ip_sed() {
 	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
 	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
 }
-read_etcd_json_revision(){
-	# Special case used in controller
-	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_json_revision" uv_hash_select | jq -r '.header.revision')
-}
-read_etcd_lastrevision(){
-	# Special case used in controller
-	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_lastrevision")	
-}
-read_etcd_keysonly(){
-	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_keysonly" "${KEYNAME}")
-}
 write_etcd(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
-	echo -e "Key Name: ${KEYNAME} set to: ${KEYVALUE} under: /$(hostname)/.\n"
+	echo -e "Key Name: ${KEYNAME} set to ${KEYVALUE} under /${hostNameSys}/\n"
 }
 write_etcd_global(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
-	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value.\n"
+	echo -e "Key Name: ${KEYNAME} set to: ${KEYVALUE} for Global value\n"
 }
 write_etcd_client_ip(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
@@ -54,6 +44,9 @@ delete_etcd_key(){
 }
 delete_etcd_key_global(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key_global" "${KEYNAME}"
+}
+delete_etcd_key_prefix(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key_prefix" "${KEYNAME}"
 }
 generate_service(){
 	# Can be called with more args with "generate_servier" ${keyToWatch} 0 0 "${serviceName}"
@@ -77,11 +70,10 @@ sense_devices() {
 	shopt -u nullglob
 }
 
-
 generate_device_info() {
 	echo -e "Now generating device info for each item presently located in /dev/v4l/by-id.."
 	echo -e "Working on ${device_string_long}"
-	device_string_short=$(echo $(hostname)/"${device_string_long}" | sed 's/.*usb-//')
+	device_string_short=$(echo ${hostNameSys}/"${device_string_long}" | sed 's/.*usb-//')
 	info=$(v4l2-ctl -D -d ${v4l_device_path})
 	# here we parse this information
 	cardType=$(echo "${info}" | awk -F ":" '/Card type/ { print $2 }')
@@ -111,12 +103,12 @@ generate_device_info() {
 isDevice_input_or_output() {
 	# Are we outputting audio/video signals someplace or is this an input?  we determine this here
 	case ${device_string_long} in 
-	*BiAmp*)				echo -e "BiAmp HDMI-USB Capture device detected..\n"						&&	event_biAmp
-	;;
-	*audio*)				echo -e "Audio out device detected..\n"										&&	echo -e "an audio output selection event would be called here\n"
-	;;
-	*)						echo -e "Not a biAmp, we are probably connecting video capture dev.\n"		&&	set_device_input
-	;;
+		*BiAmp*)				echo -e "BiAmp HDMI-USB Capture device detected..\n"						&&	event_biAmp
+		;;
+		*audio*)				echo -e "Audio out device detected..\n"										&&	echo -e "an audio output selection event would be called here\n"
+		;;
+		*)						echo -e "Not a biAmp, we are probably connecting video capture dev.\n"		&&	set_device_input
+		;;
 	esac
 }
 
@@ -125,28 +117,28 @@ set_device_input() {
 	# populated device_string_short with hash value, this is used by the interface webUI component
 	# device_string_short is effectively the webui Label / banner text.
 	# Because we cannot query etcd by keyvalue, we must create a reverse lookup prefix for everything we want to be able to clean up!!
-	KEYNAME="/interface/$(hostname)/${device_string_short}"; KEYVALUE="${deviceHash}"; write_etcd_global	
+	KEYNAME="/interface/${hostNamePretty}/${device_string_short}"; KEYVALUE="${deviceHash}"; write_etcd_global	
 	# And the reverse lookup prefix - N.B this is updated from set_label.php when the webUI changes a device label/banner string! 
-	KEYNAME="/short_hash/${deviceHash}"; KEYVALUE=$(hostname)/${device_string_short}; write_etcd_global
+	KEYNAME="/short_hash/${deviceHash}"; KEYVALUE="${hostNamePretty}/${device_string_short}"; write_etcd_global
 	# We need this to perform cleanup "gracefully"
 	KEYNAME="/long_interface${device_string_long}"; KEYVALUE=${deviceHash}; write_etcd_global
 	# This will enable us to find the device from its hash value, along with the registered host encoder, like a reverse DNS lookup..
 	# GLOBAL value
-	echo -e "Attempting to set keyname ${deviceHash} for $(hostname)${device_string_long}"
+	echo -e "Attempting to set keyname ${deviceHash} for ${hostNamePretty}${device_string_long}"
 	KEYNAME="/hash/${deviceHash}"
 	# Stores the device data under hostname/inputs/device_string_long
-	KEYVALUE="/$(hostname)/inputs${device_string_long}"; write_etcd_global
+	KEYVALUE="/${hostNamePretty}/inputs${device_string_long}"; write_etcd_global
 	# Hash - short path lookup
-	KEYNAME="/$(hostname)/devpath_lookup/${deviceHash}"; KEYVALUE="${v4l_device_path}"; write_etcd_global
+	KEYNAME="/${hostNamePretty}/devpath_lookup/${deviceHash}"; KEYVALUE="${v4l_device_path}"; write_etcd_global
 	# notify watcher that input device configuration has changed
 	KEYNAME=new_device_attached; KEYVALUE=1; write_etcd_global
 	echo -e "resetting variables to null."
 	deviceHash=""
 	device_string_short=""
-	KEYNAME="/$(hostname)/INPUT_DEVICE_PRESENT"; KEYVALUE="1"; write_etcd_global
+	KEYNAME="/${hostNameSys}/INPUT_DEVICE_PRESENT"; KEYVALUE="1"; write_etcd_global
 	# This flag is necessary to tell the wavelet_encoder module to regenerate the switcher list, the value is "consumed"
 	# I.E set back to 0 once this is done.
-	KEYNAME="/$(hostname)/INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
+	KEYNAME="${hostNameSys}/INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
 	KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
 	detect
 }
@@ -183,8 +175,8 @@ device_cleanup() {
 					cleanupStringLong="${i}"
 					echo -e "\nCleanup device is ${cleanupStringLong}"
 					# delete the input caps key for the missing device
-					echo -e "Deleting $(hostname)/inputs${cleanupStringLong}  entry"
-					KEYNAME="/$(hostname)/inputs${cleanupStringLong}"; delete_etcd_key_global
+					echo -e "Deleting ${hostNameSys}/inputs${cleanupStringLong}  entry"
+					KEYNAME="/${hostNamePretty}/inputs${cleanupStringLong}"; delete_etcd_key_global
 					# find the device hash 
 					KEYNAME="/long_interface${cleanupStringLong}"; cleanupHash=$(read_etcd)
 					echo -e "Device hash located as ${cleanupHash}"
@@ -283,23 +275,18 @@ event_biamp() {
 
 
 detect_self(){
-UG_HOSTNAME=$(hostname)
-	echo -e "Hostname is $UG_HOSTNAME \n"
-	case $UG_HOSTNAME in
-	enc*) 					echo -e "I am an Encoder, allowing device sense to proceed..\n"; encoder_checkNetwork 1
-	;;
-	decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.  An error has occurred at some point, and needs troubleshooting.\nTerminating process."; exit 0
-	;;
-	dec*)					echo -e "I am a Decoder \n"; exit 0
-	;;
-	livestream*)			echo -e "I am a Livestream ouput gateway \n"; exit 0
-	;;
-	gateway*)				echo -e "I am an input Gateway for another video streaming system \n"; exit 0
-	;;
-	svr*)					echo -e "I am a Server, allowing device sense to proceed.."; sense_devices
-	;;
-	*) 						echo -e "This device Hostname is not set approprately, I don't know what I am.  Exiting \n"; exit 0
-	;;
+	echo -e "Hostname is ${hostNamePretty}\n"
+	case ${hostNamePretty} in
+		enc*) 					echo -e "I am an Encoder, allowing device sense to proceed..\n"; encoder_checkNetwork 1
+		;;
+		decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.  An error has occurred at some point, and needs troubleshooting.\nTerminating process."; exit 0
+		;;
+		dec*)					echo -e "I am a Decoder \n"; exit 0
+		;;
+		svr*)					echo -e "I am a Server, allowing device sense to proceed.."; sense_devices
+		;;
+		*) 						echo -e "This device Hostname is not set approprately, I don't know what I am.  Exiting \n"; exit 0
+		;;
 	esac
 }
 
@@ -329,7 +316,9 @@ encoder_checkNetwork(){
 #
 #####
 
-exec >/home/wavelet/detectv4l.log 2>&1
+hostNameSys=$(hostname)
+hostNamePretty=$(hostnamectl --pretty)
+exec >/var/home/wavelet/logs/detectv4l.log 2>&1
 
 # Check RD flag set here, if it's on we need to reset the device_redetect global flag first.
 if [[ "${1}" = "RD" ]]; then

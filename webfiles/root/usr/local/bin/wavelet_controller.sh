@@ -11,9 +11,8 @@
 
 detect_self(){
 # Controller only runs on the server.
-UG_HOSTNAME=$(hostname)
-	echo -e "Hostname is $UG_HOSTNAME \n"
-	case $UG_HOSTNAME in
+	echo -e "Hostname is ${hostNameSys} \n"
+	case ${hostNameSys} in
 	svr*)			echo -e "I am a Server. Proceeding..." && event_server
 	;;
 	*) 				echo -e "This device Hostname is not set approprately, exiting \n" &&	exit 0
@@ -118,15 +117,15 @@ esac
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
-	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for value: $printvalue for host: ${hostNameSys}\n"
 }
 read_etcd_global(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
-	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for Global Value: $printvalue\n"
 }
 read_etcd_prefix(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
-	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for value $printvalue for host: ${hostNameSys}\n"
 }
 read_etcd_clients_ip() {
 	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
@@ -138,11 +137,11 @@ read_etcd_clients_ip_sed() {
 }
 write_etcd(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
-	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
+	echo -e "Key Name: ${KEYNAME} set to ${KEYVALUE} under /${hostNameSys}/\n"
 }
 write_etcd_global(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
-	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
+	echo -e "Key Name: ${KEYNAME} set to: ${KEYVALUE} for Global value\n"
 }
 write_etcd_client_ip(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
@@ -430,8 +429,7 @@ wavelet_clear_inputs() {
 # Until I fix the detection/removal stuff so that it works perfectly, this will effectively clean out any cruft from 'stuck'
 # source devices which no longer exist, but still populate on the UI.
 # bad solution, because it appears to be deleting things it should not..
-	hostname="$(hostname)"
-	keysArray=("/interface/", "/hash/", "/short_hash/", "/long_interface/", "/${hostname}/inputs/", "/network_long/", "/network_short/", "/network_interface/", "/network_ip/", "/network_uv_stream_command/")
+	keysArray=("/interface/", "/hash/", "/short_hash/", "/long_interface/", "/${hostNameSys}/inputs/", "/network_long/", "/network_short/", "/network_interface/", "/network_ip/", "/network_uv_stream_command/")
 	for key in ${keysArray[@]}; do
 		KEYNAME="${key}"
 		echo "Deleting keys under prefix: ${key}"
@@ -464,5 +462,7 @@ fi
 #set -x
 exec >${logName} 2>&1
 
+hostNameSys=$(hostname)
+hostNamePretty=$(hostnamectl --pretty)
 
 detect_self

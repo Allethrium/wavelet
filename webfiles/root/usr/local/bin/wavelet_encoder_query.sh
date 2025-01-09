@@ -21,7 +21,7 @@ main() {
 	if [[ ${targetHost} == *"network_interface"* ]]; then
 		echo -e "Target Hostname is a network device."
 		detect_self
-	elif [[ "${targetHost}" == *"$(hostname)"* ]]; then
+	elif [[ "${targetHost}" == *"${hostNamePretty}"* ]]; then
 		echo -e "Target hostname references this host!"
 		systemctl --user restart run_ug.service
 	else 
@@ -41,6 +41,8 @@ detect_self(){
 	esac
 }
 
+hostNameSys=$(hostname)
+hostNamePretty=$(hostnamectl --pretty)
 #set -x
-exec >/home/wavelet/watch_encoderflag.log 2>&1
+exec >/var/home/wavelet/logs/watch_encoderflag.log 2>&1
 main

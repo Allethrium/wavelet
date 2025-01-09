@@ -225,6 +225,7 @@ fun_with_dkms(){
 #
 ####
 
+exec >/var/home/wavelet/logs/ug_depends.log 2>&1
 
 # Set server hostname for network sense.  
 sed -i "s|hostnamegoeshere|\"$(hostname)\"|g" /usr/local/bin/wavelet_network_sense.sh
@@ -239,14 +240,15 @@ systemctl enable avahi-daemon.service --now
 ausearch -c '(gssproxy)' --raw | audit2allow -M my-gssproxy
 semodule -X 300 -i my-gssproxy.pp
 
-exec >/home/wavelet/ug_depends.log 2>&1
 rpm_ostree_install_git
+
 if vim --help; then 
 	echo "Packages are available, Container overlay succeeded, continuing to install dependencies..\n"
 else
 	echo "Packages are not available, attempting to install live from old rpm-ostree layering approach..\n"
 	rpm_ostree_install
 fi
+
 chmod g+s /var/home/wavelet
 setfacl -dm u:wavelet:rwx /var/home/wavelet
 setfacl -dm g:wavelet:rwx /var/home/wavelet

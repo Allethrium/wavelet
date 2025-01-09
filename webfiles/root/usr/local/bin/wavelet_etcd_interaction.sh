@@ -182,4 +182,6 @@ esac
 # Because we need an output from this script, we can't enable logging (unless something's broken..)
 #set -x
 #exec >/home/wavelet/etcdlog.log 2>&1
+hostNameSys=$(hostname)
+hostNamePretty=$(hostnamectl --pretty)
 main "${action}" "${inputKeyName}" "${inputKeyValue}" "${valueOnlySwitch}"

@@ -6,7 +6,6 @@
 
 #	Called during wavelet_installer setup, therefore with root privilege.  Dumps files in /var/ and /home/
 
-
 # 	Wavelet's security model is pretty simple;
 #
 #	*	Central FreeIPA IdM to handle machine accounts, service principals and certificates
@@ -16,8 +15,8 @@
 #	*	system should be properly segmented behind a proper security gateway allowing only control channels and/or http/https traffic for livestreaming
 #
 
+
 detect_self(){
-UG_HOSTNAME=$(hostname)
 	echo -e "Hostname is $UG_HOSTNAME\n"
 	case $UG_HOSTNAME in
 	enc*)                   echo -e "I am an Encoder, this module should not be applicable at this stage in configuration!\n" && exit 0
@@ -573,7 +572,7 @@ configure_client_hbac(){
 configure_additional_service(){
 	# Intermediate CA from other upstream systems?
 	# Any credentials-based services we might need logins for
-	# Stuff I haven't yet though of here
+	# Stuff I haven't yet thought of here
 
 	# rkhunter propupd set for system files and configure a daily cron job for scanning and upstream notification
 	echo -e "
@@ -585,6 +584,8 @@ configure_additional_service(){
    ) #| /bin/mail -s 'rkhunter Daily Run (PutYourServerNameHere)' your@email.com" > /etc/cron.daily/rkhunter.sh
 	rkhunter --update
 	rkhunter --propupd
+  sudo systemctl --now enable clamav-freshclam.service clamd@scan.service
+  sudo semanage boolean -m -1 antivirus_can_scan_system
 
 	# Freshclam and ClamAV scans on off hours?
 }
@@ -597,7 +598,7 @@ configure_additional_service(){
 ####
 
 
-exec >/home/wavelet/hardening.log 2>&1
-#	Certmonger is in the container though?
-#systemctl enable --now certmonger
+hostNameSys=$(hostname)
+hostNamePretty=$(hostnamectl --pretty)
+exec >/var/home/wavelet/logs/hardening.log 2>&1
 detect_self
