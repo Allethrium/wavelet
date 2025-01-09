@@ -59,8 +59,6 @@ fi
 sed "s/listen-address=::1,127.0.0.1/listen-address=::1,127.0.0.1,${IPVALUE}/g" /etc/dnsmasq.conf
 systemctl stop systemd-resolved.service
 systemctl enable dnsmasq.service --now
-# Can run SystemD-resolved with StubListener set appropriately.
-systemctl enable systemd-resolved.service --now
 systemctl restart dnsmasq.service
 
 # 8/2023 - Might replace all of this with a full iDM running BIND, especially if we need WPA2/3-ENT
