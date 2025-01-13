@@ -15,13 +15,13 @@ detect_self(){
 	case ${hostNameSys} in
 	svr*)			echo -e "I am a Server. Proceeding..." && event_server
 	;;
-	*) 				echo -e "This device Hostname is not set approprately, exiting \n" &&	exit 0
+	*) 				echo -e "This device Hostname is not set approprately, exiting" &&	exit 0
 	;;
 	esac
 }
 
 event_server(){
-echo -e "\n\n***Controller Called, checking input key and acting accordingly..***"
+echo -e "***Controller Called, checking input key and acting accordingly..***\n"
 main
 }
 
@@ -53,7 +53,7 @@ main() {
 	if [[ ${printvalue} == "1" ]]; then
 		bannerActive=${printvalue}
 	fi
-	if systemctl is-active --user --quiet wavelet_encoder.service; then 
+	if systemctl is-active --user --quiet UltraGrid.AppImage.service; then 
 		echo "Server Encoder process running, continuing"
 		waveletcontroller
 	else 

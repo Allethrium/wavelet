@@ -106,8 +106,6 @@ event_encoder(){
 }
 
 event_decoder(){
-	# Sleep for 5 seconds so we have a chance for the decoder to connect to the network
-	sleep 5
 	# Registers self as a decoder in etcd for the reflector to query & include in its client args
 	echo -e "Populated IP Address is: ${IPVALUE}"
 	KEYVALUE=${IPVALUE}

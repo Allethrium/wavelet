@@ -114,14 +114,14 @@ event_decoder(){
 	event_connectwifi
 	echo -e "Setting up systemd services to be a decoder, moving to run_ug"
 	event_reveal
-	event_reboot
+	event_system_reboot
 	event_reset
 	event_blankhost
 	event_host_relabel_watcher
 	event_promote
 	event_generateHash dec
 	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
-	sleep 1
+	sleep .33
 	# Executes run_ug in order to start the video streaming window
 	systemctl --user start run_ug.service
 }
@@ -137,7 +137,7 @@ event_encoder(){
 	/usr/local/bin/run_ug.sh
 	# Generate Systemd notifier services for encoders
 	event_encoder_reboot
-	event_reboot
+	event_system_reboot
 	event_reset
 	event_device_redetect
 	event_host_relabel_watcher
@@ -182,7 +182,7 @@ event_server(){
 	event_generate_controller
 	event_generate_reflectorreload
 	event_encoder_reboot
-	event_reboot
+	event_system_reboot
 	event_reset
 	event_device_redetect
 	event_generate_wavelet_encoder_query
@@ -296,7 +296,7 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 	echo -e "Server configuration is now complete, rebooting system.."
 	systemctl reboot
 }
-event_reboot(){
+event_system_reboot(){
 	# Everything should watch the system reboot flag for a hard reset
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service SYSTEM_REBOOT 0 0 "wavelet_reboot"
 	# and the same for the host reboot
