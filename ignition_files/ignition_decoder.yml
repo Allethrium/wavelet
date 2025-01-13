@@ -502,10 +502,9 @@ systemd:
         ExecStartPost=-systemctl reboot
         [Install]
         WantedBy=multi-user.target
-    # service to call decoderhostname randomizer (interactive auth required. This is a TEST to make it work from root!)
-    # Canfail until the install client service has created the .sh file.
+    # service to call decoderhostname randomizer. Doesn't run until called by client_installer
     - name: decoderhostname.service
-      enabled: true
+      enabled: false
       contents: |
           [Unit]
           Description=Configures a four character hostname
