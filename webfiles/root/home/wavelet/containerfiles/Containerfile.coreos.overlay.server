@@ -30,7 +30,7 @@ RUN	rpm-ostree install -y -A \
     oneVPL-intel-gpu oneapi-level-zero ocl-icd opencl-headers mpv libsrtp \
     ffmpeg ffmpeg-libs libheif-freeworld fastfetch htop mesa-libOpenCL srt srt-libs vlc mplayer \
     libndi-sdk ndi-sdk ndi-sdk-documentation pipewire-utils \
-    rkhunter clamav clamav-freshclam && \
+    rkhunter clamav clamd clamav-freshclam && \
 	ostree container commit
 
 # Install necessary devel packages in addition to the pre-existing base layer
@@ -43,43 +43,42 @@ RUN	rpm-ostree install -y -A \
 	elfutils-libelf-devel ncompress libcurl-devel \
 	ascii asciidoc go bzip2-devel libffi-devel zlib-devel libuuid-devel \
 	libudev-devel chkconfig akmods kmod kmod-devel kmodtool mokutil \
-	libsrtp libvdpau-devel firefox ndi-sdk-devel pipewire-utils && \
+	libvdpau-devel firefox ndi-sdk-devel && \
 	ostree container commit
 
+# Disable this for now
 # Define, download, and install host kernel version from Koji build system
-ARG DKMS_KERNEL_VERSION
-RUN KERNEL_VERSION="$(rpm -qa kernel --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}')" && echo "\n\nContainer Kernel Version is: ${KERNEL_VERSION}\n\n" && \
-	echo -e "\nHost Kernel: ${DKMS_KERNEL_VERSION}\n" && echo -e "\nContainer Kernel: ${KERNEL_VERSION}\n" && if [[ ${DKMS_KERNEL_VERSION} = ${KERNEL_VERSION} ]] ; then echo -e '\nKernel matches!\n' && \
-	rpm-ostree install -y kernel-devel-matched; else echo -e '\nKernels do not match, downloading matching host kernel from Koji..\n' && \
-	rpm-ostree install -y -A koji && \
-	koji download-build --rpm --arch=x86_64 kernel-${DKMS_KERNEL_VERSION} && \
-	koji download-build --rpm --arch=x86_64 kernel-core-${DKMS_KERNEL_VERSION} && \
-	koji download-build --rpm --arch=x86_64 kernel-devel-${DKMS_KERNEL_VERSION} && \
-	koji download-build --rpm --arch=x86_64 kernel-modules-${DKMS_KERNEL_VERSION} && \
-	koji download-build --rpm --arch=x86_64 kernel-modules-core-${DKMS_KERNEL_VERSION} && \
-	koji download-build --rpm --arch=x86_64 kernel-modules-extra-${DKMS_KERNEL_VERSION} && \
-	koji download-build --rpm --arch=x86_64 kernel-devel-matched-${DKMS_KERNEL_VERSION}; fi
-
-RUN	rpm-ostree cliwrap install-to-root / && rpm-ostree override replace \
-	kernel-${DKMS_KERNEL_VERSION}.rpm \
-	kernel-core-${DKMS_KERNEL_VERSION}.rpm \
-	kernel-devel-${DKMS_KERNEL_VERSION}.rpm \
-	kernel-devel-matched-${DKMS_KERNEL_VERSION}.rpm \
-	kernel-modules-${DKMS_KERNEL_VERSION}.rpm \
-	kernel-modules-core-${DKMS_KERNEL_VERSION}.rpm \
-	kernel-modules-extra-${DKMS_KERNEL_VERSION}.rpm && \
-	rm -rf *.rpm && \
-	ostree container commit || true
+#ARG DKMS_KERNEL_VERSION
+#RUN KERNEL_VERSION="$(rpm -qa kernel --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}')" && echo "\n\nContainer Kernel Version is: ${KERNEL_VERSION}\n\n" #&& \
+#	echo -e "\nHost Kernel: ${DKMS_KERNEL_VERSION}\n" && echo -e "\nContainer Kernel: ${KERNEL_VERSION}\n" && if [[ ${DKMS_KERNEL_VERSION} = #${KERNEL_VERSION} ]] ; then echo -e '\nKernel matches!\n' && \
+	#rpm-ostree install -y kernel-devel-matched; else echo -e '\nKernels do not match, downloading matching host kernel from Koji..\n' && \
+	#rpm-ostree install -y -A koji && \
+	#koji download-build --rpm --arch=x86_64 kernel-${DKMS_KERNEL_VERSION} && \
+	#koji download-build --rpm --arch=x86_64 kernel-core-${DKMS_KERNEL_VERSION} && \
+	#koji download-build --rpm --arch=x86_64 kernel-devel-${DKMS_KERNEL_VERSION} && \
+	#koji download-build --rpm --arch=x86_64 kernel-modules-${DKMS_KERNEL_VERSION} && \
+	#koji download-build --rpm --arch=x86_64 kernel-modules-core-${DKMS_KERNEL_VERSION} && \
+	#koji download-build --rpm --arch=x86_64 kernel-modules-extra-${DKMS_KERNEL_VERSION} && \
+	#koji download-build --rpm --arch=x86_64 kernel-devel-matched-${DKMS_KERNEL_VERSION}; fi
+#RUN	rpm-ostree cliwrap install-to-root / && rpm-ostree override replace \
+#	kernel-${DKMS_KERNEL_VERSION}.rpm \
+#	kernel-core-${DKMS_KERNEL_VERSION}.rpm \
+#	kernel-devel-${DKMS_KERNEL_VERSION}.rpm \
+#	kernel-devel-matched-${DKMS_KERNEL_VERSION}.rpm \
+#	kernel-modules-${DKMS_KERNEL_VERSION}.rpm \
+#	kernel-modules-core-${DKMS_KERNEL_VERSION}.rpm \
+#	kernel-modules-extra-${DKMS_KERNEL_VERSION}.rpm && \
+#	rm -rf *.rpm && \
+#	ostree container commit || true
 
 # Module key signing needs much more understanding on my part to get working correctly.
 # For now, the driver does at least build.
 
-RUN kmodgenca -a || true
-
-RUN mkdir -p /usr/lib/blackmagic && mkdir -p /var/lib/blackmagic && \
-	mokdir="/usr/lib/blackmagic" && \
-	ln -s /usr/lib/blackmagic/MOK.priv /var/lib/blackmagic/MOK.priv && \
-	ln -s /usr/lib/blackmagic/MOK.der /var/lib/blackmagic/MOK.der && \
-	curl -L https://www.andymelville.net/wavelet/desktopvideo-14.2.1a1.x86_64.rpm -f --retry 5 > "desktopvideo.rpm" && \
-	rpm-ostree install -y -A desktopvideo.rpm && \
-	ostree container commit
+#RUN kmodgenca -a || true
+#RUN mkdir -p /usr/lib/blackmagic && mkdir -p /var/lib/blackmagic && \
+#	mokdir="/usr/lib/blackmagic" && \
+#	ln -s /usr/lib/blackmagic/MOK.priv /var/lib/blackmagic/MOK.priv && \
+#	ln -s /usr/lib/blackmagic/MOK.der /var/lib/blackmagic/MOK.der && \
+#	curl -L https://www.andymelville.net/wavelet/desktopvideo-14.2.1a1.x86_64.rpm -f --retry 5 > "desktopvideo.rpm" && \
+#	rpm-ostree install -y -A desktopvideo.rpm && \
+#	ostree container commit
