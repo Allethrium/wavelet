@@ -18,7 +18,7 @@ RUN	rpm-ostree install -y -A \
     https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm && \
 	rpm-ostree install -y -A \
 	wget fontawesome-fonts wl-clipboard nnn mako sway bemenu rofi-wayland lxsession sway-systemd waybar chrony \
-	foot vim powerline powerline-fonts vim-powerline perl NetworkManager-wifi iw wireless-regdb wpa_supplicant avahi \
+	foot vim powerline powerline-fonts vim-powerline NetworkManager-wifi iw wireless-regdb wpa_supplicant avahi \
 	rdma freeipa-client iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd sha python3-pip \
 	libv4l v4l-utils pipewire-v4l2 ImageMagick \
 	mesa-dri-drivers mesa-vulkan-drivers mesa-vdpau-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
@@ -27,7 +27,7 @@ RUN	rpm-ostree install -y -A \
 	intel-media-driver intel-gpu-tools intel-compute-runtime intel-gmmlib intel-ocloc intel-opencl \
     intel-level-zero libvpl intel-mediasdk \
     libva libva-utils libva-intel-driver libva-v4l2-request libva-vdpau-driver libvdpau-va-gl libvdpau \
-    oneVPL-intel-gpu oneapi-level-zero ocl-icd opencl-headers mpv libsrtp \
+    oneVPL-intel-gpu oneapi-level-zero opencl-headers mpv libsrtp \
     ffmpeg ffmpeg-libs libheif-freeworld fastfetch htop mesa-libOpenCL srt srt-libs vlc mplayer \
     libndi-sdk ndi-sdk ndi-sdk-documentation pipewire-utils \
     rkhunter clamav clamd clamav-freshclam && \
