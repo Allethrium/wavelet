@@ -9,13 +9,13 @@ detect_self(){
 	platform=$(dmidecode | grep "Manufacturer" | cut -d ':' -f 2 | head -n 1)
 	echo -e "Hostname is ${hostNameSys}"
 	case ${hostNameSys} in
-		enc*)                   echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."							;	event_decoder
+		enc*)	echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."		;	event_decoder
 		;;
-		dec*)                   echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."								;	event_decoder
+		dec*)	echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."			;	event_decoder
 		;;
-		svr*)                   echo -e "I am a Server. Proceeding..."																			;	event_server
+		svr*)	echo -e "I am a Server. Proceeding..."														;	event_server
 		;;
-		*)                      echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
+		*)		echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
 		;;
 	esac
 }
@@ -132,6 +132,7 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_hardening.serv
 
 	# Start installing ostree updates via OCI container image
 	# This is here so we can add some platform specific cutomizations via additional containerFiles if necessary (nvidia/AMD drivers etc.)
+	platform="generic"
 	detect_custom_requirements
 	# generate a hostname file so that dnsmasq's dhcp-script call works properly
 	get_ipValue
@@ -197,15 +198,15 @@ rpm_overlay_install(){
 	# Parse input options (I.E if called by promote service)
 	echo -e "Parsing input options: ${@}.."
 	for arg in "$@"; do
-		echo -e "\nArgument is: ${arg}\n"
+		echo -e "Argument is: ${arg}"
 		case ${arg} in
-			"--generic")	echo -e "\nCalled standard config, using generic containerfile\n"	;	containerFile="Containerfile.coreos.overlay.client"
+			"--generic")	echo -e "Called standard config, using generic containerfile\n"	;	containerFile="Containerfile.coreos.overlay.client"
 			;;
-			"--nvidia")		echo -e "\nUsing nvidia containerfile\n"							;	containerFile="Containerfile.coreos.overlay.client.nvidia"
+			"--nvidia")		echo -e "Using nvidia containerfile\n"							;	containerFile="Containerfile.coreos.overlay.client.nvidia"
 			;;
-			"--amd")		echo -e "\nUsing AMD containerfile\n"								;	containerFile="Containerfile.coreos.overlay.client.amd"
+			"--amd")		echo -e "Using AMD containerfile\n"								;	containerFile="Containerfile.coreos.overlay.client.amd"
 			;;
-			*)				echo -e "\nCalled with invalid argument, exiting.\n"				;	exit 0
+			*)				echo -e "Called with invalid argument, exiting.\n"				;	exit 0
 			;;
 		esac
 	done
@@ -240,12 +241,13 @@ basicConstraints  = critical,CA:FALSE
 extendedKeyUsage  = codeSigning,1.3.6.1.4.1.2312.16.1.2
 nsComment         = "OpenSSL Generated Certificate"
 EOF
-	echo ':: A certificate to sign the driver has been created at /var/lib/blackmagic/MOK.der. This certificate needs to be enrolled if you run Secure Boot with validation (e.g. shim).'
+	echo '::A certificate to sign the driver has been created at /var/lib/blackmagic/MOK.der. This certificate needs to be enrolled if you run Secure Boot with validation (e.g. shim).'
 	echo -e "\nPlease run:\nmokutil --import '/var/lib/blackmagic/MOK.der'\nIn order to enroll the MOK key!!"
 	# Podman build, tags the image, uses DKMS_KERNEL_VERSION to parse host OS kernel version into container
 	# The first stage builds the container with the necessary software to run as a decoder/encoder
 	# The second stage adds everything necessary for the server.
 	# We do this two-stage process to keep the overlay size down as much as we can
+	echo "Building client image and pushing to registry.."
 	podman build -t localhost/coreos_overlay_client \
 	--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
 	-v=/home/wavelet/containerfiles:/mount:z \
@@ -256,7 +258,9 @@ EOF
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
 	# Push client image to container registry - N.B can only use --compress with dir: transport method. 
 	podman push localhost:5000/coreos_overlay_client:latest 192.168.1.32:5000/coreos_overlay_client --tls-verify=false	
+
 	# Build the server overlay
+	echo "Building server image and rebasing.."
 	podman build -t localhost/coreos_overlay_server \
 	--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
 	-v=/home/wavelet/containerfiles:/mount:z \
