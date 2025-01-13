@@ -17,7 +17,9 @@ UG_HOSTNAME=$(hostname)
 }
 
 event_decoder(){
-	echo "Setting decoder hostname as well as 'Pretty' label"
+	echo "Setting decoder hostname as well as 'Pretty' label to the same value."
+	echo "The Pretty label will be utilized on the webUI and may change."
+	echo "The stable hostname is for domain enrollment and should be stable after initial configuration."
 	newhostname=$(LC_ALL=C tr -dc A-Z-0-9 </dev/urandom | head -c 4)
 	hostnamectl hostname dec$newhostname.wavelet.local
 	hostnamectl --pretty hostname dec$newhostname.wavelet.local
