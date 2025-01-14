@@ -138,6 +138,4 @@ systemctl disable zincati.service --now
 exec >/var/home/wavelet/logs/update_wavelet_modules.log 2>&1
 detect_self
 
-echo -e "Update completed.  The system will automatically reboot in three seconds!"
-sleep 3
-systemctl reboot
+echo -e "Update completed!"
