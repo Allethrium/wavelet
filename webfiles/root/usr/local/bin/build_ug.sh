@@ -91,7 +91,7 @@ detect_self(){
 		;;
 		svr*)					echo -e "I am a Server. Proceeding..."															;	event_server
 		;;
-		*) 						echo -e "This device Hostname is not set approprately, exiting \n"								;	exit 0
+		*) 						echo -e "This device Hostname is not set appropriately, exiting \n"								;	exit 0
 		;;
 	esac
 }
