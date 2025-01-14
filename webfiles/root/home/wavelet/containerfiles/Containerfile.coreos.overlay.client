@@ -27,10 +27,10 @@ RUN	rpm-ostree install -y -A \
 		fastfetch htop mesa-libOpenCL srt srt-libs pipewire-utils \
 		rkhunter clamav clamd clamav-freshclam && \
 	ostree container commit
-	rpm-ostree install -y -A \
+# Replace fedora OSS builds with rpmfusion ones
+RUN	rpm-ostree install -y -A \
 		https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
 		https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm && \
-	# Replace fedora OSS builds with rpmfusion ones
 	rpm-ostree override remove \
 		libavcodec-free libavfilter-free libavformat-free libavutil-free ffmpeg-free libpostproc-free libswresample-free libswscale-free libavdevice-free --install ffmpeg && \
 	rpm-ostree install -y -A \
