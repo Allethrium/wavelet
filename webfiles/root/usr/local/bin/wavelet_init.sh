@@ -155,12 +155,14 @@ KEYNAME="uv_filter_cmd"; delete_etcd_key_global
 
 event_init_av1
 
-echo -e "Enabling monitor services..\n"
-systemctl --user enable watch_reflectorreload.service --now
-systemctl --user enable watch_encoderflag.service --now
-echo -e "Values populated, monitor services launched.  Starting Reflector and Controller\n"
-systemctl --user enable wavelet_reflector.service --now
-systemctl --user enable wavelet_controller.service --now
+echo -e "Enabling monitor services.."
+systemctl --user enable \
+	wavelet_reflector_reload.service \
+	wavelet_encoder_query.service --now
+echo -e "Values populated, monitor services launched.  Starting Reflector and Controller"
+systemctl --user enable \
+	wavelet_reflector.service \
+	wavelet_controller.service --now
 
 # Attempt to connect to a cached bluetooth audio output device
 /usr/local/bin/wavelet_set_bluetooth_connect.sh
