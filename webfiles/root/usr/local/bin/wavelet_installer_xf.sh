@@ -316,7 +316,8 @@ rpm_overlay_install_decoder(){
 	echo -e "[Unit]
 Description=Install Client Dependencies
 ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-After=multi-user.target
+Wants=network-online.target
+After=multi-user.target network-online.target
 [Service]
 Type=oneshot
 ExecStartPre=/usr/bin/bash -c 'curl -o /usr/local/bin/wavelet_install_client.sh http://192.168.1.32:8080/ignition/wavelet_install_client.sh && chmod 0755 /usr/local/bin/wavelet_install_client.sh'
