@@ -506,8 +506,8 @@ event_generateHash(){
 			KEYNAME="/hostHash/${hostHash}"; KEYVALUE="${hostNameSys}"; write_etcd_global
 			KEYNAME="/hostHash/${hostNameSys}/label"; write_etcd_global
 			# Link the "pretty" hostname to the stable system hostname
-			KEYNAME="/hostPretty/${hostNamePretty}"; KEYVALUE="${hostNameSys}" write_etcd_global
-			KEYNAME="/hostSys/${hostNameSys}"; KEYVALUE="${hostNamePretty}" write_etcd_global
+			KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
+			#KEYNAME="/hostLabels/${hostNamePretty}"; KEYVALUE=${hostNameSys}; write_etcd_global
 		else
 			echo -e "Hash value exists as /hostHash/${hashExists}\n"
 			echo -e "This means the device is already populated, or has not been removed cleanly. Checking to see if we've been relabeled.."

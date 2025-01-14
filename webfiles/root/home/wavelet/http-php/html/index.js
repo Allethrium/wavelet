@@ -64,7 +64,8 @@ function hostsAjax(){
 				var type			=	item['type'];
 				var hostName		=	item['hostName'];
 				var hostHash		=	item['hostHash'];
-				createNewHost(key, type, hostName, hostHash);
+				var hostLabel 		=	item['hostLabel'];
+				createNewHost(key, type, hostName, hostHash, hostLabel);
 				})
 		},
 	complete: function(){
@@ -861,7 +862,7 @@ function createInputButton(key, value, keyFull, functionIndex, IP) {
 	counter++;
 }
 
-function createNewHost(key, type, hostName, hostHash, functionIndex) {
+function createNewHost(key, type, hostName, hostHash, hostLabel, functionIndex) {
 	var divEntry					=		document.createElement("Div");
 	var type						=		type;
 	const id						=		document.createTextNode(counter + 1);
@@ -873,11 +874,11 @@ function createNewHost(key, type, hostName, hostHash, functionIndex) {
 	divEntry.setAttribute("data-hostType", type);
 	$(divEntry).addClass('host_divider');
 	/* This needs to be done "backwards" insofar as the type needs to be determined before we can start creating a new DIV */
-	console.log("Supplied data are---\nKey:" + key + "\nType:" +type + "\nHostname:" + hostName + "\nHash:" + hostHash);
+	console.log("Supplied data are---\nKey:" + key + "\nType:" +type + "\nHostname:" + hostName + "\nHash:" + hostHash + "\nLabel:" + hostLabel);
 	
 	function createDecoderButtonSet(hostName, hostHash){
-		console.log("Generating decoder label and buttons with\nHost Name: " + hostName +"\nAnd Host Hash: " + hostHash + "\nAnd type: " + type + "\nIn Decoders div..\n");
-		$(divEntry).append("Host: <input type='text' value="+hostName+" class='hostTextBox'" + " data-hostHash=" + hostHash + " class='input_textbox'>");
+		console.log("Generating decoder label and buttons with\nHost Label: " + hostLabel + "\nHost Name: " + hostName +"\nAnd Host Hash: " + hostHash + "\nAnd type: " + type + "\nIn Decoders div..\n");
+		$(divEntry).append("Host: <input type='text' value="+hostLabel+" class='hostTextBox'" + " data-hostHash=" + hostHash + " class='input_textbox'>");
 			var uiElement = $(".hostTextBox").last();
 			uiElement.bind('focus', function() {
 				var oldValue 	= $(this).attr("value");	
@@ -889,15 +890,14 @@ function createNewHost(key, type, hostName, hostHash, functionIndex) {
 				if ( phpOldValue == phpHostName ) {
 					console.log("Error, values have not changed, doing nothing")
 				} else {
-				confirm('This will reboot the target host!\nProceed?');
-				console.log("submitting to set_hostlabel.php with values---\nHash: " + phpHostHash + "\nHostname: " + phpHostName + "\nOld Hostname: " + phpOldValue + "\nType: " + type);
+				console.log("submitting to set_hostlabel.php with values---\nHash: " + phpHostHash + "\nNew Label: " + phpHostName + "\nHostname: " + hostName + "\nType: " + type);
 				$.ajax({
 					url : '/set_host_label.php',
 					type :'post',
 					data:{
 						hash:       phpHostHash,
 						newName:    phpHostName,
-						oldName:    phpOldValue,
+						oldName:    hostName,
 						type   :    type
 						},
 					success : function(response) {

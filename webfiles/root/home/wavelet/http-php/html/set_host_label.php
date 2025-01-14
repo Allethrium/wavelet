@@ -28,9 +28,9 @@ function curl_etcd($keyTarget, $keyValue) {
 		echo "\n Succesfully set {$keyTarget} for:\n{$keyValue}";
 }
 
-echo "posted data are: \nNew Label: $newName\nHash: $hash \nOld Label: $oldName\nType: $type\n";
+echo "posted data are: \nNew Label: $newName\nHash: $hash \nHost Name: $oldName\nType: $type\n";
 // This script sets the NEW hostname object and then a reset flag.  Everything else is handled by run_ug/build_ug on reboot
-$keyTarget="hostHash/${hash}/newHostLabel";
+$keyTarget="$oldName/hostNamePretty";
 $keyValue=$newName;
 curl_etcd("$keyTarget", "$keyValue");
 
