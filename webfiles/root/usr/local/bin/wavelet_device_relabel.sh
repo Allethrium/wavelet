@@ -71,7 +71,7 @@ check_label(){
 	oldHostName=${hostNamePretty}
 	echo "${oldHostName}" > /home/wavelet/oldHostName.txt
 	KEYNAME="/hostHash/${hostNameSys}/relabel_active"; KEYVALUE="1"; write_etcd_global
-	KEYNAME="${hostNameSys}/Hash"; read_etcd_global; myHostHash="${printvalue}"
+	KEYNAME="/${hostNameSys}/Hash"; read_etcd_global; myHostHash="${printvalue}"
 	echo -e "My hash is ${myHostHash}, attempting to find a my new device label..\n"
 	KEYNAME="/hostHash/${myHostHash}/newHostLabel"; read_etcd_global; myNewHostLabel="${printvalue}"
 	echo -e "My *New* host label is ${myNewHostLabel}!\n"

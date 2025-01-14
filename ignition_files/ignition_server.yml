@@ -668,7 +668,8 @@ systemd:
         [Unit]
         Description=Install packages, generate second-boot systemd rootful units
         ConditionFirstBoot=yes
-        After=multi-user.target
+        Wants=network-online.target
+        After=multi-user.target network-online.target
         [Service]
         Type=oneshot
         ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_installer_xf.sh"
