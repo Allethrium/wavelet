@@ -8,7 +8,7 @@
 # This containerfile aims to build all dependencies for Wavelet in a container for client systems.  It's the "base layer"
 # To be applied as an ostree rebase
 
-FROM quay.io/fedora/fedora-coreos:next
+FROM quay.io/fedora/fedora-coreos:stable
 
 # We remove nfs-utils-coreos as this makes the freeipa client unavailable for install.
 # Then replace fedora OSS builds with rpmfusion ones
