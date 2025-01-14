@@ -8,9 +8,10 @@
 # This containerfile aims to build all dependencies for Wavelet in a container for client systems.  It's the "base layer"
 # To be applied as an ostree rebase
 
-FROM quay.io/fedora/fedora-coreos:stable
+FROM quay.io/fedora/fedora-coreos:next
 
 # We remove nfs-utils-coreos as this makes the freeipa client unavailable for install.
+# Then replace fedora OSS builds with rpmfusion ones
 RUN rm /etc/yum.repos.d/fedora-cisco-openh264.repo && rpm-ostree override remove nfs-utils-coreos --install nfs-utils
 RUN	rpm-ostree install -y -A \
 		wget fontawesome-fonts wl-clipboard nnn mako sway bemenu rofi-wayland lxsession sway-systemd waybar chrony \
@@ -26,14 +27,14 @@ RUN	rpm-ostree install -y -A \
 		oneVPL-intel-gpu oneapi-level-zero opencl-headers mpv libsrtp \
 		fastfetch htop mesa-libOpenCL srt srt-libs pipewire-utils \
 		rkhunter clamav clamd clamav-freshclam && \
-	ostree container commit
-# Replace fedora OSS builds with rpmfusion ones
-RUN	rpm-ostree install -y -A \
+	rpm-ostree install -y -A \
 		https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
 		https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm && \
 	rpm-ostree override remove \
 		libavcodec-free libavfilter-free libavformat-free libavutil-free ffmpeg-free libpostproc-free libswresample-free libswscale-free libavdevice-free --install ffmpeg && \
 	rpm-ostree install -y -A \
-		ffmpeg-libs intel-media-driver libheif-freeworld libndi-sdk libva-intel-driver mplayer ndi-sdk ndi-sdk-documentation \
-		vlc mplayer && \
+		ffmpeg-libs intel-media-driver libheif-freeworld libndi-sdk libva-intel-driver mplayer \
+		ndi-sdk ndi-sdk-documentation vlc mplayer \
+		gstreamer1-plugin-libav gstreamer1-plugins-bad-free-extras \
+		gstreamer1-plugins-bad-freeworld gstreamer1-plugins-ugly gstreamer1-vaapi && \
 	ostree container commit
