@@ -45,7 +45,7 @@ event_server(){
 	# Server can only be x86.  I haven't had access to another platform with video hardware support + enough number crunching power to do the task.
 	# Generate RPM Container overlay
 	# Set my pretty hostname
-	hostnamectl --pretty $(hostname)
+	hostnamectl set-hostname $(hostname) --pretty
 	cp /usr/local/bin/wavelet_install_ug_depends.sh	/home/wavelet/containerfiles/
 	cp /usr/local/bin/wavelet_pxe_grubconfig.sh		/home/wavelet/containerfiles/
 	# Make etcd datadir and copy nonsecure yaml to conf file, and update with server IP address.  We are using network=host in the container.
