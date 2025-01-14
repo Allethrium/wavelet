@@ -183,21 +183,19 @@ remove_old_keys(){
 }
 
 clean_oldEncoderHostnameSettings(){
-	# Finds and cleans up any references in etcd to the old hostname
-	# Delete all reverse lookups, labels and hashes for this device
-	KEYNAME="/encoderlabel/${oldHostName}"; 	delete_etcd_key_global
-	KEYNAME="/hostHash/${oldHostName}"; 		delete_etcd_key_global
-	KEYNAME="/hostLabel/${oldHostName}"; 		delete_etcd_key_global
-	KEYNAME="/${oldHostName}"; 					delete_etcd_key_global
+	# Finds and cleans up any references in etcd to the old host label
+	#KEYNAME="/encoderlabel/${oldHostName}"; 	delete_etcd_key_global
+	#KEYNAME="/hostHash/${oldHostName}"; 		delete_etcd_key_global
+	#KEYNAME="/hostLabel/${oldHostName}"; 		delete_etcd_key_global
+	#KEYNAME="/${oldHostName}"; 					delete_etcd_key_global
 }
 
 clean_oldDecoderHostnameSettings(){
-	# Finds and cleans up any references in etcd to the old hostname
-	# Delete all reverse lookups, labels and hashes for this device
+	# Finds and cleans up any references in etcd to the old host label
 	echo -e "Attempting to remove all legacy keys for: ${oldHostName}\n"
-	KEYNAME="/hostHash/${oldHostName} --prefix"; 	delete_etcd_key_global
-	KEYNAME="/hostLabel/${oldHostName} --prefix"; 	delete_etcd_key_global
-	KEYNAME="/${oldHostName} --prefix"; 			delete_etcd_key_global
+	#KEYNAME="/hostHash/${oldHostName} --prefix"; 	delete_etcd_key_global
+	#KEYNAME="/hostLabel/${oldHostName} --prefix"; 	delete_etcd_key_global
+	#KEYNAME="/${oldHostName} --prefix"; 			delete_etcd_key_global
 }
 
 clean_oldServerHostnameSettings(){
@@ -210,12 +208,12 @@ clean_oldServerHostnameSettings(){
 }
 
 set_newHostName(){
-	myNewHostname=${appendedHostName}
+	myNewHostname=$@
 	remove_old_keys "${oldHostName}"
 	if hostnamectl hostname --pretty ${myNewHostname}; then
-		echo -e "\n Host Name set as ${myNewHostName} successfully!, writing relabel_active to 0."
-		KEYNAME="/hostHash/${myNewHostname}/relabel_active"; KEYVALUE="0";	write_etcd_global
-		KEYNAME="/${myNewHostname}/RECENT_RELABEL";	KEYVALUE="1"; 			write_etcd_global
+		echo -e "\nHost Name set as ${myNewHostName} successfully!, writing relabel_active to 0."
+		KEYNAME="/hostHash/${hostNameSys}/relabel_active"; KEYVALUE="0";	write_etcd_global
+		KEYNAME="/${hostNameSys}/RECENT_RELABEL";	KEYVALUE="1"; 			write_etcd_global
 		/usr/local/bin/build_ug.sh
 	else
 		echo -e "\n Hostname change command failed, please check logs\n"
