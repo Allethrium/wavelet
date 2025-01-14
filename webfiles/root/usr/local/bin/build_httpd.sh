@@ -5,9 +5,6 @@
 USER=wavelet
 SCRHOME="/var/home/wavelet"
 
-#set -x
-exec >/home/wavelet/build_httpd.log 2>&1
-
 oldMethod(){
 	# Podman generate systemd method
 	echo -e "Generating Apache Podman container and systemd service file"
@@ -86,6 +83,7 @@ fail(){
 #####
 
 #set -x
+exec >/var/home/wavelet/logs/build_httpd.log 2>&1
 
 if [[ -f /var/prod.security.enabled ]]; then
 	echo -e "Security layer enabled, generating apache with TLS configuration.."

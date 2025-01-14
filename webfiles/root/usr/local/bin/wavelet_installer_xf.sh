@@ -44,6 +44,8 @@ set_ethernet_mtu(){
 event_server(){
 	# Server can only be x86.  I haven't had access to another platform with video hardware support + enough number crunching power to do the task.
 	# Generate RPM Container overlay
+	# Set my pretty hostname
+	hostnamectl --pretty $(hostname)
 	cp /usr/local/bin/wavelet_install_ug_depends.sh	/home/wavelet/containerfiles/
 	cp /usr/local/bin/wavelet_pxe_grubconfig.sh		/home/wavelet/containerfiles/
 	# Make etcd datadir and copy nonsecure yaml to conf file, and update with server IP address.  We are using network=host in the container.
@@ -250,8 +252,8 @@ EOF
 	echo "Building client image and pushing to registry.."
 	podman build -t localhost/coreos_overlay_client \
 	--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
-	-v=/home/wavelet/containerfiles:/mount:z \
-	-f /home/wavelet/containerfiles/${containerFile}
+	-v=/var/home/wavelet/containerfiles:/mount:z \
+	-f "/var/home/wavelet/containerfiles/${containerFile}"
 	podman tag localhost/coreos_overlay_client localhost:5000/coreos_overlay_client:latest
 	touch /var/rpm-ostree-overlay.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete

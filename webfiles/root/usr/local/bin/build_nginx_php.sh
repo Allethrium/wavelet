@@ -114,6 +114,8 @@ event_server(){
 #####
 
 #set -x
-exec >/var/home/wavelet/build_nginx_php.log 2>&1
+hostNameSys=$(hostname)
+hostNamePretty=$(hostnamectl --pretty)
+exec > /var/home/wavelet/logs/build_nginx_php.log 2>&1
 cd ${SCRHOME}
 detect_self

@@ -163,8 +163,8 @@ echo 'Booting Fedora CoreOS...'
 #
 ###
 
-set -x
-exec >/home/wavelet/grubconfig.log 2>&1
+#set -x
+exec >/var/home/wavelet/logs/grubconfig.log 2>&1
 
 if [[ -f /var/pxe.complete ]]; then
 	echo -e "\nInstaller has already run, ending task!"
