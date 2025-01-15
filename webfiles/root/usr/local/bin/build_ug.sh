@@ -83,13 +83,14 @@ detect_self(){
 	# test if i'm the server
 	if [[ $(hostname) = *"svr"* ]]; then
 		echo -e "I am a Server. Proceeding..."; event_server
-	fi
-	# Handle encoder or decoder paths
-	if [[ ${printvalue} = *"enc"* ]]; then
-		echo "I am an encoder"; event_encoder
 	else
-		# This is for anything NOT a svr or enc, including an unpopulated new device.
-		echo "I am a decoder"; event_decoder
+		# Handle encoder or decoder paths
+		if [[ ${printvalue} = *"enc"* ]]; then
+			echo "I am an encoder"; event_encoder
+		else
+			# This is for anything NOT a svr or enc, including an unpopulated new device.
+			echo "I am a decoder"; event_decoder
+		fi
 	fi
 }
 
