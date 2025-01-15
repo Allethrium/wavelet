@@ -15,7 +15,7 @@ detect_self(){
 		;;
 		svr*)	echo -e "I am a Server. Proceeding..."														;	event_server
 		;;
-		*)		echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
+		*)		echo -e "This device Hostname is not set appropriately, exiting \n" && exit 0
 		;;
 	esac
 }
@@ -335,7 +335,7 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
 		echo "Container pull failed! Check server spinup and ensure network connectivity is reliable.  Failing install process!"
 		exit 1
 	fi
-	rpm-ostree rebase ostree-unverified-image:containers-storage:192.168.1.32:5000/coreos_overlay_client
+	/usr/bin/time --format='%C took %e seconds' rpm-ostree rebase ostree-unverified-image:containers-storage:192.168.1.32:5000/coreos_overlay_client
 	touch /var/rpm-ostree-overlay.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \

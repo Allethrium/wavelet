@@ -80,6 +80,11 @@ detect_self(){
 	# Detect_self in this case relies on the etcd type key
 	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
 	echo -e "Host type is: ${printvalue}\n"
+	# build_ug needs to handle the case of not having a key populated initially.
+	if [[ -z ${printvalue} ]]; then
+		echo "Type identifier for this hostname not populated, populating as decoder for initial registration."
+		printvalue="dec"
+	fi
 	case "${printvalue}" in
 		enc*) 					echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."			;	event_encoder
 		;;
