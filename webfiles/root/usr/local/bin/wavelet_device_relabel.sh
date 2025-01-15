@@ -51,9 +51,9 @@ generate_service(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
 }
 detect_self(){
-systemctl --user daemon-reload
-	echo -e "Hostname is ${hostNamePretty} \n"
-	case ${hostNamePretty} in
+	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	echo -e "Hostname is ${printvalue} \n"
+	case ${printvalue} in
 		enc*)                                   echo -e "I am an Encoder \n"            ;       check_label
 		;;
 		dec*)                                   echo -e "I am a Decoder \n"             ;       check_label
@@ -113,8 +113,7 @@ set_newLabel(){
 }
 
 event_prefix_set(){
-	# Switches the pretty hostname between enc/dec 
-	# Finds our current hash and gets the current label from Etcd as set from UI
+	# Switches the type designator under /hostLabel/$(hostname)/type
 	# First, disable all reset watchers so that the host isn't instructed to reboot the moment a flag changes!
 	systemctl --user disable \
 		wavelet_device_redetect.service \
@@ -126,42 +125,17 @@ event_prefix_set(){
 		wavelet_device_relabel.service --now
 	KEYNAME="/${hostNameSys}/Hash"; read_etcd_global; myHostHash="${printvalue}"
 	KEYNAME="/hostHash/${myHostHash}"; read_etcd_global; myHostLabel="${printvalue}"
-	echo -e "My host label is ${myHostLabel}!\n"
-	FQDN=$(nslookup ${hostNamePretty} -i | grep ${hostNamePretty} | head -n 1)
-	NAME=$(echo "${FQDN##*:}" | xargs)
-	echo -e "HostName FQDN is ${NAME}"
-	# Compare current FQDN with input FQDN and append if necessary
-	currentfqdnString=${NAME}
-	inputfqdnString=${myHostLabel}
-	if [[ "${currentfqdnString}" == "${inputfqdnString}" ]]; then
-		echo -e "FQDN strings are correct, proceeding.."
-		appendedHostName=${inputfqdnString}
-	else
-		echo -e "New label was input without an FQDN, appending automatically..\n"
-		appendedHostName="${myNewHostLabel}.${currentfqnString}"
-		echo -e "Generated FQDN hostname as ${appendedHostName}\n"
-	fi
-	# Replace dec with enc or enc with dec as appropriate..
-	echo -e "Performing search and replace for ${arg} in ${appendedHostName}\n"
-	if [[ "${arg}" == "dec" ]]; then
-		concatHostName=$(echo -e "${appendedHostName,,}" | sed "s|${arg,,}|enc|g")
-	else
-		concatHostName=$(echo -e "${appendedHostName,,}" | sed "s|${arg,,}|dec|g")
-	fi
-	# Generate the necessary files, then reboot.
-	echo -e "Switched host identifier from ${arg}, generating new host label as: ${concatHostName,,}"
-	KEYNAME="/hostHash/${myHostHash}/newHostLabel";	KEYVALUE="${concatHostName}";	write_etcd_global
-	KEYNAME="/${concatHostName}/RECENT_RELABEL";	KEYVALUE="1";	write_etcd_global
-	echo $(hostname) > /home/wavelet/oldHostName.txt
-	echo -e "${concatHostName,,}" > /home/wavelet/newHostName.txt
-	remove_old_keys ${oldHostName}
-	if hostnamectl --pretty hostname ${concatHostName,,}; then
-		echo -e "Host Name set as ${concatHostName,,} successfully! Finishing task.\n"
-		exit 0
-	else
-		echo -e " Hostname change command failed, please check logs\n"
-		exit 1
-	fi	
+	echo -e "My host label is ${myHostLabel}"
+	KEYNAME="/${hostNameSys}/type"; read_etcd_global; type=${printvalue}
+		if [[ "${type}" = "dec" ]]; then
+			echo "I am currently a decoder switching to an encoder"
+			typeswitch="enc"
+		else
+			echo "I am not a decoder, switching to become a decoder.."
+			typeswitch="dec"
+		fi
+	KEYNAME="/hostLabel/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
+	KEYNAME="/${hostNameSys}/type"; write_etcd_global
 }
 
 remove_old_keys(){

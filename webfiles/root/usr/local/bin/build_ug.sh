@@ -77,15 +77,11 @@ detect_ug_version(){
 
 detect_self(){
 	systemctl --user daemon-reload
-	# Check to see if hostname has changed since last reboot
-	if [[ -f /var/tmp/oldhostname.txt ]]; then
-		check_hostname
-	fi
-	echo -e "Hostname is ${hostNamePretty} \n"
-	case ${hostNamePretty} in
+	# Detect_self in this case relies on the etcd type key
+	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	echo -e "Host type is: ${printvalue}\n"
+	case "${printvalue}" in
 		enc*) 					echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."			;	event_encoder
-		;;
-		decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.  Client_install probably failed.."			;	systemctl start decoderhostname.service
 		;;
 		dec*)					echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."				;	event_decoder
 		;;

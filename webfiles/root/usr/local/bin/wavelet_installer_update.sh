@@ -3,14 +3,13 @@
 # Detects if we are on dev or master branch.  To switch, move that file flag someplace else.
 
 detect_self(){
-systemctl --user daemon-reload
-	echo -e "Hostname is ${hostNamePretty} \n"
-	case ${hostNamePretty} in
-		enc*) 					echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."			;	event_encoder
+	# Detect_self in this case relies on the etcd type key
+	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	echo -e "Host type is: ${printvalue}\n"
+	case "${printvalue}" in
+		enc*) 					echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."			;	event_client
 		;;
-		decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.  Randomizing my hostname, and rebooting"	;	event_decoder 
-		;;
-		dec*)					echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."				;	event_decoder
+		dec*)					echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."				;	event_client
 		;;
 		svr*)					echo -e "I am a Server. Proceeding..."  														;	event_server
 		;;
@@ -19,15 +18,7 @@ systemctl --user daemon-reload
 	esac
 }
 
-event_encoder(){
-	# retreives tar.xz from server
-	wget https://192.168.1.32:8080/ignition/wavelet-files.tar.xz
-	extract_base
-	extract_home && extract_usrlocalbin
-	exit 0
-}
-
-event_decoder(){
+event_client(){
 	# retreives tar.xz from server
 	wget https://192.168.1.32:8080/ignition/wavelet-files.tar.xz
 	extract_base

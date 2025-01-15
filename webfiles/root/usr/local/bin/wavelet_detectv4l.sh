@@ -276,19 +276,19 @@ event_biamp() {
 	echo -e "\n Detection completed for BiAmp audio device..\n"
 }
 
-
 detect_self(){
-	echo -e "Hostname is ${hostNamePretty}\n"
-	case ${hostNamePretty} in
-		enc*) 					echo -e "I am an Encoder, allowing device sense to proceed..\n"; encoder_checkNetwork 1
+	systemctl --user daemon-reload
+	# Detect_self in this case relies on the etcd type key
+	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	echo -e "Host type is: ${printvalue}\n"
+	case "${printvalue}" in
+		enc*)                                   echo -e "I am an Encoder\n"										;		encoder_checkNetwork 1
 		;;
-		decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.  An error has occurred at some point, and needs troubleshooting.\nTerminating process."; exit 0
+		dec*)                                   echo -e "I am a Decoder\n"										;		exit 0
 		;;
-		dec*)					echo -e "I am a Decoder \n"; exit 0
+		svr*)                                   echo -e "I am a Server, allowing device sense to proceed.."		;		sense_devices
 		;;
-		svr*)					echo -e "I am a Server, allowing device sense to proceed.."; sense_devices
-		;;
-		*) 						echo -e "This device Hostname is not set approprately, I don't know what I am.  Exiting \n"; exit 0
+		*)                                      echo -e "This device is other, ending process\n"				;		exit 0
 		;;
 	esac
 }

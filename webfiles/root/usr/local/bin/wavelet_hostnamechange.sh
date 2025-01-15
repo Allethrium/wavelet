@@ -49,11 +49,11 @@ generate_service(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
 }
 detect_self(){
-	echo -e "Hostname is ${hostNamePretty} \n"
-	case $UG_HOSTNAME in
+	# Detect_self in this case relies on the etcd type key
+	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	echo -e "Host type is: ${printvalue}\n"
+	case "${printvalue}" in
 	enc*) 					echo -e "I am an Encoder \n" 											;	devType="enc"	;	getNewHostname ${devType}
-	;;
-	decX.wavelet.local)		echo -e "I am a Decoder, and my hostname needs to be randomized. \n" 	;	exit 0
 	;;
 	dec*)					echo -e "I am a Decoder\n"												;	devType="dec"	;	getNewHostname ${devType}
 	;;

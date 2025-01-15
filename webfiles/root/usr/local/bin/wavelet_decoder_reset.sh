@@ -5,7 +5,10 @@
 
 
 detect_self(){
-	case ${hostNameSys} in
+	# Detect_self in this case relies on the etcd type key
+	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	echo -e "Host type is: ${printvalue}\n"
+	case "${printvalue}" in
 		enc*)                                   echo -e "I am an Encoder \n"            ;       exit 0
 		;;
 		dec*)                                   echo -e "I am a Decoder \n"             ;       event_decoder

@@ -2,8 +2,10 @@
 # Checks device hostname to define behavior and launches services as appropriate
 
 detect_self(){
-	echo -e "Hostname is ${hostNamePretty}\n"
-	case ${hostNamePretty} in
+	# Detect_self in this case relies on the etcd type key
+	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	echo -e "Host type is: ${printvalue}\n"
+	case "${printvalue}" in
 		enc*) 					echo -e "I am an Encoder"; event_encoder
 		;;
 		decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.\nAn error has occurred at some point, and needs troubleshooting.\nTerminating process."; exit 0

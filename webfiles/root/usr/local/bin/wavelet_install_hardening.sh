@@ -17,12 +17,9 @@
 
 
 detect_self(){
+	UG_HOSTNAME=$(hostname)
 	echo -e "Hostname is $UG_HOSTNAME\n"
 	case $UG_HOSTNAME in
-	enc*)                   echo -e "I am an Encoder, this module should not be applicable at this stage in configuration!\n" && exit 0
-	;;
-	dec*)                   echo -e "I am a Decoder, this should be handled in wavelet_install_client.sh!" ; exit 0
-	;;
 	svr*)                   echo -e "I am a Server. Proceeding..."	;	event_server
 	;;
 	*)                      echo -e "This device Hostname is not set approprately, exiting \n" && exit 0

@@ -1,12 +1,12 @@
-
 #!/bin/bash 
-#
 # This script resets the appropriate flag back to 0 and then calls hostname change.
 
 detect_self(){
 	systemctl --user daemon-reload
-	echo -e "Hostname is ${hostNamePretty} \n"
-	case ${hostNamePretty} in
+	# Detect_self in this case relies on the etcd type key
+	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	echo -e "Host type is: ${printvalue}\n"
+	case "${printvalue}" in
 		enc*)                                   echo -e "I am an Encoder \n"           				;		event_encoder
 		;;
 		dec*)                                   echo -e "I am a Decoder \n"                 	    ;		event_decoder

@@ -49,6 +49,9 @@ generate_service(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
 }
 
+set -x
+exec >/var/home/wavelet/logs/clear_inputs.log 2>&1
+
 # We add --prefix to perform a "directory + contents" deletion.  DANGEROUS.
 KEYNAME="interface"; delete_etcd_key_global
 KEYNAME="/interface"; delete_etcd_key_global

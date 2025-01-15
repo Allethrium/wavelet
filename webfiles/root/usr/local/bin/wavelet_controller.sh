@@ -10,7 +10,7 @@
 ###
 
 detect_self(){
-# Controller only runs on the server.
+# Controller only runs on the server, and should only respect the device system hostname.
 	echo -e "Hostname is ${hostNameSys} \n"
 	case ${hostNameSys} in
 	svr*)			echo -e "I am a Server. Proceeding..." && event_server
@@ -425,17 +425,9 @@ wavelet_system_reboot() {
 }
 
 wavelet_clear_inputs() {
-# Removes all input devices from their appropriate prefixes.
-# Until I fix the detection/removal stuff so that it works perfectly, this will effectively clean out any cruft from 'stuck'
-# source devices which no longer exist, but still populate on the UI.
-# bad solution, because it appears to be deleting things it should not..
-	keysArray=("/interface/", "/hash/", "/short_hash/", "/long_interface/", "/${hostNameSys}/inputs/", "/network_long/", "/network_short/", "/network_interface/", "/network_ip/", "/network_uv_stream_command/")
-	for key in ${keysArray[@]}; do
-		KEYNAME="${key}"
-		echo "Deleting keys under prefix: ${key}"
-		delete_etcd_key_prefix
-	done
-	echo -e "All interface devices and their configuration data, as well as labels have been deleted\nPlugging in a new device will cause the detection module to run again.\n"
+	# Removes all input devices from their appropriate prefixes.
+	# Until I fix the detection/removal stuff so that it works perfectly, this will effectively clean out any cruft from 'stuck'
+	/usr/local/bin/wavelet_clean_inputs.sh
 }
 
 wavelet_detect_inputs() {
