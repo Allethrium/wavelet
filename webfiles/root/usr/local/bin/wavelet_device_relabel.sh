@@ -1,8 +1,7 @@
 #!/bin/bash
 # Called from the relabel watcher service
-# Generates an oldHostName file in /home/wavelet and restarts run_ug.sh to start detection process
-
-# We use the "pretty" hostname, the base hostname remains stable upon imaging.
+# Generates an oldLabel file in /home/wavelet and restarts run_ug.sh to start detection process
+# We use the "pretty" hostname, the base hostname remains stable after imaging.
 
 
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
@@ -68,8 +67,8 @@ detect_self(){
 
 check_label(){
 	# Finds our current hash and gets the new label from Etcd as set from UI
-	oldHostName=${hostNamePretty}
-	echo "${oldHostName}" > /home/wavelet/oldHostName.txt
+	oldLabel=${hostNamePretty}
+	echo "${oldLabel}" > /home/wavelet/oldLabel.txt
 	KEYNAME="/hostHash/${hostNameSys}/relabel_active"; KEYVALUE="1"; write_etcd_global
 	KEYNAME="/${hostNameSys}/Hash"; read_etcd_global; myHostHash="${printvalue}"
 	echo -e "My hash is ${myHostHash}, attempting to find a my new device label..\n"
@@ -87,7 +86,7 @@ check_label(){
 
 set_newLabel(){
 	# Verifies fqdn and parses new label
-	echo -e "My old host label is ${oldHostName}"
+	echo -e "My old host label is ${oldLabel}"
 	echo -e "My new host label is ${myNewHostLabel}"
 	echo -e "My system hostname is ${hostNameSys}"
 	# Check for current FQDN in the case someone wrote gibberish in the text box.
@@ -138,52 +137,8 @@ event_prefix_set(){
 	KEYNAME="/${hostNameSys}/type"; write_etcd_global
 }
 
-remove_old_keys(){
-	# Get the old hostname from the file, then remove it because it's not necessary until the hostname is changed again.
-	oldHostName=$(cat /home/wavelet/oldHostName.txt)
-	echo -e "Detecting device type of ${oldHostName}"
-	case ${oldHostName} in
-		enc*) 					echo -e "\nI was an Encoder\n"						; clean_oldEncoderHostnameSettings ${oldHostname}
-		;;
-		decX.wavelet.local)		echo -e "\nI was an unconfigured Decoder\n"			; exit 0
-		;;
-		dec*)					echo -e "\nI was a Decoder \n"						; clean_oldDecoderHostnameSettings ${oldHostname}
-		;;
-		svr*)					echo -e "\nI was a Server. Proceeding..."			; clean_oldServerHostnameSettings ${oldHostname}
-		;;
-		*) 						echo -e "\nThis device Hostname was not set appropriately, exiting \n" && exit 0
-		;;
-	esac
-}
-
-clean_oldEncoderHostnameSettings(){
-	# Finds and cleans up any references in etcd to the old host label
-	#KEYNAME="/encoderlabel/${oldHostName}"; 	delete_etcd_key_global
-	#KEYNAME="/hostHash/${oldHostName}"; 		delete_etcd_key_global
-	#KEYNAME="/hostLabel/${oldHostName}"; 		delete_etcd_key_global
-	#KEYNAME="/${oldHostName}"; 					delete_etcd_key_global
-}
-
-clean_oldDecoderHostnameSettings(){
-	# Finds and cleans up any references in etcd to the old host label
-	echo -e "Attempting to remove all legacy keys for: ${oldHostName}\n"
-	#KEYNAME="/hostHash/${oldHostName} --prefix"; 	delete_etcd_key_global
-	#KEYNAME="/hostLabel/${oldHostName} --prefix"; 	delete_etcd_key_global
-	#KEYNAME="/${oldHostName} --prefix"; 			delete_etcd_key_global
-}
-
-clean_oldServerHostnameSettings(){
-	# Finds and cleans up any references in etcd to the old hostname
-	# The server has many more settings than any other device with the way the system currently works.
-	# This is also a silly function to have, but putting it here for completeness' sake.
-	# Delete all reverse lookups, labels and hashes for this device
-	echo -e "\nDeleting the server is quite a silly thing to do.  So we won't be doing that.\n"  
-	exit 0
-}
-
 set_newHostName(){
 	myNewHostname=$@
-	remove_old_keys "${oldHostName}"
 	if hostnamectl hostname --pretty ${myNewHostname}; then
 		echo -e "\nHost Name set as ${myNewHostName} successfully!, writing relabel_active to 0."
 		KEYNAME="/hostHash/${hostNameSys}/relabel_active"; KEYVALUE="0";	write_etcd_global
@@ -197,7 +152,7 @@ set_newHostName(){
 
 event_hostNameChange() {
 	# Check to see if hostname has changed since last session
-	if [[ -f /home/wavelet/oldhostname.txt ]]; then
+	if [[ -f /home/wavelet/oldLabel.txt ]]; then
 			check_hostname
 	fi
 	KEYNAME="/${hostNameSys}/RELABEL"; read_etcd_global

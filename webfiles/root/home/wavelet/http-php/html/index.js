@@ -510,6 +510,8 @@ function createDeleteButton(hostName, hostHash) {
 					console.log(response);
 				}
 			})
+			sleep 250
+			location.reload();
 		})
 	return $btn;
 }

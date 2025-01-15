@@ -122,6 +122,9 @@ event_decoder(){
 	event_promote
 	event_generateHash dec
 	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
+	# Set Type keys to "dec"
+	KEYVALUE="dec";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
+	KEYNAME="/hostLabel/${hostNameSys}/type"; write_etcd_global
 	sleep .33
 	# Executes run_ug in order to start the video streaming window
 	systemctl --user start run_ug.service
@@ -135,7 +138,6 @@ event_encoder(){
 		event_connectwifi
 	fi
 	systemctl --user daemon-reload
-	/usr/local/bin/run_ug.sh
 	# Generate Systemd notifier services for encoders
 	event_encoder_reboot
 	event_system_reboot
@@ -145,6 +147,9 @@ event_encoder(){
 	event_generate_wavelet_encoder_query
 	event_promote
 	# We do not perform run_ug for the encoder as that is enabled if it receives an encoderflag change.  It will be idle until then.
+	# Set Type keys to "dec"
+	KEYVALUE="enc";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
+	KEYNAME="/hostLabel/${hostNameSys}/type"; write_etcd_global
 }
 event_generate_wavelet_encoder_query(){
 	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
