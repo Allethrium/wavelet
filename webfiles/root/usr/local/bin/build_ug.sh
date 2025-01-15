@@ -114,6 +114,7 @@ event_decoder(){
 	# Set Type keys to "dec"
 	KEYVALUE="dec";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/hostLabel/${hostNameSys}/type"; write_etcd_global
+	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
 	sleep .33
 	# Executes run_ug in order to start the video streaming window
 	systemctl --user start run_ug.service
@@ -139,6 +140,7 @@ event_encoder(){
 	# Set Type keys to "dec"
 	KEYVALUE="enc";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/hostLabel/${hostNameSys}/type"; write_etcd_global
+	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
 }
 event_generate_wavelet_encoder_query(){
 	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
@@ -288,6 +290,7 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 	# Add server type ID into etcd
 	KEYVALUE="svr";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/hostLabel/${hostNameSys}/type"; write_etcd_global
+	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
 	# Finally, add a service to prune dead FUSE mountpoints.  Every time the UltraGrid AppImage is restarted, it leaves stale mountpoints.  This timed task will help keep everything clean.
 		# Get "alive mountpoints"
 		# Prune anything !=alive
