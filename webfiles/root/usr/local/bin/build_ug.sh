@@ -80,35 +80,23 @@ detect_self(){
 	# Detect_self in this case relies on the etcd type key
 	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
 	echo -e "Host type is: ${printvalue}\n"
-	# build_ug needs to handle the case of not having a key populated initially.
-	if [[ -z ${printvalue} ]]; then
-		echo "Type identifier for this hostname not populated, populating as decoder for initial registration."
-		printvalue="dec"
+	# test if i'm the server
+	if [[ $(hostname) = *"svr"* ]]; then
+		echo -e "I am a Server. Proceeding..."; event_server
 	fi
-	case "${printvalue}" in
-		enc*) 					echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."			;	event_encoder
-		;;
-		dec*)					echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."				;	event_decoder
-		;;
-		svr*)					echo -e "I am a Server. Proceeding..."															;	event_server
-		;;
-		*) 						echo -e "This device Hostname is not set appropriately, exiting \n"								;	exit 0
-		;;
-	esac
+	# Handle encoder or decoder paths
+	if [[ ${printvalue} = *"enc"* ]]; then
+		echo "I am an encoder"; event_encoder
+	else
+		# This is for anything NOT a svr or enc, including an unpopulated new device.
+		echo "I am a decoder"; event_decoder
+	fi
 }
 
 # These codeblocks directly enable the appropriate service immediately.
 # run_ug.sh will perform its own autodetection logic, this might seem redundant and probably is.
 # It was written before the need for this script became apparent.
 # to run systemd as another user (IE from root) do systemctl --user -M wavelet@  service.service
-
-event_gateway(){
-	echo -e "Not yet implemented.. \n"; exit 0
-	systemctl --user daemon-reload
-	systemctl --user enable wavelet_ndi_gateway.service
-	event_generateHash gateway
-	sleep 1
-}
 
 event_decoder(){
 	echo -e "Decoder routine started."
@@ -296,6 +284,9 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 		# If dead, ping more intensively for 30s
 		# If still dead, remove from reflector subscription
 
+	# Add server type ID into etcd
+	KEYVALUE="svr";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
+	KEYNAME="/hostLabel/${hostNameSys}/type"; write_etcd_global
 	# Finally, add a service to prune dead FUSE mountpoints.  Every time the UltraGrid AppImage is restarted, it leaves stale mountpoints.  This timed task will help keep everything clean.
 		# Get "alive mountpoints"
 		# Prune anything !=alive
