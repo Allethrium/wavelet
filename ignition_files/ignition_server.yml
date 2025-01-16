@@ -602,6 +602,12 @@ storage:
         name: wavelet
       group:
         name: wavelet
+    - path: /home/wavelet/config
+      mode: 0755
+      user:
+        name: wavelet
+      group:
+        name: wavelet
     - path: /home/wavelet/http
       mode: 0755
       user:
