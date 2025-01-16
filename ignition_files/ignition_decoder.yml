@@ -281,27 +281,6 @@ storage:
       contents:
         source: http://192.168.1.32:8080/ignition/etcd_ip
 # Systemd user units
-    # systemD user unit for wavelet initialization
-    # Called with other initializations when Sway is executed from;
-    # autologin@tty1->.bashrc->sway->build_ug->run_ug->init
-    - path: /home/wavelet/.config/systemd/user/wavelet_init.service
-      mode: 0644
-      overwrite: true
-      contents:
-        inline: |
-         [Unit]
-         Description=Wavelet Controller Service
-         After=network-online.target etcd-member.service
-         Wants=network-online.target
-         [Service]
-         Type=simple
-         ExecStart=/usr/local/bin/wavelet_init.sh
-         [Install]
-         WantedBy=default.target
-      user:
-        name: wavelet
-      group:
-        name: wavelet
     # Etcd watch reflectorflag service
     - path: /home/wavelet/.config/systemd/user/watch_reflectorreload.service
       mode: 0644
@@ -390,17 +369,20 @@ storage:
         name: wavelet
       group:
         name: wavelet
-    # build_ug.sh determines system local functions and preconfigures the user systemd services appropriately for next boot
+    # build_ug.sh determines system local functions
+    # Preconfigures the user systemd services appropriately
     - path: /home/wavelet/.config/systemd/user/build_ug.service
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           [Unit]
           Description=Wavelet Initial Setup Service
-          After=network-online.target etcd-member.service
-          Wants=network-online.target
+          After=network-online.target etcd-quadlet.service sway-session.target
+          Wants=network-online.target sway-session.target
           [Service]
           Type=oneshot
+          ExecStartPre=/usr/local/bin/wavelet_check_dependencies.sh
           ExecStart=/usr/local/bin/build_ug.sh
           [Install]
           WantedBy=default.target

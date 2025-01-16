@@ -96,7 +96,5 @@ extract_etc
 install_security_layer
 chown -R wavelet:wavelet /var/home/wavelet
 # Disable self so we don't run again on the next boot.
-systemctl disable wavelet_install_client.service
+systemctl set-default graphical.target
 touch /var/client_install.complete
-echo -e "Starting decoder hostname randomizer, this is the final step in the second boot, and will reboot the client machine.."
-systemctl start decoderhostname.service

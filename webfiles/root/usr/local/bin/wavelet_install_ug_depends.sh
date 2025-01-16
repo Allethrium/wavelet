@@ -192,6 +192,7 @@ install_ug_depends
 install_wavelet_modules
 #generate_decoder_iso
 echo -e "Dependencies Installation completed..\n"
+systemctl set-default graphical.target
 touch /var/wavelet_depends.complete
 # Apparently the pxe_grubconfig service might need some help to start..
 systemctl enable wavelet_install_pxe.service --now

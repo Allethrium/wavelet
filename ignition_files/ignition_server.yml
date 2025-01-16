@@ -447,8 +447,6 @@ storage:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/firefox/policies/policies.json
 # Systemd user units
     # systemD user unit for wavelet initialization
-    # Called with other initializations when Sway is executed from;
-    # autologin@tty1->.bashrc->sway->build_ug->run_ug->init
     - path: /home/wavelet/.config/systemd/user/wavelet_init.service
       mode: 0644
       overwrite: true
@@ -521,8 +519,8 @@ storage:
         name: wavelet
       group:
         name: wavelet
-    # build_ug.sh determines system local functions and preconfigures the user systemd services appropriately for next boot
-    # Does not start until wavelet dependencies have completed
+    # build_ug.sh determines system local functions
+    # Preconfigures the user systemd services appropriately
     - path: /home/wavelet/.config/systemd/user/build_ug.service
       mode: 0644
       overwrite: true
@@ -530,8 +528,8 @@ storage:
         inline: |
           [Unit]
           Description=Wavelet Initial Setup Service
-          After=network-online.target etcd-quadlet.service
-          Wants=network-online.target
+          After=network-online.target etcd-quadlet.service sway-session.target
+          Wants=network-online.target sway-session.target
           [Service]
           Type=oneshot
           ExecStartPre=/usr/local/bin/wavelet_check_dependencies.sh

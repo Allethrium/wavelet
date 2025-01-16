@@ -333,6 +333,7 @@ rpm_overlay_install_decoder(){
 Description=Install Client Dependencies
 ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
 ConditionPathExists=/var/firstboot.complete.target
+ConditionPathExists!=/var/client_install.complete
 Wants=network-online.target
 After=multi-user.target network-online.target
 [Service]
