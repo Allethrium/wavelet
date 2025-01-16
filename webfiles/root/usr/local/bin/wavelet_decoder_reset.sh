@@ -86,7 +86,7 @@ exit 0
 ###
 
 #set -x
-exec >/home/wavelet/wavelet_restart_decoder.log 2>&1
+exec >/home/wavelet/logs/wavelet_reset_decoder.log 2>&1
 
 
 hostNameSys=$(hostname)

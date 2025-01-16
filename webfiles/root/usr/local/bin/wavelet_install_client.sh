@@ -87,9 +87,6 @@ extract_base
 extract_home
 extract_usrlocalbin
 install_security_layer
-# Move the log file otherwise permissions is an issue and we don't get subsequent log
-# Also reset permissions on wavelet home folder so that any other files generated whilst running under root are writable by the wavelet user
-mv /var/home/wavelet/connectwifi.log /var/home/wavelet/logs/setup_old_connectwifi.log
 chown -R wavelet:wavelet /var/home/wavelet
 # Disable self so we don't run again on the next boot.
 systemctl disable wavelet_install_client.service

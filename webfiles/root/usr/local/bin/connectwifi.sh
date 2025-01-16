@@ -15,7 +15,7 @@ connectwifi(){
 	fi
 
 	# Attempt to connect to the configured wifi before proceeding
-	if nmcli con up $(cat /var/home/wavelet/wifi_ssid); then
+	if nmcli con up $(cat /var/home/wavelet/config/wifi_ssid); then
 		echo "Configured connection established, exiting."
 		exit 0
 	fi
@@ -28,9 +28,9 @@ connectwifi(){
 }
 
 connectwifi_psk(){
-	networkssid=$(cat /var/home/wavelet/wifi_ssid)
-	wifipassword=$(cat /var/home/wavelet/wifi_pw)
-	wifi_ap_mac=$(cat /var/home/wavelet/wifi_bssid)
+	networkssid=$(cat /var/home/wavelet/config/wifi_ssid)
+	wifipassword=$(cat /var/home/wavelet/config/wifi_pw)
+	wifi_ap_mac=$(cat /var/home/wavelet/config/wifi_bssid)
 	# Determine wifi ifname (what a pain..)
 	ifname=$(nmcli dev show | grep wifi -B1 | head -n 1 | awk '{print $2}')
 
@@ -59,7 +59,7 @@ connectwifi_psk(){
 			nmcli -g connection.uuid con mod ${uuid} wifi-sec.key-mgmt wpa-psk wifi-sec.psk ${wifipassword}
 			nmcli -g connection.uuid con mod ${uuid} connection.autoconnect yes
 			nmcli -g connection.uuid con up ${uuid}
-			echo "${uuid}" > /var/home/wavelet/wifi.${networkssid}.key
+			echo "${uuid}" > /var/home/wavelet/config/wifi.${networkssid}.key
 		else
 			echo "Not a wavelet configured wifi connection, ignoring"
 		fi
@@ -85,8 +85,8 @@ connectwifi_psk(){
 
 connectwifi_enterprise(){   
 	# Won't work right now, more of a bones until we get the core stuff refactored.       
-	networkssid=$(cat /var/home/wavelet/wifi_ssid)
-	wifi_ap_mac=$(cat /var/home/wavelet/wifi_bssid)
+	networkssid=$(cat /var/home/wavelet/config/wifi_ssid)
+	wifi_ap_mac=$(cat /var/home/wavelet/config/wifi_bssid)
 	# Determine wifi ifname (what a pain..)
 	ifname=$(nmcli dev show | grep wifi -B1 | head -n 1 | awk '{print $2}')
 	# Generates an nmcli connection with the appropriate certificates
@@ -147,7 +147,7 @@ set_ethernet_mtu(){
 #
 #####
 
-logName="/var/home/wavelet/connectwifi.log"
+logName="/var/home/wavelet/logs/connectwifi.log"
 if [[ -e $logName || -L $logName ]] ; then
 	i=0
 	while [[ -e $logName-$i || -L $logName-$i ]] ; do

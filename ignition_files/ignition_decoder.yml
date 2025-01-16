@@ -20,18 +20,18 @@ kernel_arguments:
 storage:
   files:
     # WiFi WiFi Name
-    - path: /var/home/wavelet/wifi_ssid
+    - path: /var/home/wavelet/config/wifi_ssid
       overwrite: true
       contents:
         inline: SEDwaveletssid
     # WiFi WiFi Name
-    - path: /var/home/wavelet/wifi_bssid
+    - path: /var/home/wavelet/config/wifi_bssid
       mode: 0600
       overwrite: true
       contents:
         inline: SEDwaveletbssid
     # WiFi WPA Passphrase
-    - path: /var/home/wavelet/wifi_pw
+    - path: /var/home/wavelet/config/wifi_pw
       mode: 0600
       overwrite: true
       contents:
@@ -275,7 +275,7 @@ storage:
           # Allow wavelet to set device hostname
           wavelet ALL=(ALL) NOPASSWD: /usr/bin/hostnamectl
     # populate the etcd cluster hostname/IP address from the server
-    - path: /var/home/wavelet/etcd_ip
+    - path: /var/home/wavelet/config/etcd_ip
       mode: 0644
       overwrite: true
       contents:
@@ -426,12 +426,6 @@ storage:
         name: wavelet
       group:
         name: wavelet
-    - path: /home/wavelet/dnsmasq
-      mode: 0755
-      user:
-        name: wavelet
-      group:
-        name: wavelet
     - path: /home/wavelet/.config/systemd
       mode: 0755
       user:
@@ -444,19 +438,7 @@ storage:
         name: wavelet
       group:
         name: wavelet
-    - path: /home/wavelet/registry
-      mode: 0755
-      user:
-        name: wavelet
-      group:
-        name: wavelet
-    - path: /home/wavelet/etcd
-      mode: 0755
-      user:
-        name: wavelet
-      group:
-        name: wavelet
-    - path: /home/wavelet/buildah
+    - path: /home/wavelet/config
       mode: 0755
       user:
         name: wavelet

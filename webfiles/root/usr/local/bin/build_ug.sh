@@ -553,14 +553,14 @@ event_connectwifi(){
 		echo -e "The /var/no.wifi flag is set.  Please remove this file if this host should utilize wireless connectivity."
 		KEYNAME="/${hostNameSys}/WIFI"; KEYVALUE="0"; write_etcd_global
 	fi
-	files=$(find /var/home/wavelet -maxdepth 1 -name "wifi.*.key")
+	files=$(find /var/home/wavelet/config -maxdepth 1 -name "wifi.*.key")
 	if [[ ${#files[@]} -gt 0 ]]; then
 		echo "Network configuration file found, continuing and getting UUID for connection.."
 	else
 		echo "No file found for network configuration, connectwifi has failed, there is no available wireless connection.  Attempting to re-run connectwifi.."
 		/usr/local/bin/connectwifi.sh
 	fi
-	networkUUID=$(cat /var/home/wavelet/wifi.*.key)
+	networkUUID=$(cat /var/home/wavelet/config/wifi.*.key)
 	# Set autoconnection again and ensure wifi is up
 	# Attempt to connect to the configured wifi before proceeding
 	if nmcli con up $(cat /var/home/wavelet/wifi_ssid); then

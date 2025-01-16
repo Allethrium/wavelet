@@ -108,7 +108,7 @@ event_decoder_unblank(){
 ###
 
 #set -x
-exec >/home/wavelet/wavelet_blank_decoder.log 2>&1
+exec >/var/home/wavelet/logs/wavelet_blank_decoder.log 2>&1
 
 hostNameSys=$(hostname)
 hostNamePretty=$(hostnamectl --pretty)
