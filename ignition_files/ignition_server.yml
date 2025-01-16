@@ -580,12 +580,6 @@ storage:
         name: wavelet
       group:
         name: wavelet
-    - path: /home/wavelet/dnsmasq
-      mode: 0755
-      user:
-        name: wavelet
-      group:
-        name: wavelet
     - path: /home/wavelet/.config/systemd
       mode: 0755
       user:
@@ -605,12 +599,6 @@ storage:
       group:
         name: wavelet
     - path: /home/wavelet/etcd
-      mode: 0755
-      user:
-        name: wavelet
-      group:
-        name: wavelet
-    - path: /home/wavelet/buildah
       mode: 0755
       user:
         name: wavelet

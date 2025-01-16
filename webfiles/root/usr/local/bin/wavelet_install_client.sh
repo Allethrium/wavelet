@@ -1,28 +1,33 @@
 #!/bin/bash
-# This runs as a systemd unit on the SECOND boot on the Client devices ONLY
-# It is responsible for extracting the wavelet modules, joining the domain (if security enabled) and provisioning services so that it can talk to etcd and the DC.
+# This runs as a systemd unit on the first boot on the Client devices ONLY.
+# It is responsible for extracting the wavelet modules, 
+# joining the domain (if security enabled) and provisioning services so that it can talk to etcd and the DC.
 
 extract_base(){
-	tar xf /home/wavelet/wavelet-files.tar.xz -C /home/wavelet --no-same-owner
-	mv /home/wavelet/usrlocalbin.tar.xz /usr/local/bin/
+	# Moves tar files to their target directories
+	cd /var/home/wavelet/setup
+	tar xf /home/wavelet/setup/wavelet-files.tar.xz -C /home/wavelet/setup --no-same-owner
+	mv ./usrlocalbin.tar.xz /usr/local/bin/; mv ./etc.tar.xz /etc; mv ./wavelethome.tar.xz ../
 }
-
+extract_etc(){
+	umask 022
+	tar xf /etc/etc.tar.xz -C /etc --no-same-owner --no-same-permissions
+	echo -e "System config files setup successfully..\n"
+	rm -rf /etc/etc.tar.xz
+}
 extract_home(){
-	tar xf /home/wavelet/wavelethome.tar.xz -C /home/wavelet
-	chown -R wavelet:wavelet /home/wavelet
-	chmod 0755 /home/wavelet/http
-	#chmod -R 0755 /home/wavelet/http-php
+	tar xf /var/home/wavelet/wavelethome.tar.xz -C /var/home/wavelet
 	echo -e "Wavelet homedir setup successfully..\n"
+	rm -rf /var/home/wavelet/wavelethome.tar.xz
 }
-
 extract_usrlocalbin(){
 	umask 022
 	tar xf /usr/local/bin/usrlocalbin.tar.xz -C /usr/local/bin --no-same-owner
 	chmod +x /usr/local/bin
-	chmod 0755 /usr/local/bin/*
+	chmod -R 0755 /usr/local/bin/
 	echo -e "Wavelet application modules setup successfully..\n"
+	rm -rf /usr/local/bin/usrlocalbin.tar.xz
 }
-
 install_security_layer(){
 	# This function checks for the presence of the security layer flag, and if it exists we run domain enrollment
 	if [[ -f /var/prod.security.enabled ]]; then
@@ -43,8 +48,6 @@ install_security_layer(){
 		-k /var/home/wavelet/pki/tls/private/etcd-client.key \
 		-K etcd-client/${hostname}@${hostname^^} \
 		-D $(dnsdomainname)
-
-
 		#ipa service-add radius-client/$(hostname) && ipa service-add-host --hosts=dc1.$(dnsdomainname) radius-client/`hostname`
 		#ipa-getcert request \
 		#-f /etc/pki/tls/certs/radius-client.crt \
@@ -73,6 +76,10 @@ install_security_layer(){
 ####
 
 mkdir -p /var/home/wavelet/logs
+mkdir -p /var/home/wavelet/setup
+
+# Run connectwifi
+/usr/local/bin/connectwifi.sh
 
 #set -x
 exec > /var/home/wavelet/logs/client_installer.log 2>&1
@@ -82,10 +89,10 @@ exec > /var/home/wavelet/logs/client_installer.log 2>&1
 groupadd -fg 84 avahi && useradd -c "Avahi Daemon Owner" -d /run/avahi-daemon -u 84 -g avahi -s /bin/false avahi
 groupadd -fg 86 netdev
 systemctl enable avai-daemon.service --now
-nmcli dev wifi rescan
 extract_base
 extract_home
 extract_usrlocalbin
+extract_etc
 install_security_layer
 chown -R wavelet:wavelet /var/home/wavelet
 # Disable self so we don't run again on the next boot.

@@ -7,10 +7,6 @@ UG_HOSTNAME=$(hostname)
 	case $UG_HOSTNAME in
 	decX.wavelet.local)		echo -e "I am a Decoder, and my hostname needs to be randomized. \n" && event_decoder
 	;;
-	dec*)					echo -e "I am a Decoder, but my hostname is already randomized and set \n"; exit 0
-	;;
-	svr*)					echo -e "I am a Server."  && echo -e "I don't need hostname randomization, ending process.. "; exit 0
-	;;
 	*) 						echo -e "This device Hostname is not set appropriately, exiting \n" && exit 0
 	;;
 	esac
@@ -26,6 +22,8 @@ event_decoder(){
 	# remember to reset permissions or we get root logfiles
 	chown wavelet:wavelet -R /var/home/wavelet
 	echo "All set, rebooting decoder.."
+	# Final step in the FIRST boot.
+	touch /var/firstboot.complete.target
 	systemctl reboot
 }
 

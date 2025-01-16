@@ -312,19 +312,6 @@ rpm_overlay_install_decoder(){
 	# This differs from the server in that we don't need to build the container unless the required platform-specific one (TBA) doesn't exist.
 	# We pull the client installer module and run it to generate the wavelet files in /usr/local/bin
 	#dmidecode | grep "Manufacturer" | cut -d ':' -f 2 | head -n 1
-	echo -e "Generating client install service systemd entry.."
-	echo -e "[Unit]
-Description=Install Client Dependencies
-ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-Wants=network-online.target
-After=multi-user.target network-online.target
-[Service]
-Type=oneshot
-ExecStartPre=/usr/bin/bash -c 'curl -o /usr/local/bin/wavelet_install_client.sh http://192.168.1.32:8080/ignition/wavelet_install_client.sh && chmod 0755 /usr/local/bin/wavelet_install_client.sh'
-ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_client.sh'
-[Install]
-WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
-	systemctl daemon-reload
 	# and we pull the already generated overlay from the server registry
 	# This is the slowest part of the process, can we speed it up by compressing the overlay?
 	echo -e "Installing via container and applying as ostree overlay..\n"
@@ -341,8 +328,24 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
 	touch /var/rpm-ostree-overlay.dev.pkgs.complete
 	echo -e "RPM package updates completed, finishing installer task..\n"
+	echo -e "Generating client install service systemd entry.."
+	echo -e "[Unit]
+Description=Install Client Dependencies
+ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+ConditionPathExists=/var/firstboot.complete.target
+Wants=network-online.target
+After=multi-user.target network-online.target
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/bash -c 'curl -o /usr/local/bin/wavelet_install_client.sh http://192.168.1.32:8080/ignition/wavelet_install_client.sh && chmod 0755 /usr/local/bin/wavelet_install_client.sh'
+ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_client.sh'
+[Install]
+WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
 	echo -e "Client install service will run on next reboot to populate wavelet modules and configure networking."
+	systemctl daemon-reload
 	systemctl enable wavelet_install_client.service
+	# Start decoderhostname which will set a unique client name
+	systemctl start decoderhostname.service
 }
 
 ####
