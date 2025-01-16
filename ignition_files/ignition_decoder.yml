@@ -511,7 +511,6 @@ systemd:
           Description=Configures a four character hostname
           Wants=network-online.target
           After=network-online.target check_and_wait.target
-          ConditionPathExists=/var/client_install.complete
           [Service]
           Type=oneshot
           ExecStart=-/usr/local/bin/decoderhostname.sh
