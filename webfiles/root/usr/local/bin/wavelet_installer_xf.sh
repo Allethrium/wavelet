@@ -4,9 +4,8 @@
 # All wavelet modules, including the web server code, are deployed on all devices.
 
 detect_self(){
-	systemctl --user daemon-reload
 	# This might be of use if we need some custom kernels or decide to start building addition ostree overlays
-	platform=$(dmidecode | grep "Manufacturer" | cut -d ':' -f 2 | head -n 1)
+	# platform=$(dmidecode | grep "Manufacturer" | cut -d ':' -f 2 | head -n 1)
 	echo -e "Hostname is ${hostNameSys}"
 	case ${hostNameSys} in
 		enc*)	echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."		;	event_decoder
@@ -214,37 +213,7 @@ rpm_overlay_install(){
 	done
 	echo -e "Installing via container and applying as Ostree overlay..\n"
 	DKMS_KERNEL_VERSION=$(uname -r)
-	# Shamelessly stolen from;
-	# https://github.com/icedream/customizepkg-config/blob/main/decklink.patches/0001-Add-signing-key-generation-post-install-secure-boot-.patch
-	cat > "/home/wavelet/containerfiles/openssl.cnf" << EOF
-HOME        = /var/lib/blackmagic
-RANDFILE    = /var/lib/blackmagic/.rnd
 
-[ req ]
-distinguished_name      = req_distinguished_name
-x509_extensions   = v3_ca
-string_mask       = utf8only
-
-[ req_distinguished_name ]
-
-[ v3_ca ]
-subjectKeyIdentifier    = hash
-authorityKeyIdentifier  = keyid:always,issuer
-basicConstraints  = critical,CA:FALSE
-
-# We use extended key usage information to limit what this auto-generated
-# key can be used for.
-#
-# codeSigning:  specifies that this key is used to sign code.
-#
-# 1.3.6.1.4.1.2312.16.1.2:  defines this key as used for module signing
-#         only. See https://lkml.org/lkml/2015/8/26/741.
-#
-extendedKeyUsage  = codeSigning,1.3.6.1.4.1.2312.16.1.2
-nsComment         = "OpenSSL Generated Certificate"
-EOF
-	echo '::A certificate to sign the driver has been created at /var/lib/blackmagic/MOK.der. This certificate needs to be enrolled if you run Secure Boot with validation (e.g. shim).'
-	echo -e "\nPlease run:\nmokutil --import '/var/lib/blackmagic/MOK.der'\nIn order to enroll the MOK key!!"
 	# Podman build, tags the image, uses DKMS_KERNEL_VERSION to parse host OS kernel version into container
 	# The first stage builds the container with the necessary software to run as a decoder/encoder
 	# The second stage adds everything necessary for the server.
