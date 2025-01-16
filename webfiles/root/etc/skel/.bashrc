@@ -23,6 +23,7 @@ if [ -d ~/.bashrc.d ]; then
 		fi
 	done
 fi
+alias logs='cd /var/home/wavelet/logs'
 
 unset rc
 
@@ -32,4 +33,3 @@ if [ -f /usr/bin/powerline-daemon ]; then
   POWERLINE_BASH_SELECT=1
   . /usr/share/powerline/bash/powerline.sh
 fi
-alias logs='cd /var/home/wavelet/logs'

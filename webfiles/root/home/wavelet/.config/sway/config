@@ -314,4 +314,7 @@ exec_always cat /proc/acpi/button/lid/LID/state | awk '{print $2}' | grep -q 'cl
 # Below are SED'd out by build_ug.sh for the server only
 #exec /usr/local/bin/wavelet_start_UI.sh
 
+# Finally we start build_ug.service as we cannot seem to enable it in any other fashion.
+exec systemctl --user start build_ug.service
+
 include /etc/sway/config.d/*

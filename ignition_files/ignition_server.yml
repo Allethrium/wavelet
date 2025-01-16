@@ -524,7 +524,6 @@ storage:
     - path: /home/wavelet/.config/systemd/user/build_ug.service
       mode: 0644
       overwrite: true
-      enabled: true
       contents:
         inline: |
           [Unit]
@@ -536,7 +535,7 @@ storage:
           ExecStartPre=/usr/local/bin/wavelet_check_dependencies.sh
           ExecStart=/usr/local/bin/build_ug.sh
           [Install]
-          WantedBy=default.target
+          WantedBy=sway-session.target
       user:
         name: wavelet
       group:

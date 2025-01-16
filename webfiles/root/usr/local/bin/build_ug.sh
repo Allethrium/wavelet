@@ -201,7 +201,6 @@ server_bootstrap(){
 		echo -e "\n server bootstrap has already been completed, exiting..\n"
 		exit 0
 	fi
-
 	bootstrap_http(){
 		# check for bootstrap_completed, verify services running
 		echo -e "Generating HTTPD server and copying/compressing wavelet files to server directory.."
@@ -210,7 +209,6 @@ server_bootstrap(){
 		#find /var/home/wavelet/http/ -type f -print0 | xargs -0 chmod 644
 		chmod +x /var/home/wavelet/http
 	}
-
 	bootstrap_nginx_php(){
 		# http PHP server for control interface	
 		/usr/local/bin/build_nginx_php.sh
@@ -218,7 +216,6 @@ server_bootstrap(){
 		#find /var/home/wavelet/http-php/ -type f -print0 | xargs -0 chmod 644
 		chmod +x /var/home/wavelet/http
 	}
-
 	bootstrap_dnsmasq_watcher_service(){
 		echo -e "[Unit]
 Description=Dnsmasq inotify service
@@ -237,7 +234,6 @@ WantedBy=default.target" > /var/home/wavelet/.config/systemd/user/wavelet_dnsmas
 		systemctl --user enable wavelet_dnsmasq_inotify.service --now
 		echo -e "\ninotify service enabled for wavelet network sense via dnsmasq..\n"
 	}
-
 	bootstrap_livestream(){
 		# This might not even be worth the hassle given we just installed ffmpeg and all the support packages on the base OS..
 		podman build -t localhost/livestreamer -f /home/wavelet/containerfiles/Containerfile.livestreamer
@@ -280,13 +276,11 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 	# uncomment a firefox exec command into sway config, this will bring up the management console on the server in a new sway window, as a backup control surface.
 	# - note we need to work on a firefox policy/autoconfig.
 	sed -i 's|#exec /usr/local/bin/wavelet_start_UI.sh|exec /usr/local/bin/wavelet_start_UI.sh|g' /var/home/wavelet/.config/sway/config
-
 	# Next, we build the reflector prune function.  This is necessary for removing streams for old decoders and maintaining the long term health of the system
 		# Get decoderIP list
 		# Ping each decoder on list
 		# If dead, ping more intensively for 30s
 		# If still dead, remove from reflector subscription
-
 	# Add server type ID into etcd
 	KEYVALUE="svr";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/hostLabel/${hostNameSys}/type"; write_etcd_global
@@ -294,8 +288,8 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 	# Finally, add a service to prune dead FUSE mountpoints.  Every time the UltraGrid AppImage is restarted, it leaves stale mountpoints.  This timed task will help keep everything clean.
 		# Get "alive mountpoints"
 		# Prune anything !=alive
-	echo -e "Server configuration is now complete, rebooting system.."
-	systemctl reboot
+	echo -e "Server configuration is now complete, bringing services up.."
+	event_server
 }
 event_system_reboot(){
 	# Everything should watch the system reboot flag for a hard reset

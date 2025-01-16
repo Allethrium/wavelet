@@ -6,6 +6,7 @@
 
 main(){
 	serverIP=$(nslookup svr | awk '/^Address: / { print $2 }')
+        systemctl --user start http-php-pod.service
 	sleep 5
 	exec firefox http://${serverIP}:9080
 }
