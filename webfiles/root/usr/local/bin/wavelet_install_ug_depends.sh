@@ -112,11 +112,11 @@ install_wavelet_modules(){
 
 generate_tarfiles(){
 	cd /var/home/wavelet/setup
-	echo -e "Generating tar.xz files for upload to distribution server..\n"
+	echo -e "Generating tar.xz files for upload to distribution server.."
 	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /var/home/wavelet/setup/wavelet-git/webfiles/root/usr/local/bin/ .
 	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /var/home/wavelet/setup/wavelet-git/webfiles/root/home/wavelet/ .
-	tar -cJf etcd.tar.xz --owner=root:0 -C /var/home/wavelet/setup/wavelet-git/webfiles/root/etc .
-	echo -e "Packaging files together..\n"
+	tar -cJf etc.tar.xz --owner=root:0 -C /var/home/wavelet/setup/wavelet-git/webfiles/root/etc .
+	echo -e "Packaging files together.."
 	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz,etcd.tar.xz}
 	echo -e "Done."
 	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz,etc.tar.xz}
