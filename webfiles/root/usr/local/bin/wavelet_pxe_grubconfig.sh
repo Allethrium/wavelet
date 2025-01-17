@@ -167,7 +167,6 @@ echo 'Booting Fedora CoreOS...'
 exec >/var/home/wavelet/logs/grubconfig.log 2>&1
 
 if [[ -f /var/pxe.complete ]]; then
-	echo -e "\nInstaller has already run, ending task!"
 	exit 0
 fi
 
@@ -205,5 +204,5 @@ if [[ -f /var/prod.security/enabled ]]; then
 	systemctl start wavelet_install_hardening.service
 	exit 0
 else
-	systemctl reboot
+	systemctl --user -M wavelet@ start sway.service
 fi
