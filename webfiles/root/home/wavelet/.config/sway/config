@@ -311,6 +311,9 @@ exec foot;
 exec foot -e journalctl -f;
 exec_always cat /proc/acpi/button/lid/LID/state | awk '{print $2}' | grep -q 'closed' && swaymsg output eDP-1 disable
 
+# Start build_ug.service
+exec systemctl --user start build_ug.service
+
 # Below are SED'd out by build_ug.sh for the server only
 #exec /usr/local/bin/wavelet_start_UI.sh
 

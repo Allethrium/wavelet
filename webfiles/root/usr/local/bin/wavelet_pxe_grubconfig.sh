@@ -202,9 +202,6 @@ if [[ -f /var/prod.security/enabled ]]; then
 	systemctl start wavelet_install_hardening.service
 	exit 0
 else
-	# Start build_ug then restart getty@tty1 to reload UI.
-	systemctl --user -M wavelet@ daemon-reload
-	systemctl --user -M wavelet@ enable build_ug.service --now
-	sleep 10
+	# restart getty@tty1 to reload UI and start userland build process
 	systemctl restart getty@tty1
 fi
