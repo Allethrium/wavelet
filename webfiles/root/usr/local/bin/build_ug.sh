@@ -77,6 +77,7 @@ detect_ug_version(){
 
 detect_self(){
 	systemctl --user daemon-reload
+	systemctl --user enable foot-server.socket --now
 	# Detect_self in this case relies on the etcd type key
 	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
 	echo -e "Host type is: ${printvalue}\n"
@@ -413,6 +414,7 @@ event_generate_reflectorreload(){
 	fi
 }
 event_generate_wavelet_ui_service(){
+	# Final step of the server spinup, and starts the web interface on the server console.
 	if [[ -f /var/home/wavelet/.config/systemd/user/wavelet_ui.service ]]; then
 		echo -e "Unit file already generated, moving on."
 		:
@@ -427,9 +429,8 @@ ExecStartPre=/bin/sleep 8
 ExecStart=/bin/bash -c "/usr/local/bin/wavelet_start_UI.sh"
 [Install]
 WantedBy=default.target' > /var/home/wavelet/.config/systemd/user/wavelet_ui.service
-		# Boots after first boot since the systemd unit is enabled here
 		systemctl --user daemon-reload
-		systemctl --user enable wavelet_ui.service
+		systemctl --user enable wavelet_ui.service -- now
 	fi
 }
 event_generate_encoder_service(){
