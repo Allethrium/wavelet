@@ -42,8 +42,8 @@ set_ethernet_mtu(){
 
 event_server(){
 	# generate proper RC files for root/wavelet-root which gives us aliases and powerline
-	cd $HOME; rm .bashrc; cp /usr/share/skel/.bashrc .
-	cd /var/home/root; rm .bashrc; cp /usr/share/skel/.bashrc .
+	cd /root; rm .bashrc; cp /usr/share/skel/.bashrc .
+	cd /var/home/wavelet-root; rm .bashrc; cp /usr/share/skel/.bashrc .
 	# Server can only be x86.  I haven't had access to another platform with video hardware support + enough number crunching power to do the task.
 	# Generate RPM Container overlay
 	# Set my pretty hostname
