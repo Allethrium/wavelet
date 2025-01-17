@@ -51,7 +51,7 @@ install_ug_depends(){
 		LIBNDI_INSTALLER="$LIBNDI_INSTALLER_NAME.tar.gz"
 		LIBNDI_INSTALLER_URL=https://downloads.ndi.tv/SDK/NDI_SDK_Linux/$LIBNDI_INSTALLER
 		download_libndi(){
-			curl -L $LIBNDI_INSTALLER_URL -f --retry 5 > "/home/wavelet/libNDI/$LIBNDI_INSTALLER"
+			curl -L $LIBNDI_INSTALLER_URL -f --retry 5 > "/home/wavelet/setup/libNDI/$LIBNDI_INSTALLER"
 			# Check if download was successful
 			if [ $? -ne 0 ]; then
 				echo "Download failed."
@@ -119,29 +119,24 @@ generate_tarfiles(){
 	echo -e "Packaging files together.."
 	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz,etcd.tar.xz}
 	echo -e "Done."
-	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz,etc.tar.xz}
 }
-
 extract_base(){
 	# Moves tar files to their target directories
 	cd /var/home/wavelet/setup
 	tar xf /home/wavelet/setup/wavelet-files.tar.xz -C /home/wavelet/setup --no-same-owner
 	mv ./usrlocalbin.tar.xz /usr/local/bin/; mv ./etc.tar.xz /etc; mv ./wavelethome.tar.xz ../
 }
-
 extract_etc(){
 	umask 022
 	tar xf /etc/etc.tar.xz -C /etc --no-same-owner --no-same-permissions
 	echo -e "System config files setup successfully..\n"
 	rm -rf /etc/etc.tar.xz
 }
-
 extract_home(){
 	tar xf /var/home/wavelet/wavelethome.tar.xz -C /var/home/wavelet
 	echo -e "Wavelet homedir setup successfully..\n"
 	rm -rf /var/home/wavelet/wavelethome.tar.xz
 }
-
 extract_usrlocalbin(){
 	umask 022
 	tar xf /usr/local/bin/usrlocalbin.tar.xz -C /usr/local/bin --no-same-owner
