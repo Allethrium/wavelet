@@ -5,29 +5,6 @@
 USER=wavelet
 SCRHOME="/var/home/wavelet"
 
-oldMethod(){
-	# Podman generate systemd method
-	echo -e "Generating Apache Podman container and systemd service file"
-	podman pull docker://docker.io/library/httpd
-	podman create --name httpd -p 8080:80 -v /home/wavelet/http:/usr/local/apache2/htdocs:Z -v /home/wavelet/config/httpd.conf:/usr/local/apache2/conf/httpd.conf:z docker://docker.io/library/httpd
-	cd /home/wavelet/.config/systemd/user
-	podman generate systemd --restart-policy=always -t 5 --name httpd --files
-	cp container-httpd.service ${SCRHOME}/.config/systemd/user
-	chown wavelet:wavelet ${SCRHOME}/.config/systemd/user
-	systemctl --user enable container-httpd.service
-	echo -e "\nApache Podman container generated, service has been enabled in systemd, and will start on next reboot.\n"
-	# Set ETCD key to true for this build step
-	# populate necessary files for decoder spinup
-	cp /usr/local/bin/UltraGrid.AppImage /home/wavelet/http/
-	cp /home/wavelet/wavelet-files.tar.xz /home/wavelet/http/ignition/
-	cp /usr/local/bin/wavelet_installer_xf.sh /home/wavelet/http/ignition/
-	cp /home/wavelet/.bashrc /home/wavelet/http/ignition/skel_bashrc.txt
-	cp /home/wavelet/.bash_profile /home/wavelet/http/ignition/skel_profile.txt
-	chown -R wavelet:wavelet /home/wavelet/http
-	chmod -x /home/wavelet/http
-	exit 0
-}
-
 newMethod(){
 	# Needs to be configured with proper TLS certs to be deployment ready.
 	echo -e "Generating Apache Podman container and systemd service file"
@@ -62,7 +39,7 @@ WantedBy=default.target" > /home/wavelet/.config/containers/systemd/httpd.contai
 	/usr/local/bin/wavelet_etcd_interaction "write_etcd_global" "SERVER_HTTP_BOOTSTRAP_COMPLETED" "1"
 	# populate necessary files for decoder spinup
 	cp /usr/local/bin/UltraGrid.AppImage /home/wavelet/http/
-	cp /home/wavelet/wavelet-files.tar.xz /home/wavelet/http/ignition/
+	cp /home/wavelet/setup/wavelet-files.tar.xz /home/wavelet/http/ignition/
 	cp /usr/local/bin/wavelet_installer_xf.sh /home/wavelet/http/ignition/
 	cp /home/wavelet/.bashrc /home/wavelet/http/ignition/skel_bashrc.txt
 	cp /home/wavelet/.bash_profile /home/wavelet/http/ignition/skel_profile.txt

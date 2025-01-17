@@ -13,36 +13,11 @@ detect_self(){
 	systemctl --user daemon-reload
 	echo -e "Hostname is ${hostNameSys} \n"
 	case ${hostNameSys} in
-	svr*)					echo -e "I am a Server. Proceeding..."															;	event_server
+	svr*)					echo -e "I am a Server. Proceeding..."															;	podman_quadlet
 	;;
-	*) 						echo -e "This device Hostname is not set appropriately, exiting \n"								;	exit 0
+	*) 						echo -e "This device Hostname is not set appropriately, exiting\n"								;	exit 0
 	;;
 	esac
-}
-
-podman_systemd_generate(){
-	# Old method
-	if [[ -f /var/prod.security.enabled ]]; then
-		echo -e "Security layer is enabled, copying SSL nginx.conf "
-		cp /var/home/wavelet/config/nginx.secure.conf /var/home/wavelet/http-php/nginx/nginx.conf
-	fi
-	podman pod create --infra=true --name http-php --hostname interface --publish 9080:80 --publish 9443:443 \
-		-v ${SCRHOME}/http-php/nginx/:/etc/nginx/conf.d/:Z \
-		-v ${SCRHOME}/http-php/html:/var/www/html:Z
-	echo -e "Generating nginx simple configuration, and systemd service files.."
-	podman create --name nginx --pod http-php docker://docker.io/library/nginx:alpine
-	podman create --name php-fpm --pod http-php docker://docker.io/library/php:fpm
-	echo -e "Generating nginx/PHP pod systemd service file.. \n"
-	podman generate systemd --restart-policy=always -t 5 --name http-php --files
-	mv container-nginx.service ${SCRHOME}/.config/systemd/user
-	mv container-php-fpm.service ${SCRHOME}/.config/systemd/user
-	mv pod-http-php.service ${SCRHOME}/.config/systemd/user
-	chown -R wavelet:wavelet ${SCRHOME}/.config/systemd/user
-	chown -R wavelet:wavelet ${SCRHOME}/http-php
-	# Does nginx need +X on these files? (yes, it does)
-	chmod -R 0755 ${SCRHOME}/http-php
-	systemctl --user daemon-reload
-	systemctl --user enable pod-http-php.service --now
 }
 
 podman_quadlet(){
@@ -95,17 +70,6 @@ WantedBy=multi-user.target" > /var/home/wavelet/.config/containers/systemd/http-
 	systemctl --user start http-php-pod.service
 	exit 0
 }
-
-event_server(){
-	if [[ -f /var/developerMode.enabled ]]; then
-		echo -e "\n\n***WARNING***\n\nDeveloper Mode is ON\n\nAttempting to spin up services using quadlets..\n"
-		podman_quadlet
-	else
-		echo -e "\nDeveloper mode off.\n"
-		podman_systemd_generate
-	fi
-}
-
 
 #####
 #
