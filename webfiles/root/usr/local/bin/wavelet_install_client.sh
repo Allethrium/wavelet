@@ -98,3 +98,4 @@ chown -R wavelet:wavelet /var/home/wavelet
 # Disable self so we don't run again on the next boot.
 systemctl set-default graphical.target
 touch /var/client_install.complete
+systemctl --user -M wavelet@ start sway.service
