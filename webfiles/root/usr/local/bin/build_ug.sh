@@ -430,7 +430,7 @@ ExecStart=/bin/bash -c "/usr/local/bin/wavelet_start_UI.sh"
 [Install]
 WantedBy=default.target' > /var/home/wavelet/.config/systemd/user/wavelet_ui.service
 		systemctl --user daemon-reload
-		systemctl --user enable wavelet_ui.service -- now
+		systemctl --user enable wavelet_ui.service --now
 	fi
 }
 event_generate_encoder_service(){
