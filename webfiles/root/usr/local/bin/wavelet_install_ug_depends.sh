@@ -194,5 +194,25 @@ install_wavelet_modules
 echo -e "Dependencies Installation completed..\n"
 systemctl set-default graphical.target
 touch /var/wavelet_depends.complete
+
+# Generate sway service for allusers
+echo "[Unit]
+Description=sway - SirCmpwn's Wayland window manager
+Documentation=man:sway(5)
+BindsTo=default.target
+Wants=default.target
+After=default.target
+
+[Install]
+WantedBy=default.target
+
+[Service]
+Type=simple
+EnvironmentFile=-%h/.config/sway/env
+ExecStart=/usr/bin/sway
+Restart=on-failure
+RestartSec=1
+TimeoutStopSec=10" > /etc/systemd/user/sway.service
+
 # Apparently the pxe_grubconfig service might need some help to start..
 systemctl enable wavelet_install_pxe.service --now
