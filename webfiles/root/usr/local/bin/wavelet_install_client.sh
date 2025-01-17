@@ -98,23 +98,5 @@ chown -R wavelet:wavelet /var/home/wavelet
 # Disable self so we don't run again on the next boot.
 systemctl set-default graphical.target
 touch /var/client_install.complete
-# Generate sway service for allusers
-echo "[Unit]
-Description=sway - SirCmpwn's Wayland window manager
-Documentation=man:sway(5)
-BindsTo=default.target
-Wants=default.target
-After=default.target
-
-[Install]
-WantedBy=default.target
-
-[Service]
-Type=simple
-EnvironmentFile=-%h/.config/sway/env
-ExecStart=/usr/bin/sway
-Restart=on-failure
-RestartSec=1
-TimeoutStopSec=10" > /etc/systemd/user/sway.service
 systemctl --user -M wavelet@ daemon-reload
-systemctl --user -M wavelet@ enable sway.service --now
+systemctl --user -M wavelet@ enable build_ug.service --now

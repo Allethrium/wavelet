@@ -204,6 +204,7 @@ if [[ -f /var/prod.security/enabled ]]; then
 	systemctl start wavelet_install_hardening.service
 	exit 0
 else
+	# Start build_ug
 	systemctl --user -M wavelet@ daemon-reload
-	systemctl --user -M wavelet@ enable sway.service --now
+	systemctl --user -M wavelet@ enable build_ug.service --now
 fi
