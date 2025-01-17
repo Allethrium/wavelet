@@ -62,10 +62,4 @@ fail(){
 #set -x
 exec >/var/home/wavelet/logs/build_httpd.log 2>&1
 
-if [[ -f /var/prod.security.enabled ]]; then
-	echo -e "Security layer enabled, generating apache with TLS configuration.."
-	newmethod
-else
-	echo -e "Security layer is not enabled, generating HTTPD without TLS.."
-	oldMethod
-fi
+newmethod
