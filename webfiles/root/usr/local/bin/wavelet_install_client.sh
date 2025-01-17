@@ -100,3 +100,5 @@ systemctl set-default graphical.target
 touch /var/client_install.complete
 systemctl --user -M wavelet@ daemon-reload
 systemctl --user -M wavelet@ enable build_ug.service --now
+sleep 10
+systemctl restart getty@tty1

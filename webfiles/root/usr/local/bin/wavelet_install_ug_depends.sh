@@ -191,4 +191,4 @@ systemctl set-default graphical.target
 touch /var/wavelet_depends.complete
 
 # Apparently the pxe_grubconfig service might need some help to start..
-systemctl enable wavelet_install_pxe.service --now
+systemctl start wavelet_install_pxe.service

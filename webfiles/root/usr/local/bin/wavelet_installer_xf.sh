@@ -41,6 +41,9 @@ set_ethernet_mtu(){
 }
 
 event_server(){
+	# generate proper RC files for root/wavelet-root which gives us aliases and powerline
+	cd $HOME; rm .bashrc; cp /usr/share/skel/.bashrc .
+	cd /var/home/root; rm .bashrc; cp /usr/share/skel/.bashrc .
 	# Server can only be x86.  I haven't had access to another platform with video hardware support + enough number crunching power to do the task.
 	# Generate RPM Container overlay
 	# Set my pretty hostname
@@ -93,6 +96,7 @@ WantedBy=multi-user.target" > /etc/containers/systemd/etcd-quadlet.container
 	echo -e "[Unit]
 Description=Install Dependencies
 ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+ConditionPathExists=!/var/pxe.complete
 After=multi-user.target
 [Service]
 Type=oneshot
@@ -104,6 +108,7 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_depends.servic
 	echo -e "[Unit]
 Description=Install PXE support
 ConditionPathExists=/var/wavelet_depends.complete
+ConditionPathExists=!/var/pxe.complete
 After=multi-user.target
 [Service]
 Type=oneshot

@@ -196,15 +196,15 @@ find /var/home/wavelet/http/ -type f -print0 | xargs -0 chmod 644
 find /var/home/wavelet/http-php/ -type f -print0 | xargs -0 chmod 644
 echo -e "\nPXE bootable images completed and populated in http serverdir, client provisioning should now be available..\n"
 touch /var/pxe.complete
-# we disable the service so it won't attempt to start on next boot
-systemctl disable wavelet_install_pxe.service 
 
 # Check to see if the security layer is enabled, if not, we are done and should reboot..
 if [[ -f /var/prod.security/enabled ]]; then
 	systemctl start wavelet_install_hardening.service
 	exit 0
 else
-	# Start build_ug
+	# Start build_ug then restart getty@tty1 to reload UI.
 	systemctl --user -M wavelet@ daemon-reload
 	systemctl --user -M wavelet@ enable build_ug.service --now
+	sleep 10
+	systemctl restart getty@tty1
 fi
