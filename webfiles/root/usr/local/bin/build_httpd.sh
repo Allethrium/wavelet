@@ -62,4 +62,4 @@ fail(){
 #set -x
 exec >/var/home/wavelet/logs/build_httpd.log 2>&1
 
-newmethod
+newMethod
