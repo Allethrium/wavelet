@@ -36,8 +36,9 @@ RestartSec=5
 [Install]
 # Start by default on boot
 WantedBy=default.target" > /home/wavelet/.config/containers/systemd/httpd.container
-	echo -e "\nApache Podman container generated, service has been enabled in systemd, and will start on next reboot.\n"
+	echo -e "\nApache Podman container generated, service has been enabled in systemd, starting service now..\n"
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "SERVER_HTTP_BOOTSTRAP_COMPLETED" "1"
+	systemctl --user start httpd.service
 	# populate necessary files for decoder spinup
 	cp /usr/local/bin/UltraGrid.AppImage /home/wavelet/http/
 	cp /home/wavelet/setup/wavelet-files.tar.xz /home/wavelet/http/ignition/
