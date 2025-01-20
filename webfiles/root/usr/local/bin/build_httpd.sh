@@ -11,6 +11,7 @@ newMethod(){
 
 	# Generate Quadlet - default is NOT secure and the config file would be overwritten by wavelet_install_hardening.sh
 	# ref https://hub.docker.com/_/httpd
+	mkdir -p /home/wavelet/.config/containers/systemd/
 	echo -e "[Unit]
 Description=HTTPD Quadlet
 After=local-fs.target
