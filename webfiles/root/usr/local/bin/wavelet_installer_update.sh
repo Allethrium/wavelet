@@ -41,6 +41,9 @@ event_server(){
 	# Ensure bashrc and profile have compatible filenames for decoder ignition
 	mv /var/home/wavelet/http/ignition/.bashrc /var/home/wavelet/http/ignition/skel_bashrc.txt
 	mv /var/home/wavelet/http/ignition/.bash_profile /var/home/wavelet/http/ignition/skel_profile.txt
+	cp /var/home/wavelet/setup/wavelet-git/webfiles/root/usr/local/bin/{wavelet_install_client.sh,wavelet_installer_xf.sh} /var/home/wavelet/http/ignition
+	cp /var/home/wavelet/setup/wavelet-git/ignition_files/{automated_coreos_deployment.sh} /var/home/wavelet/http/ignition
+	echo "Note we currently don't regenerate the client ignition files in this process.  TBD."
 	restorecon -Rv /var/home/wavelet/http
 }
 
