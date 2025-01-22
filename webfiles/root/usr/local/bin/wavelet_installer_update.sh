@@ -102,13 +102,14 @@ generate_tarfiles(){
 	cd /var/home/wavelet
 	echo "Removing old archive.."
 	rm -rf wavelet-files.tar.xz
+	tar -cJf etc.tar.xz --ownder=root:0 -C /var/home/wavelet/wavelet-git/webfiles/root/etc .
 	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /var/home/wavelet/wavelet-git/webfiles/root/usr/local/bin/ .
 	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /var/home/wavelet/wavelet-git/webfiles/root/home/wavelet/ .
 	echo -e "Packaging files together.."
 	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz}
 	echo -e "Done."
 	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz}
-	setfactl -b wavelet-files.tar.xz
+	setfacl -b wavelet-files.tar.xz
 }
 
 
