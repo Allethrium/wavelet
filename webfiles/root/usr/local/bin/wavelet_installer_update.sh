@@ -30,7 +30,7 @@ event_server(){
 	# The server requires some additional steps.
 	install_wavelet_modules
 	# Update with the server hostname - no other device should be doing network sense.
-	sed -i "s/hostnamegoeshere/$(UG_HOSTNAME)/g" /usr/local/bin/wavelet_network_sense.sh
+	sed -i "s/hostnamegoeshere/${UG_HOSTNAME}/g" /usr/local/bin/wavelet_network_sense.sh
 	FILES=("/var/home/wavelet/wavelet-files.tar.xz" \
 		"/usr/local/bin/wavelet_install_client.sh" \
 		"/usr/local/bin/wavelet_installer_xf.sh" \
