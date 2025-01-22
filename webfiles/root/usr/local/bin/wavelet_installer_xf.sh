@@ -159,6 +159,7 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_hardening.serv
 	     nameserver	${gateway}
 	     # quad9 as fallback
 	     nameserver	9.9.9.9" > /etc/resolv.conf
+	systemctl daemon-reload; systemctl restart dbus.service
 	systemctl enable dnsmasq.service --now
 	systemctl enable wavelet_install_depends.service
 	touch /var/no.wifi
