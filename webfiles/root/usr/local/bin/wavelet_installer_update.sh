@@ -31,7 +31,7 @@ event_server(){
 	install_wavelet_modules
 	# Update with the server hostname - no other device should be doing network sense.
 	sed -i "s/hostnamegoeshere/${hostNameSys}/g" /usr/local/bin/wavelet_network_sense.sh
-	FILES=("/var/home/wavelet/wavelet-files.tar.xz" \
+	FILES=("/var/home/wavelet/setup/wavelet-files.tar.xz" \
 		"/usr/local/bin/wavelet_install_client.sh" \
 		"/usr/local/bin/wavelet_installer_xf.sh" \
 		"/etc/skel/.bashrc" \
@@ -99,16 +99,16 @@ install_wavelet_modules(){
 
 generate_tarfiles(){
 	echo -e "\nGenerating tar.xz files for upload to distribution server.."
-	cd /var/home/wavelet
+	cd /var/home/wavelet/setup
 	echo "Removing old archive.."
 	rm -rf wavelet-files.tar.xz
+	echo -e "Packaging files together.."
 	tar -cJf etc.tar.xz --owner=root:0 -C /var/home/wavelet/wavelet-git/webfiles/root/etc/ .
 	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /var/home/wavelet/wavelet-git/webfiles/root/usr/local/bin/ .
 	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /var/home/wavelet/wavelet-git/webfiles/root/home/wavelet/ .
-	echo -e "Packaging files together.."
-	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz}
+	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz,etc.tar.xz}
 	echo -e "Done."
-	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz}
+	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz,etc.tar.xz}
 	setfacl -b wavelet-files.tar.xz
 }
 
