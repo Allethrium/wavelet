@@ -307,10 +307,10 @@ for_window [window_type="menu"] floating enable
 for_window [instance="file_progress"]  sticky enable
 for_window [class="info|Mate-color-select|gcolor2|timesup|QtPass|GtkFileChooserDialog"] sticky enable
 
-exec foot; 
-exec foot -e journalctl -f;
 exec_always cat /proc/acpi/button/lid/LID/state | awk '{print $2}' | grep -q 'closed' && swaymsg output eDP-1 disable
 
+# Start a journalctl window
+exec foot -e journalctl -f;
 # Start build_ug.service
 exec systemctl --user start build_ug.service
 

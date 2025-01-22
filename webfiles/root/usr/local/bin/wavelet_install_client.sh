@@ -88,7 +88,7 @@ exec > /var/home/wavelet/logs/client_installer.log 2>&1
 # Runs first because it doesn't matter what kind of server/client device, it'll need this.
 groupadd -fg 84 avahi && useradd -c "Avahi Daemon Owner" -d /run/avahi-daemon -u 84 -g avahi -s /bin/false avahi
 groupadd -fg 86 netdev
-systemctl enable avai-daemon.service --now
+systemctl enable avahi-daemon.service --now
 extract_base
 extract_home
 extract_usrlocalbin
@@ -98,7 +98,7 @@ chown -R wavelet:wavelet /var/home/wavelet
 # Disable self so we don't run again on the next boot.
 systemctl set-default graphical.target
 touch /var/client_install.complete
-systemctl --user -M wavelet@ daemon-reload
-systemctl --user -M wavelet@ enable build_ug.service --now
+#systemctl --user -M wavelet@ daemon-reload
+#systemctl --user -M wavelet@ enable build_ug.service --now
 sleep 10
 systemctl restart getty@tty1
