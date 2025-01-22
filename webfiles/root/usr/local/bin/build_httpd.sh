@@ -41,7 +41,7 @@ WantedBy=default.target" > /home/wavelet/.config/containers/systemd/httpd.contai
 	systemctl --user daemon-reload; systemctl --user start httpd.service
 	# populate necessary files for decoder spinup
 	cp /usr/local/bin/UltraGrid.AppImage /home/wavelet/http/
-	cp /home/wavelet/setup/wavelet-files.tar.xz /home/wavelet/http/ignition/
+	cp /var/home/wavelet/setup/wavelet-files.tar.xz /home/wavelet/http/ignition/
 	cp /usr/local/bin/wavelet_installer_xf.sh /home/wavelet/http/ignition/
 	cp /home/wavelet/.bashrc /home/wavelet/http/ignition/skel_bashrc.txt
 	cp /home/wavelet/.bash_profile /home/wavelet/http/ignition/skel_profile.txt

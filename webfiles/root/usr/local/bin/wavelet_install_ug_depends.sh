@@ -117,7 +117,7 @@ generate_tarfiles(){
 	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /var/home/wavelet/setup/wavelet-git/webfiles/root/home/wavelet/ .
 	tar -cJf etc.tar.xz --owner=root:0 -C /var/home/wavelet/setup/wavelet-git/webfiles/root/etc .
 	echo -e "Packaging files together.."
-	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz,etcd.tar.xz}
+	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz,etc.tar.xz}
 	echo -e "Done."
 }
 extract_base(){

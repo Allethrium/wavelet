@@ -6,7 +6,7 @@
 extract_base(){
 	# Moves tar files to their target directories
 	cd /var/home/wavelet/setup
-	tar xf /home/wavelet/setup/wavelet-files.tar.xz -C /home/wavelet/setup --no-same-owner
+	tar xf /var/home/wavelet/setup/wavelet-files.tar.xz -C /home/wavelet/setup --no-same-owner
 	mv ./usrlocalbin.tar.xz /usr/local/bin/; mv ./etc.tar.xz /etc; mv ./wavelethome.tar.xz ../
 }
 extract_etc(){
