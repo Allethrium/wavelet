@@ -11,7 +11,8 @@ extract_base(){
 }
 extract_etc(){
 	umask 022
-	tar xf /etc/etc.tar.xz -C /etc --no-same-owner --no-same-permissions
+	cd /var/home/wavelet/setup
+	tar xf /var/home/wavelet/etc.tar.xz -C /etc --no-same-owner --no-same-permissions
 	echo -e "System config files setup successfully..\n"
 	rm -rf /etc/etc.tar.xz
 }
