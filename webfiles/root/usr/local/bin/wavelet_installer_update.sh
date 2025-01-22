@@ -110,6 +110,7 @@ generate_tarfiles(){
 	echo -e "Done."
 	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz,etc.tar.xz}
 	setfacl -b wavelet-files.tar.xz
+	cp wavelet-files.tar.xz /var/home/wavelet/http/ignition/wavelet-files.tar.xz
 }
 
 
