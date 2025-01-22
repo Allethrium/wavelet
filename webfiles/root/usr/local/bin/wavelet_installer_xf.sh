@@ -317,6 +317,7 @@ ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_client.sh'
 [Install]
 WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
 	echo -e "Client install service will run on next reboot to populate wavelet modules and configure networking."
+	touch /var/firstboot.complete.target
 	systemctl daemon-reload
 	systemctl enable wavelet_install_client.service
 	# Start decoderhostname which will set a unique client name
