@@ -313,6 +313,7 @@ Wants=network-online.target
 After=multi-user.target network-online.target
 [Service]
 Type=oneshot
+ExecStartPre=/usr/bin/bash -c 'sleep 5'
 ExecStartPre=/usr/bin/bash -c 'curl -o /usr/local/bin/wavelet_install_client.sh http://192.168.1.32:8080/ignition/wavelet_install_client.sh && chmod 0755 /usr/local/bin/wavelet_install_client.sh'
 ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_client.sh'
 [Install]
