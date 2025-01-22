@@ -6,28 +6,27 @@
 extract_base(){
 	# Moves tar files to their target directories
 	cd /var/home/wavelet/setup
-	tar xf /var/home/wavelet/setup/wavelet-files.tar.xz -C /home/wavelet/setup --no-same-owner
-	mv ./usrlocalbin.tar.xz /usr/local/bin/; mv ./etc.tar.xz /etc; mv ./wavelethome.tar.xz ../
+	tar xf /var/home/wavelet/setup/wavelet-files.tar.xz -C /var/home/wavelet/setup --no-same-owner
 }
 extract_etc(){
 	umask 022
 	cd /var/home/wavelet/setup
-	tar xf /var/home/wavelet/etc.tar.xz -C /etc --no-same-owner --no-same-permissions
+	tar xf /var/home/wavelet/setup/etc.tar.xz -C /etc --no-same-owner --no-same-permissions
 	echo -e "System config files setup successfully..\n"
-	rm -rf /etc/etc.tar.xz
+	rm -rf /var/home/wavelet/setup/etc.tar.xz
 }
 extract_home(){
-	tar xf /var/home/wavelet/wavelethome.tar.xz -C /var/home/wavelet
+	tar xf /var/home/wavelet/setup/wavelethome.tar.xz -C /var/home/wavelet
 	echo -e "Wavelet homedir setup successfully..\n"
-	rm -rf /var/home/wavelet/wavelethome.tar.xz
+	rm -rf /var/home/wavelet/setup/wavelethome.tar.xz
 }
 extract_usrlocalbin(){
 	umask 022
-	tar xf /usr/local/bin/usrlocalbin.tar.xz -C /usr/local/bin --no-same-owner
+	tar xf /var/home/wavelet/setup/usrlocalbin.tar.xz -C /usr/local/bin --no-same-owner
 	chmod +x /usr/local/bin
 	chmod -R 0755 /usr/local/bin/
 	echo -e "Wavelet application modules setup successfully..\n"
-	rm -rf /usr/local/bin/usrlocalbin.tar.xz
+	rm -rf /var/home/wavelet/setup/usrlocalbin.tar.xz
 }
 install_security_layer(){
 	# This function checks for the presence of the security layer flag, and if it exists we run domain enrollment
