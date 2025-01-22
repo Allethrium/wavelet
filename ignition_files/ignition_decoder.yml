@@ -382,7 +382,6 @@ storage:
           Wants=network-online.target sway-session.target
           [Service]
           Type=oneshot
-          ExecStartPre=/usr/local/bin/wavelet_check_dependencies.sh
           ExecStart=/usr/local/bin/build_ug.sh
           [Install]
           WantedBy=sway-session.target
