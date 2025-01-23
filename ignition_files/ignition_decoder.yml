@@ -61,11 +61,11 @@ storage:
       contents:
         source: http://192.168.1.32:8080/ignition/wavelet_installer_xf.sh
     # Client installer module
-    - path: /usr/local/bin/wavelet_client_installer.sh
+    - path: /usr/local/bin/wavelet_install_client.sh
       mode: 0755
       overwrite: true
       contents:
-        source: http://192.168.1.32:8080/ignition/wavelet_client_installer.sh
+        source: http://192.168.1.32:8080/ignition/wavelet_install_client.sh
     # Decoderhostname module
     - path: /usr/local/bin/decoderhostname.sh
       mode: 0755
