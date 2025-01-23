@@ -40,7 +40,7 @@ WantedBy=default.target" > /home/wavelet/.config/containers/systemd/httpd.contai
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "SERVER_HTTP_BOOTSTRAP_COMPLETED" "1"
 	systemctl --user daemon-reload; systemctl --user start httpd.service
 	# populate necessary files for decoder spinup
-	cp /usr/local/bin/{wavelet_install_client.sh,decoderhostname.sh,connectwifi.sh,wavelet_installer_xf.sh} /var/home/wavelet/http/ignition/
+	cp /usr/local/bin/{UltraGrid.AppImage,wavelet_install_client.sh,decoderhostname.sh,connectwifi.sh,wavelet_installer_xf.sh} /var/home/wavelet/http/ignition/
 	cp /var/home/wavelet/setup/wavelet-files.tar.xz /home/wavelet/http/ignition/
 	cp /home/wavelet/.bashrc /home/wavelet/http/ignition/skel_bashrc.txt
 	cp /home/wavelet/.bash_profile /home/wavelet/http/ignition/skel_profile.txt

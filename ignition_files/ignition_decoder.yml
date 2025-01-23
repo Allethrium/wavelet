@@ -40,6 +40,7 @@ storage:
     - path: /var/prod.security.disabled
       mode: 0644
       contents:
+      overwrite: true
         inline: |
           Flag tells wavelet to utilize security layer on setup.
     # UltraGrid AppImage
