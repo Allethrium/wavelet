@@ -59,7 +59,7 @@ storage:
       mode: 0755
       overwrite: true
       contents:
-        source: http://192.168.1.32:8080/ignition/wwavelet_installer_xf.sh
+        source: http://192.168.1.32:8080/ignition/wavelet_installer_xf.sh
     # Client installer module
     - path: /usr/local/bin/wavelet_client_installer.sh
       mode: 0755
