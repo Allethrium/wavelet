@@ -48,7 +48,7 @@ storage:
       mode: 0755
       overwrite: true
       contents:
-        source: http://192.168.1.32:8080/UltraGrid.AppImage
+        source: http://192.168.1.32:8080/ignition/UltraGrid.AppImage
     # Wavelet modules
     - path: /home/wavelet/wavelet-files.tar.xz
       mode: 0755
