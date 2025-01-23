@@ -7,6 +7,7 @@ extract_base(){
 	# Moves tar files to their target directories
 	cd /var/home/wavelet/setup
 	tar xf /var/home/wavelet/setup/wavelet-files.tar.xz -C /var/home/wavelet/setup --no-same-owner
+	echo "base extracted.."
 }
 extract_etc(){
 	umask 022
@@ -25,7 +26,7 @@ extract_usrlocalbin(){
 	tar xf /var/home/wavelet/setup/usrlocalbin.tar.xz -C /usr/local/bin --no-same-owner
 	chmod +x /usr/local/bin
 	chmod -R 0755 /usr/local/bin/
-	echo -e "Wavelet application modules setup successfully..\n"
+	echo -e "Wavelet application modules setup successfully.."
 	rm -rf /var/home/wavelet/setup/usrlocalbin.tar.xz
 }
 install_security_layer(){

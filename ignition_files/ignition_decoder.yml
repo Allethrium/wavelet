@@ -55,7 +55,7 @@ storage:
       contents:
         source: http://192.168.1.32:8080/ignition/wavelet-files.tar.xz
     # Setup module for first boot and ostree layer
-    - path: /usr/local/bin/wavelet_installer_xf.sh
+    - path: /var/home/wavelet/setup/wavelet-files.tar.xz
       mode: 0755
       overwrite: true
       contents:
@@ -72,6 +72,12 @@ storage:
       overwrite: true
       contents:
         source: http://192.168.1.32:8080/ignition/decoderhostname.sh
+    # Connectwifi module
+    - path: /usr/local/bin/connectwifi.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/connectwifi.sh
     # Sets hostname (set randomly after bootstrap process completes.
     # Any decoder can be promoted to another device by manually changing hostname
     - path: /etc/hostname

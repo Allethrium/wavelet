@@ -72,10 +72,10 @@ check_label(){
 	KEYNAME="/hostHash/${hostNameSys}/relabel_active"; KEYVALUE="1"; write_etcd_global
 	KEYNAME="/${hostNameSys}/Hash"; read_etcd_global; myHostHash="${printvalue}"
 	echo -e "My hash is ${myHostHash}, attempting to find a my new device label..\n"
-	KEYNAME="/hostHash/${myHostHash}/newHostLabel"; read_etcd_global; myNewHostLabel="${printvalue}"
+	KEYNAME="/${hostNameSys}/hostNamePretty"; read_etcd_global; myNewHostLabel="${printvalue}"
 	echo -e "My *New* host label is ${myNewHostLabel}!\n"
 	if [[ "${hostNamePretty}" == "${myNewHostLabel}" ]]; then
-		echo -e "New label and current Pretty hostname are identical, doing nothing..\n"
+		echo -e "New label and current Pretty hostname are identical, setting flag to 0 and doing nothing..\n"
 		KEYNAME="/hostHash/${hostNamePretty}/relabel_active"; KEYVALUE="0"; write_etcd_global
 		exit 0
 	else
@@ -151,10 +151,6 @@ set_newHostName(){
 }
 
 event_hostNameChange() {
-	# Check to see if hostname has changed since last session
-	if [[ -f /home/wavelet/oldLabel.txt ]]; then
-			check_hostname
-	fi
 	KEYNAME="/${hostNameSys}/RELABEL"; read_etcd_global
 	if [[ "${printvalue}" -eq "0" ]]; then
 		echo -e "Relabel task bit for this hostname is set to 0, doing nothing.."
