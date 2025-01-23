@@ -48,18 +48,30 @@ storage:
       overwrite: true
       contents:
         source: http://192.168.1.32:8080/UltraGrid.AppImage
-    # Client installer module
-    - path: /usr/local/bin/wavelet_install_client.sh
-      mode: 0755
-      overwrite: true
-      contents:
-        source: http://192.168.1.32:8080/ignition/wavelet_install_client.sh
-    # Wavelet modules package
-    - path: /var/home/wavelet/setup/wavelet-files.tar.xz
+    # Wavelet modules
+    - path: /home/wavelet/wavelet-files.tar.xz
       mode: 0755
       overwrite: true
       contents:
         source: http://192.168.1.32:8080/ignition/wavelet-files.tar.xz
+    # Setup module for first boot and ostree layer
+    - path: /usr/local/bin/wavelet_installer_xf.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/wwavelet_installer_xf.sh
+    # Client installer module
+    - path: /usr/local/bin/wavelet_client_installer.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/wavelet_client_installer.sh
+    # Decoderhostname module
+    - path: /usr/local/bin/decoderhostname.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/decoderhostname.sh
     # Sets hostname (set randomly after bootstrap process completes.
     # Any decoder can be promoted to another device by manually changing hostname
     - path: /etc/hostname
@@ -254,18 +266,6 @@ storage:
         inline: |
           ACTION=="add", ENV{ID_BUS}=="usb", SUBSYSTEM=="usb", RUN+="/usr/local/bin/udev_call.sh"
           ACTION=="remove", ENV{ID_BUS}=="usb", SUBSYSTEM=="usb", RUN+="/usr/local/bin/udev_call.sh removed"
-    # Remainder files to be served from a previously configured Wavelet server.
-    - path: /home/wavelet/wavelet-files.tar.xz
-      mode: 0755
-      overwrite: true
-      contents:
-        source: http://192.168.1.32:8080/ignition/wavelet-files.tar.xz
-    # Setup script for RPMFusion depends
-    - path: /usr/local/bin/wavelet_installer_xf.sh
-      mode: 0755
-      overwrite: true
-      contents:
-        source: http://192.168.1.32:8080/ignition/wavelet_installer_xf.sh
     # We don't want rolling updates enabled via Zincati, as this is an offline appliance
     - path: /etc/sudoers.d/hostnamectl
       mode: 0644
@@ -476,7 +476,7 @@ systemd:
           After=network-online.target check_and_wait.target
           [Service]
           Type=oneshot
-          ExecStart=-/usr/local/bin/decoderhostname.sh
+          ExecStart=/usr/local/bin/decoderhostname.sh
           [Install]
           WantedBy=default.target
     # Reboot service
