@@ -48,19 +48,19 @@ event_server(){
 }
 
 extract_base(){
-	tar xf /var/home/wavelet/wavelet-files.tar.xz -C /home/wavelet --no-same-owner
+	tar xf /var/home/wavelet/setup/wavelet-files.tar.xz -C /home/wavelet --no-same-owner
 	cd /var/home/wavelet
 	mv ./usrlocalbin.tar.xz /usr/local/bin/
 }
 
 extract_etc(){
 	umask 022
-	tar xf /etc/etc.tar.xz -C /etc --no-same-owner --no-same-permissions
+	tar xf /var/home/wavelet/setup/etc.tar.xz -C /etc --no-same-owner --no-same-permissions
 	echo -e "System config files setup successfully..\n"
 }
 
 extract_home(){
-	tar xf /var/home/wavelet/wavelethome.tar.xz -C /home/wavelet
+	tar xf /var/home/wavelet/setup/wavelethome.tar.xz -C /home/wavelet
 	chown -R wavelet:wavelet /home/wavelet
 	chmod 0755 /var/home/wavelet/http
 	chmod -R 0755 /var/home/wavelet/http-php
@@ -69,7 +69,7 @@ extract_home(){
 
 extract_usrlocalbin(){
 	umask 022
-	tar xf /usr/local/bin/usrlocalbin.tar.xz -C /usr/local/bin --no-same-owner
+	tar xf /var/home/wavelet/setup/usrlocalbin.tar.xz -C /usr/local/bin --no-same-owner
 	chmod +x /usr/local/bin
 	chmod 0755 /usr/local/bin/*
 	echo -e "Wavelet application modules setup successfully..\n"
@@ -84,10 +84,10 @@ install_wavelet_modules(){
 	fi
 	GH_REPO="https://github.com/Allethrium/wavelet"
 	# Git complains about the directory already existing so we'll just work in a tmpdir for now..
-	rm -rf /var/home/wavelet/wavelet-git
-	mkdir -p /var/home/wavelet/wavelet-git
+	rm -rf /var/home/wavelet/setup/wavelet-git
+	mkdir -p /var/home/wavelet/setup/wavelet-git
 	echo -e "\nCommand is; ${gitcommand} clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/wavelet-git\n"
-	git clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/wavelet-git && echo -e "Cloning git repository..\n"
+	git clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/setup/wavelet-git && echo -e "Cloning git repository..\n"
 	generate_tarfiles
 	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
 	extract_base
@@ -106,14 +106,14 @@ generate_tarfiles(){
 	echo "Removing old archive.."
 	rm -rf wavelet-files.tar.xz
 	echo -e "Packaging files together.."
-	tar -cJf etc.tar.xz --owner=root:0 -C /var/home/wavelet/wavelet-git/webfiles/root/etc/ .
-	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /var/home/wavelet/wavelet-git/webfiles/root/usr/local/bin/ .
-	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /var/home/wavelet/wavelet-git/webfiles/root/home/wavelet/ .
+	tar -cJf etc.tar.xz --owner=root:0 -C /var/home/wavelet/setup/wavelet-git/webfiles/root/etc/ .
+	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /var/home/wavelet/setup/wavelet-git/webfiles/root/usr/local/bin/ .
+	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /var/home/wavelet/setup/wavelet-git/webfiles/root/home/wavelet/ .
 	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz,etc.tar.xz}
 	echo -e "Done."
 	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz,etc.tar.xz}
 	setfacl -b wavelet-files.tar.xz
-	cp wavelet-files.tar.xz /var/home/wavelet/http/ignition/wavelet-files.tar.xz
+	cp wavelet-files.tar.xz /var/home/wavelet/setup/http/ignition/wavelet-files.tar.xz
 }
 
 
