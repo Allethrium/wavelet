@@ -504,17 +504,8 @@ event_generateHash(){
 			# Link the "pretty" hostname to the stable system hostname
 			KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
 		else
-			echo -e "Hash value exists as /hostHash/${hashExists}\n"
-			echo -e "This means the device is already populated, or has not been removed cleanly. Checking to see if we've been relabeled.."
-			KEYNAME="/${hostNameSys}/RECENT_RELABEL"; read_etcd_global
-			if [[ "${printvalue}" == "1" ]]; then
-				echo -e "This device was recently relabeled!  Clearing hash and running this function again..\n"
-				KEYNAME="/${hostNameSys}/RECENT_RELABEL"; KEYVALUE="0"; write_etcd_global
-				KEYNAME="/hostHash/${hostHash}"; delete_etcd_key_global
-				event_generateHash ${hashType}
-			else
-				echo -e "Device has not been relabeled, performing no further action."
-			fi
+			echo -e "Hash value exists as /hostHash/${hashExists}"
+			echo -e "Device already populated, taking no further action."
 		fi
 }
 event_device_redetect(){
