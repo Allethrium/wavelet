@@ -29,6 +29,7 @@ extract_usrlocalbin(){
 	echo -e "Wavelet application modules setup successfully.."
 	rm -rf /var/home/wavelet/setup/usrlocalbin.tar.xz
 }
+
 install_security_layer(){
 	# This function checks for the presence of the security layer flag, and if it exists we run domain enrollment
 	if [[ -f /var/prod.security.enabled ]]; then
@@ -68,7 +69,14 @@ install_security_layer(){
 	fi
 }
 
-
+setup_deprovision_service(){
+	# Service calls a module which destroys the host and will remove from domain if the security layer is enabled
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/%H/DEPROVISION" 0 0 "wavelet_deprovision"
+	# Move to system folder
+	mv /home/wavelet/.config/systemd/user/${waveletModule}.service /etc/systemd/system
+	systemctl daemon-reload
+	systemctl start wavelet_deprovision.service --now
+}
 
 ####
 #
@@ -95,6 +103,7 @@ extract_home
 extract_usrlocalbin
 extract_etc
 install_security_layer
+setup_deprovision_service
 chown -R wavelet:wavelet /var/home/wavelet
 # Disable self so we don't run again on the next boot.
 systemctl set-default graphical.target
