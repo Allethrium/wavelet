@@ -50,13 +50,13 @@ event_server(){
 extract_base(){
 	tar xf /var/home/wavelet/setup/wavelet-files.tar.xz -C /home/wavelet/setup --no-same-owner
 	cd /var/home/wavelet
-	mv ./usrlocalbin.tar.xz /usr/local/bin/
 }
 
 extract_etc(){
 	umask 022
 	tar xf /var/home/wavelet/setup/etc.tar.xz -C /etc --no-same-owner --no-same-permissions
 	echo -e "System config files setup successfully..\n"
+	rm -rf /var/home/wavelet/setup/etcd.tar.xz
 }
 
 extract_home(){
@@ -65,6 +65,7 @@ extract_home(){
 	chmod 0755 /var/home/wavelet/http
 	chmod -R 0755 /var/home/wavelet/http-php
 	echo -e "Wavelet homedir setup successfully..\n"
+	rm -rf /var/home/wavelet/setup/wavelethome.tar.xz
 }
 
 extract_usrlocalbin(){
@@ -73,6 +74,7 @@ extract_usrlocalbin(){
 	chmod +x /usr/local/bin
 	chmod 0755 /usr/local/bin/*
 	echo -e "Wavelet application modules setup successfully..\n"
+    rm -rf /var/home/wavelet/setup/usrlocalbin.tar.xz
 }
 
 install_wavelet_modules(){
