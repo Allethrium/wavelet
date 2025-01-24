@@ -152,7 +152,7 @@ generate_server_args(){
 	# Set network devices
 	# Index starts at 3 for netDevs
 	declare -A networkInputs=()
-	KEYNAME="/network_uv_stream_command/"; read_etcd_prefix_global;
+	KEYNAME="/network_uv_stream_command/"; read_etcd_prefix;
 	if [[ ${printvalue} == "" ]]; then
 		echo "Array is empty, no network devices."
 		:
