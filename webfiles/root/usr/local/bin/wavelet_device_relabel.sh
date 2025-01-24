@@ -134,6 +134,9 @@ event_prefix_set(){
 		fi
 	KEYNAME="/hostLabel/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/type"; write_etcd_global
+	# Sleep for two seconds and then issue a device reboot
+	sleep 2
+	systemctl reboot -i
 }
 
 set_newHostName(){
@@ -142,7 +145,7 @@ set_newHostName(){
 		echo -e "\nHost Name set as ${myNewHostName} successfully!, writing relabel_active to 0."
 		KEYNAME="/hostHash/${hostNameSys}/relabel_active"; KEYVALUE="0";	write_etcd_global
 		KEYNAME="/${hostNameSys}/RECENT_RELABEL";	KEYVALUE="1"; 			write_etcd_global
-		/usr/local/bin/build_ug.sh
+		echo "Done, no further actions needed."
 	else
 		echo -e "\n Hostname change command failed, please check logs\n"
 		exit 1
