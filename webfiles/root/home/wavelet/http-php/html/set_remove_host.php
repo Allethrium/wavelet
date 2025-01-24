@@ -62,6 +62,7 @@ function delete_host_state($key) {
 	}
 }
 function delete_host_label($key) {
+	$key = substr($key, 0, strpos($key, "."));
 	$prefixstring = "/hostLabel/$key";
 	$prefixstringplusOne = "$prefixstring" . "0";
 	$keyPrefix=base64_encode($prefixstring);
