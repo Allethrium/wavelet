@@ -332,5 +332,7 @@ read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] 
 
 customization
 
+echo "Removing old ignition files.."
+rm -rf ignition/*.ign
 echo -e "Calling coreos_installer.sh to generate ISO images.  You will then need to burn them to USB/SD cards."
 ./coreos_installer.sh "${developerMode}" "${isoMode}"
