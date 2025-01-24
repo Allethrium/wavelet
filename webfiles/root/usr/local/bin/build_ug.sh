@@ -500,10 +500,9 @@ event_generateHash(){
 			KEYNAME="/hostHash/${hostNameSys}/Hash"; KEYVALUE="${hostHash}"; write_etcd_global
 			KEYNAME="/${hostNameSys}/Hash"; write_etcd_global
 			KEYNAME="/hostHash/${hostHash}"; KEYVALUE="${hostNameSys}"; write_etcd_global
-			KEYNAME="/hostHash/${hostNameSys}/label"; write_etcd_global
+			KEYNAME="/hostHash/${hostNameSys}/label"; KEYVALUE="${hostNamePretty}"; write_etcd_global
 			# Link the "pretty" hostname to the stable system hostname
 			KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
-			#KEYNAME="/hostLabels/${hostNamePretty}"; KEYVALUE=${hostNameSys}; write_etcd_global
 		else
 			echo -e "Hash value exists as /hostHash/${hashExists}\n"
 			echo -e "This means the device is already populated, or has not been removed cleanly. Checking to see if we've been relabeled.."
@@ -558,7 +557,7 @@ event_connectwifi(){
 	networkUUID=$(cat /var/home/wavelet/config/wifi.*.key)
 	# Set autoconnection again and ensure wifi is up
 	# Attempt to connect to the configured wifi before proceeding
-	if nmcli con up $(cat /var/home/wavelet/wifi_ssid); then
+	if nmcli con up $(cat /var/home/wavelet/config/wifi_ssid); then
 		echo "Configured connection established, continuing."
 		# We'll use this flag for future UI improvements to help determine if a host is wired or wireless
 		KEYNAME="/${hostNameSys}/WIFI"; KEYVALUE="1"; write_etcd_global
