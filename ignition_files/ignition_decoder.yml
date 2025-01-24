@@ -108,6 +108,17 @@ storage:
       overwrite: true
       contents:
         source: http://192.168.1.32:8080/ignition/skel_profile.txt
+    # Root user bashrc
+    - path: /root/.bashrc
+      mode: 0644
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/skel_bashrc.txt
+    - path: /root/.bash_profile
+      mode: 0644
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/skel_profile.txt
     # PolKit entries for systemd services the wavelet user is allowed to manage
     # SystemD unit control
     - path: /etc/polkit-1/rules.d/1337-wavelet.rules
