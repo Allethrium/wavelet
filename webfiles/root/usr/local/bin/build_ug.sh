@@ -594,15 +594,5 @@ until [[ $(/usr/local/bin/wavelet_etcd_interaction.sh "check_status" | awk '{pri
 	fi
 done
 
-while [[ $# -gt 0 ]] && [[ "$1" == "--"* ]] ;do
-  opt="$1";
-    shift;              #expose next argument
-    case "$opt" in
-    	"--R")			echo >&2 "Host has had a new pretty hostname set via Wavelet Label.. continuing"; set_pretty
-		;;
-        *)				echo >&2 "Invalid option: $@"; exit 1
-		;;
-   esac
-done
 
 detect_self
