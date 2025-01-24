@@ -56,4 +56,10 @@ exec > "${logName}" 2>&1
 
 hostNameSys=$(hostname)
 hostNamePretty=$(hostnamectl --pretty)
-event_deprovision
+
+if [[ $(hostname) = *"svr"* ]]; then
+	echo "Deprovisioning the server is not supported.  This should be done manually."
+	exit 0
+else
+	event_deprovision
+fi
