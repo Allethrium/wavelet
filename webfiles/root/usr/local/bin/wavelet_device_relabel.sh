@@ -105,7 +105,6 @@ set_newLabel(){
 		echo -e "Generated FQDN hostname as ${appendedHostName}\n"
 	fi
 	echo "${appendedHostName}" > newHostName.txt
-	KEYNAME="/hostHash/${myHostHash}"; delete_etcd_key_global
 	KEYNAME="/${hostNameSys}/RECENT_RELABEL"; KEYVALUE="1"; write_etcd_global
 	# Generate the necessary files, then reboot.
 	set_newHostName ${appendedHostName}
