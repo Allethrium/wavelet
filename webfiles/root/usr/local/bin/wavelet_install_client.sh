@@ -95,6 +95,9 @@ exec > /var/home/wavelet/logs/client_installer.log 2>&1
 
 # Fix AVAHI otherwise NDI won't function correctly, amongst other things;  https://www.linuxfromscratch.org/blfs/view/svn/basicnet/avahi.html
 # Runs first because it doesn't matter what kind of server/client device, it'll need this.
+# generate proper RC files for root/wavelet-root which gives us aliases and powerline
+cd /root; rm .bashrc .bash_profile; cp /etc/skel/{.bashrc,.bash_profile} .
+cd /var/home/wavelet-root; rm .bashrc .bash_profile; cp /etc/skel/{.bashrc,.bash_profile} .
 groupadd -fg 84 avahi && useradd -c "Avahi Daemon Owner" -d /run/avahi-daemon -u 84 -g avahi -s /bin/false avahi
 groupadd -fg 86 netdev
 systemctl enable avahi-daemon.service --now
