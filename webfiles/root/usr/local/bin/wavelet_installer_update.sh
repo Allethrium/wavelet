@@ -48,7 +48,7 @@ event_server(){
 }
 
 extract_base(){
-	tar xf /var/home/wavelet/setup/wavelet-files.tar.xz -C /home/wavelet --no-same-owner
+	tar xf /var/home/wavelet/setup/wavelet-files.tar.xz -C /home/wavelet/setup --no-same-owner
 	cd /var/home/wavelet
 	mv ./usrlocalbin.tar.xz /usr/local/bin/
 }
@@ -60,7 +60,7 @@ extract_etc(){
 }
 
 extract_home(){
-	tar xf /var/home/wavelet/setup/wavelethome.tar.xz -C /home/wavelet
+	tar xf /var/home/wavelet/setup/wavelethome.tar.xz -C /home/wavelet/
 	chown -R wavelet:wavelet /home/wavelet
 	chmod 0755 /var/home/wavelet/http
 	chmod -R 0755 /var/home/wavelet/http-php
