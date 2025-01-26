@@ -2,8 +2,8 @@
 # Attempts to find and join a Wavelet network if it's available
 
 get_full_bssid(){
-	sleep 3
-	wifibssid=$(nmcli -f BSSID device wifi | grep ${wifi_ap_mac} | head -n 1 | xargs)
+	sleep 2
+	wifibssid=$(nmcli -f BSSID device wifi | grep ${wifi_ap_mac^^} | head -n 1 | xargs)
 	echo ${wifibssid}
 }
 
@@ -37,7 +37,7 @@ connectwifi_psk(){
 	ifname=$(nmcli dev show | grep wifi -B1 | head -n 1 | awk '{print $2}')
 
 	# Keep scanning until we get a match on wifi_ap_mac
-	until get_full_bssid | grep -m 1 "${wifi_ap_mac}"; do
+	until get_full_bssid | grep -m 1 "${wifi_ap_mac^^}"; do
 		nmcli dev wifi rescan
 	done
 	# We need to do this once more, or the variable isn't populated.
