@@ -24,6 +24,7 @@ event_decoder(){
 	echo "All set, rebooting decoder.."
 	# Final step in the FIRST boot.
 	touch /var/firstboot.complete.target
+	sleep 1
 	systemctl reboot
 }
 
