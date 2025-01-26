@@ -18,12 +18,14 @@ connectwifi(){
 	if nmcli con up $(cat /var/home/wavelet/config/wifi_ssid); then
 		echo "Configured connection established, exiting."
 		exit 0
-	fi
-
-	if [[ -f /var/prod.security.enabled ]]; then
-		connectwifi_enterprise
 	else
-		connectwifi_psk
+		# Recreate the network
+		echo "An error has occurred, attempting to repopulate the wifi connection.."
+		if [[ -f /var/prod.security.enabled ]]; then
+			connectwifi_enterprise
+		else
+			connectwifi_psk
+		fi
 	fi
 }
 
