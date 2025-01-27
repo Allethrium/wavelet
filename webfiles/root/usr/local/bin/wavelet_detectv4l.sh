@@ -56,7 +56,7 @@ generate_service(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
 }
 
-sense_devices() {
+sense_devices_local() {
 	shopt -s nullglob
 	declare -a v4lArray=(/dev/v4l/by-id/*)
 	for index in "${!v4lArray[@]}" ; do
@@ -286,7 +286,7 @@ detect_self(){
 		;;
 		dec*)                                   echo -e "I am a Decoder\n"										;		exit 0
 		;;
-		svr*)                                   echo -e "I am a Server, allowing device sense to proceed.."		;		sense_devices
+		svr*)                                   echo -e "I am a Server, allowing device sense to proceed.."		;		sense_devices_local;	redetect_network_devices
 		;;
 		*)                                      echo -e "This device is other, ending process\n"				;		exit 0
 		;;
@@ -303,7 +303,7 @@ encoder_checkNetwork(){
 	ping -c 3 192.168.1.32
 	if [[ $? -eq 0 ]]; then
 		echo -e "Online and connected to Wavelet Server, continuing..\n"
-		sense_devices
+		sense_devices_local
 	else
 		echo -e "No network connection, device registration will be unsuccessful, sleeping for 5 seconds and trying again..\n"
 		sleep 5
@@ -312,6 +312,18 @@ encoder_checkNetwork(){
 	fi
 }
 
+redetect_network_devices(){
+	# Redetects network devices
+	echo -e "Redetecting network devices.  Ensuring DEVICE_REDETECT watcher service is temporarily disabled.."
+	systemctl --user disable wavelet_device_redetect.service --now
+	KEYNAME="DEVICE_REDETECT"; KEYVALUE="0"; write_etcd_global
+	for i in $(cat /var/lib/dnsmasq/dnsmasq.leases | awk '{print $3}'); do
+		echo "Probing IP Address: ${i}"
+		/usr/local/bin/wavelet_network_device.sh "--p" "${i}"
+	done
+	sleep 3
+	systemctl --user enable wavelet_device_redetect.service --now
+}
 
 #####
 #
@@ -319,21 +331,10 @@ encoder_checkNetwork(){
 #
 #####
 
+
+#set -x
+exec >/var/home/wavelet/logs/detectv4l.log 2>&1
 hostNameSys=$(hostname)
 hostNamePretty=$(hostnamectl --pretty)
-exec >/var/home/wavelet/logs/detectv4l.log 2>&1
-
-# Check RD flag set here, if it's on we need to reset the device_redetect global flag first.
-if [[ "${1}" = "RD" ]]; then
-	echo -e "Called by refresh devices, hanging watcher for two seconds whilst we reset the key.."
-	systemctl --user disable wavelet_device_redetect.service --now
-	KEYNAME="DEVICE_REDETECT"; KEYVALUE="0"; write_etcd_global
-	sleep 2
-	systemctl --user enable wavelet_device_redetect.service --now
-fi
-
 device_cleanup
-
-# check to see if I'm a server or an encoder
-echo -e "\n********Begin device detection and registration process...********"
 detect_self
