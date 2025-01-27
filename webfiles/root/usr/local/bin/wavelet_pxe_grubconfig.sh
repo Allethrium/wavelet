@@ -49,7 +49,7 @@ generate_coreos_image() {
 	if [[ -f automated_installer.yml ]]; then
 		echo -e "automated installer YAML already exists!\n"
 	fi
-	mv /home/wavelet/http/ignition/automated_installer.yml ./
+	cp /home/wavelet/config/automated_installer.yml ./
 	butane --pretty --strict --files-dir ./ automated_installer.yml --output automated_installer.ign
 	cp ./automated_installer.ign /home/wavelet/http/ignition/automated_installer.ign
 	cp /usr/local/bin/wavelet_install_client.sh /home/wavelet/http/ignition
