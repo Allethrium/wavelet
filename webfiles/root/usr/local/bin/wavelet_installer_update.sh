@@ -44,8 +44,8 @@ event_server(){
 	cp /var/home/wavelet/setup/wavelet-git/webfiles/root/usr/local/bin/{wavelet_install_client.sh,wavelet_installer_xf.sh} /var/home/wavelet/http/ignition
 	cp /var/home/wavelet/setup/wavelet-git/ignition_files/automated_coreos_deployment.sh /var/home/wavelet/http/ignition
 	echo "Regenerating ignition files for clients.."
-	butane --pretty --strict --files-dir /var/home/wavelet/config/automated_installer.yml --output /var/home/wavelet/http/ignition/automated_installer.ign
-	butane --pretty --strict --files-dir /var/home/wavelet/config/decoder_custom.yml --output /var/home/wavelet/http/ignition/decoder.ign
+	butane --pretty --strict /var/home/wavelet/config/automated_installer.yml --output /var/home/wavelet/http/ignition/automated_installer.ign
+	butane --pretty --strict /var/home/wavelet/config/decoder_custom.yml --output /var/home/wavelet/http/ignition/decoder.ign
 	restorecon -Rv /var/home/wavelet/http > /dev/null
 }
 
