@@ -155,8 +155,8 @@ event_magewell_ndi(){
 
 event_ptz_ndiHX(){
 		# Interrogates PTZ Cam device, attempts preconfigured username and password, then tries to set appropriate settings for streaming into UltraGrid.
-		echo -e "Waiting for five seconds, then attempting to connect to device..\n"
-		sleep 5
+		echo -e "Waiting for three seconds, then attempting to connect to device..\n"
+		sleep 3
 		# stuff to set the stream target to RTP/RTSP 192.168.1.32 on appropriate port
 		# Generate JSON config object from the device webserver
 		input=$(curl -X GET -H "Content-type: application/json" -H "Accept: application/json" http://${ipAddr}/cgi-bin/param.cgi?get_device_conf | tr -d '"' | jq -Rs 'split("\n")[:-1][]')
@@ -220,8 +220,8 @@ event_vendorDevice3(){
 
 event_unsupportedDevice(){
 		# We could do something here to attempt to connect to the device and parse whatever looks like a string to a proper value?
-		echo -e "Waiting for five seconds, then attempting to connect to device..\n"
-		sleep 5
+		echo -e "Waiting for three seconds, then attempting to connect to device..\n"
+		sleep 3
 		# Check to see if this device is a wavelet decoder or encoder
 		read_etcd_clients_ip_sed
 		if [[ "${printvalue}" == *"${ipAddr}"* ]]; then
@@ -322,6 +322,12 @@ populate_to_etcd(){
 	exit 0
 }
 
+probe_ip(){
+	# Probes a specific IP.  Can be called from CLI or more commonly from detectv4l.sh
+	echo -e "Detected IP Address: ${ipAddr}"
+	macAddr=$(cat /var/lib/dnsmasq/dnsmasq.leases | grep ${ipAddr} | awk '{print $2}')
+	parse_macaddr "${ipAddr}" "${macAddr}"
+}
 
 
 #####
@@ -329,6 +335,7 @@ populate_to_etcd(){
 # Main
 #
 ####
+
 
 logName=/var/tmp/network_device.log
 if [[ -e $logName || -L $logName ]] ; then
@@ -340,6 +347,16 @@ if [[ -e $logName || -L $logName ]] ; then
 fi
 hostNameSys=$(hostname)
 hostNamePretty=$(hostnamectl --pretty)
+
+# Process input args (if any)
+for i in "$@"; do
+		case $i in
+			"--p")		echo "Probing $2"; ipAddr=$2; probe_ip
+			;;
+			*)			echo "no input, called from wavelet_network sense";
+			;;
+		esac
+done
 
 #set -x
 exec >${logName} 2>&1
