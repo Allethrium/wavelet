@@ -16,6 +16,10 @@ read_etcd_global(){
 	echo -e "Key Name: {$KEYNAME} read from etcd for Global Value: $printvalue\n"
 }
 read_etcd_prefix(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix_global" "${KEYNAME}")
+	echo -e "Key Name: {$KEYNAME} read from etcd for value $printvalue for host: ${hostNameSys}\n"
+}
+read_etcd_prefix_global(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
 	echo -e "Key Name: {$KEYNAME} read from etcd for value $printvalue for host: ${hostNameSys}\n"
 }
