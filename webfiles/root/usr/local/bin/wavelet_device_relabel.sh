@@ -127,10 +127,10 @@ event_prefix_set(){
 	KEYNAME="/${hostNameSys}/type"; read_etcd_global; type=${printvalue}
 		if [[ "${type}" = "dec" ]]; then
 			echo "I am currently a decoder switching to an encoder"
-			typeswitch="enc"
+			typeSwitch="enc"
 		else
 			echo "I am not a decoder, switching to become a decoder.."
-			typeswitch="dec"
+			typeSwitch="dec"
 		fi
 	KEYNAME="/hostLabel/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/type"; write_etcd_global
