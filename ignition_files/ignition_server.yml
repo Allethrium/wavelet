@@ -26,6 +26,11 @@ storage:
       mode: 0644
       contents:
         local: decoder.ign
+    # The customized decoder yml file which can be modified and regenerated
+    - path: /home/wavelet/config/decoder_custom.yml
+      mode: 0644
+      contents:
+        local: decoder_custom.yml
     - path: /var/isolationMode.enabled
       mode: 0644
       contents:
@@ -43,7 +48,7 @@ storage:
       contents:
         local: automated_coreos_deployment.sh
     # Client automated installer ignition
-    - path: /home/wavelet/http/ignition/automated_installer.yml
+    - path: /home/wavelet/config/automated_installer.yml
       mode: 0644
       overwrite: true
       contents:
