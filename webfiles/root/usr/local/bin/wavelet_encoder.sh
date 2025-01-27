@@ -19,6 +19,10 @@ read_etcd_prefix(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
 	echo -e "Key Name: {$KEYNAME} read from etcd for value $printvalue for host: ${hostNameSys}\n"
 }
+read_etcd_prefix_global(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix_global" "${KEYNAME}")
+	echo -e "Key Name: {$KEYNAME} read from etcd for value $printvalue for host: ${hostNameSys}\n"
+}
 read_etcd_clients_ip() {
 	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
 }
@@ -152,7 +156,7 @@ generate_server_args(){
 	# Set network devices
 	# Index starts at 3 for netDevs
 	declare -A networkInputs=()
-	KEYNAME="/network_uv_stream_command/"; read_etcd_prefix;
+	KEYNAME="/network_uv_stream_command/"; read_etcd_prefix_global;
 	if [[ ${printvalue} == "" ]]; then
 		echo "Array is empty, no network devices."
 		:
@@ -228,7 +232,7 @@ generate_local_args(){
 	# Because we have spaces in the return value, and this value is returned as a string, we have to process everything
 	# remove -t, remove preceding space, 
 	readarray -t localInputsArray <<< $(echo ${printvalue} | sed 's|-t|\n|g' | cut -d ' ' -f 2 | sed '/^[[:space:]]*$/d')
-	echo -e "Local Array contents:\n${localInputsArray[@]}\n"
+	echo -e "Local Array contents:\n${localInputsArray[@]}"
 
 	# Declare the master local inputs array
 	declare -A localInputDevices=(); declare -A localInputs=()
@@ -261,9 +265,10 @@ generate_local_args(){
 		# Filter out dummy entries
 		if [[ "${i}" == "-t" ]]; then
 			:
+		else
+			echo "$i)${localInputDevices[$i]}"
+			echo "$i,${localInputDevices[$i]},${hostNameSys}" >> /var/home/wavelet/device_map_entries_verity
 		fi
-		echo "$i)${localInputDevices[$i]}"
-		echo "$i,${localInputDevices[$i]},${hostNameSys}" >> /var/home/wavelet/device_map_entries_verity
 	done))
 	# Generate the command line proper
 	commandLine=$(while IFS= read -r line; do
@@ -335,10 +340,12 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage
 	systemctl --user daemon-reload
 	systemctl --user restart UltraGrid.AppImage.service
 	echo -e "Encoder systemd unit instructed to start.."
-	until systemctl --user is-active UltraGrid.AppImage.service; do
+	WAIT_TIME=0
+	until (( WAIT_TIME == 10 )) || systemctl --user is-active UltraGrid.AppImage.service; do
 		echo "waiting for Systemd service to activate.."
-		sleep .75
+		sleep "$(( WAIT_TIME++ ))"
 	done
+	(( WAIT_TIME < 10 ))
 	echo "UG Process generated and task started, moving on to setting channel index.."
 	sleep 1
 	set_channelIndex
