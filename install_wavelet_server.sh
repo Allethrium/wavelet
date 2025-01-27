@@ -287,6 +287,8 @@ customization(){
 		repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_password}")
 		sed -i "s/SEDwaveletwifipassword/${repl}/g" ${INPUTFILES}
 
+		echo "Copying customized yml back to ignition folder.."
+		cp ./decoder_custom.yml ./ignition_files/
 		echo -e "\n${GREEN} ***Customization complete, moving to injecting configurations to CoreOS images for initial installation..*** \n${NC}"
 }
 
