@@ -43,7 +43,9 @@ event_server(){
 	mv /var/home/wavelet/http/ignition/.bash_profile /var/home/wavelet/http/ignition/skel_profile.txt
 	cp /var/home/wavelet/setup/wavelet-git/webfiles/root/usr/local/bin/{wavelet_install_client.sh,wavelet_installer_xf.sh} /var/home/wavelet/http/ignition
 	cp /var/home/wavelet/setup/wavelet-git/ignition_files/automated_coreos_deployment.sh /var/home/wavelet/http/ignition
-	echo "Note we currently don't regenerate the client ignition files in this process.  TBD."
+	echo "Regenerating ignition files for clients.."
+	butane --pretty --strict /var/home/wavelet/config/automated_installer.yml --output /var/home/wavelet/http/ignition/automated_installer.ign
+	butane --pretty --strict /var/home/wavelet/config/decoder_custom.yml --output /var/home/wavelet/http/ignition/decoder.ign
 	restorecon -Rv /var/home/wavelet/http > /dev/null
 }
 
@@ -115,7 +117,7 @@ generate_tarfiles(){
 	echo -e "Done."
 	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz,etc.tar.xz}
 	setfacl -b wavelet-files.tar.xz
-	cp wavelet-files.tar.xz /var/home/wavelet/setup/http/ignition/wavelet-files.tar.xz
+	cp /var/home/wavelet/setup/wavelet-files.tar.xz /var/home/wavelet/http/ignition/wavelet-files.tar.xz
 }
 
 
@@ -125,7 +127,6 @@ generate_tarfiles(){
 #
 #####
 
-# One rather silly thing.. if this module is what gets updated... then that won't work until it is run again the next reboot.
 hostNameSys=$(hostname)
 hostNamePretty=$(hostnamectl --pretty)
 
