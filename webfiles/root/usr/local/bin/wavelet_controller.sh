@@ -214,6 +214,14 @@ wavelet_testcard() {
 wavelet_refresh() {
 	# This is only called by the RD, refresh-devices button.  It finds the previous hash and resets to it.
 	KEYNAME="uv_hash_select_old"; read_etcd_global; previousHash=${printvalue}
+	case ${previousHash} in
+		"")		echo "previousHash is null, setting to seal"		previousHash="seal"
+		;;
+		"RD")	echo "previousHash is RD, setting to seal"			previousHash="seal"
+		;;
+		*)		echo "previousHash is something else, proceeding."
+		;;
+	esac
 	KEYNAME="uv_hash_select"; KEYVALUE=${previousHash}; write_etcd_global
 	echo -e "Previous hash value reset, running detectv4l to redetect local sources on all hosts.."
 	wavelet_detect_inputs
@@ -433,7 +441,7 @@ wavelet_clear_inputs() {
 wavelet_detect_inputs() {
 	# Tells detectv4l to run on everything, all encoders watch this flag when they are provisioned as such.
 	KEYNAME="DEVICE_REDETECT"; KEYVALUE=1; write_etcd_global
-	echo -e "\nAll devices now redetecting available input video sources..\n"
+	echo -e "All devices now redetecting available input video sources.."
 }
 
 
