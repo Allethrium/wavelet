@@ -180,7 +180,7 @@ event_ptz_ndiHX(){
 		tput -T linux setaf 2
 		ndiSource=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | cut -d '(' -f1 | awk '{print $1}')
 		if [ -n ${ndiSource} ]; then
-			echo -e "\nNDI source for this IP address not found, configuring for RTSP..\n"
+			echo -e "NDI source for this IP address not found, configuring for RTSP..\n"
 			UGdeviceStreamCommand="rtsp://${ipAddr}:554/1:decompress"
 			if [[ $(ffprobe -v quiet -show_streams rtsp://${ipAddr}:554/1) ]]; then
 
@@ -233,7 +233,7 @@ event_unsupportedDevice(){
 			deviceHostName=$(nslookup ${ipAddr} | awk '{print $4}')
 			ndiSource=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | cut -d '(' -f1 | awk '{print $1}')
 			if [ -n ${ndiSource} ]; then
-				echo -e "\nNDI source for this IP address: ${ipAddr}\nnot found, attempting RTSP.."
+				echo -e "NDI source for this IP address: ${ipAddr} not found, attempting RTSP.."
 				UGdeviceStreamCommand="rtsp://${ipAddr}:554/1:decompress"
 				# Do a test here to see if RTSP is successful, if not, this probably isn't a video device and we don't want to go further.
 				if [[ $(ffprobe -v quiet -show_streams ${UGdeviceStreamCommand}) ]]; then
