@@ -131,6 +131,11 @@ event_prefix_set(){
 		else
 			echo "I am not a decoder, switching to become a decoder.."
 			typeSwitch="dec"
+			systemctl --user disable \
+				wavelet_encoder.service \
+				wavelet_encoder_query.service \
+				watch_encoderflag.service \
+				--now
 		fi
 	KEYNAME="/hostLabel/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/type"; write_etcd_global
