@@ -53,11 +53,11 @@ set -x
 exec >/var/home/wavelet/logs/clear_inputs.log 2>&1
 
 # We add --prefix to perform a "directory + contents" deletion.  DANGEROUS.
-KEYNAME="interface"; delete_etcd_key_global
-KEYNAME="/interface"; delete_etcd_key_global
-KEYNAME="/hash"; delete_etcd_key_global
-KEYNAME="hash"; delete_etcd_key_global
-KEYNAME="/short"; delete_etcd_key_global
-KEYNAME="/long"; delete_etcd_key_global
+KEYNAME="interface"; delete_etcd_key_prefix
+KEYNAME="/interface"; delete_etcd_key_prefix
+KEYNAME="/hash"; delete_etcd_key_prefix
+KEYNAME="hash"; delete_etcd_key_prefix
+KEYNAME="/short"; delete_etcd_key_prefix
+KEYNAME="/long"; delete_etcd_key_prefix
 echo -e "\nInput Device data completely cleared.  Plug a device in to begin detection of input sources from scratch.\n"
 exit 0
