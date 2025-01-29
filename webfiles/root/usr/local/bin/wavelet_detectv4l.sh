@@ -172,33 +172,33 @@ device_cleanup() {
 		echo -e "Orphaned devices located:\n"
 		printf "%s\n" "${interfaceLongArray[@]}"
 		for i in "${interfaceLongArray[@]}"; do
-				if [ ! -z "$i" ]; then
-					:
-				else
-					cleanupStringLong="${i}"
-					echo -e "\nCleanup device is ${cleanupStringLong}"
-					# delete the input caps key for the missing device
-					echo -e "Deleting ${hostNameSys}/inputs${cleanupStringLong}  entry"
-					KEYNAME="/${hostNamePretty}/inputs${cleanupStringLong}"; delete_etcd_key_global
-					# find the device hash 
-					KEYNAME="/long_interface${cleanupStringLong}"; cleanupHash=$(read_etcd)
-					echo -e "Device hash located as ${cleanupHash}"
-					# delete from long_interface prefix
-					echo -e "Deleting /long_interface${cleanupStringLong} entry"
-					delete_etcd_key
-					# delete from hash prefix
-					echo -e "Deleting /hash/${cleanupHash} entry"
-					KEYNAME="/hash/${cleanupHash}"; delete_etcd_key_global
-					# finally, find and delete from interface prefix - Guess we need ANOTHER lookup table to manage to keep all of this straight..
-					KEYNAME="/short_hash/${cleanupHash}"; read_etcd_global; cleanupInterface=${printvalue}
-					echo -e "Device UI Interface label located in /short_hash/${cleanupHash} for the value ${cleanupInterface}"
-					echo -e "Deleting /short_hash/${cleanupHash}  entry"
-					delete_etcd_key
-					echo -e "Deleting /interface/${cleanupInterface} entry"
-					KEYNAME="/interface/$${cleanupInterface}"; delete_etcd_key_global
-					echo -e "Device entry ${cleanupStringLong} should be removed along with all references to ${cleanupHash}\n\n"
-				fi
-			done
+			if [ ! -z "$i" ]; then
+				:
+			else
+				cleanupStringLong="${i}"
+				echo -e "\nCleanup device is ${cleanupStringLong}"
+				# delete the input caps key for the missing device
+				echo -e "Deleting ${hostNameSys}/inputs${cleanupStringLong}  entry"
+				KEYNAME="/${hostNamePretty}/inputs${cleanupStringLong}"; delete_etcd_key_global
+				# find the device hash 
+				KEYNAME="/long_interface${cleanupStringLong}"; cleanupHash=$(read_etcd)
+				echo -e "Device hash located as ${cleanupHash}"
+				# delete from long_interface prefix
+				echo -e "Deleting /long_interface${cleanupStringLong} entry"
+				delete_etcd_key
+				# delete from hash prefix
+				echo -e "Deleting /hash/${cleanupHash} entry"
+				KEYNAME="/hash/${cleanupHash}"; delete_etcd_key_global
+				# finally, find and delete from interface prefix - Guess we need ANOTHER lookup table to manage to keep all of this straight..
+				KEYNAME="/short_hash/${cleanupHash}"; read_etcd_global; cleanupInterface=${printvalue}
+				echo -e "Device UI Interface label located in /short_hash/${cleanupHash} for the value ${cleanupInterface}"
+				echo -e "Deleting /short_hash/${cleanupHash}  entry"
+				delete_etcd_key
+				echo -e "Deleting /interface/${cleanupInterface} entry"
+				KEYNAME="/interface/$${cleanupInterface}"; delete_etcd_key_global
+				echo -e "Device entry ${cleanupStringLong} should be removed along with all references to ${cleanupHash}\n\n"
+			fi
+		done
 	fi
 }
 
@@ -319,7 +319,8 @@ redetect_network_devices(){
 	KEYNAME="DEVICE_REDETECT"; KEYVALUE="0"; write_etcd_global
 	for i in $(cat /var/lib/dnsmasq/dnsmasq.leases | awk '{print $3}'); do
 		echo "Probing IP Address: ${i}"
-		/usr/local/bin/wavelet_network_device.sh "--p" "${i}"
+		nohup /usr/local/bin/wavelet_network_device.sh "--p" "${i}" &
+		wait
 	done
 	sleep 3
 	systemctl --user enable wavelet_device_redetect.service --now
