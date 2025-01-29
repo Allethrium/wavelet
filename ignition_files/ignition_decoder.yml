@@ -222,6 +222,28 @@ storage:
                   return polkit.Result.YES;
                 }
           });
+    # Restart getty
+    - path: /etc/polkit-1/rules.d/1336-systemd-getty.rules
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          polkit.addRule(function(action, subject) {
+            if ((action.id == "org.freedesktop.systemd1.manage-units" &&
+                 subject.user == "wavelet")) {
+                  polkit.log("action=" + action)
+                  polkit.log("subject=" + subject)
+                  polkit.log("unit="+action.lookup("unit"))
+                  polkit.log("verb="+action.lookup("verb"))
+            if (action.lookup("unit") == "getty@tty1.service") {
+                 var verb = action.lookup("verb");
+                 if (verb == "restart") {
+                  polkit.log("returning YES")
+                  return polkit.Result.YES;
+                  }
+                }
+              }
+          });
     # Define system performance settings
     - path: /etc/sysctl.d/90-sysrq.conf
       mode: 0644
