@@ -5,7 +5,6 @@
 
 event(){
 # Kill the systemd task for a few moments
-systemctl --user stop wavelet_device_redetect.service
 echo -e "\nResetting redetect flag and starting device detection..\n\n\n"
 /usr/local/bin/wavelet_detectv4l.sh && wait 3
 systemctl --user enable wavelet_device_redetect.service --now
