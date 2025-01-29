@@ -18,9 +18,13 @@ event_deprovision(){
 	KEYNAME="/${hostNameSys}/DEPROVISION"; read_etcd_global
 	if [[ "${printvalue}" -eq 1 ]]; then
 		echo -e "\nDeprovision flag is set.  System will deprovision itself.."
-		if [[ -f /var/prod.security.disabled ]]; then
-			echo "Security layer enabled.  Not this will prevent the host reconnecting to Wavelet."
+		if [[ -f /var/prod.security.enabled ]]; then
+			echo "Security layer enabled.  Note this will prevent the host reconnecting to Wavelet."
 			security_layer_deprovision
+		fi
+		echo "Resetting device type to dec and calling relabel module in order to remove associated input devices.."
+		KEYNAME="/${hostNameSys}/type"; KEYVALUE="dec"; write_etcd_global
+		/usr/local/bin/wavelet_device_relabel.sh "deprovision"
 		systemctl shutdown now
 	else
 		echo -e "\nDeprovision key is set to 0, doing nothing.. \n"
