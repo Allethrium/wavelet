@@ -140,28 +140,56 @@ event_prefix_set(){
 				wavelet_encoder_query.service \
 				watch_encoderflag.service \
 				--now
-			echo "Removing input devices associated with my hostname.."
-			KEYNAME="/interface/$(hostnamectl --pretty)/"; read_etcd_prefix_global; devHash="${printvalue}"
-			for i in ${devhash[@]}; do
-				KEYNAME="/short_hash/${i}"; delete_etcd_key_global
-				KEYNAME="/hash/${i}"; delete_etcd_key_global
-				KEYNAME="/$(hostnamectl --pretty)/devpath_lookup/${i}"; delete_etcd_global
-				KEYNAME="uv_hash_select"; read_etcd_global
-				if [[ ${printvalue} = "${i}" ]]; then
-					echo "current device is the selected device, resetting streaming to seal."
-					KEYNAME="uv_hash_select"; KEYVALUE="seal"; write_etcd_global
-				fi
-			done
-			# Now we have processed ALL of the interface items on this host, we can remove the interface labels:
-			KEYNAME="/interface/$(hostnamectl --pretty)/"; delete_etcd_prefix
-			KEYNAME="/$(hostname)/inputs"; delete_etcd_key_global 
-			KEYNAME="/$(hostname)/INPUT_DEVICE_PRESENT"; delete_etcd_key_global
+			remove_associated_inputs
 		fi
 	KEYNAME="/hostLabel/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/type"; write_etcd_global
 	# Sleep for two seconds and then issue a UI restart (save a system reset)
 	sleep 2
 	swaymsg reload
+}
+
+remove_associated_inputs(){
+	echo "Removing input devices associated with my hostname.."
+	KEYNAME="/interface/$(hostnamectl --pretty)/"; read_etcd_prefix_global; devHash="${printvalue}"
+	for i in ${devhash[@]}; do
+		KEYNAME="/short_hash/${i}"; delete_etcd_key_global
+		KEYNAME="/hash/${i}"; delete_etcd_key_global
+		KEYNAME="/$(hostnamectl --pretty)/devpath_lookup/${i}"; delete_etcd_global
+		KEYNAME="uv_hash_select"; read_etcd_global
+		if [[ ${printvalue} = "${i}" ]]; then
+			echo "current device is the selected device, resetting streaming to seal."
+			KEYNAME="uv_hash_select"; KEYVALUE="seal"; write_etcd_global
+		fi
+	done
+	# Now we have processed ALL of the interface items on this host, we can remove the interface labels:
+	KEYNAME="/interface/$(hostnamectl --pretty)/"; delete_etcd_prefix
+	KEYNAME="/$(hostname)/inputs"; delete_etcd_key_global 
+	KEYNAME="/$(hostname)/INPUT_DEVICE_PRESENT"; delete_etcd_key_global	
+}
+
+remove_host_keys(){
+	echo "Disabling watcher services and removing any remaining host keys.."
+	systemctl --user disable \
+		wavelet_device_redetect.service \
+		wavelet_encoder_reboot.service \
+		wavelet_monitor_decoder_blank.service \
+		wavelet_monitor_decoder_reboot.service \
+		wavelet_monitor_decoder_reveal.service \
+		wavelet_monitor_decoder_reset.service \
+		watch_encoderflag.service \
+		wavelet_deprovision.service \
+		wavelet_detectv4l.service \
+		wavelet_device_relabel.service \
+		wavelet_encoder.service \
+		wavelet_encoder_query.service \
+		wavelet_promote.service \
+		wavelet_reboot.service \
+		wavelet_reset.service --now
+	KEYNAME="/${hostNameSys}"; delete_etcd_prefix
+	KEYNAME="/hostHash/${hostNameSys}"; delete_etcd_prefix
+	echo "Host keys deleted, shutting down!"
+	systemctl poweroff -i
 }
 
 set_newHostName(){
@@ -214,13 +242,15 @@ hostNamePretty=$(hostnamectl --pretty)
 for arg in "$@"; do
 	echo -e "\nArgument is: ${arg}\n"
 	case ${arg} in
-		dec*)		echo -e "\nCalled with decoder argument, promoting to Encoder\n"				;	event_prefix_set "${arg}"
+		dec*)			echo -e "\nCalled with decoder argument, promoting to Encoder\n"				;	event_prefix_set "${arg}"
 		;;
-		enc*)		echo -e "\nCalled with encoder argument, promoting to Decoder\n"				;	event_prefix_set "${arg}"
+		enc*)			echo -e "\nCalled with encoder argument, promoting to Decoder\n"				;	event_prefix_set "${arg}"
 		;;
-		"relabel")	echo -e "\nCalled with relabel argument, not calling prefix function..\n"		;	event_hostNameChange
+		"relabel")		echo -e "\nCalled with relabel argument, not calling prefix function..\n"		;	event_hostNameChange
 		;;
-		*)			echo -e "\nCalled with invalid argument, not calling prefix function..\n"		;	event_hostNameChange
+		"deprovision")	echo -e "\nCalled with deprov argument, removing inputs..\n"					;	remove_associated_inputs	;	remove_host_keys
+		;;
+		*)				echo -e "\nCalled with invalid argument, not calling prefix function..\n"		;	event_hostNameChange
 		;;
 	esac
 done
