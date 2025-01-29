@@ -43,7 +43,8 @@ event_server(){
 	mv /var/home/wavelet/http/ignition/.bash_profile /var/home/wavelet/http/ignition/skel_profile.txt
 	cp /var/home/wavelet/setup/wavelet-git/webfiles/root/usr/local/bin/{wavelet_install_client.sh,wavelet_installer_xf.sh} /var/home/wavelet/http/ignition
 	cp /var/home/wavelet/setup/wavelet-git/ignition_files/automated_coreos_deployment.sh /var/home/wavelet/http/ignition
-	echo "Regenerating ignition files for clients.."
+	echo "Regenerating ignition files for clients..(note; this will NOT update the customized decoder ignition (yet)"
+	echo "This is because it needs secrets and other data from the initial configuration."
 	butane --pretty --strict /var/home/wavelet/config/automated_installer.yml --output /var/home/wavelet/http/ignition/automated_installer.ign
 	butane --pretty --strict /var/home/wavelet/config/decoder_custom.yml --output /var/home/wavelet/http/ignition/decoder.ign
 	restorecon -Rv /var/home/wavelet/http > /dev/null
