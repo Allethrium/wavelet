@@ -101,7 +101,7 @@ Restart=always
 [Install]
 WantedBy=default.target" > /home/wavelet/.config/systemd/user/${waveletModule}.service
 	fi
-	echo -e "User Systemd service unit for etcd Key: ${inputKeyName} generated\nName: ${waveletModule}.service\nRemember to run 'systemd --user daemon-reload' from your calling function!\n"
+	echo -e "User Systemd service unit for etcd Key: ${inputKeyName} generated\nName: ${waveletModule}.service\nRemember to run 'systemctl --user daemon-reload' from your calling function!\n"
 	exit 0
 }
 
@@ -167,7 +167,7 @@ case ${action} in
 	delete_etcd_key_global)		declare -A commandLine=([1]="del" [0]="${inputKeyName}"); fID="clearText";
 	;;
 	# Delete keys on prefix
-	delete_etcd_key_prefix)		declare -A commandLine=([2]="del" [1]="${inputKeyName}" [0]="prefix"); fID="clearText";
+	delete_etcd_key_prefix)		declare -A commandLine=([2]="del" [1]="${inputKeyName}" [0]="--prefix"); fID="clearText";
 	;;
 	# Generate a user systemd watcher based off keyname and module arguments.
 	generate_service)			generate_service "${inputKeyName}" "${waveletModule}" "${additionalArg}"; fID="clearText";
@@ -181,7 +181,7 @@ esac
 
 # Because we need an output from this script, we can't enable logging (unless something's broken..)
 #set -x
-#exec >/home/wavelet/etcdlog.log 2>&1
+#exec >/home/wavelet/logs/etcdlog.log 2>&1
 hostNameSys=$(hostname)
 hostNamePretty=$(hostnamectl --pretty)
 main "${action}" "${inputKeyName}" "${inputKeyValue}" "${valueOnlySwitch}"
