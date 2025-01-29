@@ -17,6 +17,10 @@ read_etcd_prefix(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
 	echo -e "Key Name: {$KEYNAME} read from etcd for value $printvalue for host: ${hostNameSys}\n"
 }
+read_etcd_prefix_global(){
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix_global" "${KEYNAME}")
+	echo -e "Key Name: {$KEYNAME} read from etcd for global value $printvalue\n"
+}
 read_etcd_clients_ip() {
 	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
 }
@@ -136,12 +140,28 @@ event_prefix_set(){
 				wavelet_encoder_query.service \
 				watch_encoderflag.service \
 				--now
+			echo "Removing input devices associated with my hostname.."
+			KEYNAME="/interface/$(hostnamectl --pretty)/"; read_etcd_prefix_global; devHash="${printvalue}"
+			for i in ${devhash[@]}; do
+				KEYNAME="/short_hash/${i}"; delete_etcd_key_global
+				KEYNAME="/hash/${i}"; delete_etcd_key_global
+				KEYNAME="/$(hostnamectl --pretty)/devpath_lookup/${i}"; delete_etcd_global
+				KEYNAME="uv_hash_select"; read_etcd_global
+				if [[ ${printvalue} = "${i}" ]]; then
+					echo "current device is the selected device, resetting streaming to seal."
+					KEYNAME="uv_hash_select"; KEYVALUE="seal"; write_etcd_global
+				fi
+			done
+			# Now we have processed ALL of the interface items on this host, we can remove the interface labels:
+			KEYNAME="/interface/$(hostnamectl --pretty)/"; delete_etcd_prefix
+			KEYNAME="/$(hostname)/inputs"; delete_etcd_key_global 
+			KEYNAME="/$(hostname)/INPUT_DEVICE_PRESENT"; delete_etcd_key_global
 		fi
 	KEYNAME="/hostLabel/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/type"; write_etcd_global
-	# Sleep for two seconds and then issue a device reboot
+	# Sleep for two seconds and then issue a UI restart (save a system reset)
 	sleep 2
-	systemctl reboot -i
+	swaymsg reload
 }
 
 set_newHostName(){
@@ -177,7 +197,6 @@ event_hostNameChange() {
 
 #set -x
 # Check for pre-existing log file
-# This is necessary because of system restarts, the log will get overwritten, and we need to see what it's doing across reboots.
 logName=/var/home/wavelet/logs/changehostname.log
 if [[ -e $logName || -L $logName ]] ; then
 	i=0
