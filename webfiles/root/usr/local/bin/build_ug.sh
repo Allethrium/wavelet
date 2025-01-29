@@ -510,9 +510,9 @@ event_generateHash(){
 }
 event_device_redetect(){
 	# Watches for a device redetection flag, then runs detectv4l.sh
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "DEVICE_REDETECT" 0 0 "wavelet_detectv4l"
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "DEVICE_REDETECT" 0 0 "wavelet_device_redetect"
 	systemctl --user daemon-reload
-	systemctl --user enable wavelet_detectv4l.service --now
+	systemctl --user enable wavelet_device_redetect.service --now
 }
 event_host_relabel_watcher(){
 	# Watches for a device relabel flag, then runs wavelet_device_relabel.sh
