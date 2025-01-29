@@ -57,7 +57,7 @@ KEYNAME="interface"; delete_etcd_key_global
 KEYNAME="/interface"; delete_etcd_key_global
 KEYNAME="/hash"; delete_etcd_key_global
 KEYNAME="hash"; delete_etcd_key_global
-KEYNAME="/short"; ddelete_etcd_key_global
+KEYNAME="/short"; delete_etcd_key_global
 KEYNAME="/long"; delete_etcd_key_global
 echo -e "\nInput Device data completely cleared.  Plug a device in to begin detection of input sources from scratch.\n"
 exit 0
