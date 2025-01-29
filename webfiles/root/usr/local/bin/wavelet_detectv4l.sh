@@ -317,13 +317,12 @@ redetect_network_devices(){
 	echo -e "Redetecting network devices.  Ensuring DEVICE_REDETECT watcher service is temporarily disabled.."
 	systemctl --user disable wavelet_device_redetect.service --now
 	KEYNAME="DEVICE_REDETECT"; KEYVALUE="0"; write_etcd_global
+	systemctl --user enable wavelet_device_redetect.service --now
 	for i in $(cat /var/lib/dnsmasq/dnsmasq.leases | awk '{print $3}'); do
 		echo "Probing IP Address: ${i}"
 		nohup /usr/local/bin/wavelet_network_device.sh "--p" "${i}" &
 		wait
 	done
-	sleep 3
-	systemctl --user enable wavelet_device_redetect.service --now
 }
 
 #####
