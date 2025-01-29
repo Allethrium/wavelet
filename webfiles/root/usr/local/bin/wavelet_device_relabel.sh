@@ -132,6 +132,11 @@ event_prefix_set(){
 		if [[ "${type}" = "dec" ]]; then
 			echo "I am currently a decoder switching to an encoder"
 			typeSwitch="enc"
+			systemctl --user enable \
+				wavelet_encoder.service \
+				wavelet_encoder_query.service \
+				watch_encoderflag.service \
+				wavelet_promote.service --now
 		else
 			echo "I am not a decoder, switching to become a decoder.."
 			typeSwitch="dec"
@@ -139,7 +144,7 @@ event_prefix_set(){
 				wavelet_encoder.service \
 				wavelet_encoder_query.service \
 				watch_encoderflag.service \
-				--now
+				wavelet_promote.service --now
 			remove_associated_inputs
 		fi
 	KEYNAME="/hostLabel/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
