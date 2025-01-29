@@ -144,9 +144,9 @@ event_prefix_set(){
 		fi
 	KEYNAME="/hostLabel/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/type"; write_etcd_global
-	# Sleep for two seconds and then issue a UI restart (save a system reset)
+	# Sleep for two seconds and then issue a UI restart (save a system reset, needs a polkit entry for getty, however.)
 	sleep 2
-	swaymsg reload
+	systemctl restart getty@tty1.service
 }
 
 remove_associated_inputs(){
