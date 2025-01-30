@@ -179,9 +179,17 @@ wavelet_blank() {
 # 1
 # Displays a black jpg to blank the screen fully
 	current_event="wavelet-blank"
+	KEYNAME="uv_hash_select_old"; read_etcd_global; eventHashPrevious="${printvalue}"
+	echo "old hash select is: ${eventHashPrevious}"
+	KEYNAME="/hash/${eventHashPrevious}"; read_etcd_global; eventLabel="${printvalue}"
 	KEYNAME=uv_input; KEYVALUE="blank"					;	write_etcd_global
 	KEYNAME="ENCODER_QUERY"; KEYVALUE="1"				;	write_etcd_global
 	KEYNAME="uv_hash_select_old"; KEYVALUE="blank"		;	write_etcd_global
+	if [[ "${eventLabel}" != *"svr"* ]]; then
+		echo "Previous event does not reference the server, restarting UG process to ensure reflector detects transition.."
+		systemctl --user restart UltraGrid.AppImage.service
+		sleep 1
+	fi
 	# The server should not require any restarts as the UltraGrid.AppImage service should still be running from wavelet_init
 	echo 'capture.data 0' | busybox nc -v 127.0.0.1 6160
 	echo -e "Blank screen for all hosts activated."
@@ -191,10 +199,18 @@ wavelet_seal() {
 # 2
 # Serves a static image in .jpg format in a loop to the encoder.
 	cd /home/wavelet/
+	KEYNAME="uv_hash_select_old"; read_etcd_global; eventHashPrevious="${printvalue}"
+	echo "old hash select is: ${eventHashPrevious}"
+	KEYNAME="/hash/${eventHashPrevious}"; read_etcd_global; eventLabel="${printvalue}"
 	current_event="wavelet-seal"
 	KEYNAME=uv_input; KEYVALUE="seal"					;	write_etcd_global
 	KEYNAME="ENCODER_QUERY"; KEYVALUE="2"				;	write_etcd_global
 	KEYNAME="uv_hash_select_old"; KEYVALUE="seal"		;	write_etcd_global
+	if [[ "${eventLabel}" != *"svr"* ]]; then
+		echo "Previous event does not reference the server, restarting UG process to ensure reflector detects transition.."
+		systemctl --user restart UltraGrid.AppImage.service
+		sleep 1
+	fi
 	# We now use the switcher for simple things
 	echo 'capture.data 1' | busybox nc -v 127.0.0.1 6160
 	echo -e "Static image activated."
@@ -203,10 +219,18 @@ wavelet_seal() {
 wavelet_testcard() {
 # T
 # Test Card
+	current_event="wavelet-blank"
+	KEYNAME="uv_hash_select_old"; read_etcd_global; eventHashPrevious="${printvalue}"
+	echo "old hash select is: ${eventHashPrevious}"
 	current_event="wavelet-testcard"
 	KEYNAME="uv_input"; KEYVALUE="smpte_bars"			;	write_etcd_global
 	KEYNAME="ENCODER_QUERY"; KEYVALUE="T"				;	write_etcd_global
 	KEYNAME="uv_hash_select_old"; KEYVALUE="smpte_bars"	;	write_etcd_global
+	if [[ "${eventLabel}" != *"svr"* ]]; then
+		echo "Previous event does not reference the server, restarting UG process to ensure reflector detects transition.."
+		systemctl --user restart UltraGrid.AppImage.service
+		sleep 1
+	fi
 	echo 'capture.data 2' | busybox nc -v 127.0.0.1 6160
 	echo "Testcard image activated."
 }
