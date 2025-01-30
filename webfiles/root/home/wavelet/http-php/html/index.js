@@ -119,10 +119,10 @@ function sendPHPID(buttonElement) {
 	// we use id here in place of value (both are same for static items in the html)
 	// Because javascript inexplicably can access everythign EXCEPT the value??
 	const postValue				=		(buttonElement.id);
-	const postLabel				=		($(this).innerText);
-	if ("postLabel" in window) {
+	var postLabel				=		($(this).innerText);
+	if (postLabel in window) {
 		console.log("postLabel is not defined! Setting a dummy value..");
-		postLabel	=	"dummyValue";
+		var postLabel	=	"STATIC";
 	}
 	console.log("Sending Value: " + postValue + "\nAnd Label: " + postLabel);
 	$.ajax({
@@ -136,7 +136,8 @@ function sendPHPID(buttonElement) {
 				console.log(response);
 				if (postValue == "RD" || "CL") {
 					// Perhaps we also want to set the button inactive
-					setTimeout(() => window.location.reload(), 1250);
+					sleep(1250);
+					location.reload();
 				}
 			}
 	});
@@ -511,7 +512,7 @@ function createHostDeleteButton(hostName, hostHash) {
 				}
 			})
 			sleep (250);
-			//location.reload();
+			location.reload();
 		})
 	return $btn;
 }
@@ -680,6 +681,8 @@ function createCodecStateChangeButton(hostName, hostHash, type) {
 				},
 				success: function(response){
 					console.log(response);
+					sleep (250);
+					location.reload()
 				}
 			});
 		})
@@ -1020,7 +1023,7 @@ function removeInputElement() {
 		});
 	$(this).parent().remove();
 	sleep(300);
-	//setTimeout(() => window.location.reload(), 750);
+	location.reload();
 }
 
 function removeHostElement(hostName, hostHash) {
@@ -1038,7 +1041,7 @@ function removeHostElement(hostName, hostHash) {
 		});
 	$(this).parent().remove();
 	sleep(300);
-	//setTimeout(() => window.location.reload(), 750);
+	location.reload();
 }
 
 function setButtonActiveStyle(button) {
