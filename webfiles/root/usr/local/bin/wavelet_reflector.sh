@@ -152,5 +152,5 @@ wavelet_reflector() {
 }
 
 #set -x
-exec >/home/wavelet/reflector.log 2>&1
+exec >/home/wavelet/logs/reflector.log 2>&1
 wavelet_reflector
