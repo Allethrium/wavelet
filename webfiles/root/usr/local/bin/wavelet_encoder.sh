@@ -96,8 +96,8 @@ check_ugAppImage(){
 		echo "UG AppImage Systemd unit is running, continuing."
 		echo "Controller should be able to select basic static inputs from channel update cmd."
 	else
-		echo "UG AppImage Systemd unit is NOT running, attempting restart.."
-		systemctl --user restart UltraGrid.AppImage.service
+		echo "UG AppImage Systemd unit is NOT running."
+		#systemctl --user restart UltraGrid.AppImage.service
 	fi	
 }
 
