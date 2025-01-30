@@ -138,7 +138,9 @@ event_encoder(){
 	event_generate_wavelet_encoder_query
 	event_promote
 	# We do not perform run_ug for the encoder as that is enabled if it receives an encoderflag change.  It will be idle until then.
-	# Set Type keys to "dec"
+	# Run detectv4l here
+	/usr/local/bin/wavelet_detectv4l.sh
+	# Set Type keys to "enc"
 	KEYVALUE="enc";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/hostLabel/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
