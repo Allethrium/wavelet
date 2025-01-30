@@ -99,8 +99,7 @@ event_encoder_server() {
 event_encoder(){
 	# Registers self as a decoder in etcd for the reflector to query & include in its client args
 	echo -e "Calling wavelet_encoder systemd unit.."
-	# I've added a blank bit here too.. it might make more sense to call it "host blank" though..
-	KEYNAME="/${hostNameSys}/DECODER_BLANK"; KEYVALUE="0"; write_etcd_global
+	KEYNAME="/${hostNameSys}/ENCODER_BLANK"; KEYVALUE="0"; write_etcd_global
 	# Telling Wavelet that this host will be actively streaming
 	KEYNAME="ENCODER_ACTIVE"; KEYVALUE="${hostNamePretty}"; write_etcd_global
 	# Call wavelet_encoder.service which will provision and start the AppImage proper
