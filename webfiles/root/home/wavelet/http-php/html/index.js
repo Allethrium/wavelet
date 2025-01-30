@@ -511,7 +511,7 @@ function createHostDeleteButton(hostName, hostHash) {
 					console.log(response);
 				}
 			})
-			sleep (250);
+			sleep (750);
 			location.reload();
 		})
 	return $btn;
@@ -681,7 +681,7 @@ function createCodecStateChangeButton(hostName, hostHash, type) {
 				},
 				success: function(response){
 					console.log(response);
-					sleep (250);
+					sleep (3000);
 					location.reload()
 				}
 			});
