@@ -1,6 +1,5 @@
 #!/bin/bash
 # Called from the relabel watcher service
-# Generates an oldLabel file in /home/wavelet and restarts run_ug.sh to start detection process
 # We use the "pretty" hostname, the base hostname remains stable after imaging.
 
 
@@ -123,8 +122,7 @@ event_prefix_set(){
 		wavelet_monitor_decoder_blank.service \
 		wavelet_monitor_decoder_reboot.service \
 		wavelet_monitor_decoder_reveal.service \
-		wavelet_monitor_decoder_reset.service \
-		wavelet_device_relabel.service --now
+		wavelet_monitor_decoder_reset.service --now
 	KEYNAME="/${hostNameSys}/Hash"; read_etcd_global; myHostHash="${printvalue}"
 	KEYNAME="/hostHash/${myHostHash}"; read_etcd_global; myHostLabel="${printvalue}"
 	echo -e "My host label is ${myHostLabel}"
@@ -133,44 +131,49 @@ event_prefix_set(){
 			echo "I am currently a decoder switching to an encoder"
 			typeSwitch="enc"
 			systemctl --user enable \
-				wavelet_encoder.service \
+				wavelet_device_redetect \
 				wavelet_encoder_query.service \
 				watch_encoderflag.service \
 				wavelet_promote.service --now
+			KEYNAME="/decoderip/${hostNameSys}"; delete_etcd_global
+			KEYNAME="DEVICE_REDETECT"; KEYVALUE="1"; write_etcd_global
+			KEYNAME="reload_reflector"; write_etcd_global
 		else
 			echo "I am not a decoder, switching to become a decoder.."
 			typeSwitch="dec"
 			systemctl --user disable \
+				run_ug.service \
 				wavelet_encoder.service \
 				wavelet_encoder_query.service \
-				watch_encoderflag.service \
-				wavelet_promote.service --now
+				watch_encoderflag.service --now
 			remove_associated_inputs
 		fi
 	KEYNAME="/hostLabel/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/type"; write_etcd_global
-	# Sleep for two seconds and then issue a UI restart (save a system reset, needs a polkit entry for getty, however.)
-	sleep 2
 	systemctl restart getty@tty1.service
 }
 
 remove_associated_inputs(){
 	echo "Removing input devices associated with my hostname.."
-	KEYNAME="/interface/$(hostnamectl --pretty)/"; read_etcd_prefix_global; devHash="${printvalue}"
-	for i in ${devhash[@]}; do
+	KEYNAME="/interface/${hostNamePretty}/"; read_etcd_prefix_global; read -a devHash <<< "${printvalue}"
+	for i in ${devHash[@]}; do
+		echo "Working on hash: ${i}"
 		KEYNAME="/short_hash/${i}"; delete_etcd_key_global
 		KEYNAME="/hash/${i}"; delete_etcd_key_global
-		KEYNAME="/$(hostnamectl --pretty)/devpath_lookup/${i}"; delete_etcd_global
+		KEYNAME="/${hostNamePretty}/devpath_lookup/${i}"; delete_etcd_global
 		KEYNAME="uv_hash_select"; read_etcd_global
 		if [[ ${printvalue} = "${i}" ]]; then
 			echo "current device is the selected device, resetting streaming to seal."
 			KEYNAME="uv_hash_select"; KEYVALUE="seal"; write_etcd_global
+			KEYNAME="ENCODER_QUERY"; KEYVALUE="2"; write_etcd_global
+			KEYNAME="input_update"; KEYVALUE="1"; write_etcd_global
 		fi
 	done
 	# Now we have processed ALL of the interface items on this host, we can remove the interface labels:
-	KEYNAME="/interface/$(hostnamectl --pretty)/"; delete_etcd_prefix
-	KEYNAME="/$(hostname)/inputs"; delete_etcd_key_global 
-	KEYNAME="/$(hostname)/INPUT_DEVICE_PRESENT"; delete_etcd_key_global	
+	KEYNAME="/interface/${hostNamePretty}/"; delete_etcd_key_prefix
+	KEYNAME="/${hostNameSys}/inputs"; delete_etcd_key_prefix
+	KEYNAME="/${hostNamePretty}/inputs"; delete_etcd_key_prefix
+	KEYNAME="/${hostNameSys}/INPUT_DEVICE_PRESENT"; delete_etcd_key_global	
 }
 
 remove_host_keys(){
