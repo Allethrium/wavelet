@@ -231,15 +231,65 @@ function handleDynamicButtonClick() {
 	sendDynamicPHPID(this);
 }
 
+function togglebox_setup(toggleBox) {
+	// adds appropriate event listener to the toggleBox, uses a common module to set the value
+	let toggleID		=	toggleBox.split('_toggle_checkbox').join('');
+	let toggleElementID =	$('#' + toggleBox);
+	console.log("Adding event listener to ID: #" + toggleBox + "\nAnd key: " + toggleID);
+	// 	$("#banner_toggle_checkbox").change 
+	$(toggleElementID).on('change', function() {
+		var checkbox = $(this)[0];
+		if (checkbox.checked) {
+			var toggleValue = 1;
+		} else {
+			var toggleValue = 0;
+		}
+		console.log("Submitting ID:" + toggleID + "\nValue: " + toggleValue);
+		$.ajax({
+			type: "POST",
+			url: "/set_toggle_status.php",
+			data: {
+				toggleID:		toggleID,
+				toggleValue:	toggleValue
+				},
+			success: function(response){
+			console.log(response);
+			}
+		});
+	});
+}
+
+function getToggleStatus(toggleKey, toggleValue) {
+	// this function gets a toggle status and returns it.  Replaces audio, banner, livestream & persist toggle modules.
+	console.log("Getting toggle value for /ui/" + toggleKey);
+	$.ajax({
+			type: "POST",
+			url: "/get_toggle_status.php",
+			data: {
+				key: toggleKey
+			},
+		success: function(returned_data) {
+		const toggleValue = JSON.parse(returned_data);
+			if (toggleValue == "1" ) {
+				console.log ( toggleKey + "value is 1, enabling toggle.");
+				$("#" + toggleKey +"_toggle_checkbox")[0].checked=true;
+				} else {
+				console.log ("Banner value is 0, disabling toggle.");
+				$("#" + toggleKey +"_toggle_checkbox")[0].checked=false;
+				}
+		}
+	})
+}
+
 function handlePageLoad() {
-	var livestreamValue				=		getLivestreamStatus(livestreamValue);
-	var bannerValue					=		getBannerStatus(bannerValue);
+	var livestreamValue				=		getLivestreamStatus("livestream", livestreamValue);
+	var bannerValue					=		getBannerStatus("banner", bannerValue);
 	var audioValue					=		getToggleStatus("audio", audioValue);
 	var persistValue 				=		getToggleStatus("persist", persistValue);
 	var bluetoothMACValue			=		getBluetoothMAC(bluetoothMACValue);
-	var audioStatus					=		getAudioStatus(audioValue);
 	// Adding classes and attributes to the prepopulated 'static' buttons on the webUI
 	const staticInputElements		=		document.querySelectorAll(".btn");
+	let toggleInputElements 		= 		Array.from(document.getElementsByClassName('toggle-checkbox'));
 	var confirmElements 			= 		document.getElementsByClassName('serious');
 	var confirmIt					= 		function (e) {
 			var answer=confirm('Are you sure?');
@@ -254,87 +304,8 @@ function handlePageLoad() {
 	}
 	staticInputElements.forEach(el => 
 		el.addEventListener("click", handleButtonClick));
-	// Apply event listener to Livestream toggle
-	$("#lstoggleinput").change
-		(function() {
-			if ($(this).is(':checked')) {
-				$.ajax({
-					type: "POST",
-					url: "/set_enable_livestream.php",
-					data: {
-						lsonoff: "1"
-						},
-					success: function(response){
-					console.log(response);
-					}
-				});
-				} else {
-					$.ajax({
-						type: "POST",
-						url: "/set_enable_livestream.php",
-						data: {
-								lsonoff: "0"
-								},
-								success: function(response){
-								console.log(response);
-								}
-							});
-
-				}
-	});
-	// Apply event listener to banner toggle
-	$("#banner_toggle_checkbox").change
-		(function() {
-			if ($(this).is(':checked')) {
-				$.ajax({
-					type: "POST",
-					url: "/set_enable_banner.php",
-					data: {
-						banneronoff: "1"
-					},
-					success: function(response){
-						console.log(response);
-					}
-				});
-			} else {
-				$.ajax({
-					type: "POST",
-					url: "/set_enable_banner.php",
-					data: {
-						banneronoff: "0"
-							},
-					success: function(response){
-						console.log(response);
-						}
-				});
-			}
-		});
-	// Apply event listener to audio toggle
-	$("#audio_toggle").change
-		(function() {
-			if ($(this).is(':checked')) {
-				$.ajax({
-					type: "POST",
-					url: "/set_enable_audio.php",
-					data: {
-						audioonoff: "1"
-						},
-					success: function(response){
-						console.log(response);
-					}
-				});
-			} else {
-				$.ajax({
-					type: "POST",
-					url: "/set_enable_audio.php",
-					data: {
-						audioonoff: "0"
-							},
-					success: function(response){
-						console.log(response);
-					}
-				});
-			}
+	toggleInputElements.forEach(el => {
+		togglebox_setup(el.id);
 	});
 	// Execute initial AJAX Call
 	inputsAjax();
@@ -373,27 +344,6 @@ function getBannerStatus(bannerValue) {
 				} else {
 				console.log ("Banner value is NOT 1, disabling checkbox toggle.");
 				$("#banner_toggle_checkbox")[0].checked=false; // set HTML checkbox to unchecked
-				}
-		}
-	})
-}
-
-function getToggleStatus(toggleKey, toggleValue) {
-	// this function gets a toggle status and returns it.  Replaces audio, banner, livestream & persist toggle modules.
-	$.ajax({
-			type: "POST",
-			url: "/get_toggle_status.php",
-			data: {
-				key: toggleKey
-			},
-		success: function(returned_data) {
-		const toggleValue = JSON.parse(returned_data);
-			if (toggleValue == "1" ) {
-				console.log ( toggleKey + "value is 1, enabling toggle automatically.");
-				$("#" + toggleKey +"_toggle_checkbox")[0].checked=true;
-				} else {
-				console.log ("Banner value is NOT 1, disabling checkbox toggle.");
-				$("#" + toggleKey +"_toggle_checkbox")[0].checked=false;
 				}
 		}
 	})
