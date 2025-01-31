@@ -52,7 +52,7 @@ generate_service(){
 
 banner_onoff(){
 # Runs first to determine if the banner/watermark flag is enabled
-	KEYNAME=/banner/enabled; read_etcd_global
+	KEYNAME=/ui/banner; read_etcd_global
 		if [[ "$printvalue" -eq 1 ]]; then
 			echo -e "Banner is enabled, proceeding.."
 			read_uv_filter
