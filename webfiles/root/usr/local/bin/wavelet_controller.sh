@@ -40,7 +40,7 @@ main() {
 		exit 0
 	fi
 	# Check livestream toggle UI value
-	KEYNAME="/livestream/enabled"; read_etcd_global; livestream_state="${printvalue}"
+	KEYNAME="/ui/livestream"; read_etcd_global; livestream_state="${printvalue}"
 		if [[ "${livestream_state}" = 0 ]]; then
 			echo "Livestreaming is off, setting LiveStreaming flag to disabled"
 			KEYNAME=uv_islivestreaming; KEYVALUE="0"; write_etcd_global
@@ -49,7 +49,7 @@ main() {
 			KEYNAME=uv_islivestreaming; KEYVALUE="1"; write_etcd_global
 		fi
 	bannerActive=0
-	KEYNAME="/banner/enabled"; read_etcd_global
+	KEYNAME="/ui/banner"; read_etcd_global
 	if [[ ${printvalue} == "1" ]]; then
 		bannerActive=${printvalue}
 	fi
