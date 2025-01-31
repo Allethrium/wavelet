@@ -234,7 +234,8 @@ function handleDynamicButtonClick() {
 function handlePageLoad() {
 	var livestreamValue				=		getLivestreamStatus(livestreamValue);
 	var bannerValue					=		getBannerStatus(bannerValue);
-	var audioValue					=		getAudioStatus(audioValue);
+	var audioValue					=		getToggleStatus("audio", audioValue);
+	var persistValue 				=		getToggleStatus("persist", persistValue);
 	var bluetoothMACValue			=		getBluetoothMAC(bluetoothMACValue);
 	var audioStatus					=		getAudioStatus(audioValue);
 	// Adding classes and attributes to the prepopulated 'static' buttons on the webUI
@@ -372,6 +373,27 @@ function getBannerStatus(bannerValue) {
 				} else {
 				console.log ("Banner value is NOT 1, disabling checkbox toggle.");
 				$("#banner_toggle_checkbox")[0].checked=false; // set HTML checkbox to unchecked
+				}
+		}
+	})
+}
+
+function getToggleStatus(toggleKey, toggleValue) {
+	// this function gets a toggle status and returns it.  Replaces audio, banner, livestream & persist toggle modules.
+	$.ajax({
+			type: "POST",
+			url: "/get_toggle_status.php",
+			data: {
+				key: toggleKey
+			},
+		success: function(returned_data) {
+		const toggleValue = JSON.parse(returned_data);
+			if (toggleValue == "1" ) {
+				console.log ( toggleKey + "value is 1, enabling toggle automatically.");
+				$("#" + toggleKey +"_toggle_checkbox")[0].checked=true;
+				} else {
+				console.log ("Banner value is NOT 1, disabling checkbox toggle.");
+				$("#" + toggleKey +"_toggle_checkbox")[0].checked=false;
 				}
 		}
 	})
