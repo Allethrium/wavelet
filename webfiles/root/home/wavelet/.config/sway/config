@@ -307,14 +307,14 @@ for_window [window_type="menu"] floating enable
 for_window [instance="file_progress"]  sticky enable
 for_window [class="info|Mate-color-select|gcolor2|timesup|QtPass|GtkFileChooserDialog"] sticky enable
 
-exec foot; 
-exec foot -e journalctl -f;
-exec systemctl --user enable build_ug.service --now;
 exec_always cat /proc/acpi/button/lid/LID/state | awk '{print $2}' | grep -q 'closed' && swaymsg output eDP-1 disable
 
-# Below are SED'd out by build_ug.sh for the server only
+# Start a journalctl window
+exec foot -e journalctl -f;
+# Start build_ug.service
+exec systemctl --user start build_ug.service
 
-# Wait for UI containers to come up
+# Below are SED'd out by build_ug.sh for the server only
 #exec /usr/local/bin/wavelet_start_UI.sh
 
 include /etc/sway/config.d/*

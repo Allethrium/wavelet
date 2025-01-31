@@ -26,6 +26,11 @@ storage:
       mode: 0644
       contents:
         local: decoder.ign
+    # The customized decoder yml file which can be modified and regenerated
+    - path: /home/wavelet/config/decoder_custom.yml
+      mode: 0644
+      contents:
+        local: decoder_custom.yml
     - path: /var/isolationMode.enabled
       mode: 0644
       contents:
@@ -43,7 +48,7 @@ storage:
       contents:
         local: automated_coreos_deployment.sh
     # Client automated installer ignition
-    - path: /home/wavelet/http/ignition/automated_installer.yml
+    - path: /home/wavelet/config/automated_installer.yml
       mode: 0644
       overwrite: true
       contents:
@@ -447,8 +452,6 @@ storage:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/etc/firefox/policies/policies.json
 # Systemd user units
     # systemD user unit for wavelet initialization
-    # Called with other initializations when Sway is executed from;
-    # autologin@tty1->.bashrc->sway->build_ug->run_ug->init
     - path: /home/wavelet/.config/systemd/user/wavelet_init.service
       mode: 0644
       overwrite: true
@@ -521,8 +524,8 @@ storage:
         name: wavelet
       group:
         name: wavelet
-    # build_ug.sh determines system local functions and preconfigures the user systemd services appropriately for next boot
-    # Does not start until wavelet dependencies have completed
+    # build_ug.sh determines system local functions
+    # Preconfigures the user systemd services appropriately
     - path: /home/wavelet/.config/systemd/user/build_ug.service
       mode: 0644
       overwrite: true
@@ -530,14 +533,14 @@ storage:
         inline: |
           [Unit]
           Description=Wavelet Initial Setup Service
-          After=network-online.target etcd-quadlet.service
-          Wants=network-online.target
+          After=network-online.target etcd-quadlet.service sway-session.target
+          Wants=network-online.target sway-session.target
           [Service]
           Type=oneshot
           ExecStartPre=/usr/local/bin/wavelet_check_dependencies.sh
           ExecStart=/usr/local/bin/build_ug.sh
           [Install]
-          WantedBy=default.target
+          WantedBy=sway-session.target
       user:
         name: wavelet
       group:
@@ -580,12 +583,6 @@ storage:
         name: wavelet
       group:
         name: wavelet
-    - path: /home/wavelet/dnsmasq
-      mode: 0755
-      user:
-        name: wavelet
-      group:
-        name: wavelet
     - path: /home/wavelet/.config/systemd
       mode: 0755
       user:
@@ -610,7 +607,7 @@ storage:
         name: wavelet
       group:
         name: wavelet
-    - path: /home/wavelet/buildah
+    - path: /home/wavelet/config
       mode: 0755
       user:
         name: wavelet
@@ -668,7 +665,8 @@ systemd:
         [Unit]
         Description=Install packages, generate second-boot systemd rootful units
         ConditionFirstBoot=yes
-        After=multi-user.target
+        Wants=network-online.target
+        After=multi-user.target network-online.target
         [Service]
         Type=oneshot
         ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_installer_xf.sh"

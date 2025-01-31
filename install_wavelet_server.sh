@@ -287,6 +287,8 @@ customization(){
 		repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_password}")
 		sed -i "s/SEDwaveletwifipassword/${repl}/g" ${INPUTFILES}
 
+		echo "Copying customized yml back to ignition folder.."
+		cp ./decoder_custom.yml ./ignition_files/
 		echo -e "\n${GREEN} ***Customization complete, moving to injecting configurations to CoreOS images for initial installation..*** \n${NC}"
 }
 
@@ -332,5 +334,7 @@ read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] 
 
 customization
 
+echo "Removing old ignition files.."
+rm -rf ignition/*.ign
 echo -e "Calling coreos_installer.sh to generate ISO images.  You will then need to burn them to USB/SD cards."
 ./coreos_installer.sh "${developerMode}" "${isoMode}"

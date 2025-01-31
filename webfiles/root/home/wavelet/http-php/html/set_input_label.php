@@ -62,7 +62,7 @@ if (str_contains ($hash, '/network_interface/')) {
 	} else {
 		echo "This is a local device, calling appropriate function for local device..";
 		set_etcd_inputLabel('/interface/' .$label, $hash);
-		set_etcd_inputLabel('/short_hash/' . $hash, $label);
+		set_etcd_inputLabel('/short_hash/' .$hash, $label);
 		del_etcd("$oldText");
 	}
 ?>

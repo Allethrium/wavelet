@@ -4,8 +4,8 @@
 // label = device label from webUI, this is used to overwrite the device string in /interface/ and make the label persistent.
 // oldText = the old device label, which we need to delete from ETCD.
 $hash = $_POST["hash"];
-$newName = $_POST["newName"];
-$oldName = $_POST["oldName"];
+$prettyName = $_POST["prettyName"];
+$hostName = $_POST["hostName"];
 $type = $_POST["type"];
 
 function curl_etcd($keyTarget, $keyValue) {
@@ -28,15 +28,15 @@ function curl_etcd($keyTarget, $keyValue) {
 		echo "\n Succesfully set {$keyTarget} for:\n{$keyValue}";
 }
 
-echo "posted data are: \nNew Label: $newName\nHash: $hash \nOld Label: $oldName\nType: $type\n";
+echo "posted data are: \nNew Label: $prettyName\nHash: $hash \nHost Name: $hostName\nType: $type";
 // This script sets the NEW hostname object and then a reset flag.  Everything else is handled by run_ug/build_ug on reboot
-$keyTarget="hostHash/${hash}/newHostLabel";
-$keyValue=$newName;
+$keyTarget="$hostName/hostNamePretty";
+$keyValue=$prettyName;
 curl_etcd("$keyTarget", "$keyValue");
 
 // set old hostname relabel bit to activate process on target host
 // after the task on the target host is completed, it will remove its old entries automatically
-$keyTarget="$oldName/RELABEL";
+$keyTarget="$hostName/RELABEL";
 $keyValue="1";
 curl_etcd("$keyTarget", "$keyValue");
 ?>

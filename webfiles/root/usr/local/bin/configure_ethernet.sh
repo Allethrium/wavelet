@@ -2,22 +2,18 @@
 
 detect_self(){
 systemctl --user daemon-reload
-UG_HOSTNAME=$(hostname)
-	echo -e "Hostname is $UG_HOSTNAME \n"
-	case $UG_HOSTNAME in
+	echo -e "Hostname is ${hostNameSys}\n"
+	case ${hostNameSys} in
 	enc*) 					event_subordinate
 	;;
 	dec*)					event_subordinate
 	;;
 	svr*)					event_server
 	;;
-	*) 						echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
+	*) 					echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
 	;;
 	esac
 }
-
-detect_self
-
 
 event_server(){
 # Ensures static IP is set on the server
@@ -48,3 +44,7 @@ nmcli con down ${VAR}
 nmcli con up ${VAR}
 echo "Static Ethernet connection configuration applied.."
 }
+
+hostNameSys=$(hostname)
+hostNamePretty=$(hostnamectl --pretty)
+detect_self

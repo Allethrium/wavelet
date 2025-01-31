@@ -49,7 +49,7 @@ function inputsAjax(){
 
 function hostsAjax(){
 // get dynamic hosts from etcd, and call createNewHost to generate entries and buttons for them.
-// returns:  Key (keyname), type (host type), and makes one further call to get the host's hash value
+// returns:  Key (keyname), type (host type), hostName (hostname), hostHash (host's machine ID as SHA256sum), hostLabel (pretty hostname)
 	$.ajax({
 		type: "POST",
 		url: "get_hosts.php",
@@ -64,7 +64,8 @@ function hostsAjax(){
 				var type			=	item['type'];
 				var hostName		=	item['hostName'];
 				var hostHash		=	item['hostHash'];
-				createNewHost(key, type, hostName, hostHash);
+				var hostLabel 		=	item['hostLabel'];
+				createNewHost(key, type, hostName, hostHash, hostLabel);
 				})
 		},
 	complete: function(){
@@ -118,10 +119,10 @@ function sendPHPID(buttonElement) {
 	// we use id here in place of value (both are same for static items in the html)
 	// Because javascript inexplicably can access everythign EXCEPT the value??
 	const postValue				=		(buttonElement.id);
-	const postLabel				=		($(this).innerText);
-	if ("postLabel" in window) {
+	var postLabel				=		($(this).innerText);
+	if (postLabel in window) {
 		console.log("postLabel is not defined! Setting a dummy value..");
-		postLabel	=	"dummyValue";
+		var postLabel	=	"STATIC";
 	}
 	console.log("Sending Value: " + postValue + "\nAnd Label: " + postLabel);
 	$.ajax({
@@ -135,7 +136,8 @@ function sendPHPID(buttonElement) {
 				console.log(response);
 				if (postValue == "RD" || "CL") {
 					// Perhaps we also want to set the button inactive
-					setTimeout(() => window.location.reload(), 1250);
+					sleep(1250);
+					location.reload();
 				}
 			}
 	});
@@ -487,8 +489,8 @@ const callingFunction = (callback) => {
 	callback(this);
 };
 
-function createDeleteButton(hostName, hostHash) {
-/* add delete button */
+function createHostDeleteButton(hostName, hostHash) {
+/* add host delete button */
 	var $btn				=		$('<button/>', {
 		type:   'button',
 		text:   'Remove Host',
@@ -509,6 +511,8 @@ function createDeleteButton(hostName, hostHash) {
 					console.log(response);
 				}
 			})
+			sleep (750);
+			location.reload();
 		})
 	return $btn;
 }
@@ -677,6 +681,8 @@ function createCodecStateChangeButton(hostName, hostHash, type) {
 				},
 				success: function(response){
 					console.log(response);
+					sleep (3000);
+					location.reload()
 				}
 			});
 		})
@@ -690,7 +696,7 @@ function createDecoderMenuSet(hostName, hostHash, type) {
 	$(activeMenuSelector).append(createRebootButton(hostName, hostHash));
 	$(activeMenuSelector).append(createIdentifyButton(hostName, hostHash));
 	$(activeMenuSelector).append(createCodecStateChangeButton(hostName, hostHash, type));
-	$(activeMenuSelector).append(createDeleteButton(hostName, hostHash));
+	$(activeMenuSelector).append(createHostDeleteButton(hostName, hostHash));
 }
 
 function createEncoderMenuSet(hostName, hostHash, type) {
@@ -699,7 +705,7 @@ function createEncoderMenuSet(hostName, hostHash, type) {
 	$(activeMenuSelector).append(createRestartButton(hostName, hostHash));
 	$(activeMenuSelector).append(createRebootButton(hostName, hostHash));
 	$(activeMenuSelector).append(createCodecStateChangeButton(hostName, hostHash, type));
-	$(activeMenuSelector).append(createDeleteButton(hostName, hostHash));
+	$(activeMenuSelector).append(createHostDeleteButton(hostName, hostHash));
 }
 
 function createServerMenuSet(hostName, hostHash, type) {
@@ -830,7 +836,7 @@ function createInputButton(key, value, keyFull, functionIndex, IP) {
 		return $btn;
 	}
 	//  Create a remove button
-	function createDeleteButton() {
+	function createInputDeleteButton() {
 		var $btn = $('<button/>', {
 			type:	'button',
 			text:	'Remove',
@@ -841,7 +847,7 @@ function createInputButton(key, value, keyFull, functionIndex, IP) {
 		}).click(removeInputElement);
 		return $btn;
 	}
-	$(divEntry).append(createDeleteButton());
+	$(divEntry).append(createInputDeleteButton());
 	$(divEntry).append(createRenameButton());
 	$(divEntry).append(createInputButton(text, value));
 	var createdButton = $(divEntry).find('.dynamicInputButton');
@@ -861,11 +867,11 @@ function createInputButton(key, value, keyFull, functionIndex, IP) {
 	counter++;
 }
 
-function createNewHost(key, type, hostName, hostHash, functionIndex) {
-	var divEntry					=		document.createElement("Div");
-	var type						=		type;
-	const id						=		document.createTextNode(counter + 1);
-	var initialHostBlankStatus		=		getBlankHostStatus(hostName, hostHash);
+function createNewHost(key, type, hostName, hostHash, hostLabel, functionIndex) {
+	var divEntry						=		document.createElement("Div");
+	var type							=		type;
+	const id							=		document.createTextNode(counter + 1);
+	var initialHostBlankStatus			=		getBlankHostStatus(hostName, hostHash);
 	divEntry.setAttribute("id", id);
 	divEntry.setAttribute("divHost", hostHash);
 	divEntry.setAttribute("data-fulltext", key);
@@ -873,71 +879,47 @@ function createNewHost(key, type, hostName, hostHash, functionIndex) {
 	divEntry.setAttribute("data-hostType", type);
 	$(divEntry).addClass('host_divider');
 	/* This needs to be done "backwards" insofar as the type needs to be determined before we can start creating a new DIV */
-	console.log("Supplied data are---\nKey:" + key + "\nType:" +type + "\nHostname:" + hostName + "\nHash:" + hostHash);
-	
-	function createDecoderButtonSet(hostName, hostHash){
-		console.log("Generating decoder label and buttons with\nHost Name: " + hostName +"\nAnd Host Hash: " + hostHash + "\nAnd type: " + type + "\nIn Decoders div..\n");
-		$(divEntry).append("Host: <input type='text' value="+hostName+" class='hostTextBox'" + " data-hostHash=" + hostHash + " class='input_textbox'>");
-			var uiElement = $(".hostTextBox").last();
-			uiElement.bind('focus', function() {
-				var oldValue 	= $(this).attr("value");	
-			});
-			uiElement.bind('blur', function() {
-				var phpOldValue =   $(this).attr("value");
-				var phpHostName =   $(this).val();
-				var phpHostHash =   $(this).attr("data-hostHash");
-				if ( phpOldValue == phpHostName ) {
-					console.log("Error, values have not changed, doing nothing")
-				} else {
-				confirm('This will reboot the target host!\nProceed?');
-				console.log("submitting to set_hostlabel.php with values---\nHash: " + phpHostHash + "\nHostname: " + phpHostName + "\nOld Hostname: " + phpOldValue + "\nType: " + type);
-				$.ajax({
-					url : '/set_host_label.php',
-					type :'post',
-					data:{
-						hash:       phpHostHash,
-						newName:    phpHostName,
-						oldName:    phpOldValue,
-						type   :    type
-						},
-					success : function(response) {
-						console.log(response);
-					}
-				});
-			}});
-		getHostIPAJAX(hostName, divEntry);
-		$(divEntry).append(createBlankButton(hostName, hostHash, initialHostBlankStatus));
-		$(divEntry).append(createDetailMenu(hostName, hostHash, type, divEntry));
-		counter ++;
-	}
-	
-	function createEncoderButtonSet(hostName, hostHash){
-		console.log("Generating encoder label and buttons with\nHost Name: " + hostName +"\nAnd Host Hash: " + hostHash + "\nAnd type: " + type + "\nIn encoders div..\n");
-		$(divEntry).append("Host: <input type='text' value="+hostName+" class='hostTextBox' data-hostHash="+hostHash+" class='input_textbox'>");
-		var uiElement = $(".hostTextBox").last();
-		uiElement.bind('blur', function() {
-			var phpOldValue =   $(this).attr("value");
-			var phpHostName =   $(this).val();
-			var phpHostHash =   $(this).attr("data-hostHash");
-			console.log("submitting to set_hostname.php with values---\nHash: " + phpHostHash + "\nHostname: " + phpHostName + "\nOld Hostname: " + phpOldValue);
+	console.log("Generating label and buttons with\nHost Label: "+hostLabel+"\nHost Name: "+hostName+"\nAnd Host Hash: "+hostHash+"\nAnd type: "+type);
+	function createClientButtonSet(hostLabel, hostName, hostHash, type){
+		var labelTextBox					=		document.createElement("input");
+		var labelTextBoxLabel				=		document.createElement("label");
+		labelTextBox.innerHTML 				=		hostLabel;
+		labelTextBox.setAttribute("type", "text");
+		labelTextBox.setAttribute("value", hostLabel);
+		labelTextBox.setAttribute("data-hostHash", hostHash);
+		labelTextBox.setAttribute("class", "input_textbox, hostTextBox");
+		labelTextBox.id=("labelTextBox"+hostHash);
+		labelTextBox.addEventListener('focus', function() {
+			var oldLabelValue 	= $(this).attr("value");	
+			console.log('picking up button value of ' +oldLabelValue);
+		});	
+		labelTextBox.addEventListener('blur', function() {
+			var oldLabelValue				=		$(this).attr("value");
+			var prettyName					=		$(this).val();
+			var phpHostHash					=		$(this).attr("data-hostHash");
+			if ( oldLabelValue 				==		prettyName ) {
+				console.log("Error, values have not changed, doing nothing")
+			} else {
+			console.log("submitting to set_hostlabel.php with values---\nHash: " + phpHostHash + "\nNew Label: " + prettyName + "\nHostname: " + hostName + "\nType: " + type);
 			$.ajax({
-				url : 'set_host_label.php',
+				url : '/set_host_label.php',
 				type :'post',
 				data:{
-					hash:       phpHostHash,
-					newName:    phpHostName,
-					oldName:    phpOldValue
-				},
-				success : function(response) {
+					hash:			phpHostHash,
+					prettyName:		prettyName,
+					hostName:		hostName,
+					type   :		type
+					},
+				success:	function(response) {
 					console.log(response);
 				}
 			});
-		});
-		var thisHostBlankStatus = (getBlankHostStatus(hostName, hostHash));
+		}});
 		getHostIPAJAX(hostName, divEntry);
+		$(divEntry).append(labelTextBox);
 		$(divEntry).append(createBlankButton(hostName, hostHash, initialHostBlankStatus));
-		$(this).addClass('host_divider');
 		$(divEntry).append(createDetailMenu(hostName, hostHash, type, divEntry));
+		counter ++;
 	}
 	function createServerButtonSet(hostName, hostHash){
 		(divEntry).append("Host:" + hostName);
@@ -953,20 +935,19 @@ function createNewHost(key, type, hostName, hostHash, functionIndex) {
 		case 'dec':
 			let dynamicdecHosts = document.getElementById('dynamicdecHosts');
 			console.log("This is a decoder host");
-			console.log("Generating DIV, and calling decoder host generation..\n");
 			dynamicdecHosts.appendChild(divEntry);
-			createDecoderButtonSet(hostName, hostHash);
+			createClientButtonSet(hostLabel, hostName, hostHash, type);
 			counter++;
 			break;
 		case 'enc':
+			let dynamicencHosts = document.getElementById('dynamicencHosts');
 			console.log("This is an encoder host");
 			dynamicencHosts.appendChild(divEntry);
-			createEncoderButtonSet(hostName, hostHash);
+			createClientButtonSet(hostLabel, hostName, hostHash, type);
 			counter++;
 			break;
 		case 'svr':
 			console.log("This is a Server");
-			console.log("Generating DIV, and calling server host generation..\n");
 			dynamicsvrHosts.appendChild(divEntry);
 			createServerButtonSet(hostName, hostHash);
 			break;
@@ -1042,7 +1023,25 @@ function removeInputElement() {
 		});
 	$(this).parent().remove();
 	sleep(300);
-	//setTimeout(() => window.location.reload(), 750);
+	location.reload();
+}
+
+function removeHostElement(hostName, hostHash) {
+	console.log("Host Name for removal is: " + hostName + "\nHash is: " + hostHash);
+		$.ajax({
+			type: "POST",
+			url: "/set_remove_host.php",
+			data: {
+				key: hostName,
+				value: hostHash
+			},
+			success: function(response){
+				console.log(response);
+			}
+		});
+	$(this).parent().remove();
+	sleep(300);
+	location.reload();
 }
 
 function setButtonActiveStyle(button) {

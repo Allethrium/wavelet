@@ -5,38 +5,13 @@
 USER=wavelet
 SCRHOME="/var/home/wavelet"
 
-#set -x
-exec >/home/wavelet/build_httpd.log 2>&1
-
-oldMethod(){
-	# Podman generate systemd method
-	echo -e "Generating Apache Podman container and systemd service file"
-	podman pull docker://docker.io/library/httpd
-	podman create --name httpd -p 8080:80 -v /home/wavelet/http:/usr/local/apache2/htdocs:Z -v /home/wavelet/config/httpd.conf:/usr/local/apache2/conf/httpd.conf:z docker://docker.io/library/httpd
-	cd /home/wavelet/.config/systemd/user
-	podman generate systemd --restart-policy=always -t 5 --name httpd --files
-	cp container-httpd.service ${SCRHOME}/.config/systemd/user
-	chown wavelet:wavelet ${SCRHOME}/.config/systemd/user
-	systemctl --user enable container-httpd.service
-	echo -e "\nApache Podman container generated, service has been enabled in systemd, and will start on next reboot.\n"
-	# Set ETCD key to true for this build step
-	# populate necessary files for decoder spinup
-	cp /usr/local/bin/UltraGrid.AppImage /home/wavelet/http/
-	cp /home/wavelet/wavelet-files.tar.xz /home/wavelet/http/ignition/
-	cp /usr/local/bin/wavelet_installer_xf.sh /home/wavelet/http/ignition/
-	cp /home/wavelet/.bashrc /home/wavelet/http/ignition/skel_bashrc.txt
-	cp /home/wavelet/.bash_profile /home/wavelet/http/ignition/skel_profile.txt
-	chown -R wavelet:wavelet /home/wavelet/http
-	chmod -x /home/wavelet/http
-	exit 0
-}
-
 newMethod(){
 	# Needs to be configured with proper TLS certs to be deployment ready.
 	echo -e "Generating Apache Podman container and systemd service file"
 
 	# Generate Quadlet - default is NOT secure and the config file would be overwritten by wavelet_install_hardening.sh
 	# ref https://hub.docker.com/_/httpd
+	mkdir -p /home/wavelet/.config/containers/systemd/
 	echo -e "[Unit]
 Description=HTTPD Quadlet
 After=local-fs.target
@@ -61,12 +36,12 @@ RestartSec=5
 [Install]
 # Start by default on boot
 WantedBy=default.target" > /home/wavelet/.config/containers/systemd/httpd.container
-	echo -e "\nApache Podman container generated, service has been enabled in systemd, and will start on next reboot.\n"
-	/usr/local/bin/wavelet_etcd_interaction "write_etcd_global" "SERVER_HTTP_BOOTSTRAP_COMPLETED" "1"
+	echo -e "\nApache Podman container generated, service has been enabled in systemd, starting service now..\n"
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "SERVER_HTTP_BOOTSTRAP_COMPLETED" "1"
+	systemctl --user daemon-reload; systemctl --user start httpd.service
 	# populate necessary files for decoder spinup
-	cp /usr/local/bin/UltraGrid.AppImage /home/wavelet/http/
-	cp /home/wavelet/wavelet-files.tar.xz /home/wavelet/http/ignition/
-	cp /usr/local/bin/wavelet_installer_xf.sh /home/wavelet/http/ignition/
+	cp /usr/local/bin/{UltraGrid.AppImage,wavelet_install_client.sh,decoderhostname.sh,connectwifi.sh,wavelet_installer_xf.sh} /var/home/wavelet/http/ignition/
+	cp /var/home/wavelet/setup/wavelet-files.tar.xz /home/wavelet/http/ignition/
 	cp /home/wavelet/.bashrc /home/wavelet/http/ignition/skel_bashrc.txt
 	cp /home/wavelet/.bash_profile /home/wavelet/http/ignition/skel_profile.txt
 	chown -R wavelet:wavelet /home/wavelet/http
@@ -85,10 +60,7 @@ fail(){
 #
 #####
 
-if [[ -f /var/prod.security.enabled ]]; then
-	echo -e "Security layer enabled, generating apache with TLS configuration.."
-	newmethod
-else
-	echo -e "Security layer is not enabled, generating HTTPD without TLS.."
-	oldMethod
-fi
+#set -x
+exec >/var/home/wavelet/logs/build_httpd.log 2>&1
+
+newMethod

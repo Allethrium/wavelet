@@ -62,6 +62,7 @@ function delete_host_state($key) {
 	}
 }
 function delete_host_label($key) {
+	$key = substr($key, 0, strpos($key, "."));
 	$prefixstring = "/hostLabel/$key";
 	$prefixstringplusOne = "$prefixstring" . "0";
 	$keyPrefix=base64_encode($prefixstring);
@@ -79,11 +80,30 @@ function delete_host_label($key) {
 			echo 'Error:' . curl_error($ch);
 	}
 }
+function set_host_deprovision($key) {
+		$b64KeyTarget = base64_encode($key);
+		$b64KeyValue = base64_encode("1");
+		$ch = curl_init();
+		curl_setopt($ch, CURLOPT_URL, 'http://192.168.1.32:2379/v3/kv/put');
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+		curl_setopt($ch, CURLOPT_POST, 1);
+		curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\":\"$b64KeyTarget\", \"value\":\"$b64KeyValue\"}");
+		$headers = array();
+		$headers[] = 'Content-Type: application/x-www-form-urlencoded';
+		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+		$result = curl_exec($ch);
+		if (curl_errno($ch)) {
+				echo 'Error:' . curl_error($ch);
+		}
+		curl_close($ch);
+		echo "Succesfully set {$key} to deprovision.  Unit will shutdown immediately.\n";
+}
 
 // Key is hostname, value is the hash
 delete_host_entries($key);
 delete_host_label($key);
 delete_host_hash($value);
 delete_host_state($key);
-echo "Host has been removed from Wavelet.  If rebooted whilst connected to the network, it will re-register itself with the server.";
+set_host_deprovision($key);
+echo "Host has been removed from Wavelet.  If booted whilst connected to the network, it will re-register itself with the server.  If the security layer is enabled, it will be unsuccessful as it will need to be re-imaged from scratch.";
 ?>

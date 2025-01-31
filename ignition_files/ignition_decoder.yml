@@ -20,18 +20,18 @@ kernel_arguments:
 storage:
   files:
     # WiFi WiFi Name
-    - path: /var/home/wavelet/wifi_ssid
+    - path: /var/home/wavelet/config/wifi_ssid
       overwrite: true
       contents:
         inline: SEDwaveletssid
     # WiFi WiFi Name
-    - path: /var/home/wavelet/wifi_bssid
+    - path: /var/home/wavelet/config/wifi_bssid
       mode: 0600
       overwrite: true
       contents:
         inline: SEDwaveletbssid
     # WiFi WPA Passphrase
-    - path: /var/home/wavelet/wifi_pw
+    - path: /var/home/wavelet/config/wifi_pw
       mode: 0600
       overwrite: true
       contents:
@@ -39,6 +39,7 @@ storage:
     # Flag to set security layer for production deployment - off by default!
     - path: /var/prod.security.disabled
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           Flag tells wavelet to utilize security layer on setup.
@@ -47,19 +48,37 @@ storage:
       mode: 0755
       overwrite: true
       contents:
-        source: http://192.168.1.32:8080/UltraGrid.AppImage
+        source: http://192.168.1.32:8080/ignition/UltraGrid.AppImage
+    # Wavelet modules
+    - path: /home/wavelet/setup/wavelet-files.tar.xz
+      mode: 0755
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/wavelet-files.tar.xz
+    # Setup module for first boot and ostree layer
+    - path: /usr/local/bin/wavelet_installer_xf.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/wavelet_installer_xf.sh
     # Client installer module
     - path: /usr/local/bin/wavelet_install_client.sh
       mode: 0755
       overwrite: true
       contents:
         source: http://192.168.1.32:8080/ignition/wavelet_install_client.sh
-    # Wavelet modules package (pulled down by client_install but making sure it's here..)
-    - path: /usr/local/bin/wavelet-files.tar.xz
-      mode: 0555
+    # Decoderhostname module
+    - path: /usr/local/bin/decoderhostname.sh
+      mode: 0755
       overwrite: true
       contents:
-        source: http://192.168.1.32:8080/ignition/wavelet-files.tar.xz
+        source: http://192.168.1.32:8080/ignition/decoderhostname.sh
+    # Connectwifi module
+    - path: /usr/local/bin/connectwifi.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/connectwifi.sh
     # Sets hostname (set randomly after bootstrap process completes.
     # Any decoder can be promoted to another device by manually changing hostname
     - path: /etc/hostname
@@ -85,6 +104,17 @@ storage:
       contents:
         source: http://192.168.1.32:8080/ignition/skel_bashrc.txt
     - path: /home/wavelet/.bash_profile
+      mode: 0644
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/skel_profile.txt
+    # Root user bashrc
+    - path: /root/.bashrc
+      mode: 0644
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/skel_bashrc.txt
+    - path: /root/.bash_profile
       mode: 0644
       overwrite: true
       contents:
@@ -173,7 +203,7 @@ storage:
       contents:
         inline: |
           polkit.addRule(function(action, subject) {
-          if (action.id == "org.freedesktop.hostname1.set-hostname") {
+          if (action.id == "org.freedesktop.hostname1.set-static-hostname") {
             if (subject.user == "wavelet") {
               return polkit.Result.YES;
               }
@@ -191,6 +221,28 @@ storage:
                  subject.user == "wavelet")) {
                   return polkit.Result.YES;
                 }
+          });
+    # Restart getty
+    - path: /etc/polkit-1/rules.d/1336-systemd-getty.rules
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          polkit.addRule(function(action, subject) {
+            if ((action.id == "org.freedesktop.systemd1.manage-units" &&
+                 subject.user == "wavelet")) {
+                  polkit.log("action=" + action)
+                  polkit.log("subject=" + subject)
+                  polkit.log("unit="+action.lookup("unit"))
+                  polkit.log("verb="+action.lookup("verb"))
+            if (action.lookup("unit") == "getty@tty1.service") {
+                 var verb = action.lookup("verb");
+                 if (verb == "restart") {
+                  polkit.log("returning YES")
+                  return polkit.Result.YES;
+                  }
+                }
+              }
           });
     # Define system performance settings
     - path: /etc/sysctl.d/90-sysrq.conf
@@ -254,18 +306,6 @@ storage:
         inline: |
           ACTION=="add", ENV{ID_BUS}=="usb", SUBSYSTEM=="usb", RUN+="/usr/local/bin/udev_call.sh"
           ACTION=="remove", ENV{ID_BUS}=="usb", SUBSYSTEM=="usb", RUN+="/usr/local/bin/udev_call.sh removed"
-    # Remainder files to be served from a previously configured Wavelet server.
-    - path: /home/wavelet/wavelet-files.tar.xz
-      mode: 0755
-      overwrite: true
-      contents:
-        source: http://192.168.1.32:8080/ignition/wavelet-files.tar.xz
-    # Setup script for RPMFusion depends
-    - path: /usr/local/bin/wavelet_installer_xf.sh
-      mode: 0755
-      overwrite: true
-      contents:
-        source: http://192.168.1.32:8080/ignition/wavelet_installer_xf.sh
     # We don't want rolling updates enabled via Zincati, as this is an offline appliance
     - path: /etc/sudoers.d/hostnamectl
       mode: 0644
@@ -275,33 +315,12 @@ storage:
           # Allow wavelet to set device hostname
           wavelet ALL=(ALL) NOPASSWD: /usr/bin/hostnamectl
     # populate the etcd cluster hostname/IP address from the server
-    - path: /var/home/wavelet/etcd_ip
+    - path: /var/home/wavelet/config/etcd_ip
       mode: 0644
       overwrite: true
       contents:
         source: http://192.168.1.32:8080/ignition/etcd_ip
 # Systemd user units
-    # systemD user unit for wavelet initialization
-    # Called with other initializations when Sway is executed from;
-    # autologin@tty1->.bashrc->sway->build_ug->run_ug->init
-    - path: /home/wavelet/.config/systemd/user/wavelet_init.service
-      mode: 0644
-      overwrite: true
-      contents:
-        inline: |
-         [Unit]
-         Description=Wavelet Controller Service
-         After=network-online.target etcd-member.service
-         Wants=network-online.target
-         [Service]
-         Type=simple
-         ExecStart=/usr/local/bin/wavelet_init.sh
-         [Install]
-         WantedBy=default.target
-      user:
-        name: wavelet
-      group:
-        name: wavelet
     # Etcd watch reflectorflag service
     - path: /home/wavelet/.config/systemd/user/watch_reflectorreload.service
       mode: 0644
@@ -390,20 +409,22 @@ storage:
         name: wavelet
       group:
         name: wavelet
-    # build_ug.sh determines system local functions and preconfigures the user systemd services appropriately for next boot
+    # build_ug.sh determines system local functions
+    # Preconfigures the user systemd services appropriately
     - path: /home/wavelet/.config/systemd/user/build_ug.service
       mode: 0644
+      overwrite: true
       contents:
         inline: |
           [Unit]
           Description=Wavelet Initial Setup Service
-          After=network-online.target etcd-member.service
-          Wants=network-online.target
+          After=network-online.target etcd-quadlet.service sway-session.target
+          Wants=network-online.target sway-session.target
           [Service]
           Type=oneshot
           ExecStart=/usr/local/bin/build_ug.sh
           [Install]
-          WantedBy=default.target
+          WantedBy=sway-session.target
       user:
         name: wavelet
       group:
@@ -426,12 +447,6 @@ storage:
         name: wavelet
       group:
         name: wavelet
-    - path: /home/wavelet/dnsmasq
-      mode: 0755
-      user:
-        name: wavelet
-      group:
-        name: wavelet
     - path: /home/wavelet/.config/systemd
       mode: 0755
       user:
@@ -444,19 +459,7 @@ storage:
         name: wavelet
       group:
         name: wavelet
-    - path: /home/wavelet/registry
-      mode: 0755
-      user:
-        name: wavelet
-      group:
-        name: wavelet
-    - path: /home/wavelet/etcd
-      mode: 0755
-      user:
-        name: wavelet
-      group:
-        name: wavelet
-    - path: /home/wavelet/buildah
+    - path: /home/wavelet/config
       mode: 0755
       user:
         name: wavelet
@@ -495,16 +498,17 @@ systemd:
         [Unit]
         Description=Install Overlay packages, and generate second-boot systemd units
         ConditionFirstBoot=yes
-        After=multi-user.target
+        Wants=network-online.target
+        After=multi-user.target network-online.target
         [Service]
         Type=oneshot
         ExecStart=/usr/bin/bash -c "/usr/local/bin/wavelet_installer_xf.sh"
         ExecStartPost=-systemctl reboot
         [Install]
         WantedBy=multi-user.target
-    # service to call decoderhostname randomizer (interactive auth required so this is a TEST to make it work from root!)
+    # service to call decoderhostname randomizer. Doesn't run until called by client_installer
     - name: decoderhostname.service
-      enabled: true
+      enabled: false
       contents: |
           [Unit]
           Description=Configures a four character hostname
@@ -512,7 +516,7 @@ systemd:
           After=network-online.target check_and_wait.target
           [Service]
           Type=oneshot
-          ExecStart=-/usr/local/bin/decoderhostname.sh
+          ExecStart=/usr/local/bin/decoderhostname.sh
           [Install]
           WantedBy=default.target
     # Reboot service

@@ -2,55 +2,66 @@
 # Attempts to find and join a Wavelet network if it's available
 
 get_full_bssid(){
-	sleep 3
-	wifibssid=$(nmcli -f BSSID device wifi | grep ${wifi_ap_mac} | head -n 1 | xargs)
+	sleep 2
+	wifibssid=$(nmcli -f BSSID device wifi | grep ${wifi_ap_mac^^} | head -n 1 | xargs)
 	echo ${wifibssid}
 }
 
 connectwifi(){
+	# Check for debug flag
 	if [[ $- == *"x"* ]]; then
 		# Spit out a list of wifi networks so we have something to refer to
 		nmcli con show
 	fi
-	if [[ -f /var/prod.security.enabled ]]; then
-		connectwifi_enterprise
+
+	# Attempt to connect to the configured wifi before proceeding
+	if nmcli con up $(cat /var/home/wavelet/config/wifi_ssid); then
+		echo "Configured connection established, exiting."
+		exit 0
 	else
-		connectwifi_psk
+		# Recreate the network
+		echo "An error has occurred, attempting to repopulate the wifi connection.."
+		if [[ -f /var/prod.security.enabled ]]; then
+			connectwifi_enterprise
+		else
+			connectwifi_psk
+		fi
 	fi
 }
 
 connectwifi_psk(){
-	networkssid=$(cat /var/home/wavelet/wifi_ssid)
-	wifipassword=$(cat /var/home/wavelet/wifi_pw)
-	wifi_ap_mac=$(cat /var/home/wavelet/wifi_bssid)
+	networkssid=$(cat /var/home/wavelet/config/wifi_ssid)
+	wifipassword=$(cat /var/home/wavelet/config/wifi_pw)
+	wifi_ap_mac=$(cat /var/home/wavelet/config/wifi_bssid)
 	# Determine wifi ifname (what a pain..)
 	ifname=$(nmcli dev show | grep wifi -B1 | head -n 1 | awk '{print $2}')
 
 	# Keep scanning until we get a match on wifi_ap_mac
-	until get_full_bssid | grep -m 1 "${wifi_ap_mac}"; do
+	until get_full_bssid | grep -m 1 "${wifi_ap_mac^^}"; do
 		nmcli dev wifi rescan
 	done
 	# We need to do this once more, or the variable isn't populated.
 	wifibssid=$(get_full_bssid)
+	# Spit this out for notation purposes
+	nmcli con show
 	echo -e "Found WiFi BSSID match! It is: ${wifibssid}\n"
 
 	# Remove any old connection UUID's with the same name
+	nmcli con del ${networkssid}
+	# Create new connection
 	response=$(nmcli connection add type wifi con-name ${networkssid} ifname ${ifname} ssid ${networkssid})
 	currentuuid=$(echo $response | awk '{print $3}' | sed 's|(||g' | sed 's|)||g')
+	echo "Created Wavelet network connection with UUID: ${currentuuid}"
+	echo -e "Available network connections:\n$(nmcli con show)"
 	for connection in $(nmcli -g NAME con show); do
 		if [[ ${connection} == ${networkssid} ]]; then
-			echo "Is a wavelet-configured wifi connection, proceeding.."
+			echo "${connection} is a wavelet-configured WiFi connection, proceeding.."
 			uuid=$(nmcli -g connection.uuid con show "${connection}")
-			if [[ ${connection} == ${currentuuid} ]]; then
-				echo "connection is the active UUID, configuring and setting as ON"
-				nmcli con mod ${connection} wifi-sec.key-mgmt wpa-psk wifi-sec.psk ${wifipassword}
-				nmcli con mod ${connection} connection.autoconnect yes
-				#nmcli dev set ${ifname} autoconnect yes
-				nmcli con up ${connection}
-				echo "${currentuuid}" > /var/home/wavelet/wifi.${networkssid}.key
-			else
-				nmcli con del ${connection}
-			fi
+			echo -e "connection is the active UUID of:${uuid}\nConfiguring and setting as ON"
+			nmcli -g connection.uuid con mod ${uuid} wifi-sec.key-mgmt wpa-psk wifi-sec.psk ${wifipassword}
+			nmcli -g connection.uuid con mod ${uuid} connection.autoconnect yes
+			nmcli -g connection.uuid con up ${uuid}
+			echo "${uuid}" > /var/home/wavelet/config/wifi.${networkssid}.key
 		else
 			echo "Not a wavelet configured wifi connection, ignoring"
 		fi
@@ -76,8 +87,8 @@ connectwifi_psk(){
 
 connectwifi_enterprise(){   
 	# Won't work right now, more of a bones until we get the core stuff refactored.       
-	networkssid=$(cat /var/home/wavelet/wifi_ssid)
-	wifi_ap_mac=$(cat /var/home/wavelet/wifi_bssid)
+	networkssid=$(cat /var/home/wavelet/config/wifi_ssid)
+	wifi_ap_mac=$(cat /var/home/wavelet/config/wifi_bssid)
 	# Determine wifi ifname (what a pain..)
 	ifname=$(nmcli dev show | grep wifi -B1 | head -n 1 | awk '{print $2}')
 	# Generates an nmcli connection with the appropriate certificates
@@ -108,13 +119,20 @@ connectwifi_enterprise(){
 detect_disable_ethernet(){
 	if [[ -f /var/no.wifi ]]; then
 		echo -e "The /var/no.wifi flag is set.  Please remove this file if this host should utilize wireless connectivity."
+		exit 0
 	else
-		# Simplify this from the previous loop, just find ethernet interface and awk for connection UUID, then disable.
+		sleep 2
 		ethernetInterfaceUUID=$(nmcli con show | grep ethernet | awk '{print $4}')
-		nmcli -f uuid con down "${ethernetInterfaceUUID}"
-		# We need to set the CONNECTION do be down, NOT the interface.
-		#nmcli device disconnect "${ethernetInterface}"
-		echo -e "The primary ethernet connection with UUID ${ethernetInterfaceUUID} has been disabled.\nTo re-enable, you can use:\nnmcli con up ${ethernetInterfaceUUID}\nOr:\nnmtui\nFor a gui interface."
+		echo -e "Ethernet Interface UUID discovered: ${ethernetInterfaceUUID}"
+		nmcli con show ${ethernetInterfaceUUID}
+		if [[ $(nmcli -f GENERAL.STATE con show uuid ${ethernetInterfaceUUID}) == "*activated*" ]]; then
+			# Simplify this from the previous loop, just find ethernet interface and awk for connection UUID, then disable.
+			echo "Ethernet connection detected as inactive.  No further action necessary."
+		else
+			target=$(nmcli con show --active | grep ethernet | awk '{print $4}')
+			nmcli con down "${target}"
+			echo -e "The primary ethernet connection with UUID ${ethernetInterfaceUUID} has been disabled.\nTo re-enable, you can use:\nnmcli con up ${ethernetInterfaceUUID}\nOr:\nnmtui\nFor a gui interface."
+		fi	
 	fi
 }
 
@@ -124,14 +142,14 @@ set_ethernet_mtu(){
 	done
 }
 
+
 #####
 #
 # Main
 #
 #####
 
-
-logName="/var/home/wavelet/connectwifi.log"
+logName="/var/home/wavelet/logs/connectwifi.log"
 if [[ -e $logName || -L $logName ]] ; then
 	i=0
 	while [[ -e $logName-$i || -L $logName-$i ]] ; do
@@ -139,9 +157,8 @@ if [[ -e $logName || -L $logName ]] ; then
 	done
 	logName=$logName-$i
 fi
-set -x
+#set -x
 exec >${logName} 2>&1
-
 
 if [[ $(hostname) = *"svr"* ]]; then
 	echo -e "This script enables wifi and disables other networking devices.  It is highly recommended to have the server running on a wired link."

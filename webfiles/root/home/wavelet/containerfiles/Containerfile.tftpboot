@@ -8,7 +8,7 @@
 # ExecPost = wavelet_pxe_grubconfig.sh
 
 FROM quay.io/fedora/fedora:40
-RUN mkdir -p /tmp/boot_rpms && dnf update -y --refresh 
+RUN rm /etc/yum.repos.d/fedora-cisco-openh264.repo && mkdir -p /tmp/boot_rpms && dnf update -y --refresh 
 RUN dnf install -y grub2-efi-x64-modules grub2-tools-extra grub2-pc-modules shadow-utils podman fuse-overlayfs cpio --exclude container-selinux && \
 grub2-mknetdir --net-directory /tmp/var/lib/tftpboot/
 RUN dnf install -y --downloadonly --downloaddir=/tmp/boot_rpms/ shim shim-x64 grub2-efi grub2-efi-x64

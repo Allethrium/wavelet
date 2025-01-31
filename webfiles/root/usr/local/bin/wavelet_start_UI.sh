@@ -6,6 +6,7 @@
 
 main(){
 	serverIP=$(nslookup svr | awk '/^Address: / { print $2 }')
+        systemctl --user start http-php-pod.service
 	sleep 5
 	exec firefox http://${serverIP}:9080
 }
@@ -22,7 +23,7 @@ get_authtoken(){
 #
 #####
 
-logName=/var/home/wavelet/webui.log
+logName=/var/home/wavelet/logs/webui.log
 #set -x
 exec > "${logName}" 2>&1
 

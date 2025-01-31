@@ -14,15 +14,15 @@
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
-	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for value: $printvalue for host: ${hostNameSys}\n"
 }
 read_etcd_global(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
-	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for Global Value: $printvalue\n"
 }
 read_etcd_prefix(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
-	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for value $printvalue for host: ${hostNameSys}\n"
 }
 read_etcd_clients_ip() {
 	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
@@ -34,17 +34,27 @@ read_etcd_clients_ip_sed() {
 }
 write_etcd(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
-	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
+	echo -e "Key Name: ${KEYNAME} set to ${KEYVALUE} under /${hostNameSys}/\n"
 }
 write_etcd_global(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
-	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
+	echo -e "Key Name: ${KEYNAME} set to: ${KEYVALUE} for Global value\n"
 }
 write_etcd_client_ip(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
 }
 delete_etcd_key(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key" "${KEYNAME}"
+}
+delete_etcd_key_global(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key_global" "${KEYNAME}"
+}
+delete_etcd_key_prefix(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key_prefix" "${KEYNAME}"
+}
+generate_service(){
+	# Can be called with more args with "generate_servier" ${keyToWatch} 0 0 "${serviceName}"
+	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
 }
 
 parse_macaddr() {
@@ -137,7 +147,7 @@ event_magewell_ndi(){
 	echo -e "MageWell ProConvert device should now be fully configured..\n"
 	# Generate UG Stream command from the appropriate NDI Source
 	deviceHostName="Magewell_Proconvert_HDMI_$(curl -b /var/tmp/wavelet_sid.txt http://${ipAddr}/mwapi?method=get-summary-info | jq '.ndi.name' | tr -d '"')"
-	UGdeviceStreamCommand="ndi:url=${ndiIPAddr}"
+	UGdeviceStreamCommand="ndi:url=${ndiIPAddr}:color=100"
 	populate_to_etcd
 	# Call a new module to populate the DHCP lease into FreeIPA BIND (does nothing if security layer is off)
 	/usr/local/bin/wavelet_ddns_update.sh ${deviceHostName} ${ipAddr}
@@ -145,8 +155,8 @@ event_magewell_ndi(){
 
 event_ptz_ndiHX(){
 		# Interrogates PTZ Cam device, attempts preconfigured username and password, then tries to set appropriate settings for streaming into UltraGrid.
-		echo -e "Waiting for five seconds, then attempting to connect to device..\n"
-		sleep 5
+		echo -e "Waiting for three seconds, then attempting to connect to device..\n"
+		sleep 3
 		# stuff to set the stream target to RTP/RTSP 192.168.1.32 on appropriate port
 		# Generate JSON config object from the device webserver
 		input=$(curl -X GET -H "Content-type: application/json" -H "Accept: application/json" http://${ipAddr}/cgi-bin/param.cgi?get_device_conf | tr -d '"' | jq -Rs 'split("\n")[:-1][]')
@@ -170,9 +180,9 @@ event_ptz_ndiHX(){
 		tput -T linux setaf 2
 		ndiSource=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | cut -d '(' -f1 | awk '{print $1}')
 		if [ -n ${ndiSource} ]; then
-			echo -e "\nNDI source for this IP address not found, configuring for RTSP..\n"
+			echo -e "NDI source for this IP address not found, configuring for RTSP..\n"
 			UGdeviceStreamCommand="rtsp://${ipAddr}:554/1:decompress"
-			if [[ $(ffprobe -v quiet -show_streams ${UGdeviceStreamCommand}) ]]; then
+			if [[ $(ffprobe -v quiet -show_streams rtsp://${ipAddr}:554/1) ]]; then
 
 				populate_to_etcd
 				echo -e "Device RTSP configured, however it may not work without further settings.\n"
@@ -210,8 +220,8 @@ event_vendorDevice3(){
 
 event_unsupportedDevice(){
 		# We could do something here to attempt to connect to the device and parse whatever looks like a string to a proper value?
-		echo -e "Waiting for five seconds, then attempting to connect to device..\n"
-		sleep 5
+		echo -e "Waiting for three seconds, then attempting to connect to device..\n"
+		sleep 3
 		# Check to see if this device is a wavelet decoder or encoder
 		read_etcd_clients_ip_sed
 		if [[ "${printvalue}" == *"${ipAddr}"* ]]; then
@@ -223,7 +233,7 @@ event_unsupportedDevice(){
 			deviceHostName=$(nslookup ${ipAddr} | awk '{print $4}')
 			ndiSource=$(/usr/local/bin/UltraGrid.AppImage --tool uv -t ndi:help | grep ${ipAddr} | cut -d '(' -f1 | awk '{print $1}')
 			if [ -n ${ndiSource} ]; then
-				echo -e "\nNDI source for this IP address: ${ipAddr}\nnot found, attempting RTSP.."
+				echo -e "NDI source for this IP address: ${ipAddr} not found, attempting RTSP.."
 				UGdeviceStreamCommand="rtsp://${ipAddr}:554/1:decompress"
 				# Do a test here to see if RTSP is successful, if not, this probably isn't a video device and we don't want to go further.
 				if [[ $(ffprobe -v quiet -show_streams ${UGdeviceStreamCommand}) ]]; then
@@ -307,9 +317,17 @@ populate_to_etcd(){
 		# /usr/local/bin/wavelet_network_device_relabel.sh
 	# This key often winds up with garbage, and must be deleted or it will cause issues parsing things back out.
 	KEYNAME="/network_interface/short"; delete_etcd_key
+	# Finally we tell wavelet there is a new input device in town so the server encoder task will regenerate next click..
+	KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
 	exit 0
 }
 
+probe_ip(){
+	# Probes a specific IP.  Can be called from CLI or more commonly from detectv4l.sh
+	echo -e "Detected IP Address: ${ipAddr}"
+	macAddr=$(cat /var/lib/dnsmasq/dnsmasq.leases | grep ${ipAddr} | awk '{print $2}')
+	parse_macaddr "${ipAddr}" "${macAddr}"
+}
 
 
 #####
@@ -317,6 +335,7 @@ populate_to_etcd(){
 # Main
 #
 ####
+
 
 logName=/var/tmp/network_device.log
 if [[ -e $logName || -L $logName ]] ; then
@@ -326,6 +345,18 @@ if [[ -e $logName || -L $logName ]] ; then
 	done
 	logName=$logName-$i
 fi
+hostNameSys=$(hostname)
+hostNamePretty=$(hostnamectl --pretty)
+
+# Process input args (if any)
+for i in "$@"; do
+		case $i in
+			"--p")		echo "Probing $2"; ipAddr=$2; probe_ip
+			;;
+			*)			echo "no input, called from wavelet_network sense";
+			;;
+		esac
+done
 
 #set -x
 exec >${logName} 2>&1

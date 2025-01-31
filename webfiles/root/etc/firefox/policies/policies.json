@@ -93,7 +93,7 @@
 		},
 		"HardwareAcceleration": true,
 		"Homepage": {
-			"URL": "http://192.168.1.32:8180/",
+			"URL": "http://192.168.1.32:9080/",
 			"Locked": true,
 			"StartPage": "homepage-locked"
 		},

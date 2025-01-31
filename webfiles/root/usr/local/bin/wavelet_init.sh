@@ -1,22 +1,22 @@
-
-
 #!/bin/bash
 
 # This forms the basis of an init script when the server starts and run_ug.sh is called to determine the system type
 # It runs once, sets initial values in etcd which the controller then handles appropriately.  
 # This effectively starts the controller in a default state, on "best" settings
 
+
+# Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
-	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for value: $printvalue for host: ${hostNameSys}\n"
 }
 read_etcd_global(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
-	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for Global Value: $printvalue\n"
 }
 read_etcd_prefix(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
-	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for value $printvalue for host: ${hostNameSys}\n"
 }
 read_etcd_clients_ip() {
 	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
@@ -26,21 +26,13 @@ read_etcd_clients_ip_sed() {
 	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
 	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
 }
-read_etcd_json_revision(){
-	# Special case used in controller
-	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_json_revision" uv_hash_select | jq -r '.header.revision')
-}
-read_etcd_lastrevision(){
-	# Special case used in controller
-	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_lastrevision")	
-}
 write_etcd(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
-	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under: /$(hostname)/\n"
+	echo -e "Key Name: ${KEYNAME} set to ${KEYVALUE} under /${hostNameSys}/\n"
 }
 write_etcd_global(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
-	echo -e "Key Name ${KEYNAME} set to: ${KEYVALUE} for Global value\n"
+	echo -e "Key Name: ${KEYNAME} set to: ${KEYVALUE} for Global value\n"
 }
 write_etcd_client_ip(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
@@ -50,6 +42,9 @@ delete_etcd_key(){
 }
 delete_etcd_key_global(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key_global" "${KEYNAME}"
+}
+delete_etcd_key_prefix(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key_prefix" "${KEYNAME}"
 }
 generate_service(){
 	# Can be called with more args with "generate_servier" ${keyToWatch} 0 0 "${serviceName}"
@@ -137,6 +132,8 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage
 #
 #####
 
+hostNameSys=$(hostname)
+hostNamePretty=$(hostnamectl --pretty)
 
 # Populate standard values into etcd
 #set -x
@@ -147,7 +144,7 @@ until [[ $(/usr/local/bin/wavelet_etcd_interaction.sh "check_status" | awk '{pri
 done
 sleep 2
 echo -e "Etcd cluster is up and responding, continuing.."
-exec >/home/wavelet/initialize.log 2>&1
+exec >/var/home/wavelet/logs/initialize.log 2>&1
 echo -e "Populating standard values into etcd, the last step will trigger the Controller and Reflector functions, bringing the system up.\n"
 KEYNAME="uv_videoport"; KEYVALUE="5004"; write_etcd_global
 KEYNAME="uv_audioport"; KEYVALUE="5006"; write_etcd_global
@@ -158,12 +155,14 @@ KEYNAME="uv_filter_cmd"; delete_etcd_key_global
 
 event_init_av1
 
-echo -e "Enabling monitor services..\n"
-systemctl --user enable watch_reflectorreload.service --now
-systemctl --user enable watch_encoderflag.service --now
-echo -e "Values populated, monitor services launched.  Starting Reflector and Controller\n"
-systemctl --user enable wavelet_reflector.service --now
-systemctl --user enable wavelet_controller.service --now
+echo -e "Enabling monitor services.."
+systemctl --user enable \
+	wavelet_reflector_reload.service \
+	wavelet_encoder_query.service --now
+echo -e "Values populated, monitor services launched.  Starting Reflector and Controller"
+systemctl --user enable \
+	wavelet_reflector.service \
+	wavelet_controller.service --now
 
 # Attempt to connect to a cached bluetooth audio output device
 /usr/local/bin/wavelet_set_bluetooth_connect.sh

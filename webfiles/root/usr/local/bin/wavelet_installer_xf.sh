@@ -4,22 +4,18 @@
 # All wavelet modules, including the web server code, are deployed on all devices.
 
 detect_self(){
-systemctl --user daemon-reload
-# This might be of use if we need some custom kernels or decide to start building addition ostree overlays
-platform=$(dmidecode | grep "Manufacturer" | cut -d ':' -f 2 | head -n 1)
-UG_HOSTNAME=$(hostname)
-	echo -e "Hostname is $UG_HOSTNAME \n"
-	case $UG_HOSTNAME in
-	enc*)                   echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."							;	event_decoder
-	;;
-	decX.wavelet.local)     echo -e "I am a Decoder, but my hostname is generic.  An additional reboot will occur after build_ug firstrun"	;	event_decoder 
-	;;
-	dec*)                   echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."								;	event_decoder
-	;;
-	svr*)                   echo -e "I am a Server. Proceeding..."																			;	event_server
-	;;
-	*)                      echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
-	;;
+	# This might be of use if we need some custom kernels or decide to start building addition ostree overlays
+	# platform=$(dmidecode | grep "Manufacturer" | cut -d ':' -f 2 | head -n 1)
+	echo -e "Hostname is ${hostNameSys}"
+	case ${hostNameSys} in
+		enc*)	echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."		;	event_decoder
+		;;
+		dec*)	echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."			;	event_decoder
+		;;
+		svr*)	echo -e "I am a Server. Proceeding..."														;	event_server
+		;;
+		*)		echo -e "This device Hostname is not set appropriately, exiting \n" && exit 0
+		;;
 	esac
 }
 
@@ -27,11 +23,11 @@ event_decoder(){
 	# First we'd need to determine our architecture.
 	arch=$(uname -m)
 	case ${arch} in
-		"x86_64")	echo -e "AMD64 architecture, checking if we are a Microsoft Surface for custom kernel..\n";		determine_ifSurface
+		"x86_64")	echo -e "AMD64 architecture, running base install..\n"		;		rpm_overlay_install_decoder
 		;;
-		"arm")		echo -e "aarch64 architecture, switching to ARM ostree..";										rpm_ostree_ARM
+		"arm")		echo -e "aarch64 architecture, switching to ARM ostree.."	;		rpm_ostree_ARM
 		;;
-		"riscV")	echo -e "RISC-V architecture, switching to RISCV ostree..";										rpm_ostree_RISCV
+		"riscV")	echo -e "RISC-V architecture, switching to RISCV ostree.."	;		rpm_ostree_RISCV
 		;;
 		*)			echo -e "Architecture obsolete or unsupported, exiting..\n"
 	esac
@@ -45,63 +41,22 @@ set_ethernet_mtu(){
 }
 
 event_server(){
-	#	Server can only be x86.  I haven't had access to another platform with video hardware support + enough number crunching power to do the task.
-	#	Suggestions which aren't too exotic are welcome!
+	# generate proper RC files for root/wavelet-root which gives us aliases and powerline
+	cd /root; rm .bashrc .bash_profile; cp /etc/skel/{.bashrc,.bash_profile} .
+	cd /var/home/wavelet-root; rm .bashrc .bash_profile; cp /etc/skel/{.bashrc,.bash_profile} .
+	# Server can only be x86.  I haven't had access to another platform with video hardware support + enough number crunching power to do the task.
 	# Generate RPM Container overlay
+	# Set my pretty hostname
+	hostnamectl set-hostname $(hostname) --pretty
 	cp /usr/local/bin/wavelet_install_ug_depends.sh	/home/wavelet/containerfiles/
 	cp /usr/local/bin/wavelet_pxe_grubconfig.sh		/home/wavelet/containerfiles/
-	# old etcd setup previously in build_ug.sh
-	#echo -e "Pulling etcd and generating systemd services.."
-	#cd /home/wavelet/.config/systemd/user/
-	#/bin/podman pull quay.io/coreos/etcd:v3.5.9
-	#/bin/podman create --name etcd-member --net=host \
-   #quay.io/coreos/etcd:v3.5.9 /usr/local/bin/etcd              \
-   #--data-dir /etcd-data --name wavelet_svr                  \
-   #--initial-advertise-peer-urls http://192.168.1.32:2380 \
-   #--listen-peer-urls http://192.168.1.32:2380           \
-   #--advertise-client-urls http://192.168.1.32:2379       \
-   #--listen-client-urls http://192.168.1.32:2379,http://127.0.0.1:2379        \
-	#   --initial-cluster wavelet_svr=http://192.168.1.32:2380 \
-	#   --initial-cluster-state new
-	#/bin/podman generate systemd --files --name etcd-member --restart-policy=always -t 2
-	#sleep 1
-	# Quadlet Etcd service, I have decided it's more appropriate to move this back to a system service
-	# This is because it would only run when a user is logged on
-	# We will likely want to secure the server console in prod deployment.
 	# Make etcd datadir and copy nonsecure yaml to conf file, and update with server IP address.  We are using network=host in the container.
 	mkdir -p /var/lib/etcd-data
 	# Copy nonsecure conf file.  The secure file would be added by the wavelet_install_hardening.sh module if hardening is enabled.
 	cp /etc/etcd/etcd.yaml.conf /etc/etcd/etcd.conf
 	ip=$(hostname -I | cut -d " " -f 1)
-	echo "${ip}" > /var/home/wavelet/etcd_ip
+	echo "${ip}" > /var/home/wavelet/config/etcd_ip
 	sed -i "s|svrIP|${ip}|g" /etc/etcd/etcd.conf
-
-	# Old systemd method
-	echo -e "[Unit]
-Description=Run single node etcd
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-ExecStartPre=-mkdir -p /var/lib/etcd-data
-ExecStartPre=-/bin/podman kill etcd
-ExecStartPre=-/bin/podman rm etcd
-ExecStartPre=-/bin/podman pull quay.io/coreos/etcd:v3.5.9
-ExecStart=/bin/podman run --name etcd \
-	--volume /var/lib/etcd-data:/etcd-data:Z \
-	--net=host quay.io/coreos/etcd /usr/local/bin/etcd \
-	--data-dir /etcd-data \
-	--name wavelet_svr \
-	--initial-advertise-peer-urls http://${ip}:2380 \
-	--listen-peer-urls http://${ip}:2380 \
-	--advertise-client-urls http://${ip}:2379 \
-	--listen-client-urls http://${ip}:2379,http://127.0.0.1:2379 \
-	--initial-cluster wavelet_svr=http://${ip}:2380 \
-	--initial-cluster-state new
-ExecStop=/bin/podman stop etcd
-
-[Install]
-WantedBy=multi-user.target" > /etc/systemd/system/etcd-container.service
 
 	# Quadlet
 	echo -e "[Unit]
@@ -134,7 +89,6 @@ WantedBy=multi-user.target" > /etc/containers/systemd/etcd-quadlet.container
 	systemctl daemon-reload
 	# Remember, quadlets don't work with systemd enable <arg>
 	systemctl start etcd-quadlet.service
-	#systemctl enable etcd-container.service --now
 
 	# Generate and enable systemd units
 	# Therefore, they will start on next boot, run, and disable themselves
@@ -142,6 +96,7 @@ WantedBy=multi-user.target" > /etc/containers/systemd/etcd-quadlet.container
 	echo -e "[Unit]
 Description=Install Dependencies
 ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+ConditionPathExists=!/var/pxe.complete
 After=multi-user.target
 [Service]
 Type=oneshot
@@ -153,6 +108,7 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_depends.servic
 	echo -e "[Unit]
 Description=Install PXE support
 ConditionPathExists=/var/wavelet_depends.complete
+ConditionPathExists=!/var/pxe.complete
 After=multi-user.target
 [Service]
 Type=oneshot
@@ -181,6 +137,8 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_hardening.serv
 	# It will detect the security layer flag and call wavelet_install_hardening.sh, then reboot allowing build_ug.sh to run in userspace.
 
 	# Start installing ostree updates via OCI container image
+	# This is here so we can add some platform specific cutomizations via additional containerFiles if necessary (nvidia/AMD drivers etc.)
+	platform="generic"
 	detect_custom_requirements
 	# generate a hostname file so that dnsmasq's dhcp-script call works properly
 	get_ipValue
@@ -201,6 +159,7 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_hardening.serv
 	     nameserver	${gateway}
 	     # quad9 as fallback
 	     nameserver	9.9.9.9" > /etc/resolv.conf
+	systemctl daemon-reload
 	systemctl enable dnsmasq.service --now
 	systemctl enable wavelet_install_depends.service
 	touch /var/no.wifi
@@ -230,85 +189,55 @@ get_ipValue(){
 	fi
 }
 
-determine_ifSurface(){
-	# We already know we're x86, now we check to see if we're a Surface and that extended overlays should be built.
-	# Ref https://github.com/linux-surface/linux-surface
-	if [[ ${determination} == 1 ]]; then
-		echo "This device is a surface, proceeding to pull a CoreOS overlay based off the Surface Kernel..\n"
-			if [[ -f /var/extended_x86_support.flag ]]; then
-				echo -e "Extended x86 support is enabled, building surface kernel container overlay..\n"
-				rpm_ostree_surfaceKernel
-			else
-				echo -e "Extended x86 device support is DISABLED.  We will not build additional coreos overlays and utilize the standard overlay instead..\n"
-				rpm_overlay_install_decoder
-			fi
-	else
-		echo -e "This platform has some microsoft identifiers, but does not appear to be a Surface device, reverting to standard ostree overlay.."
-		rpm_overlay_install_decoder
-	fi
-}
-
 detect_custom_requirements(){
 	echo -e "platform is ${platform} \n"
 	case ${platform} in
-	*Dell*)                 echo -e "platform is Dell, no special additions needed..\n"					;	touch /var/platform.dell && rpm_overlay_install
+	*Dell*)                 echo -e "platform is Dell, no special additions needed..\n"					;	rpm_overlay_install "--generic"
 	;;
-	*icrosoft*)				echo -e "platform is Microsoft, probing for Surface specific devices..\n"	;	determine_ifSurface
-	;;
-	*)                      echo -e "platform is generic and requires no special additions..\n" 		;	rpm_overlay_install
+	*)                      echo -e "platform is generic and requires no special additions..\n" 		;	rpm_overlay_install "--generic"
 	;;
 	esac
+	# Test case
+	#*Nvidia*)				echo -e "Platform has nvidia card, parsing args to overlay installer..\n"	;	rpm_overlay_install "--nvidia"
 }
 
 rpm_overlay_install(){
+	# Parse input options (I.E if called by promote service)
+	echo -e "Parsing input options: ${@}.."
+	for arg in "$@"; do
+		echo -e "Argument is: ${arg}"
+		case ${arg} in
+			"--generic")	echo -e "Called standard config, using generic containerfile\n"	;	containerFile="Containerfile.coreos.overlay.client"
+			;;
+			"--nvidia")		echo -e "Using nvidia containerfile\n"							;	containerFile="Containerfile.coreos.overlay.client.nvidia"
+			;;
+			"--amd")		echo -e "Using AMD containerfile\n"								;	containerFile="Containerfile.coreos.overlay.client.amd"
+			;;
+			*)				echo -e "Called with invalid argument, exiting.\n"				;	exit 0
+			;;
+		esac
+	done
 	echo -e "Installing via container and applying as Ostree overlay..\n"
 	DKMS_KERNEL_VERSION=$(uname -r)
-	# Shamelessly stolen from;
-	# https://github.com/icedream/customizepkg-config/blob/main/decklink.patches/0001-Add-signing-key-generation-post-install-secure-boot-.patch
-	cat > "/home/wavelet/containerfiles/openssl.cnf" << EOF
-HOME        = /var/lib/blackmagic
-RANDFILE    = /var/lib/blackmagic/.rnd
 
-[ req ]
-distinguished_name      = req_distinguished_name
-x509_extensions   = v3_ca
-string_mask       = utf8only
-
-[ req_distinguished_name ]
-
-[ v3_ca ]
-subjectKeyIdentifier    = hash
-authorityKeyIdentifier  = keyid:always,issuer
-basicConstraints  = critical,CA:FALSE
-
-# We use extended key usage information to limit what this auto-generated
-# key can be used for.
-#
-# codeSigning:  specifies that this key is used to sign code.
-#
-# 1.3.6.1.4.1.2312.16.1.2:  defines this key as used for module signing
-#         only. See https://lkml.org/lkml/2015/8/26/741.
-#
-extendedKeyUsage  = codeSigning,1.3.6.1.4.1.2312.16.1.2
-nsComment         = "OpenSSL Generated Certificate"
-EOF
-	echo ':: A certificate to sign the driver has been created at /var/lib/blackmagic/MOK.der. This certificate needs to be enrolled if you run Secure Boot with validation (e.g. shim).'
-	echo -e "\nPlease run:\nmokutil --import '/var/lib/blackmagic/MOK.der'\nIn order to enroll the MOK key!!"
 	# Podman build, tags the image, uses DKMS_KERNEL_VERSION to parse host OS kernel version into container
 	# The first stage builds the container with the necessary software to run as a decoder/encoder
 	# The second stage adds everything necessary for the server.
 	# We do this two-stage process to keep the overlay size down as much as we can
+	echo "Building client image and pushing to registry.."
 	podman build -t localhost/coreos_overlay_client \
 	--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
-	-v=/home/wavelet/containerfiles:/mount:z \
-	-f /home/wavelet/containerfiles/Containerfile.coreos.overlay.client
+	-v=/var/home/wavelet/containerfiles:/mount:z \
+	-f "/var/home/wavelet/containerfiles/${containerFile}"
 	podman tag localhost/coreos_overlay_client localhost:5000/coreos_overlay_client:latest
 	touch /var/rpm-ostree-overlay.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
 	# Push client image to container registry - N.B can only use --compress with dir: transport method. 
 	podman push localhost:5000/coreos_overlay_client:latest 192.168.1.32:5000/coreos_overlay_client --tls-verify=false	
+
 	# Build the server overlay
+	echo "Building server image and rebasing.."
 	podman build -t localhost/coreos_overlay_server \
 	--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
 	-v=/home/wavelet/containerfiles:/mount:z \
@@ -318,52 +247,6 @@ EOF
 	# Rebase server on server overlay image
 	rpm-ostree rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay_server
 	echo -e "\nRPM package updates completed, finishing installer task and checking for extended support..\n"
-}
-
-rpm_ostree_surfaceKernel(){
-	# Surface kernel will require MOK for running a nonstandard kernel.
-	DKMS_KERNEL_VERSION=$(uname -r)
-	# Shamelessly stolen from;
-	# https://github.com/icedream/customizepkg-config/blob/main/decklink.patches/0001-Add-signing-key-generation-post-install-secure-boot-.patch
-	cat > "/home/wavelet/containerfiles/openssl.cnf" << EOF
-HOME        = /var/lib/blackmagic
-RANDFILE    = /var/lib/blackmagic/.rnd
-
-[ req ]
-distinguished_name      = req_distinguished_name
-x509_extensions   = v3_ca
-string_mask       = utf8only
-
-[ req_distinguished_name ]
-
-[ v3_ca ]
-subjectKeyIdentifier    = hash
-authorityKeyIdentifier  = keyid:always,issuer
-basicConstraints  = critical,CA:FALSE
-
-# We use extended key usage information to limit what this auto-generated
-# key can be used for.
-#
-# codeSigning:  specifies that this key is used to sign code.
-#
-# 1.3.6.1.4.1.2312.16.1.2:  defines this key as used for module signing
-#         only. See https://lkml.org/lkml/2015/8/26/741.
-#
-extendedKeyUsage  = codeSigning,1.3.6.1.4.1.2312.16.1.2
-nsComment         = "OpenSSL Generated Certificate"
-EOF
-	echo ':: A certificate to sign the driver has been created at /var/lib/blackmagic/MOK.der. This certificate needs to be enrolled if you run Secure Boot with validation (e.g. shim).'
-	echo -e "\nPlease run:\nmokutil --import '/var/lib/blackmagic/MOK.der'\nIn order to enroll the MOK key!!"
-	podman build -t localhost/coreos_overlay \
-	--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
-	-v=/home/wavelet/containerfiles:/mount:z \
-	-f /home/wavelet/containerfiles/Containerfile.surface.coreos.overlay
-	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay_surface
-	touch /var/rpm-ostree-overlay.complete
-	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
-	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-	# N.B can only use --compress with dir: transport method. zstd would be pretty cool, no? 
-	podman push localhost:5000/coreos_overlay_surface:latest 192.168.1.32:5000/coreos_overlay_surface --tls-verify=false
 }
 
 rpm_ostree_ARM(){
@@ -401,35 +284,45 @@ rpm_ostree_RISCV(){
 }
 
 rpm_overlay_install_decoder(){
-	# This differs from the server in that we don't need to build the container,
+	# This differs from the server in that we don't need to build the container unless the required platform-specific one (TBA) doesn't exist.
 	# We pull the client installer module and run it to generate the wavelet files in /usr/local/bin
 	#dmidecode | grep "Manufacturer" | cut -d ':' -f 2 | head -n 1
-	echo -e "Generating client install service systemd entry.."
-	echo -e "[Unit]
-Description=Install Client Dependencies
-ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-After=multi-user.target
-[Service]
-Type=oneshot
-ExecStartPre=/usr/bin/bash -c 'curl -o /usr/local/bin/wavelet_install_client.sh http://192.168.1.32:8080/ignition/wavelet_install_client.sh && chmod 0755 /usr/local/bin/wavelet_install_client.sh'
-ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_client.sh'
-[Install]
-WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
-	systemctl daemon-reload
 	# and we pull the already generated overlay from the server registry
 	# This is the slowest part of the process, can we speed it up by compressing the overlay?
 	echo -e "Installing via container and applying as ostree overlay..\n"
 	# We need to pull the container from the server registry first, apparently manually?  Probably https issue here.
-	podman pull 192.168.1.32:5000/coreos_overlay_client --tls-verify=false 
+	if podman pull 192.168.1.32:5000/coreos_overlay_client --tls-verify=false ; then
+		echo "Container pulled successfully.."
+	else
+		echo "Container pull failed! Check server spinup and ensure network connectivity is reliable.  Failing install process!"
+		exit 1
+	fi
 	rpm-ostree rebase ostree-unverified-image:containers-storage:192.168.1.32:5000/coreos_overlay_client
 	touch /var/rpm-ostree-overlay.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete && \
 	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete && \
 	touch /var/rpm-ostree-overlay.dev.pkgs.complete
 	echo -e "RPM package updates completed, finishing installer task..\n"
+	echo -e "Generating client install service systemd entry.."
+	echo -e "[Unit]
+Description=Install Client Dependencies
+ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+ConditionPathExists=/var/firstboot.complete.target
+ConditionPathExists=!/var/client_install.complete
+Wants=network-online.target
+After=multi-user.target network-online.target
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/bash -c 'sleep 5'
+ExecStartPre=/usr/bin/bash -c 'curl -o /usr/local/bin/wavelet_install_client.sh http://192.168.1.32:8080/ignition/wavelet_install_client.sh && chmod 0755 /usr/local/bin/wavelet_install_client.sh'
+ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_client.sh'
+[Install]
+WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
 	echo -e "Client install service will run on next reboot to populate wavelet modules and configure networking."
+	touch /var/firstboot.complete.target
+	systemctl daemon-reload
 	systemctl enable wavelet_install_client.service
-	echo -e "Starting decoder hostname randomizer, this is the final step in the first boot, and will reboot the client machine.."
+	# Start decoderhostname which will set a unique client name
 	systemctl start decoderhostname.service
 }
 
@@ -441,10 +334,13 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_client.service
 #
 ####
 
+mkdir -p /var/home/wavelet/logs
+hostNameSys=$(hostname)
+hostNamePretty=$(hostnamectl --pretty)
 # Perhaps add a checksum to make sure nothing's been tampered with here..
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 systemctl disable zincati.service --now
-# Debug flag
-# set -x
-exec >/home/wavelet/installer.log 2>&1
+#set -x
+exec >/var/home/wavelet/logs/installer.log 2>&1
+chown -R wavelet:wavelet /var/home/wavelet
 detect_self

@@ -3,32 +3,22 @@
 # Detects if we are on dev or master branch.  To switch, move that file flag someplace else.
 
 detect_self(){
-systemctl --user daemon-reload
-UG_HOSTNAME=$(hostname)
-	echo -e "Hostname is $UG_HOSTNAME \n"
-	case $UG_HOSTNAME in
-	enc*) 					echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."			;	event_encoder
-	;;
-	decX.wavelet.local)		echo -e "I am a Decoder, but my hostname is generic.  Randomizing my hostname, and rebooting"	;	event_decoder 
-	;;
-	dec*)					echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."				;	event_decoder
-	;;
-	svr*)					echo -e "I am a Server. Proceeding..."  														;	event_server
-	;;
-	*) 						echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
-	;;
+	# Detect_self in this case relies on the etcd type key
+	printvalue=$(hostname)
+	echo -e "Host type is: ${printvalue}\n"
+	case "${printvalue}" in
+		enc*) 					echo -e "I am an Encoder \n" && echo -e "Provisioning systemD units as an encoder.."			;	event_client
+		;;
+		dec*)					echo -e "I am a Decoder \n" && echo -e "Provisioning systemD units as a decoder.."				;	event_client
+		;;
+		svr*)					echo -e "I am a Server. Proceeding..."  														;	event_server
+		;;
+		*) 						echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
+		;;
 	esac
 }
 
-event_encoder(){
-	# retreives tar.xz from server
-	wget https://192.168.1.32:8080/ignition/wavelet-files.tar.xz
-	extract_base
-	extract_home && extract_usrlocalbin
-	exit 0
-}
-
-event_decoder(){
+event_client(){
 	# retreives tar.xz from server
 	wget https://192.168.1.32:8080/ignition/wavelet-files.tar.xz
 	extract_base
@@ -37,37 +27,57 @@ event_decoder(){
 }
 
 event_server(){
+	# The server requires some additional steps.
 	install_wavelet_modules
-	extract_base
-	extract_home && extract_usrlocalbin
+	# Update with the server hostname - no other device should be doing network sense.
+	sed -i "s/hostnamegoeshere/${hostNameSys}/g" /usr/local/bin/wavelet_network_sense.sh
+	FILES=("/var/home/wavelet/setup/wavelet-files.tar.xz" \
+		"/usr/local/bin/wavelet_install_client.sh" \
+		"/usr/local/bin/wavelet_installer_xf.sh" \
+		"/etc/skel/.bashrc" \
+		"/etc/skel/.bash_profile")
+	cp "${FILES[@]}" /var/home/wavelet/http/ignition/
+	chmod -R 0644 /var/home/wavelet/http/ignition/* && chown -R wavelet:wavelet /var/home/wavelet/http
+	# Ensure bashrc and profile have compatible filenames for decoder ignition
+	mv /var/home/wavelet/http/ignition/.bashrc /var/home/wavelet/http/ignition/skel_bashrc.txt
+	mv /var/home/wavelet/http/ignition/.bash_profile /var/home/wavelet/http/ignition/skel_profile.txt
+	cp /var/home/wavelet/setup/wavelet-git/webfiles/root/usr/local/bin/{wavelet_install_client.sh,wavelet_installer_xf.sh} /var/home/wavelet/http/ignition
+	cp /var/home/wavelet/setup/wavelet-git/ignition_files/automated_coreos_deployment.sh /var/home/wavelet/http/ignition
+	echo "Regenerating ignition files for clients..(note; this will NOT update the customized decoder ignition (yet)"
+	echo "This is because it needs secrets and other data from the initial configuration."
+	butane --pretty --strict /var/home/wavelet/config/automated_installer.yml --output /var/home/wavelet/http/ignition/automated_installer.ign
+	butane --pretty --strict /var/home/wavelet/config/decoder_custom.yml --output /var/home/wavelet/http/ignition/decoder.ign
+	restorecon -Rv /var/home/wavelet/http > /dev/null
 }
 
 extract_base(){
-	tar xf /var/home/wavelet/wavelet-files.tar.xz -C /home/wavelet --no-same-owner
+	tar xf /var/home/wavelet/setup/wavelet-files.tar.xz -C /home/wavelet/setup --no-same-owner
 	cd /var/home/wavelet
-	mv ./usrlocalbin.tar.xz /usr/local/bin/
 }
 
 extract_etc(){
 	umask 022
-	tar xf /etc/etc.tar.xz -C /etc --no-same-owner --no-same-permissions
+	tar xf /var/home/wavelet/setup/etc.tar.xz -C /etc --no-same-owner --no-same-permissions
 	echo -e "System config files setup successfully..\n"
+	rm -rf /var/home/wavelet/setup/etcd.tar.xz
 }
 
 extract_home(){
-	tar xf /var/home/wavelet/wavelethome.tar.xz -C /home/wavelet
+	tar xf /var/home/wavelet/setup/wavelethome.tar.xz -C /home/wavelet/
 	chown -R wavelet:wavelet /home/wavelet
 	chmod 0755 /var/home/wavelet/http
 	chmod -R 0755 /var/home/wavelet/http-php
 	echo -e "Wavelet homedir setup successfully..\n"
+	rm -rf /var/home/wavelet/setup/wavelethome.tar.xz
 }
 
 extract_usrlocalbin(){
 	umask 022
-	tar xf /usr/local/bin/usrlocalbin.tar.xz -C /usr/local/bin --no-same-owner
+	tar xf /var/home/wavelet/setup/usrlocalbin.tar.xz -C /usr/local/bin --no-same-owner
 	chmod +x /usr/local/bin
 	chmod 0755 /usr/local/bin/*
 	echo -e "Wavelet application modules setup successfully..\n"
+    rm -rf /var/home/wavelet/setup/usrlocalbin.tar.xz
 }
 
 install_wavelet_modules(){
@@ -79,10 +89,10 @@ install_wavelet_modules(){
 	fi
 	GH_REPO="https://github.com/Allethrium/wavelet"
 	# Git complains about the directory already existing so we'll just work in a tmpdir for now..
-	rm -rf /var/home/wavelet/wavelet-git
-	mkdir -p /var/home/wavelet/wavelet-git
+	rm -rf /var/home/wavelet/setup/wavelet-git
+	mkdir -p /var/home/wavelet/setup/wavelet-git
 	echo -e "\nCommand is; ${gitcommand} clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/wavelet-git\n"
-	git clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/wavelet-git && echo -e "Cloning git repository..\n"
+	git clone -b ${GH_BRANCH} ${GH_REPO} /var/home/wavelet/setup/wavelet-git && echo -e "Cloning git repository..\n"
 	generate_tarfiles
 	# This seems redundant, but works to ensure correct placement+permissions of wavelet modules
 	extract_base
@@ -97,14 +107,18 @@ install_wavelet_modules(){
 
 generate_tarfiles(){
 	echo -e "\nGenerating tar.xz files for upload to distribution server.."
-	cd /var/home/wavelet
-	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /var/home/wavelet/wavelet-git/webfiles/root/usr/local/bin/ .
-	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /var/home/wavelet/wavelet-git/webfiles/root/home/wavelet/ .
+	cd /var/home/wavelet/setup
+	echo "Removing old archive.."
+	rm -rf wavelet-files.tar.xz
 	echo -e "Packaging files together.."
-	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz}
+	tar -cJf etc.tar.xz --owner=root:0 -C /var/home/wavelet/setup/wavelet-git/webfiles/root/etc/ .
+	tar -cJf usrlocalbin.tar.xz --owner=root:0 -C /var/home/wavelet/setup/wavelet-git/webfiles/root/usr/local/bin/ .
+	tar -cJf wavelethome.tar.xz --owner=wavelet:1337 -C /var/home/wavelet/setup/wavelet-git/webfiles/root/home/wavelet/ .
+	tar -cJf wavelet-files.tar.xz {./usrlocalbin.tar.xz,wavelethome.tar.xz,etc.tar.xz}
 	echo -e "Done."
-	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz}
-	setfactl -b wavelet-files.tar.xz
+	rm -rf {./usrlocalbin.tar.xz,wavelethome.tar.xz,etc.tar.xz}
+	setfacl -b wavelet-files.tar.xz
+	cp /var/home/wavelet/setup/wavelet-files.tar.xz /var/home/wavelet/http/ignition/wavelet-files.tar.xz
 }
 
 
@@ -114,25 +128,14 @@ generate_tarfiles(){
 #
 #####
 
-# One rather silly thing.. if this module is what gets updated... then that won't work until it is run again the next reboot.  O_O
+hostNameSys=$(hostname)
+hostNamePretty=$(hostnamectl --pretty)
 
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 systemctl disable zincati.service --now
-# Update with the server hostname - no other device should be doing network sense.
-sed -i "s/hostnamegoeshere/$(hostname)/g" /usr/local/bin/wavelet_network_sense.sh
-FILES=("/var/home/wavelet/wavelet-files.tar.xz" \
-	"/usr/local/bin/wavelet_install_client.sh" \
-	"/usr/local/bin/wavelet_installer_xf.sh" \
-	"/etc/skel/.bashrc" \
-	"/etc/skel/.bash_profile")
-cp "${FILES[@]}" /var/home/wavelet/http/ignition/
-chmod -R 0644 /var/home/wavelet/http/ignition/* && chown -R wavelet:wavelet /var/home/wavelet/http
-# Ensure bashrc and profile have compatible filenames for decoder ignition
-mv /var/home/wavelet/http/ignition/.bashrc /var/home/wavelet/http/ignition/skel_bashrc.txt
-mv /var/home/wavelet/http/ignition/.bash_profile /var/home/wavelet/http/ignition/skel_profile.txt
-restorecon -Rv /var/home/wavelet/http
+
 #set -x
-exec >/var/home/wavelet/update_wavelet_modules.log 2>&1
+exec >/var/home/wavelet/logs/update_wavelet_modules.log 2>&1
 detect_self
-echo -e "Update completed.  The system will automatically reboot in ten seconds!"
-systemctl reboot
+
+echo -e "Update completed!"

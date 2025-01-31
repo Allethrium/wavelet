@@ -1,61 +1,46 @@
-
-
 #!/bin/bash
 #
 # The controller is responsible for orchestrating the rest of the system
 
-
-# Define standard default variables for encoders
-uv_videoport="5004"
-uv_audioport="5006"
-uv_reflector="192.168.1.32"
-uv_islivestreaming="0"
 
 ###
 #
 # Routine codeblocks that define things which this script handles.
 #
 ###
+
 detect_self(){
-# Controller only runs on the server.
-UG_HOSTNAME=$(hostname)
-	echo -e "Hostname is $UG_HOSTNAME \n"
-	case $UG_HOSTNAME in
-	enc*) 			echo -e "I am an Encoder \n" && echo -e "Cannot run the controller on an encoder, exiting..";	exit 0
-	;;
-	dec*)			echo -e "I am a Decoder \n" && echo -e "Cannot run the controller on a decoder, exiting..";	exit 0
-	;;
-	livestream*)	echo -e "I am a Livestreamer \n" && echo -e "Cannot run the controller on a livestreamer, exiting..";	exit 0
-	;;
-	gateway*)		echo -e "I am an input Gateway for another video streaming system \n" && echo -e "Cannot run the controller on a gateway, exiting..";	exit 0
-	;;
+# Controller only runs on the server, and should only respect the device system hostname.
+	echo -e "Hostname is ${hostNameSys} \n"
+	case ${hostNameSys} in
 	svr*)			echo -e "I am a Server. Proceeding..." && event_server
 	;;
-	*) 				echo -e "This device Hostname is not set approprately, exiting \n" &&	exit 0
+	*) 				echo -e "This device Hostname is not set approprately, exiting" &&	exit 0
 	;;
 	esac
 }
 
-
 event_server(){
-echo -e "\n\n***Controller Called, checking input key and acting accordingly..***"
-# Now called by etcd so inputting standard values to etcd would overwrite everything every time an event happened.  
-# These are populated by wavelet_init.sh
+echo -e "***Controller Called, checking input key and acting accordingly..***\n"
 main
 }
-
 
 main() {
 	KEYNAME=input_update; read_etcd_global
 	if [[ "${printvalue}" == 1 ]]; then
-		echo -e "\ninput_update key is set to 1, continuing with task.. \n"
+		echo -e "input_update key is set to 1, continuing with task..\n"
 	else
-		echo -e "\ninput_update key is set to 0, doing nothing.. \n"
+		echo -e "input_update key is set to 0, doing nothing..\n"
 		exit 0
 	fi
-	KEYNAME=uv_hash_select; read_etcd_global; event=${printvalue}
+	KEYNAME="uv_hash_select"; read_etcd_global; event="${printvalue}"
+	KEYNAME="uv_hash_select_old"; read_etcd_global; eventPrevious="${printvalue}"
+	if [[ ${event} == ${eventPrevious} ]];  then
+		echo "Event ID matches the previous input update, doing nothing."
+		exit 0
+	fi
 	# Check livestream toggle UI value
-	KEYNAME=/livestream/enabled; read_etcd_global; livestream_state=${printvalue}
+	KEYNAME="/livestream/enabled"; read_etcd_global; livestream_state="${printvalue}"
 		if [[ "${livestream_state}" = 0 ]]; then
 			echo "Livestreaming is off, setting LiveStreaming flag to disabled"
 			KEYNAME=uv_islivestreaming; KEYVALUE="0"; write_etcd_global
@@ -63,13 +48,24 @@ main() {
 			echo "Livestreaming is on, setting LiveStreaming flag to enabled"
 			KEYNAME=uv_islivestreaming; KEYVALUE="1"; write_etcd_global
 		fi
-	waveletcontroller
+	bannerActive=0
+	KEYNAME="/banner/enabled"; read_etcd_global
+	if [[ ${printvalue} == "1" ]]; then
+		bannerActive=${printvalue}
+	fi
+	if systemctl is-active --user --quiet UltraGrid.AppImage.service; then 
+		echo "Server Encoder process running, continuing"
+		waveletcontroller
+	else 
+		echo "Server Encoder process is not running, attempting to start before proceeding.."
+		systemctl --user start run_ug.service
+		waveletcontroller
+	fi
 }
 
 
 waveletcontroller() {
 # Tests event input and runs appropriate event
-# 11/2023 - note that hardcoded inputs are no longer used here, the case $event in line just tests static buttons from the webUI.  The rest is handled between detectv4l and wavelet_encoder, for the most part.
 case $event in
 	# 1
 	(1) 	echo -e "Option One, Blank activated\n"						;current_event="wavelet-blank"			;wavelet_blank								;;
@@ -87,11 +83,6 @@ case $event in
 	(SR)	echo -e "Whole system reboot\n"								;current_event="wavelet-system-reboot"	;wavelet_system_reboot						;;
 	(CL)	echo -e "Clearing All Input Sources from keystore..\n"		;current_event="wavelet-clear-inputs"	;wavelet_clear_inputs						;;
 	(RD)	echo -e "Running re-detection of source devices..\n"		;current_event="wavelet-detect-inputs"	;wavelet_refresh							;;
-#	if [ $recording = true ]; then
-#		echo "Recording to archive file" && recording=true && wavelet_record_start
-#	if [ $recording = false ]; then
-#		($false) echo "Recording to archive file" && recording=true && wavelet_record_start;; 
-	# does not kill any streams, instead copies stream and appends to a labeled MKV file (not implemented unless we get a real server w/ STORAGE)
 	# HW and SW modes selected for compatibility reasons - some decoders don't like HW encoded video.  SW encoding will need a *FAST* CPU unless you like latency, dropped frames and glitches.
 	(A)		event_x264sw						&& echo "x264 Software video codec selected, updating encoder variables"						;;
 	(B)		event_x264hw 						&& echo "x264 VA-API video codec selected, updating encoder variables"							;;
@@ -114,11 +105,11 @@ case $event in
 	#
 	# Multiple input modes go here (I wonder if there's a better, matrix-based approach to this?)
 	#
-	(W) echo "Four-way panel split activated \n"						;current_event="event_foursplit";wavelet_foursplit						;;
-	(X) echo "Two-way panel split activated \n"							;current_event="event_twosplit"	;wavelet_twosplit						;;
-	(Y) echo "Picture-in-Picture 1 activated \n"						;current_event="event_pip1"		;wavelet_pip1							;;
-	(Z) echo "Picture-in-Picture 2 activated \n"						;current_event="event_pip2"		;wavelet_pip2							;;
-	(*) echo "Unknown predefined input, passing hash to encoders.. \n"	;current_event="dynamic"		;wavelet_dynamic					;;
+	(W) echo "Four-way panel split activated"						;current_event="event_foursplit";wavelet_foursplit						;;
+	(X) echo "Two-way panel split activated"						;current_event="event_twosplit"	;wavelet_twosplit						;;
+	(Y) echo "Picture-in-Picture 1 activated"						;current_event="event_pip1"		;wavelet_pip1							;;
+	(Z) echo "Picture-in-Picture 2 activated"						;current_event="event_pip2"		;wavelet_pip2							;;
+	(*) echo "Unknown predefined input, passing hash to encoders.."	;current_event="dynamic"		;wavelet_dynamic						;;
 esac
 }
 
@@ -126,15 +117,15 @@ esac
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
-	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for value: $printvalue for host: ${hostNameSys}\n"
 }
 read_etcd_global(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
-	echo -e "Key Name {$KEYNAME} read from etcd for Global Value $printvalue\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for Global Value: $printvalue\n"
 }
 read_etcd_prefix(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "${KEYNAME}")
-	echo -e "Key Name {$KEYNAME} read from etcd for value $printvalue for host $(hostname)\n"
+	echo -e "Key Name: {$KEYNAME} read from etcd for value $printvalue for host: ${hostNameSys}\n"
 }
 read_etcd_clients_ip() {
 	return_etcd_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip")
@@ -144,21 +135,13 @@ read_etcd_clients_ip_sed() {
 	# the above is useful for generating the reference text file but this parses through sed to string everything into a string with no newlines.
 	processed_clients_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_clients_ip" | sed ':a;N;$!ba;s/\n/ /g')
 }
-read_etcd_json_revision(){
-	# Special case used in controller
-	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_json_revision" uv_hash_select | jq -r '.header.revision')
-}
-read_etcd_lastrevision(){
-	# Special case used in controller
-	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_lastrevision")	
-}
 write_etcd(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
-	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} under /$(hostname)/\n"
+	echo -e "Key Name: ${KEYNAME} set to ${KEYVALUE} under /${hostNameSys}/\n"
 }
 write_etcd_global(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
-	echo -e "Key Name ${KEYNAME} set to ${KEYVALUE} for Global value\n"
+	echo -e "Key Name: ${KEYNAME} set to: ${KEYVALUE} for Global value\n"
 }
 write_etcd_client_ip(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_client_ip" "${KEYNAME}" "${KEYVALUE}"
@@ -196,140 +179,97 @@ wavelet_blank() {
 # 1
 # Displays a black jpg to blank the screen fully
 	current_event="wavelet-blank"
-	KEYNAME=uv_input; KEYVALUE="BLANK";	write_etcd_global
+	KEYNAME="uv_hash_select_old"; read_etcd_global; eventHashPrevious="${printvalue}"
+	echo "old hash select is: ${eventHashPrevious}"
+	KEYNAME="/hash/${eventHashPrevious}"; read_etcd_global; eventLabel="${printvalue}"
+	KEYNAME=uv_input; KEYVALUE="blank"					;	write_etcd_global
+	KEYNAME="ENCODER_QUERY"; KEYVALUE="1"				;	write_etcd_global
+	KEYNAME="uv_hash_select_old"; KEYVALUE="blank"		;	write_etcd_global
+	if [[ "${eventLabel}" != *"svr"* ]]; then
+		echo "Previous event does not reference the server, restarting UG process to ensure reflector detects transition.."
+		systemctl --user restart UltraGrid.AppImage.service
+		sleep 1
+	fi
 	# The server should not require any restarts as the UltraGrid.AppImage service should still be running from wavelet_init
 	echo 'capture.data 0' | busybox nc -v 127.0.0.1 6160
+	echo -e "Blank screen for all hosts activated."
 }
 
 wavelet_seal() {
 # 2
 # Serves a static image in .jpg format in a loop to the encoder.
 	cd /home/wavelet/
+	KEYNAME="uv_hash_select_old"; read_etcd_global; eventHashPrevious="${printvalue}"
+	echo "old hash select is: ${eventHashPrevious}"
+	KEYNAME="/hash/${eventHashPrevious}"; read_etcd_global; eventLabel="${printvalue}"
 	current_event="wavelet-seal"
-	KEYNAME=uv_input; KEYVALUE="SEAL"; write_etcd_global
-	# Write server-local encoder restart key
-	#KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
+	KEYNAME=uv_input; KEYVALUE="seal"					;	write_etcd_global
+	KEYNAME="ENCODER_QUERY"; KEYVALUE="2"				;	write_etcd_global
+	KEYNAME="uv_hash_select_old"; KEYVALUE="seal"		;	write_etcd_global
+	if [[ "${eventLabel}" != *"svr"* ]]; then
+		echo "Previous event does not reference the server, restarting UG process to ensure reflector detects transition.."
+		systemctl --user restart UltraGrid.AppImage.service
+		sleep 1
+	fi
 	# We now use the switcher for simple things
 	echo 'capture.data 1' | busybox nc -v 127.0.0.1 6160
-	echo -e "\nStatic image activated from server encoder..\n"
+	echo -e "Static image activated."
 }
 
 wavelet_testcard() {
 # T
 # Test Card
+	current_event="wavelet-blank"
+	KEYNAME="uv_hash_select_old"; read_etcd_global; eventHashPrevious="${printvalue}"
+	echo "old hash select is: ${eventHashPrevious}"
 	current_event="wavelet-testcard"
-	KEYNAME=uv_input; KEYVALUE="BLANK";	write_etcd_global
-	# Write server-local encoder restart key
-	#KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
+	KEYNAME="uv_input"; KEYVALUE="smpte_bars"			;	write_etcd_global
+	KEYNAME="ENCODER_QUERY"; KEYVALUE="T"				;	write_etcd_global
+	KEYNAME="uv_hash_select_old"; KEYVALUE="smpte_bars"	;	write_etcd_global
+	if [[ "${eventLabel}" != *"svr"* ]]; then
+		echo "Previous event does not reference the server, restarting UG process to ensure reflector detects transition.."
+		systemctl --user restart UltraGrid.AppImage.service
+		sleep 1
+	fi
 	echo 'capture.data 2' | busybox nc -v 127.0.0.1 6160
+	echo "Testcard image activated."
 }
 
 wavelet_refresh() {
-	# This is only called by the RD, refresh-devices button, and it finds the previous hash and resets to it.
-	revisions=$(read_etcd_json_revision)
-	lastrev=$((${revisions} - 1))
-	KEYNAME=uv_hash_select; read_etcd_lastrevision; previousHash=${printvalue}
-	KEYVALUE=${previousHash}; write_etcd_global
+	# This is only called by the RD, refresh-devices button.  It finds the previous hash and resets to it.
+	KEYNAME="uv_hash_select_old"; read_etcd_global; previousHash=${printvalue}
+	case ${previousHash} in
+		"")		echo "previousHash is null, setting to seal"		previousHash="seal"
+		;;
+		"RD")	echo "previousHash is RD, setting to seal"			previousHash="seal"
+		;;
+		*)		echo "previousHash is something else, proceeding."
+		;;
+	esac
+	KEYNAME="uv_hash_select"; KEYVALUE=${previousHash}; write_etcd_global
 	echo -e "Previous hash value reset, running detectv4l to redetect local sources on all hosts.."
 	wavelet_detect_inputs
 }
 
-set_channelIndex(){
-	# This is called from wavelet_dynamic only if the device mapping file exists
-	controllerInputLabel=$1
-	targetHost="${controllerInputLabel%/*}"
-	# Determine what kind of device we are dealing with
-	if [[ ${targetHost} == *"network_interface"* ]]; then
-		echo -e "Target Hostname is a network device."
-		deviceType="N"; targetHost="$(hostname)"; KEYNAME="/network_ip/${controllerInputHash}"; read_etcd_global; deviceFullPath=${printvalue}
-		KEYNAME="/network_uv_stream_command/${deviceFullPath}"; read_etcd_global; searchArg="${printvalue}"
-	elif [[ "${targetHost}" == *"$(hostname)"* ]]; then
-		echo -e "Target hostname references this server."
-		deviceType="L"; targetHost="$(hostname)"; KEYNAME="/hash/${controllerInputHash}"; read_etcd_global; deviceFullPath=${printvalue}
-		KEYNAME="${deviceFullPath}"; read_etcd_global; searchArg="$(echo ${printvalue} | base64 -d)"
-	else 
-		echo -e "Device is hosted from a remote encoder.\n"
-		deviceType="R"; targetHost="${controllerInputLabel%/*}"; KEYNAME="/hash/${controllerInputHash}"; read_etcd_global; deviceFullPath=${printvalue}
-		KEYNAME="${deviceFullPath}"; read_etcd_global; searchArg="$(${printvalue} | base64 -d)"
-	fi
-
-	echo -e "Target host name is ${targetHost}"
-	targetIP=$(getent ahostsv4 "${targetHost}" | head -n 1 | awk '{print $1}')
-	# Here we want to check to see if the device is already prepopulated on the switcher
-	# Find the command line in the device_map_entries file
-	if grep -q ${searchArg#*-t} /var/home/wavelet/device_map_entries_verity; then
-		echo "Entry found in device map.."
-		channelIndex=$(grep "${searchArg#*-t}" /var/home/wavelet/device_map_entries_verity | cut -d ',' -f1)
-	else
-		# If not, we run the process again after having the encoder restart
-		# Then we restart the controller process after a 3s delay
-		echo "Entry missing from device map file! Forcing encoder restart."
-		KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
-		sleep 3; KEYNAME=input_update; KEYVALUE="1"; write_etcd_global
-	fi
-
-	# We check for the appropriate device in the generated user SystemD unit
-	if ! grep -q ${searchArg#*-t} /var/home/wavelet/.config/systemd/user/UltraGrid.AppImage.service; then
-		echo "Device command line is missing! Forcing encoder restart.."
-		KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
-		sleep 3; KEYNAME=input_update; KEYVALUE="1"; write_etcd_global
-	else
-		echo "Device entry found in systemD unit, continuing.."
-	fi
-
-	# And ensure the encoder is even running...
-	if ! systemctl --user is-active --quiet UltraGrid.AppImage.service; then
-		# Restart the encoder, sleep 3 and run this again.
-		KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
-		sleep 3; KEYNAME=input_update; KEYVALUE="1"; write_etcd_global
-	fi
-
-	# And now set the appropriate channel
-	echo "Channel Index is: ${channelIndex%,*}"
-	echo "capture.data ${channelIndex%,*}" | busybox nc -v ${targetHost} 6160	
-}
-
-set_singleDevice(){
-	# This is the obsolete way of handling single devices, which always requires a full encoder restart for every "channel" switch.
-	targetHost=$(echo ${controllerInputLabel} | sed 's|\(.*\)/.*|\1|')
-	echo -e "${targetHost} encoder_restart flag set!\n"
-	# Note we are writing a global key to the TARGET host, so we need to base64 encode it for it to be valid.
-	KEYNAME="/${targetHost}/encoder_restart"; KEYVALUE="$(echo "1" | base64)"; write_etcd_global
-	KEYNAME="input_update"; KEYVALUE="0"; echo -e "Task completed, reset input_update key to 0.. \n"; write_etcd_global
-	sleep 1
-	# Ensure channel input is set to 3, so that we get the first switcher device, which is not a static out of UG.
-	KEYNAME="/hostHash/${targetHost}/ipaddr"; read_etcd_global; targetIP=${printvalue}
-	if [[ ${deviceType} == "N" ]]; then
-		# targetHost is Server, else it's popoulated already from the device key
-		targetHost="$(hostname)"
-	fi
-	echo -e "\nAttempting to set switcher channel to new device for ${targetHost}..\n"
-	sleep 2
-	echo 'capture.data 3' | busybox nc -v ${targetHost} 6160
-}
-
 wavelet_dynamic() {
-	# processes device hashes submitted from the WebUI through to the encoder
-	# The only thing the controller is doing here ought to be notifying the encoder to switch, or restart.
+	# Processes device hashes submitted from the WebUI through to the encoder
+	# The only thing the controller is doing here ought to be determining the host
+	# The encoder performs the necessary tasks from there.
 	current_event="wavelet-dynamic"
 	KEYNAME=uv_input; read_etcd_global;	controllerInputLabel=${printvalue}
 	KEYNAME=uv_hash_select;	read_etcd_global; controllerInputHash=${printvalue}
-	echo -e "Controller notified that input hash ${controllerInputHash}\nhas been selected with the input label: ${controllerInputLabel}\n"
-	# Check for device map file
-	if [[ -f /var/home/wavelet/device_map_entries_verity ]]; then
-		echo -e "\nDevice map file has been generated on this host, continuing.."
-		set_channelIndex "${controllerInputLabel}"
-	else
-		echo -e "No device-channel mapping file is available."
-		if [[ -f /var/home/wavelet/encoder.firstrun ]]; then
-			echo "Encoder first run detected, assuming map file needs to be generated and restarting process.."
-			KEYNAME="encoder_restart"; KEYVALUE="1"; write_etcd
-			sleep 3; KEYNAME=input_update; KEYVALUE="1"; write_etcd_global
-			rm -rf /var/home/wavelet/encoder.firstrun
-		else
-			set_singleDevice "${controllerInputLabel}"
-		fi
+	KEYNAME="uv_hash_select_old"; read_etcd_global; controllerInputHashPrevious="${printvalue}"
+	if [[ ${controllerInputHash} == ${controllerInputHashPrevious} ]]; then
+		echo "Hash selection is identical, assuming multiple clicks on UI and doing nothing."
+		exit 0
 	fi
+	echo -e "Controller notified that input hash ${controllerInputHash}\nhas been selected with the input label: ${controllerInputLabel}\n"
+	echo "Setting global encoder update bit"
+	# The concept here is the query value is "pitched" out to the entire cluster, and the machine which has it "catches" the ball.
+	# Do we need ANOTHER watcher service here? Or should the encoders simply watch INPUT_UPDATE and uv_hash_select?
+	KEYNAME="ENCODER_QUERY"; KEYVALUE="${controllerInputHash}"; write_etcd_global
+	# Write uv_hash_select_old so the system can remember the previous selected hash
+	KEYNAME="uv_hash_select_old"; KEYVALUE="${controllerInputHash}"; write_etcd_global
 }
 
 wavelet_foursplit() {
@@ -337,13 +277,14 @@ wavelet_foursplit() {
 	KEYNAME=uv_input; KEYVALUE="Multi source mix"; write_etcd_global
 	#controllerInputLabel=${printvalue}
 	KEYNAME=uv_hash_select; read_etcd_global; controllerInputHash=${printvalue}
-	echo -e "\n \n Controller notified that the Four-way split input hash has been selected from the WebUI.  Encoder will do its best to generate a software mix of up to four available input devices. \n \n "
+	echo -e "\n\nController notified that the Four-way split input hash has been selected from the WebUI.\nEncoder will do its best to generate a software mix of up to four available input devices.\n\n "
 	# Kill existing streaming on the SERVER
 	systemctl --user stop UltraGrid.AppImage.service
 	# Set encoder restart flag to 1
 	KEYNAME=encoder_restart; KEYVALUE="1"; write_etcd_global
-	KEYNAME=input_update; KEYVALUE="0"; echo -e "\n Task completed, resetting input_update key to 0.. \n"; write_etcd_global
 }
+
+
 # These events contain additional codec-specific settings that have been found to work acceptably well on the system.
 # Since they are tuned by hand, you probably won't want to modify them unless you know exactly what you're doing.
 # Proper operation depends on bandwidth, latency, network quality, encoder speed.  It's highly hardware dependent.
@@ -516,24 +457,15 @@ wavelet_system_reboot() {
 }
 
 wavelet_clear_inputs() {
-# Removes all input devices from their appropriate prefixes.
-# Until I fix the detection/removal stuff so that it works perfectly, this will effectively clean out any cruft from 'stuck'
-# source devices which no longer exist, but still populate on the UI.
-# bad solution
-	hostname="$(hostname)"
-	keysArray=("/interface/" "/hash/" "/short_hash/" "/long_interface/" "/${hostname}/inputs/" "/network_long/" "/network_short/" "/network_interface/" "/network_ip/" "/network_uv_stream_command/")
-	for key in ${keysArray[@]}; do
-		KEYNAME="${key}"
-		echo "Deleting: ${key}"
-		delete_etcd_key_prefix
-	done
-	echo -e "All interface devices and their configuration data, as well as labels have been deleted\nPlugging in a new device will cause the detection module to run again.\n"
+	# Removes all input devices from their appropriate prefixes.
+	# Until I fix the detection/removal stuff so that it works perfectly, this will effectively clean out any cruft from 'stuck'
+	/usr/local/bin/wavelet_clean_inputs.sh
 }
 
 wavelet_detect_inputs() {
 	# Tells detectv4l to run on everything, all encoders watch this flag when they are provisioned as such.
 	KEYNAME="DEVICE_REDETECT"; KEYVALUE=1; write_etcd_global
-	echo -e "\nAll devices now redetecting available input video sources..\n"
+	echo -e "All devices now redetecting available input video sources.."
 }
 
 
@@ -543,7 +475,7 @@ wavelet_detect_inputs() {
 #
 ###
 
-logName="controller.log"
+logName="/var/home/wavelet/logs/controller.log"
 if [[ -e $logName || -L $logName ]] ; then
 	i=0
 	while [[ -e $logName-$i || -L $logName-$i ]] ; do
@@ -554,5 +486,7 @@ fi
 #set -x
 exec >${logName} 2>&1
 
+hostNameSys=$(hostname)
+hostNamePretty=$(hostnamectl --pretty)
 
 detect_self

@@ -1,26 +1,33 @@
 #!/bin/bash
-# This runs as a systemd unit on the SECOND boot on the Client devices ONLY
-# It is responsible for extracting the wavelet modules, joining the domain (if security enabled) and provisioning services so that it can talk to etcd and the DC.
+# This runs as a systemd unit on the first boot on the Client devices ONLY.
+# It is responsible for extracting the wavelet modules, 
+# joining the domain (if security enabled) and provisioning services so that it can talk to etcd and the DC.
 
 extract_base(){
-	tar xf /home/wavelet/wavelet-files.tar.xz -C /home/wavelet --no-same-owner
-	mv /home/wavelet/usrlocalbin.tar.xz /usr/local/bin/
+	# Moves tar files to their target directories
+	cd /var/home/wavelet/setup
+	tar xf /var/home/wavelet/setup/wavelet-files.tar.xz -C /var/home/wavelet/setup --no-same-owner
+	echo "base extracted.."
 }
-
+extract_etc(){
+	umask 022
+	cd /var/home/wavelet/setup
+	tar xf /var/home/wavelet/setup/etc.tar.xz -C /etc --no-same-owner --no-same-permissions
+	echo -e "System config files setup successfully..\n"
+	rm -rf /var/home/wavelet/setup/etc.tar.xz
+}
 extract_home(){
-	tar xf /home/wavelet/wavelethome.tar.xz -C /home/wavelet
-	chown -R wavelet:wavelet /home/wavelet
-	chmod 0755 /home/wavelet/http
-	#chmod -R 0755 /home/wavelet/http-php
+	tar xf /var/home/wavelet/setup/wavelethome.tar.xz -C /var/home/wavelet
 	echo -e "Wavelet homedir setup successfully..\n"
+	rm -rf /var/home/wavelet/setup/wavelethome.tar.xz
 }
-
 extract_usrlocalbin(){
 	umask 022
-	tar xf /usr/local/bin/usrlocalbin.tar.xz -C /usr/local/bin --no-same-owner
+	tar xf /var/home/wavelet/setup/usrlocalbin.tar.xz -C /usr/local/bin --no-same-owner
 	chmod +x /usr/local/bin
-	chmod 0755 /usr/local/bin/*
-	echo -e "Wavelet application modules setup successfully..\n"
+	chmod -R 0755 /usr/local/bin/
+	echo -e "Wavelet application modules setup successfully.."
+	rm -rf /var/home/wavelet/setup/usrlocalbin.tar.xz
 }
 
 install_security_layer(){
@@ -43,8 +50,6 @@ install_security_layer(){
 		-k /var/home/wavelet/pki/tls/private/etcd-client.key \
 		-K etcd-client/${hostname}@${hostname^^} \
 		-D $(dnsdomainname)
-
-
 		#ipa service-add radius-client/$(hostname) && ipa service-add-host --hosts=dc1.$(dnsdomainname) radius-client/`hostname`
 		#ipa-getcert request \
 		#-f /etc/pki/tls/certs/radius-client.crt \
@@ -58,23 +63,20 @@ install_security_layer(){
 		echo -e "Reconfiguring etcd client..\n"
 		# Here
 
-		# Reconfigure WiFi to utilize EAP-TTLS
-		echo -e "Reconfiguring WiFi supplicant..\n"
-
-		nmcli con mod ${wifiConnection} \
-		802-11-wireless.ssid 'My Wifi' \
-		802-11-wireless-security.key-mgmt wpa-eap \
-		802-1x.eap tls \
-		802-1x.identity identity@example.com \
-		802-1x.ca-cert /etc/ipa/ca.crt \
-		802-1x.client-cert /etc/nssdb/ \
-		802-1x.private-key /etc/nssdb/
+		# WiFi configuration is handled via connectwifi module
 	else
 		echo -e "security layer is not enabled, not configuring"
 	fi
 }
 
-
+setup_deprovision_service(){
+	# Service calls a module which destroys the host and will remove from domain if the security layer is enabled
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/%H/DEPROVISION" 0 0 "wavelet_deprovision"
+	# Move to system folder
+	mv /home/wavelet/.config/systemd/user/${waveletModule}.service /etc/systemd/system
+	systemctl daemon-reload
+	systemctl start wavelet_deprovision.service --now
+}
 
 ####
 #
@@ -82,24 +84,34 @@ install_security_layer(){
 #
 ####
 
+mkdir -p /var/home/wavelet/logs
+mkdir -p /var/home/wavelet/setup
+
+# Run connectwifi
+/usr/local/bin/connectwifi.sh
+
+#set -x
+exec > /var/home/wavelet/logs/client_installer.log 2>&1
 
 # Fix AVAHI otherwise NDI won't function correctly, amongst other things;  https://www.linuxfromscratch.org/blfs/view/svn/basicnet/avahi.html
 # Runs first because it doesn't matter what kind of server/client device, it'll need this.
+# generate proper RC files for root/wavelet-root which gives us aliases and powerline
+cd /root; rm .bashrc .bash_profile; cp /etc/skel/{.bashrc,.bash_profile} .
+cd /var/home/wavelet-root; rm .bashrc .bash_profile; cp /etc/skel/{.bashrc,.bash_profile} .
 groupadd -fg 84 avahi && useradd -c "Avahi Daemon Owner" -d /run/avahi-daemon -u 84 -g avahi -s /bin/false avahi
 groupadd -fg 86 netdev
-systemctl enable avai-daemon.service --now
-
-nmcli dev wifi rescan
-exec > /home/wavelet/client_installer.log 2>&1
+systemctl enable avahi-daemon.service --now
 extract_base
 extract_home
 extract_usrlocalbin
+extract_etc
 install_security_layer
-touch /var/client_install.complete
-systemctl disable wavelet_install_client.service
-echo -e "Calling connectwifi module"
-/usr/local/bin/connectwifi.sh
-# Move the log file otherwise permissions is an issue and we don't get subsequent log
-# Also reset permissions on wavelet home folder so that any other files generated whilst running under root are writable by the wavelet user
-mv /var/home/wavelet/connectwifi.log /var/home/wavelet/setup_old_connectwifi.log
+setup_deprovision_service
 chown -R wavelet:wavelet /var/home/wavelet
+# Disable self so we don't run again on the next boot.
+systemctl set-default graphical.target
+touch /var/client_install.complete
+#systemctl --user -M wavelet@ daemon-reload
+#systemctl --user -M wavelet@ enable build_ug.service --now
+sleep 5
+systemctl restart getty@tty1

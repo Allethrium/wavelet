@@ -48,6 +48,27 @@ function get_device_ip($input){
 	echo "\nFound: $decodedValue";
 }
 
+function get_etcd($key) {
+	echo "Attempting to get $keyTarget";
+	$b64KeyTarget = base64_encode($keyTarget);
+	$ch = curl_init();
+	curl_setopt($ch, CURLOPT_URL, 'http://192.168.1.32:2379/v3/kv/range');
+	curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+	curl_setopt($ch, CURLOPT_POST, 1);
+	curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\":\"$b64KeyTarget\"}");
+	$headers = array();
+	$headers[] = 'Content-Type: application/x-www-form-urlencoded';
+	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+	$result = curl_exec($ch);
+	if (curl_errno($ch)) {
+		echo 'Error:' . curl_error($ch);
+	}
+	curl_close($ch);
+	echo "\n Successfully got {$keyTarget} for {$keyValue} \n";
+	return $keyValue;
+}
+
+
 echo "PHP set_remove_input Received removal request for Key:\n$key\nAnd value:\n$value\n";
 if (str_contains ($value, '/network_ip/')) {
                 echo "\nThis is a network device, calling appropriate function for network device..\n";
@@ -62,11 +83,22 @@ if (str_contains ($value, '/network_ip/')) {
                 del_etcd("/network_shorthash/$modHash");
         } else {
                 echo "\nThis is a local device, calling appropriate function for local device..\n";
-                del_etcd($key);
-                del_etcd("/hash/$value");
+                // We find long_interface and devpath_lookup from hash so we delete that last
+                $longInterface	= get_etcd("/hash/$value"); 
+                echo "$longInterface";
+                $longInterface	= strstr($longInterface, '/inputs', true);
+                echo "$longInterface";
+                $longInterface	= "/long_interface/" . $longInterface;
+                echo "$longInterface";
+                $strippedKey	= strstr($key, '/interface/', true);
+                echo "$strippedKey";
+                $strippedKey	= substr($strippedKey, 0, strpos($variable, "/"));
+                $hostName	= strstr($strippedKey, '/', true);
+                echo "$hostname";
+                del_etcd("/$hostName/devpath_lookup/$value");
+                del_etcd("$longInterface");
                 del_etcd("/short_hash/$value");
-                del_etcd("/long_interface/dev/v4l/by-id/$value");
-                // we need to get the target hostname and apply it here.
-                // del_etcd("$hostName/inputs/dev/v4l/by-id/$value");
+                del_etcd("/hash/$value");  
+		del_etcd($key);
 }
 ?>

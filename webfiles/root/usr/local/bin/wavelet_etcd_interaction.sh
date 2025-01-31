@@ -4,7 +4,7 @@
 # Effectively, it intercepts the etcd calls from the other modules and injects certificates as necessary
 
 #Etcd Interaction global variables
-ETCDENDPOINT="$(cat /var/home/wavelet/etcd_ip):2379"
+ETCDENDPOINT="$(cat /var/home/wavelet/config/etcd_ip):2379"
 ETCDCTL_API=3
 clientCertificateFile="/etc/pki/tls/cert/etcd.cert"
 clientCertificateKeyFile="/etc/pki/tls/private/etcd.key"
@@ -82,7 +82,7 @@ ExecStart=etcdctl --endpoints=${ETCDENDPOINT} \
 --cert-file ${clientCertificateFile} \
 --key-file ${clientKeyFile} \
 --ca-file ${certificateAuthorityFile} \
-watch ${inputKeyName} -w simple -- sh -c "/usr/local/bin/${waveletModule}.sh ${additionalArg}"
+watch ${inputKeyName} -w simple -- /usr/bin/bash -c \"/usr/local/bin/${waveletModule}.sh ${additionalArg}\"
 Restart=always
 
 [Install]
@@ -95,13 +95,13 @@ Wants=network-online.target
 
 [Service]
 ExecStart=etcdctl --endpoints=${ETCDENDPOINT} \
-watch ${inputKeyName} -w simple -- sh -c "/usr/local/bin/${waveletModule}.sh ${additionalArg}"
+watch ${inputKeyName} -w simple -- /usr/bin/bash -c \"/usr/local/bin/${waveletModule}.sh ${additionalArg}\"
 Restart=always
 
 [Install]
 WantedBy=default.target" > /home/wavelet/.config/systemd/user/${waveletModule}.service
 	fi
-	echo -e "User Systemd service unit for etcd Key: ${inputKeyName} generated\nName: ${waveletModule}.service\nRemember to run 'systemd --user daemon-reload' from your calling function!\n"
+	echo -e "User Systemd service unit for etcd Key: ${inputKeyName} generated\nName: ${waveletModule}.service\nRemember to run 'systemctl --user daemon-reload' from your calling function!\n"
 	exit 0
 }
 
@@ -167,7 +167,7 @@ case ${action} in
 	delete_etcd_key_global)		declare -A commandLine=([1]="del" [0]="${inputKeyName}"); fID="clearText";
 	;;
 	# Delete keys on prefix
-	delete_etcd_key_prefix)		declare -A commandLine=([2]="del" [1]="${inputKeyName}" [0]="prefix"); fID="clearText";
+	delete_etcd_key_prefix)		declare -A commandLine=([2]="del" [1]="${inputKeyName}" [0]="--prefix"); fID="clearText";
 	;;
 	# Generate a user systemd watcher based off keyname and module arguments.
 	generate_service)			generate_service "${inputKeyName}" "${waveletModule}" "${additionalArg}"; fID="clearText";
@@ -181,5 +181,7 @@ esac
 
 # Because we need an output from this script, we can't enable logging (unless something's broken..)
 #set -x
-#exec >/home/wavelet/etcdlog.log 2>&1
+#exec >/home/wavelet/logs/etcdlog.log 2>&1
+hostNameSys=$(hostname)
+hostNamePretty=$(hostnamectl --pretty)
 main "${action}" "${inputKeyName}" "${inputKeyValue}" "${valueOnlySwitch}"

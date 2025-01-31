@@ -49,7 +49,7 @@ generate_coreos_image() {
 	if [[ -f automated_installer.yml ]]; then
 		echo -e "automated installer YAML already exists!\n"
 	fi
-	mv /home/wavelet/http/ignition/automated_installer.yml ./
+	cp /home/wavelet/config/automated_installer.yml ./
 	butane --pretty --strict --files-dir ./ automated_installer.yml --output automated_installer.ign
 	cp ./automated_installer.ign /home/wavelet/http/ignition/automated_installer.ign
 	cp /usr/local/bin/wavelet_install_client.sh /home/wavelet/http/ignition
@@ -163,11 +163,10 @@ echo 'Booting Fedora CoreOS...'
 #
 ###
 
-set -x
-exec >/home/wavelet/grubconfig.log 2>&1
+#set -x
+exec >/var/home/wavelet/logs/grubconfig.log 2>&1
 
 if [[ -f /var/pxe.complete ]]; then
-	echo -e "\nInstaller has already run, ending task!"
 	exit 0
 fi
 
@@ -188,7 +187,7 @@ restorecon -Rv /var/lib/tftpboot
 cp -R /var/lib/tftpboot/*.efi /home/wavelet/http/pxe
 cp -R /var/lib/tftpboot/boot /home/wavelet/http/pxe
 cp -R /var/lib/tftpboot/efi /home/wavelet/http/pxe
-cp /var/home/wavelet/etcd_ip /home/wavelet/http/ignition
+cp /var/home/wavelet/config/etcd_ip /home/wavelet/http/ignition
 # Ensure the wavelet user owns the http folder, and set +x and read perms on http folder and subfolders
 chmod -R 0755 /home/wavelet/http
 chown -R wavelet /home/wavelet/
@@ -197,13 +196,12 @@ find /var/home/wavelet/http/ -type f -print0 | xargs -0 chmod 644
 find /var/home/wavelet/http-php/ -type f -print0 | xargs -0 chmod 644
 echo -e "\nPXE bootable images completed and populated in http serverdir, client provisioning should now be available..\n"
 touch /var/pxe.complete
-# we disable the service so it won't attempt to start on next boot
-systemctl disable wavelet_install_pxe.service 
 
 # Check to see if the security layer is enabled, if not, we are done and should reboot..
 if [[ -f /var/prod.security/enabled ]]; then
 	systemctl start wavelet_install_hardening.service
 	exit 0
 else
-	systemctl reboot
+	# restart getty@tty1 to reload UI and start userland build process
+	systemctl restart getty@tty1
 fi
