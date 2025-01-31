@@ -148,9 +148,9 @@ exec >/var/home/wavelet/logs/initialize.log 2>&1
 echo -e "Populating standard values into etcd, the last step will trigger the Controller and Reflector functions, bringing the system up.\n"
 KEYNAME="uv_videoport"; KEYVALUE="5004"; write_etcd_global
 KEYNAME="uv_audioport"; KEYVALUE="5006"; write_etcd_global
-KEYNAME="/livestream/enabled"; KEYVALUE="0"; write_etcd_global
+KEYNAME="/ui/livestream"; KEYVALUE="0"; write_etcd_global
 KEYNAME="uv_hash_select"; KEYVALUE="2"; write_etcd_global
-KEYNAME="/banner/enabled"; KEYVALUE="0"; write_etcd_global
+KEYNAME="/ui/banner"; KEYVALUE="0"; write_etcd_global
 KEYNAME="uv_filter_cmd"; delete_etcd_key_global
 
 event_init_av1
@@ -169,4 +169,11 @@ systemctl --user enable \
 # Ping detectv4l so that we populate devices
 /usr/local/bin/wavelet_detectv4l.sh
 touch /var/home/wavelet/encoder.firstrun
-event_init_seal
+
+KEYNAME="/interface/persist"; read_etcd_global
+if [[ ${printvalue} -eq "1" ]]; then
+	echo "Input persistance is enabled.  Attempting to start encoder with the previously selected input.."
+else
+	ehco "Input persistence is not enable, starting with the static image input.."
+	event_init_seal
+fi
