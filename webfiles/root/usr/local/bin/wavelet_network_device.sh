@@ -260,7 +260,7 @@ generate_device_info() {
 	if [[ $output_return == "" ]] then
 		echo -e "\n${deviceHash} not located within etcd's /network_hash/* keyspace, assuming we have a new device and continuing with process to set parameters..\n"
 	else
-		echo -e "\n${deviceHash} located in etcd:\n\n${output_return}\n\n, terminating process.\nIf you wish for the device to be properly redetected from scratch, please move it to a different USB port.\n"
+		echo -e "\n${deviceHash} located in etcd:\n${output_return}\n, terminating process.\nIf you wish for the device to be properly redetected from scratch, please move it to a different USB port.\n"
 		# we run device_cleanup regardless!!
 		device_cleanup
 	fi
@@ -298,7 +298,7 @@ read_leasefile(){
 populate_to_etcd(){
 	# Now we populate the appropriate keys for webUI labeling and tracking:
 	echo -e "Populating ETCD with discovery data..\n"
-	KEYNAME="/network_interface/short/${deviceHostName}"; KEYVALUE="${deviceHash}"; write_etcd_global
+	KEYNAME="/UI/network_interface/short/${deviceHostName}"; KEYVALUE="${deviceHash}"; write_etcd_global
 	KEYNAME="/network_shorthash/${deviceHash}"; KEYVALUE="${deviceHostName}"; write_etcd_global
 	#KEYNAME="/network_long/${leasefile}"
 	#KEYVALUE="${devicehash}"
@@ -316,7 +316,7 @@ populate_to_etcd(){
 		# Finally, set and configure a watcher service for this device so that it will reconfigure the device hostname if the label is changed on the webUI
 		# /usr/local/bin/wavelet_network_device_relabel.sh
 	# This key often winds up with garbage, and must be deleted or it will cause issues parsing things back out.
-	KEYNAME="/network_interface/short"; delete_etcd_key
+	KEYNAME="/UI/network_interface/short"; delete_etcd_key
 	# Finally we tell wavelet there is a new input device in town so the server encoder task will regenerate next click..
 	KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
 	exit 0
