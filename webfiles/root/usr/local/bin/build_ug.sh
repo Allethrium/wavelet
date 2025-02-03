@@ -197,18 +197,22 @@ event_server(){
 		server_bootstrap
 	fi
 	# The server runs a superset of most of the client machines units, however it shouldn't support renaming.
-	services="event_clear_devicemap \
-	event_generate_reflector \
-	event_generate_controller \
-	event_generate_reflectorreload \
-	event_system_reboot \
-	event_reset \
-	event_device_redetect \
-	event_generate_wavelet_encoder_query \
-	event_generate_wavelet_ui_service \
-	event_audio_toggle \
-	event_audio_bluetooth_connect"
+	event_generate_wavelet_encoder_query
+	event_generate_wavelet_ui_service
+	event_clear_devicemap
+	event_generate_reflector
+	event_generate_controller
+	event_generate_reflectorreload
+	event_system_reboot 
+	event_reset
+	event_device_redetect
+	event_audio_toggle
+	event_audio_bluetooth_connect
 	event_generateHash svr
+	services="wavelet.reflector wavelet_audio_toggle wavelet_controller \
+	wavelet_decoder_reboot wavelet_decoder_reset wavelet_device_redetect \
+	wavelet_encoder_query wavelet_reboot wavelet_reflector_reload \
+	wavelet_reset wavelet_set_bluetooth_connect wavelet_ui"
 	for i in ${services}; do
 		${i}
 	done
