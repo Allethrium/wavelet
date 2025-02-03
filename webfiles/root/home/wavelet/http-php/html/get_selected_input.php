@@ -1,6 +1,7 @@
 <?php
 header('Content-type: application/json');
-// this script curls etcd for available input devices, cleans out the cruft and re-encodes a JSON object that should be handled by the webui index.html via AJAX
+// this script curls etcd for available input devices, 
+// cleans out the cruft and re-encodes a JSON object that should be handled by the webui index.html via AJAX
 
 function poll_etcd_inputs($keyPrefix) {
 		$ch = curl_init();
