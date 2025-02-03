@@ -122,13 +122,16 @@ event_decoder(){
 	for i in ${services}; do
 		systemctl --user enable ${i} --now
 	done
-	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
+	# Notifies the server to provision the client machine and give it a role for itself
+	# Might work terribly, will have to test.
+	KEYNAME="PROV_RQ"; KEYVALUE="${hostNameSys}"; write_etcd_global
+	sleep .33
+	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd # if fails, we have a security rights issue!
 	# Set Type keys to "dec" for system, /hostLabel/ and also for UI
 	KEYVALUE="dec";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/UI/hosts/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/hostLabel/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
-	sleep .33
 	# Executes run_ug in order to start the video streaming window
 	systemctl --user start run_ug.service
 }
