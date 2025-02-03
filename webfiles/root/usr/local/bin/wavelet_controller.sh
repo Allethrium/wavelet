@@ -34,7 +34,7 @@ main() {
 		exit 0
 	fi
 	KEYNAME="/UI/UV_HASH_SELECT"; read_etcd_global; event="${printvalue}"
-	KEYNAME="/UI/UV_HASH_SELECT"; read_etcd_global; eventPrevious="${printvalue}"
+	KEYNAME="/UI/UV_HASH_SELECT_OLD"; read_etcd_global; eventPrevious="${printvalue}"
 	if [[ ${event} == ${eventPrevious} ]];  then
 		echo "Event ID matches the previous input update, doing nothing."
 		exit 0
