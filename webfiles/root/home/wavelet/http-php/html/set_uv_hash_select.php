@@ -28,7 +28,7 @@ function curl_etcd($keyTarget, $keyValue) {
 }
 
 // curl etcd uv_hash_select for the value of the device hash we want to see streaming on the system
-curl_etcd("uv_hash_select", $hash);
-curl_etcd("uv_input", $label);
-curl_etcd("input_update", "1");
+curl_etcd("/UI/UV_HASH_SELECT", $hash);
+curl_etcd("/UI/UV_INPUT", $label);
+curl_etcd("/UI/INPUT_UPDATE", "1");
 ?>
