@@ -71,11 +71,11 @@ event_init_seal(){
 	rm -rf seal.mkv
 	# Generate an image
 	ffmpeg -fflags +genpts -loop 1 -i ny-stateseal.jpg -t 10 -c:v mjpeg -vf scale=1080x1080 -t 10 seal.mkv
-	KEYNAME=uv_input; KEYVALUE="SEAL"; write_etcd_global
+	KEYNAME=UV_INPUT; KEYVALUE="SEAL"; write_etcd_global
 	cd /home/wavelet/
 
 	# call uv_hash_select to process the provided device hash and select the input from these data
-	KEYNAME=uv_hash_select; read_etcd_global; 
+	KEYNAME=UV_HASH_SELECT; read_etcd_global; 
 	# Reads Filter settings, should be banner.pam most of the time
 	KEYNAME=uv_filter_cmd; read_etcd_global; filtervar=${printvalue}
 	# Reads Encoder codec settings, should be populated from the Controller
@@ -148,9 +148,9 @@ exec >/var/home/wavelet/logs/initialize.log 2>&1
 echo -e "Populating standard values into etcd, the last step will trigger the Controller and Reflector functions, bringing the system up.\n"
 KEYNAME="uv_videoport"; KEYVALUE="5004"; write_etcd_global
 KEYNAME="uv_audioport"; KEYVALUE="5006"; write_etcd_global
-KEYNAME="/ui/livestream"; KEYVALUE="0"; write_etcd_global
-KEYNAME="uv_hash_select"; KEYVALUE="2"; write_etcd_global
-KEYNAME="/ui/banner"; KEYVALUE="0"; write_etcd_global
+KEYNAME="/UI/livestream"; KEYVALUE="0"; write_etcd_global
+KEYNAME="UV_HASH_SELECT"; KEYVALUE="2"; write_etcd_global
+KEYNAME="/UI/banner"; KEYVALUE="0"; write_etcd_global
 KEYNAME="uv_filter_cmd"; delete_etcd_key_global
 
 event_init_av1
@@ -170,7 +170,7 @@ systemctl --user enable \
 /usr/local/bin/wavelet_detectv4l.sh
 touch /var/home/wavelet/encoder.firstrun
 
-KEYNAME="/interface/persist"; read_etcd_global
+KEYNAME="/UI/interface/persist"; read_etcd_global
 if [[ ${printvalue} -eq "1" ]]; then
 	echo "Input persistance is enabled.  Attempting to start encoder with the previously selected input.."
 else
