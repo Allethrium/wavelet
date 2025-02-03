@@ -26,21 +26,21 @@ main
 }
 
 main() {
-	KEYNAME=input_update; read_etcd_global
+	KEYNAME=/UI/INPUT_UPDATE; read_etcd_global
 	if [[ "${printvalue}" == 1 ]]; then
 		echo -e "input_update key is set to 1, continuing with task..\n"
 	else
 		echo -e "input_update key is set to 0, doing nothing..\n"
 		exit 0
 	fi
-	KEYNAME="uv_hash_select"; read_etcd_global; event="${printvalue}"
-	KEYNAME="uv_hash_select_old"; read_etcd_global; eventPrevious="${printvalue}"
+	KEYNAME="/UI/UV_HASH_SELECT"; read_etcd_global; event="${printvalue}"
+	KEYNAME="/UI/UV_HASH_SELECT"; read_etcd_global; eventPrevious="${printvalue}"
 	if [[ ${event} == ${eventPrevious} ]];  then
 		echo "Event ID matches the previous input update, doing nothing."
 		exit 0
 	fi
 	# Check livestream toggle UI value
-	unset printvalue
+	printvalue="0"
 	KEYNAME="/UI/livestream"; read_etcd_global; livestream_state="${printvalue}"
 		if [[ "${livestream_state}" = 0 ]]; then
 			echo "Livestreaming is off, setting LiveStreaming flag to disabled"
@@ -49,7 +49,7 @@ main() {
 			echo "Livestreaming is on, setting LiveStreaming flag to enabled"
 			KEYNAME=UV_ISLIVESTREAMING; KEYVALUE="1"; write_etcd_global
 		fi
-	bannerActive=0
+	printvalue="0"
 	KEYNAME="/UI/banner"; read_etcd_global
 	if [[ ${printvalue} == "1" ]]; then
 		bannerActive=${printvalue}
@@ -180,12 +180,12 @@ wavelet_blank() {
 # 1
 # Displays a black jpg to blank the screen fully
 	current_event="wavelet-blank"
-	KEYNAME="UV_HASH_SELECT_OLD"; read_etcd_global; eventHashPrevious="${printvalue}"
+	KEYNAME="/UI/UV_HASH_SELECT_OLD"; read_etcd_global; eventHashPrevious="${printvalue}"
 	echo "old hash select is: ${eventHashPrevious}"
 	KEYNAME="/hash/${eventHashPrevious}"; read_etcd_global; eventLabel="${printvalue}"
-	KEYNAME=UV_INPUT; KEYVALUE="blank"					;	write_etcd_global
+	KEYNAME="/UI/UV_INPUT"; KEYVALUE="blank"					;	write_etcd_global
 	KEYNAME="ENCODER_QUERY"; KEYVALUE="1"				;	write_etcd_global
-	KEYNAME="UV_HASH_SELECT_OLD"; KEYVALUE="blank"		;	write_etcd_global
+	KEYNAME="/UI/UV_HASH_SELECT_OLD"; KEYVALUE="blank"		;	write_etcd_global
 	if [[ "${eventLabel}" != *"svr"* ]]; then
 		echo "Previous event does not reference the server, restarting UG process to ensure reflector detects transition.."
 		systemctl --user restart UltraGrid.AppImage.service
@@ -200,13 +200,13 @@ wavelet_seal() {
 # 2
 # Serves a static image in .jpg format in a loop to the encoder.
 	cd /home/wavelet/
-	KEYNAME="UV_HASH_SELECT_OLD"; read_etcd_global; eventHashPrevious="${printvalue}"
+	KEYNAME="/UI/UV_HASH_SELECT_OLD"; read_etcd_global; eventHashPrevious="${printvalue}"
 	echo "old hash select is: ${eventHashPrevious}"
 	KEYNAME="/hash/${eventHashPrevious}"; read_etcd_global; eventLabel="${printvalue}"
 	current_event="wavelet-seal"
-	KEYNAME=UV_INPUT; KEYVALUE="seal"					;	write_etcd_global
+	KEYNAME="/UI/UV_INPUT"; KEYVALUE="seal"					;	write_etcd_global
 	KEYNAME="ENCODER_QUERY"; KEYVALUE="2"				;	write_etcd_global
-	KEYNAME="UV_HASH_SELECT_OLD"; KEYVALUE="seal"		;	write_etcd_global
+	KEYNAME="/UI/UV_HASH_SELECT_OLD"; KEYVALUE="seal"		;	write_etcd_global
 	if [[ "${eventLabel}" != *"svr"* ]]; then
 		echo "Previous event does not reference the server, restarting UG process to ensure reflector detects transition.."
 		systemctl --user restart UltraGrid.AppImage.service
@@ -221,12 +221,12 @@ wavelet_testcard() {
 # T
 # Test Card
 	current_event="wavelet-blank"
-	KEYNAME="UV_HASH_SELECT_OLD"; read_etcd_global; eventHashPrevious="${printvalue}"
+	KEYNAME="/UI/UV_HASH_SELECT_OLD"; read_etcd_global; eventHashPrevious="${printvalue}"
 	echo "old hash select is: ${eventHashPrevious}"
 	current_event="wavelet-testcard"
-	KEYNAME="UV_INPUT"; KEYVALUE="smpte_bars"			;	write_etcd_global
+	KEYNAME="/UI/UV_INPUT"; KEYVALUE="smpte_bars"			;	write_etcd_global
 	KEYNAME="ENCODER_QUERY"; KEYVALUE="T"				;	write_etcd_global
-	KEYNAME="UV_HASH_SELECT_OLD"; KEYVALUE="smpte_bars"	;	write_etcd_global
+	KEYNAME="/UI/UV_HASH_SELECT_OLD"; KEYVALUE="smpte_bars"	;	write_etcd_global
 	if [[ "${eventLabel}" != *"svr"* ]]; then
 		echo "Previous event does not reference the server, restarting UG process to ensure reflector detects transition.."
 		systemctl --user restart UltraGrid.AppImage.service
@@ -238,7 +238,7 @@ wavelet_testcard() {
 
 wavelet_refresh() {
 	# This is only called by the RD, refresh-devices button.  It finds the previous hash and resets to it.
-	KEYNAME="UV_HASH_SELECT_OLD"; read_etcd_global; previousHash=${printvalue}
+	KEYNAME="/UI/UV_HASH_SELECT_OLD"; read_etcd_global; previousHash=${printvalue}
 	case ${previousHash} in
 		"")		echo "previousHash is null, setting to seal"		previousHash="seal"
 		;;
@@ -247,7 +247,7 @@ wavelet_refresh() {
 		*)		echo "previousHash is something else, proceeding."
 		;;
 	esac
-	KEYNAME="UV_HASH_SELECT"; KEYVALUE=${previousHash}; write_etcd_global
+	KEYNAME="/UI/UV_HASH_SELECT"; KEYVALUE=${previousHash}; write_etcd_global
 	echo -e "Previous hash value reset, running detectv4l to redetect local sources on all hosts.."
 	wavelet_detect_inputs
 }
@@ -257,9 +257,9 @@ wavelet_dynamic() {
 	# The only thing the controller is doing here ought to be determining the host
 	# The encoder performs the necessary tasks from there.
 	current_event="wavelet-dynamic"
-	KEYNAME=UV_INPUT; read_etcd_global;	controllerInputLabel=${printvalue}
-	KEYNAME=UV_HASH_SELECT;	read_etcd_global; controllerInputHash=${printvalue}
-	KEYNAME="UV_HASH_SELECT_OLD"; read_etcd_global; controllerInputHashPrevious="${printvalue}"
+	KEYNAME="/UI/UV_INPUT"; read_etcd_global;	controllerInputLabel=${printvalue}
+	KEYNAME="/UI/UV_HASH_SELECT";	read_etcd_global; controllerInputHash=${printvalue}
+	KEYNAME="/UI/UV_HASH_SELECT_OLD"; read_etcd_global; controllerInputHashPrevious="${printvalue}"
 	if [[ ${controllerInputHash} == ${controllerInputHashPrevious} ]]; then
 		echo "Hash selection is identical, assuming multiple clicks on UI and doing nothing."
 		exit 0
@@ -270,14 +270,14 @@ wavelet_dynamic() {
 	# Do we need ANOTHER watcher service here? Or should the encoders simply watch INPUT_UPDATE and uv_hash_select?
 	KEYNAME="ENCODER_QUERY"; KEYVALUE="${controllerInputHash}"; write_etcd_global
 	# Write uv_hash_select_old so the system can remember the previous selected hash
-	KEYNAME="UV_HASH_SELECT_OLD"; KEYVALUE="${controllerInputHash}"; write_etcd_global
+	KEYNAME="/UI/UV_HASH_SELECT_OLD"; KEYVALUE="${controllerInputHash}"; write_etcd_global
 }
 
 wavelet_foursplit() {
 	current_event="wavelet_foursplit"
-	KEYNAME=UV_INPUT; KEYVALUE="Multi source mix"; write_etcd_global
+	KEYNAME="/UI/UV_INPUT"; KEYVALUE="Multi source mix"; write_etcd_global
 	#controllerInputLabel=${printvalue}
-	KEYNAME=UV_HASH_SELECT; read_etcd_global; controllerInputHash=${printvalue}
+	KEYNAME="/UI/UV_HASH_SELECT"; read_etcd_global; controllerInputHash=${printvalue}
 	echo -e "\n\nController notified that the Four-way split input hash has been selected from the WebUI.\nEncoder will do its best to generate a software mix of up to four available input devices.\n\n "
 	# Kill existing streaming on the SERVER
 	systemctl --user stop UltraGrid.AppImage.service
@@ -402,28 +402,28 @@ event_libsvt_av1() {
 wavelet_foursplit() {
 # W
 	current_event="wavelet-foursplit"
-	KEYNAME=UV_INPUT; KEYVALUE=FOURSPLIT; write_etcd_global
+	KEYNAME="/UI/UV_INPUT"; KEYVALUE=FOURSPLIT; write_etcd_global
 	# Set encoder restart flag to 1
 	KEYNAME=ENCODER_RESTART; KEYVALUE="1"; write_etcd_global
 }
 wavelet_twosplit() {
 # W
 	current_event="wavelet-twosplit"
-	KEYNAME=UV_INPUT; KEYVALUE=TWOSPLIT; write_etcd_global
+	KEYNAME="/UI/UV_INPUT"; KEYVALUE=TWOSPLIT; write_etcd_global
 	# Set encoder restart flag to 1
 	KEYNAME=ENCODER_RESTART; KEYVALUE="1"; write_etcd_global
 }
 wavelet_pip1() {
 # Doesn't currently work, so disable.
 	current_event="wavelet-pip1"
-	KEYNAME=UV_INPUT; KEYVALUE=PIP1; write_etcd_global
+	KEYNAME="/UI/UV_INPUT"; KEYVALUE=PIP1; write_etcd_global
 	# Set encoder restart flag to 1
 	KEYNAME=ENCODER_RESTART; KEYVALUE="1"; write_etcd_global
 }
 wavelet_pip2() {
 # Doesn't currently work, so disable.
 	current_event="wavelet-pip2"
-	KEYNAME=UV_INPUT; KEYVALUE=PIP2; write_etcd_global
+	KEYNAME="/UI/UV_INPUT"; KEYVALUE=PIP2; write_etcd_global
 	# Set encoder restart flag to 1
 	KEYNAME=ENCODER_RESTART; KEYVALUE="1"; write_etcd_global
 }
