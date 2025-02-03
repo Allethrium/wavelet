@@ -119,22 +119,18 @@ set_device_input() {
 	# called from generate_device_info from the nested if loop checking for pre-existing deviceHash in etcd /hash/
 	# populated device_string_short with hash value, this is used by the interface webUI component
 	# device_string_short is effectively the webui Label / banner text.
-	# Because we cannot query etcd by keyvalue, we must create a reverse lookup prefix for everything we want to be able to clean up!!
-	KEYNAME="/interface/${hostNamePretty}/${device_string_short}"; KEYVALUE="${deviceHash}"; write_etcd_global	
-	# And the reverse lookup prefix - N.B this is updated from set_label.php when the webUI changes a device label/banner string! 
-	KEYNAME="/short_hash/${deviceHash}"; KEYVALUE="${hostNamePretty}/${device_string_short}"; write_etcd_global
+	# Because we cannot query etcd by keyvalue, we must create a reverse lookup prefix for everything we want to be able to clean up
+	KEYNAME="/UI/interface/${device_string_short}"; KEYVALUE="${deviceHash}"; write_etcd_global	
+	# And the reverse lookup prefix. This is updated from set_label.php when the webUI changes a device label
+	KEYNAME="/UI/short_hash/${deviceHash}"; KEYVALUE="${hostNamePretty}/${device_string_short}"; write_etcd_global
 	# We need this to perform cleanup "gracefully"
-	KEYNAME="/long_interface${device_string_long}"; KEYVALUE=${deviceHash}; write_etcd_global
 	# This will enable us to find the device from its hash value, along with the registered host encoder, like a reverse DNS lookup..
-	# GLOBAL value
-	echo -e "Attempting to set keyname ${deviceHash} for ${hostNamePretty}${device_string_long}"
-	KEYNAME="/hash/${deviceHash}"
-	# Stores the device data under hostname/inputs/device_string_long
-	KEYVALUE="/${hostNamePretty}/inputs${device_string_long}"; write_etcd_global
+	KEYNAME="/long_interface${device_string_long}"; KEYVALUE=${deviceHash}; write_etcd_global
+	KEYVALUE="/${hostNameSys}/inputs${device_string_long}"; KEYNAME="/hash/${deviceHash}"; write_etcd_global
 	# Hash - short path lookup
-	KEYNAME="/${hostNamePretty}/devpath_lookup/${deviceHash}"; KEYVALUE="${v4l_device_path}"; write_etcd_global
+	KEYNAME="/${hostNameSys}/devpath_lookup/${deviceHash}"; KEYVALUE="${v4l_device_path}"; write_etcd_global
 	# notify watcher that input device configuration has changed
-	KEYNAME=new_device_attached; KEYVALUE=1; write_etcd_global
+	KEYNAME=NEW_DEVICE_ATTACHED; KEYVALUE=1; write_etcd_global
 	echo -e "resetting variables to null."
 	deviceHash=""
 	device_string_short=""
@@ -190,12 +186,12 @@ device_cleanup() {
 				echo -e "Deleting /hash/${cleanupHash} entry"
 				KEYNAME="/hash/${cleanupHash}"; delete_etcd_key_global
 				# finally, find and delete from interface prefix - Guess we need ANOTHER lookup table to manage to keep all of this straight..
-				KEYNAME="/short_hash/${cleanupHash}"; read_etcd_global; cleanupInterface=${printvalue}
+				KEYNAME="/UI/interface/short_hash/${cleanupHash}"; read_etcd_global; cleanupInterface=${printvalue}
 				echo -e "Device UI Interface label located in /short_hash/${cleanupHash} for the value ${cleanupInterface}"
-				echo -e "Deleting /short_hash/${cleanupHash}  entry"
+				echo -e "Deleting /UI/interface/short_hash/${cleanupHash}  entry"
 				delete_etcd_key
-				echo -e "Deleting /interface/${cleanupInterface} entry"
-				KEYNAME="/interface/$${cleanupInterface}"; delete_etcd_key_global
+				echo -e "Deleting /UI/interface/${cleanupInterface} entry"
+				KEYNAME="/UI/interface/${cleanupInterface}"; delete_etcd_key_global
 				echo -e "Device entry ${cleanupStringLong} should be removed along with all references to ${cleanupHash}\n\n"
 			fi
 		done
