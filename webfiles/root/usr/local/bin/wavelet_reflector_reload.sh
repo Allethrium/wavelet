@@ -58,8 +58,8 @@ reflector_monitor() {
         	echo "$line=DEAD"
         	# Get hostname from $line value by querying against DNS
         	deadhostkeyname=$(dig +short -x $line | cut -d"." -f1)
-        	KEYNAME="/decoderip/$deadkeyhostname"; delete_etcd_key
-        	echo -e "${deadhostkeyname} has been deleted from /decoderip/ list in etcd \n"
+        	KEYNAME="/DECODERIP/$deadkeyhostname"; delete_etcd_key
+        	echo -e "${deadhostkeyname} has been deleted from /DECODERIP/ list in etcd \n"
         	sleep 2
         	systemctl --user restart wavelet_reflector.service
         	echo -e "Wavelet reflector service restarted via systemd"
