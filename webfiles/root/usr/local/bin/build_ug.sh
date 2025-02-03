@@ -145,8 +145,7 @@ event_encoder(){
 	fi
 	systemctl --user daemon-reload
 	# Generate Systemd notifier services for encoders
-	services="event_encoder_reboot \
-	event_system_reboot \
+	services="event_system_reboot \
 	event_reset \
 	event_device_redetect \
 	event_host_relabel_watcher \
@@ -156,7 +155,7 @@ event_encoder(){
 		${i}
 	done
 	systemctl --user daemon-reload
-	for i in ${service}; do
+	for i in ${services}; do
 		systemctl --user enable ${i} --now
 	done
 	# We do not perform run_ug for the encoder as that is enabled if it receives an encoderflag change.  It will be idle until then.
@@ -168,6 +167,7 @@ event_encoder(){
 	KEYNAME="/hostLabel/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
 }
+
 event_generate_wavelet_encoder_query(){
 	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
 	# We need to add this switch here to ensure if we're a server we don't populate ourselves to the encoders DOM in the webUI..
@@ -179,8 +179,6 @@ event_generate_wavelet_encoder_query(){
 	fi
 	# Can be called directly, remember to escape quotes if we want to preserve them as per bash standards.
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "ENCODER_QUERY" 0 0 "wavelet_encoder_query"
-	systemctl --user daemon-reload
-	systemctl --user enable wavelet_encoder_query.service --now
 }
 event_server(){
 	if [[ -f /var/pxe.complete ]]; then
@@ -203,7 +201,6 @@ event_server(){
 	event_generate_reflector \
 	event_generate_controller \
 	event_generate_reflectorreload \
-	event_encoder_reboot \
 	event_system_reboot \
 	event_reset \
 	event_device_redetect \
@@ -216,7 +213,8 @@ event_server(){
 		${i}
 	done
 	systemctl --user daemon-reload
-	for i in ${service}; do
+	echo "System services generated, starting services now.."
+	for i in ${services}; do
 		systemctl --user enable ${i} --now
 	done
 }
@@ -303,7 +301,8 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 	echo -e "Enabling server notification services"
 	event_generate_controller
 	event_generate_reflectorreload
-	event_generate_watch_encoderflag
+	#event_generate_watch_encoderflag  where did you go?
+	event_generate_watch_provision
 	event_generate_run_ug
 	systemctl --user enable wavelet_controller.service --now
 	systemctl --user enable watch_reflectorreload.service --now
@@ -407,7 +406,7 @@ event_generate_controller(){
 	else
 		echo -e "Unit file does not exist, generating..\n"
 		# Generate userspace controller service
-		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "input_update" 0 0 "wavelet_controller"
+		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "INPUT_UPDATE" 0 0 "wavelet_controller"
 	fi
 }
 event_generate_reflectorreload(){
@@ -417,7 +416,7 @@ event_generate_reflectorreload(){
 	else
 		echo -e "Unit file does not exist, generating..\n"
 		# Generate userspace reflector_reload service
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/decoderip/ --prefix" 0 0 "wavelet_reflector_reload"
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/DECODERIP/ --prefix" 0 0 "wavelet_reflector_reload"
 	fi
 }
 event_generate_wavelet_ui_service(){
@@ -521,6 +520,10 @@ event_host_relabel_watcher(){
 	# Watches for a device relabel flag, then runs wavelet_device_relabel.sh
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/%H/control/RELABEL 0 0 "wavelet_device_relabel" \"relabel\"
 }
+event_generate_watch_provision(){
+	# Watches for device provision requests
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "PROV_RQ" 0 0 "wavelet_device_provision"
+}
 event_clear_devicemap(){
 	# Clears the device map file so it will be regenerated.  Since the paths under v4l2 aren't stable, 
 	# we need to do this to avoid the channel indexing becoming incorrect
@@ -544,8 +547,9 @@ event_connectwifi(){
 	if [[ ${#files[@]} -gt 0 ]]; then
 		echo "Network configuration file found, continuing and getting UUID for connection.."
 	else
-		echo "No file found for network configuration, connectwifi has failed, there is no available wireless connection.  Attempting to re-run connectwifi.."
-		/usr/local/bin/connectwifi.sh
+		echo "No file found for network configuration, connectwifi has failed, there is no available wireless connection.  setting troubleshooting flag and rebooting.."
+		touch /var/home/wavelet/config/wifi_issue.flag
+		systemctl reboot -i
 	fi
 	networkUUID=$(cat /var/home/wavelet/config/wifi.*.key)
 	# Set autoconnection again and ensure wifi is up
