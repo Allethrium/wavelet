@@ -34,7 +34,7 @@ function poll_etcd_inputs($keyPrefix) {
 		echo $decodedValue;
 }
 
-$prefixstring = "uv_hash_select";
+$prefixstring = "/UI/UV_HASH_SELECT";
 $keyPrefix=base64_encode($prefixstring);
 poll_etcd_inputs($keyPrefix);
 ?>
