@@ -78,7 +78,7 @@ function validateValue($function, $value) {
 validateValue($function, $value);
 $token=get_etcd_authtoken($password, $username);
 
-$prefixstring = "/ui/hosts/$hostKey/control/$function";
+$prefixstring = "/UI/hosts/$hostKey/control/$function";
 
 $keyPrefix=base64_encode($prefixstring);
 $keyValue=base64_encode($value);
