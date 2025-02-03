@@ -40,6 +40,7 @@ main() {
 		exit 0
 	fi
 	# Check livestream toggle UI value
+	unset printvalue
 	KEYNAME="/UI/livestream"; read_etcd_global; livestream_state="${printvalue}"
 		if [[ "${livestream_state}" = 0 ]]; then
 			echo "Livestreaming is off, setting LiveStreaming flag to disabled"
