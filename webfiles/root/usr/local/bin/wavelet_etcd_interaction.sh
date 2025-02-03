@@ -29,7 +29,7 @@ main() {
 	# the commandline must be quoted, otherwise arguments such as "-t blablabla" aren't processed.
 	# This may mean we get quotation marks back out during queries, which will need to be stripped by their processing modules.
 	if [[ -f /var/prod.security.enabled ]]; then
-		ETCDURI=https://192.168.1.32:2379/v3/kv/
+		ETCDURI=https://${ETCDENDPOINT}/v3/kv/
 		etcdCommand(){
 			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" \
 			--cert-file "${clientCertificateFile}" \
@@ -37,7 +37,7 @@ main() {
 			--ca-file "${certificateAuthorityFile}" ${commandLine[@]})
 		}
 	else
-		ETCDURI=http://192.168.1.32:2379/v3/kv/
+		ETCDURI=http://${ETCDENDPOINT}/v3/kv/
 		etcdCommand(){
 			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]})
 		}
@@ -71,7 +71,7 @@ generate_service(){
 	fi
 
 	if [[ -f /var/prod.security.enabled ]]; then
-		ETCDURI=https://192.168.1.32:2379/v3/kv/put
+		ETCDURI=http://${ETCDENDPOINT}/v3/kv/
 		echo -e "[Unit]
 Description=Wavelet ${inputKeyName}
 After=network-online.target
@@ -105,6 +105,19 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/${waveletModule}.s
 	exit 0
 }
 
+generate_roles(){
+	# Generate etcd roles
+	# Etcd roles must be generated because the build_ug, detectv4l modules do not know if security is on or off, so they set role permissions as they generate and remove their keys.
+	# webui ensures the webui can only write to keys under the range "/UI/"
+	etcdctl --endpoints=${ETCDENDPOINT} role add webui
+	etcdctl --endpoints=${ETCDENDPOINT} role grant-permission webui --prefix=true readwrite "/UI/" 
+	# The server should be able to modify everything, and has its own "root" role.  Most coordination happens on the server, so this is fine.
+	etcdctl --endpoints=${ETCDENDPOINT} role add server
+	etcdctl --endpoints=${ETCDENDPOINT} role grant-permission server --prefix=true readwrite "" 
+	# Hosts can modify keys under themselves: /$(hostname)/$, they should not be able to write server/"root" keys
+	# These permissions can really only be added after the initial host provisioning is completed, because they do not exist prior to this.
+	etcdctl --endpoints=${ETCDENDPOINT} role add host
+}
 
 #####
 #
@@ -171,6 +184,9 @@ case ${action} in
 	;;
 	# Generate a user systemd watcher based off keyname and module arguments.
 	generate_service)			generate_service "${inputKeyName}" "${waveletModule}" "${additionalArg}"; fID="clearText";
+	;;
+	# Generates basic etcd role definitions
+	generate_roles)				generate_roles;
 	;;
 	check_status)				commandLine=("endpoint status"); fID="clearText";
 	;;
