@@ -22,9 +22,9 @@ function escapeHTML(val) {
 
 function inputsAjax(){
 // get dynamic devices from etcd, and call createInputButton function to generate entries for them.
-// value = generated hash value of the device, this is how we track it, and how wavelet can find it
+// value = generated hash value of the device from detectv4l, this is how we track it, and how wavelet can find it
 // keyfull = the pathname of the device in /interface/friendlyname
-// key = the key of the device (also friendlyname)
+// key = the key of the device (also a UI-modifiable label attribute)
 	$.ajax({
 		type: "POST",
 		url: "get_inputs.php",
@@ -65,6 +65,7 @@ function hostsAjax(){
 				var hostName		=	item['hostName'];
 				var hostHash		=	item['hostHash'];
 				var hostLabel 		=	item['hostLabel'];
+				// var hostIP 		=	item['hostIPAddress'];
 				createNewHost(key, type, hostName, hostHash, hostLabel);
 				})
 		},
@@ -98,7 +99,8 @@ function networkInputsAjax(){
 }
 
 function fetchHostLabelAndUpdateUI(getLabelHostName){
-// This function gets hostname | label from etcd and is responsible for telling the server which text labels to produce for each host.
+	// This function gets hostname | label from etcd and is responsible for telling the server which text labels to produce for each host.
+	// We should probably fold this into get_hosts.php so it is provided at once.
 	$.ajax({
 		type: "POST",
 		url: "get_host_label.php",
@@ -118,6 +120,7 @@ function fetchHostLabelAndUpdateUI(getLabelHostName){
 function sendPHPID(buttonElement) {
 	// we use id here in place of value (both are same for static items in the html)
 	// Because javascript inexplicably can access everythign EXCEPT the value??
+	// Can probably retire this in favor of the dynamicPHPID function below.
 	const postValue				=		(buttonElement.id);
 	var postLabel				=		($(this).innerText);
 	if (postLabel in window) {
@@ -170,6 +173,8 @@ function sendPHPID(buttonElement) {
 
 
 function sendDynamicPHPID(buttonElement) {
+	/* Sends via AJAX the button Value (Hash) and Label (shortname), then sets self as Active for CSS on page reload */
+	/* Has to run a full DOM tree search to find itself though.. */
 	const selectedDivHash                           =               $(this).parent().attr('divDeviceHash');
 	const targetID									=               $(this).parent().attr('divDevID');
 	const inputButtonKeyFull                        =               $(this).parent().attr('data-fulltext');
@@ -370,6 +375,7 @@ function getAudioStatus(audioValue) {
 
 async function getHostIPAJAX(hostName, divEntry) {
 	/* Takes the hostname on hover and gets the IP address of the device */
+	/* For simplicities' sake, I think folding this into get_hosts.php would be a better option.*/
 	var queryHostName			=		hostName;
 	console.log("Attempting AJAX PHP query for the IP Address of " + queryHostName);
 	$.ajax({
