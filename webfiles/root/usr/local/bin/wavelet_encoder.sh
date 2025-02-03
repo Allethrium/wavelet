@@ -336,7 +336,7 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage
 	# Tell wavelet my encoder IP address
 	activeConnection=$(nmcli -t -f NAME,DEVICE c s -a | head -n 1)
 	activeConnectionIP=$(nmcli dev show ${activeConnection#*:} | grep ADDRESS | awk '{print $2}' | head -n 1)
-	KEYNAME=encoder_ip_address; KEYVALUE=${activeConnectionIP%/*}; write_etcd_global
+	KEYNAME=ENCODER_IP_ADDRESS; KEYVALUE=${activeConnectionIP%/*}; write_etcd_global
 	systemctl --user daemon-reload
 	systemctl --user restart UltraGrid.AppImage.service
 	echo -e "Encoder systemd unit instructed to start.."
@@ -371,6 +371,7 @@ set_channelIndex(){
 		KEYNAME="/network_uv_stream_command/${printvalue}"; read_etcd_global
 		searchArg=${printvalue}
 	else
+		# We want the UI label to reflect the pretty hostnames as set on the UI here.  I think..
 		KEYNAME="/${hostNamePretty}/devpath_lookup/${hashValue}"; read_etcd_global; searchArg="${printvalue}"
 	fi
 
@@ -415,7 +416,7 @@ set_channelIndex(){
 read_banner_status(){
 	# Reads Filter settings, should be banner.pam most of the time
 	# If banner isn't enabled filterVar will be null, as the logo.c file can result in crashes with RTSP streams and some other pixel formats.
-	KEYNAME="/banner/enabled"; read_etcd_global; bannerStatus=${printvalue}
+	KEYNAME="/UI/banner"; read_etcd_global; bannerStatus=${printvalue}
 	echo -e "Banner status is: ${bannerStatus}"
 	if [[ "${bannerStatus}" -eq 1 ]]; then
 		echo -e "Banner is enabled, so filterVar will be set appropriately.  Note currently the logo.c file in UltraGrid can generate errors on particular kinds of streams!..\n"
