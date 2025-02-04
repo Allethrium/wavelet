@@ -108,21 +108,25 @@ event_decoder(){
 	echo -e "Decoder routine started."
 	event_connectwifi
 	echo -e "Setting up systemd services to be a decoder, moving to run_ug"
-	services="event_reveal \
-	event_system_reboot \
-	event_reset \
-	event_blankhost \
-	event_host_relabel_watcher \
-	event_promote"
-	for i in ${services}; do
-		${i}
-	done
 	event_generateHash dec
+	event_blankhost
+	event_reveal
+	event_reset
+	event_system_reboot
+	event_host_relabel_watcher
+	event_promote
 	systemctl --user daemon-reload
-	for i in ${services}; do
-		systemctl --user enable ${i} --now
-	done
-	# Notifies the server to provision the client machine and give it a role for itself
+	systemctl --user enable \
+		wavelet_decoder_reboot \
+		wavelet_decoder_reset \
+		wavelet_decoder_blank \
+		wavelet_decoder_reveal \
+		wavelet_reboot \
+		wavelet_reset \
+		wavelet_deprovision \
+		wavelet_device_relabel \
+		wavelet_promote --now
+	# Notifies the server to provision the client machine and give it a role for its own key range
 	# Might work terribly, will have to test.
 	KEYNAME="PROV_RQ"; KEYVALUE="${hostNameSys}"; write_etcd_global
 	sleep .33
@@ -143,21 +147,26 @@ event_encoder(){
 	else
 		event_connectwifi
 	fi
+    event_encoder_reboot
+    event_system_reboot
+    event_reset
+    event_device_redetect
+    event_host_relabel_watcher
+    event_generate_wavelet_encoder_query
+    event_promote
 	systemctl --user daemon-reload
 	# Generate Systemd notifier services for encoders
-	services="event_system_reboot \
-	event_reset \
-	event_device_redetect \
-	event_host_relabel_watcher \
-	event_generate_wavelet_encoder_query \
-	event_promote"
-	for i in ${services}; do
-		${i}
-	done
-	systemctl --user daemon-reload
-	for i in ${services}; do
-		systemctl --user enable ${i} --now
-	done
+	systemctl --user enable \
+		wavelet_decoder_reboot \
+		wavelet_decoder_reset \
+		wavelet_decoder_blank \
+		wavelet_decoder_reveal \
+		wavelet_reboot \
+		wavelet_reset \
+		wavelet_deprovision \
+		wavelet_device_relabel \
+		wavelet_promote \
+		wavelet_encoder_query --now
 	# We do not perform run_ug for the encoder as that is enabled if it receives an encoderflag change.  It will be idle until then.
 	# Run detectv4l here
 	/usr/local/bin/wavelet_detectv4l.sh
@@ -209,18 +218,21 @@ event_server(){
 	event_audio_toggle
 	event_audio_bluetooth_connect
 	event_generateHash svr
-	services="wavelet.reflector wavelet_audio_toggle wavelet_controller \
-	wavelet_decoder_reboot wavelet_decoder_reset wavelet_device_redetect \
-	wavelet_encoder_query wavelet_reboot wavelet_reflector_reload \
-	wavelet_reset wavelet_set_bluetooth_connect wavelet_ui"
-	for i in ${services}; do
-		${i}
-	done
 	systemctl --user daemon-reload
+	systemctl --user start \
+		wavelet.reflector \
+		wavelet_audio_toggle \
+		wavelet_controller \
+		wavelet_decoder_reboot \
+		wavelet_decoder_reset \
+		wavelet_device_redetect \
+		wavelet_encoder_query \
+		wavelet_reboot \
+		wavelet_reflector_reload \
+		wavelet_reset \
+		wavelet_set_bluetooth_connect \
+		wavelet_ui --now
 	echo "System services generated, starting services now.."
-	for i in ${services}; do
-		systemctl --user enable ${i} --now
-	done
 }
 
 server_bootstrap(){
@@ -305,7 +317,6 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 	echo -e "Enabling server notification services"
 	event_generate_controller
 	event_generate_reflectorreload
-	#event_generate_watch_encoderflag  where did you go?
 	event_generate_watch_provision
 	event_generate_run_ug
 	systemctl --user enable wavelet_controller.service --now
