@@ -12,6 +12,7 @@ header('Content-type: application/json');
 //									PROMOTE(bool)
 //									DEPROVISION(bool)
 //									RESET(bool)
+//									REBOOT(bool)
 //									REVEAL(bool)
 //									BLANK(bool)
 //									The host modules can write to the UI subkeys, the UI is limited to only UI.
@@ -21,9 +22,10 @@ header('Content-type: application/json');
 $password = base64_encode('test');
 $username = base64_encode('wavelet_webui');
 
-$hostKey 		= $_POST["toggleID"];		// 
-$value			= $_POST["value"]; 			// this can be a bool or a label
-$hostFunction	= $_POST["function"];		// from JS
+$hostName 		= $_POST["hostName"];			// The hostName of the device
+$hostHash 		= $_POST["hostHash"];			// Hash value of the target device
+$value			= $_POST["value"]; 				// this can be a bool or a label
+$hostFunction	= $_POST["hostFunction"];		// from JS
 
 function get_etcd_authtoken($password, $username) {
 	$ch = curl_init();
@@ -73,12 +75,11 @@ function validateValue($function, $value) {
 	}
 }
 
-
 // The key context, everything this does happens below here.
 validateValue($function, $value);
 $token=get_etcd_authtoken($password, $username);
 
-$prefixstring = "/UI/hosts/$hostKey/control/$function";
+$prefixstring = "/UI/hosts/$hostName/control/$function";
 
 $keyPrefix=base64_encode($prefixstring);
 $keyValue=base64_encode($value);
