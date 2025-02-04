@@ -133,8 +133,8 @@ event_decoder(){
 	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd # if fails, we have a security rights issue!
 	# Set Type keys to "dec" for system, /hostLabel/ and also for UI
 	KEYVALUE="dec";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
-	KEYNAME="/UI/hosts/${hostNameSys}/type"; write_etcd_global
-	KEYNAME="/hostLabel/${hostNameSys}/type"; write_etcd_global
+	KEYNAME="/UI/hosts/$hostNameSys/type"; write_etcd_global
+	KEYNAME="/UI/hostlist/${hostNameSys}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
 	# Executes run_ug in order to start the video streaming window
 	systemctl --user start run_ug.service
@@ -172,8 +172,8 @@ event_encoder(){
 	/usr/local/bin/wavelet_detectv4l.sh
 	# Set Type keys to "enc"
 	KEYVALUE="enc";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
-	KEYNAME="/UI/hosts/${hostNameSys}/type"; write_etcd_global
-	KEYNAME="/hostLabel/${hostNameSys}/type"; write_etcd_global
+	KEYNAME="/UI/hosts/$hostNameSys/type"; write_etcd_global
+	KEYNAME="/UI/hostlist/${hostNameSys}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
 }
 
@@ -332,7 +332,8 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 		# If still dead, remove from reflector subscription
 	# Add server type ID into etcd (note the webUI could change the server's type from the UI side but would be prevented from changing the server SYSTEM type)
 	KEYVALUE="svr";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
-	KEYVALUE="svr";	KEYNAME="/UI/hosts/$hostNameSys/type"; write_etcd_global
+	KEYNAME="/UI/hosts/$hostNameSys/type"; write_etcd_global
+	KEYNAME="/UI/hostlist/${hostNameSys}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
 	# Add a service to prune dead FUSE mountpoints.  Every time the UltraGrid AppImage is restarted, it leaves stale mountpoints.  This timed task will help keep everything clean.
 		# Get "alive mountpoints"
@@ -515,7 +516,7 @@ event_generateHash(){
 			esac
 			# Populate UI data
 			KEYNAME="/UI/hosts/${hostNameSys}/type"; write_etcd_global
-			KEYNAME="/UI/hosts/${hostNameSys}/hash/"; KEYVALUE="${hostHash}"; write_etcd_global
+			KEYNAME="/UI/hosts/${hostNameSys}/hash"; KEYVALUE="${hostHash}"; write_etcd_global
 			KEYNAME="/UI/hosts/${hostNameSys}/control/label"; KEYVALUE="${hostNamePretty}"; write_etcd_global
 			# Populate SYSTEM values
 			KEYNAME="/${hostNameSys}/Hash"; write_etcd_global
