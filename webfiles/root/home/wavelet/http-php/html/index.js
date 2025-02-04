@@ -66,6 +66,7 @@ function hostsAjax(){
 				var hostHash		=	item['hostHash'];
 				var hostLabel 		=	item['hostLabel'];
 				// var hostIP 		=	item['hostIPAddress'];
+				// var blankstatus  =   item['hostBlankStatus'];
 				createNewHost(key, type, hostName, hostHash, hostLabel);
 				})
 		},
@@ -287,8 +288,8 @@ function getToggleStatus(toggleKey, toggleValue) {
 }
 
 function handlePageLoad() {
-	var livestreamValue				=		getLivestreamStatus("livestream", livestreamValue);
-	var bannerValue					=		getBannerStatus("banner", bannerValue);
+	var livestreamValue				=		getToggleStatus("livestream", livestreamValue);
+	var bannerValue					=		getToggleStatus("banner", bannerValue);
 	var audioValue					=		getToggleStatus("audio", audioValue);
 	var persistValue 				=		getToggleStatus("persist", persistValue);
 	var bluetoothMACValue			=		getBluetoothMAC(bluetoothMACValue);
@@ -314,63 +315,6 @@ function handlePageLoad() {
 	});
 	// Execute initial AJAX Call
 	inputsAjax();
-}
-
-function getLivestreamStatus(livestreamValue) {
-	// this function gets the livestream status from etcd and sets the livestream toggle button on/off upon page load
-	$.ajax({
-		type: "POST",
-		url: "get_livestream_status.php",
-		dataType: "json",
-		success: function(returned_data) {
-		const livestreamValue = JSON.parse(returned_data);
-			if (livestreamValue == "1" ) {
-				console.log ("Livestream value is 1, enabling toggle automatically.");
-				$("#lstoggleinput")[0].checked=true; // set HTML checkbox to checked
-				} else {
-				console.log ("Livestream value is NOT 1, disabling checkbox toggle.");
-				$("#lstoggleinput")[0].checked=false; // set HTML checkbox to unchecked
-				}
-		}
-	})
-}
-
-function getBannerStatus(bannerValue) {
-	// this function gets the banner status from etcd and sets the banner toggle button on/off upon page load
-	$.ajax({
-		type: "POST",
-		url: "get_banner_status.php",
-		dataType: "json",
-		success: function(returned_data) {
-		const bannerValue = JSON.parse(returned_data);
-			if (bannerValue == "1" ) {
-				console.log ("Banner value is 1, enabling toggle automatically.");
-				$("#banner_toggle_checkbox")[0].checked=true; // set HTML checkbox to checked
-				} else {
-				console.log ("Banner value is NOT 1, disabling checkbox toggle.");
-				$("#banner_toggle_checkbox")[0].checked=false; // set HTML checkbox to unchecked
-				}
-		}
-	})
-}
-
-function getAudioStatus(audioValue) {
-	// this function gets the audio status from etcd and sets the audio toggle button on/off upon page load
-	$.ajax({
-		type: "POST",
-		url: "get_audio_status.php",
-		dataType: "json",
-		success: function(returned_data) {
-		const audioValue = JSON.parse(returned_data);
-			if (audioValue == "1" ) {
-				console.log ("Audio value is 1, enabling toggle automatically.");
-				$("#audio_toggle_checkbox")[0].checked=true; // set HTML checkbox to checked
-				} else {
-				console.log ("Audio value is NOT 1, disabling checkbox toggle.");
-				$("#audio_toggle_checkbox")[0].checked=false; // set HTML checkbox to unchecked
-				}
-		}
-	})
 }
 
 async function getHostIPAJAX(hostName, divEntry) {
@@ -421,8 +365,38 @@ function getBluetoothMAC(bluetoothMACValue) {
 	})
 }
 
+function createHostButton(hostName, hostHash, buttonJob) {
+/* add generic host button for controls */
+	var $btn				=		$('<button/>', {
+		type:   'button',
+		text:   '${buttonJob}-Host',
+		title:  '${buttonJob}-Host',
+		value:  '${buttonJob}-${hostHash}',      
+		class:  'btn renameButton',
+		id: 	'btn_Host-${hostHash}-${buttonJob}',
+		}).click(function(){
+			console.log("Instructing host:" + hostName + "\nHash Value:" + hostHash + "\nTo: " + buttonJob);
+			$.ajax({
+				type: "POST",
+				url: "/set_host_control.php",
+				data: {
+					key:				hostName,
+					hash:				hostHash,
+					value:				"1",
+					hostFunction:		buttonJob
+					},
+				success: function(response){
+					console.log(response);
+				}
+			})
+			sleep (750);
+			location.reload();
+		})
+	return $btn;
+}
+
 function getBlankHostStatus(hostName, hostHash) {
-	// this function gets the host blank bit status from etcd, and sets the banner toggle button on/off upon page load
+	// this function gets the host blank bit status, and then sets the button text based on that value
 	console.log('Attempting to get host blank bit for: ' + hostName + ", hash:" +hostHash);
 	let retValue = null;
 	var blankHostName = hostName;
@@ -437,11 +411,7 @@ function getBlankHostStatus(hostName, hostHash) {
 			console.log("Returned blank bit value for " + hostName +" is: " + returned_data);
 			if (returned_data == "1") {
 				console.log("Value is " + returned_data + ", changing CSS and text appropriately");
-				let matchedElement = 
-					// $('#dynamicDecHosts > div > button[data-blankHostName="${blankHostName}"]');
-					// $('#btn_blank').find(`[data-hostname="${blankHostName}"]`)
-										$('body').find(`[data-blankHostName="${blankHostName}"]`);
-
+				let matchedElement = $('body').find(`[data-blankHostName="${blankHostName}"]`);
 				if(matchedElement){
 					console.log("Found element: " + matchedElement);
 					$(matchedElement).text("Unblank Host");
@@ -462,122 +432,8 @@ function getBlankHostStatus(hostName, hostHash) {
 	});
 }
 
-const callingFunction = (callback) => {
-	const callerId = 'calling_function';
-	callback(this);
-};
-
-function createHostDeleteButton(hostName, hostHash) {
-/* add host delete button */
-	var $btn				=		$('<button/>', {
-		type:   'button',
-		text:   'Remove Host',
-		title:  'Delete this host',
-		value:  'Remove'+hostHash,      
-		class:  'btn renameButton',
-		id: 'btn_HostDelete',
-		}).click(function(){
-			console.log("Deleting host entry and associated keys for: " + hostName + "\nAnd Hash Value:" + hostHash);
-			$.ajax({
-				type: "POST",
-				url: "/set_remove_host.php",
-				data: {
-					key: hostName,
-					value: hostHash
-				},
-				success: function(response){
-					console.log(response);
-				}
-			})
-			sleep (750);
-			location.reload();
-		})
-	return $btn;
-}
-
-function createIdentifyButton(hostName, hostHash) {
-/* add decoder Identify button */
-	var $btn				=		$('<button/>', {
-		type:   'button',
-		text:   'Identify Host (15s)',
-		title:  'Display SMPTE Bars on this host for 15 seconds',
-		value:  'Identify'+hostHash,
-		class:  'btn identifyButton',
-		id: 'btn_identify'
-		}).click(function(){
-			console.log("Host instructed to reveal itself:" + hostName);
-			$(this).addClass('btn_active');
-			$.ajax({
-				type: "POST",
-				url: "/set_reveal_host.php",
-				data: {
-					key: hostName,
-					value: "1"
-					},
-			success: function(response){
-				console.log(response);
-			}
-		});
-	})
-return $btn;
-}
-
-function createRestartButton(hostName, hostHash) {
-/* add task restart button */
-	var $btn					=		$('<button/>', {
-		type:   'button',
-		text:   'Restart Codec Task',
-		value:  'Restart'+hostName,
-		class:  'btn restartButton',
-		title:  'restart codec task',
-		id: 'btn_restart'
-	}).click(function(){
-		console.log("Host instructed to restart UltraGrid task:" + hostName);
-		$.ajax({
-			type: "POST",
-			url: "/set_reset_host.php",
-			data: {
-				key: hostName,
-				value: "1"
-			},
-		success: function(response){
-			console.log(response);
-		}
-		});
-	})
-	return $btn;
-}
-
-function createRebootButton(hostName, hostHash) {
-/* add reboot button */
-	var $btn					=		$('<button/>', {
-		type:   'button',
-		text:   'Reboot Host',
-		class:  'btn rebootButton',
-		id: 'btn_reboot',
-		title:  'Reboot Host'
-		}).click(function(){
-			console.log("Host instructed to reboot!" + hostName);
-			$.ajax({
-				type: "POST",
-				url: "/set_reboot_host.php",
-				data: {
-					key: hostName,
-					value: "1"
-				},
-				success: function(response){
-					console.log(response);
-				}
-			});
-		})
-	return $btn;
-}
-
-function sleep(ms) {
-	return new Promise(resolve => setTimeout(resolve, ms || DEF_DELAY));
-}
-
 function createBlankButton(hostName, hostHash, initialHostBlankStatus) {
+	// This function creates the host blank button, and changes the button text depending on status.
 	var blankHostName			=		hostName;
 	var blankHostHash			=		hostHash;
 	var blankHostText			=		"pending status";
@@ -597,10 +453,12 @@ function createBlankButton(hostName, hostHash, initialHostBlankStatus) {
 				console.log("Host instructed to blank screen:" + blankHostName);
 				$.ajax({
 					type: "POST",
-					url: "/set_blank_host.php",
+					url: "/set_host_control.php",
 					data: {
-						key: blankHostName,
-						value: "1"
+					key:				hostName,
+					hash:				hostHash,
+					value:				"1",
+					hostFunction:		"BLANK"
 						},
 						success: function(response){
 							console.log(response);
@@ -613,10 +471,12 @@ function createBlankButton(hostName, hostHash, initialHostBlankStatus) {
 				console.log("Host instructed to restore display:" + blankHostName);
 				$.ajax({
 					type: "POST",
-					url: "/set_blank_host.php",
+					url: "/set_host_control.php",
 					data: {
-						key: hostName,
-						value: "0"
+						key:				hostName,
+						hash:				hostHash,
+						value:				"0",
+						hostFunction:		"BLANK"
 						},
 					success: function(response){
 						console.log(response);
@@ -631,8 +491,7 @@ function createBlankButton(hostName, hostHash, initialHostBlankStatus) {
 }
 
 function createCodecStateChangeButton(hostName, hostHash, type) {
-/* Add a button to set the codec state change for a host*/
-/* this is processed through PHP and then handled by the hostname change module, hence it submits hostname and hash data too */
+	/* Add a button to set the codec state change for a host*/
 	console.log("Called codec state change button with:" + hostName + "," +hostHash + "," + type);
 	var buttonText					=		type;
 		if (type == "dec"){
@@ -643,20 +502,21 @@ function createCodecStateChangeButton(hostName, hostHash, type) {
 	var $btn = $('<button/>', {
 		type:   'button',
 		class:  'btn encoderButton',
-		id: 'btn_codec_swap',
+		id: 	'btn_codec_swap',
 		title:  'Change function',
 		text:   buttonText
 	});
 		$btn.click(function(){
 			console.log("Host instructed to switch codec functionality:" + hostName);
-			$.ajax({
-				type: "POST",
-				url: "/set_codec_state_change.php",
-				data: {
-					key: hostName,
-					hash: hostHash,
-					value: "1"
-				},
+				$.ajax({
+					type: "POST",
+					url: "/set_host_control.php",
+					data: {
+						key:				hostName,
+						hash:				hostHash,
+						value:				"1",
+						hostFunction:		"PROMOTE"
+						},
 				success: function(response){
 					console.log(response);
 					sleep (3000);
@@ -670,27 +530,30 @@ function createCodecStateChangeButton(hostName, hostHash, type) {
 function createDecoderMenuSet(hostName, hostHash, type) {
 	console.log("Generating Decoder buttons in Hamburger Menu..");
 	let activeMenuSelector			=	(`#hamburgerMenu_${hostHash}`);
-	$(activeMenuSelector).append(createRestartButton(hostName, hostHash));
-	$(activeMenuSelector).append(createRebootButton(hostName, hostHash));
-	$(activeMenuSelector).append(createIdentifyButton(hostName, hostHash));
+	let buttonList 					=	['DEPROVISION','RESET','REBOOT','REVEAL'];
+	for (let item of array) {
+		$(activeMenuSelector).append(createHostButton(hostName, hostHash, item));
+	}
 	$(activeMenuSelector).append(createCodecStateChangeButton(hostName, hostHash, type));
-	$(activeMenuSelector).append(createHostDeleteButton(hostName, hostHash));
 }
 
 function createEncoderMenuSet(hostName, hostHash, type) {
 	console.log("Generating Decoder buttons in Hamburger Menu..");
 	let activeMenuSelector			=	(`#hamburgerMenu_${hostHash}`);
-	$(activeMenuSelector).append(createRestartButton(hostName, hostHash));
-	$(activeMenuSelector).append(createRebootButton(hostName, hostHash));
+	let buttonList 					=	['DEPROVISION','RESET','REBOOT','REVEAL'];
+	for (let item of array) {
+		$(activeMenuSelector).append(createHostButton(hostName, hostHash, item));
+	}
 	$(activeMenuSelector).append(createCodecStateChangeButton(hostName, hostHash, type));
-	$(activeMenuSelector).append(createHostDeleteButton(hostName, hostHash));
 }
 
 function createServerMenuSet(hostName, hostHash, type) {
 	console.log("Generating Decoder buttons in Hamburger Menu..");
 	let activeMenuSelector			=	(`#hamburgerMenu_${hostHash}`);
-	$(activeMenuSelector).append(createRestartButton(hostName, hostHash));
-	$(activeMenuSelector).append(createRebootButton(hostName, hostHash));
+	let buttonList 					=	['RESET','REBOOT'];
+	for (let item of array) {
+		$(activeMenuSelector).append(createHostButton(hostName, hostHash, item));
+	}
 }
 
 function createDetailMenu(hostName, hostHash, type, divEntry) {
@@ -1095,6 +958,15 @@ function getActiveInputHash(activeInputHash) {
 			}
 		}).then();
 }
+
+function sleep(ms) {
+	return new Promise(resolve => setTimeout(resolve, ms || DEF_DELAY));
+}
+
+const callingFunction = (callback) => {
+	const callerId = 'calling_function';
+	callback(this);
+};
 
 $(document).ready(function() {
 	getActiveInputHash("your_input_hash");
