@@ -220,7 +220,7 @@ event_server(){
 	event_generateHash svr
 	systemctl --user daemon-reload
 	systemctl --user start \
-		wavelet.reflector \
+		wavelet_reflector \
 		wavelet_audio_toggle \
 		wavelet_controller \
 		wavelet_decoder_reboot \
