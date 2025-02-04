@@ -275,7 +275,7 @@ event_biamp() {
 detect_self(){
 	systemctl --user daemon-reload
 	# Detect_self in this case relies on the etcd type key
-	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	KEYNAME="/${hostNameSys}/type"; read_etcd_global
 	echo -e "Host type is: ${printvalue}\n"
 	case "${printvalue}" in
 		enc*)                                   echo -e "I am an Encoder\n"										;		encoder_checkNetwork 1
