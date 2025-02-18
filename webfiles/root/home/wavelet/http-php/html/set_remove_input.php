@@ -1,5 +1,7 @@
 <?php
 header('Content-type: application/json');
+include('get_auth_token.php');
+
 $key = $_POST["key"];
 $value = $_POST["value"];
 
@@ -14,7 +16,10 @@ function del_etcd($input) {
 	curl_setopt($ch, CURLOPT_POST, 1);
 	curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\": \"$keyPrefix\", \"range_end\": \"$keyPrefixPlusOneBit\"}");
 	$headers = array();
-	$headers[] = 'Content-Type: application/x-www-form-urlencoded';
+	$headers = [
+		"Authorization: $token",
+		"Content-Type: application/json"
+	];
 	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 	error_log("Calling delete_input_labels() function for key prefix \"$prefixstring\"");
 	$result = curl_exec($ch);
@@ -33,7 +38,10 @@ function get_device_ip($input){
 	curl_setopt($ch, CURLOPT_POST, 1);
 	curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\": \"$networkIPHashValue\"}");
 	$headers = array();
-	$headers[] = 'Content-Type: application/x-www-form-urlencoded';
+	$headers = [
+		"Authorization: $token",
+		"Content-Type: application/json"
+	];
 	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 	$IPresult = curl_exec($ch);
 	if (curl_errno($ch)) {
@@ -57,7 +65,10 @@ function get_etcd($key) {
 	curl_setopt($ch, CURLOPT_POST, 1);
 	curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\":\"$b64KeyTarget\"}");
 	$headers = array();
-	$headers[] = 'Content-Type: application/x-www-form-urlencoded';
+	$headers = [
+		"Authorization: $token",
+		"Content-Type: application/json"
+	];
 	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 	$result = curl_exec($ch);
 	if (curl_errno($ch)) {
@@ -68,6 +79,7 @@ function get_etcd($key) {
 	return $keyValue;
 }
 
+$token=get_etcd_authtoken;
 
 echo "PHP set_remove_input Received removal request for Key:\n$key\nAnd value:\n$value\n";
 if (str_contains ($value, '/network_ip/')) {
