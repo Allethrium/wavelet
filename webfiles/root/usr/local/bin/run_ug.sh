@@ -19,7 +19,7 @@ detect_self(){
 	esac
 }
 
-
+ipaddr
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" ${KEYNAME})
@@ -68,7 +68,7 @@ generate_service(){
 
 event_server(){
 	# The server is a special case because it serves blanks screen, static image and test bars.
-	# As a result, instead of run_ug it calls wavelet_init.service
+	# As a result, instead of using the normal runner, it calls wavelet_init.service
 	# Ensure web interface is up
 	systemctl --user start http-php-pod.service
 	# Check for input devices
@@ -194,6 +194,7 @@ get_ipValue(){
 				if [[ $ip =~ $regex ]]; then
 					echo -e "\nIP Address is valid as ${ip}, continuing.."
 					KEYNAME="/hostHash/${hostNameSys}/ipaddr"; KEYVALUE="${ip}"; write_etcd_global
+					KEYNAME="/UI/${hostNameSys}/IP"; write_etcd_global
 				else
 					echo -e "IP Address is not valid, sleeping and calling function again\n"
 					get_ipValue
