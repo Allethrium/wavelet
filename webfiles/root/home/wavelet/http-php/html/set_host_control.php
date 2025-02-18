@@ -52,7 +52,7 @@ function set_etcd($keyPrefix, $keyValue) {
 	curl_setopt($ch, CURLOPT_POST, 1);
 	$headers = [
 		"Authorization: $token",
-		"Content-Type: application/x-www-form-urlencoded"
+		"Content-Type: application/json"
 	];
 	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 	curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\":\"$keyPrefix\", \"value\":\"$keyValue\"}");
@@ -62,7 +62,6 @@ function set_etcd($keyPrefix, $keyValue) {
 		echo 'Error:' . curl_error($ch);
 	}
 	curl_close($ch);
-	echo "Set Key: $keyPrefix and Value: $keyValue";
 }
 
 function validateValue($function, $value) {
