@@ -373,43 +373,6 @@ function createHostButton(hostName, hostHash, item) {
 	return $btn;
 }
 
-function getBlankHostStatus(hostName, hostHash) {
-	// this function gets the host blank bit status, and then sets the button text based on that value
-	console.log('Attempting to get host blank bit for: ' + hostName + ", hash:" +hostHash);
-	let retValue = null;
-	var blankHostName = hostName;
-	$.ajax({
-		type: "POST",
-		url: "get_blank_host_status.php",
-		dataType: "json",
-		data: {
-			key: hostName
-		},
-		success: function(returned_data) {
-			console.log("Returned blank bit value for " + hostName +" is: " + returned_data);
-			if (returned_data == "1") {
-				console.log("Value is " + returned_data + ", changing CSS and text appropriately");
-				let matchedElement = $('body').find(`[data-blankHostName="${blankHostName}"]`);
-				if(matchedElement){
-					console.log("Found element: " + matchedElement);
-					$(matchedElement).text("Unblank Host");
-					$(matchedElement).addClass('active');
-						return true;
-				} else {
-					console.log("Could not find the element with this selector!");
-				}
-			} else if (returned_data == "0") {
-								let matchedElement =
-								$('body').find(`[data-blankHostName="${blankHostName}"]`);
-								$(matchedElement).text("Blank Host");
-								$(matchedElement).removeClass('active');
-			} else {
-				console.log("invalid bit returned!")
-			};
-		}
-	});
-}
-
 function createBlankButton(hostName, hostHash, initialHostBlankStatus) {
 	// This function creates the host blank button, and changes the button text depending on status.
 	var blankHostName			=		hostName;
@@ -693,7 +656,7 @@ function createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, blankst
 	var divEntry						=		document.createElement("Div");
 	var type							=		type;
 	const id							=		document.createTextNode(counter + 1);
-	var initialHostBlankStatus			=		getBlankHostStatus(hostName, hostHash);
+	var initialHostBlankStatus			=		blankstatus;
 	divEntry.setAttribute("id", id);
 	divEntry.setAttribute("divHost", hostHash);
 	divEntry.setAttribute("data-fulltext", key);
