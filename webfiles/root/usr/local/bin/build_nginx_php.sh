@@ -55,7 +55,7 @@ Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/nginx.container
 	fi
 	mkdir -p /var/home/wavelet/http-php/log
 	# We populate the webui password as an environment variable
-	webuiPass=$(cat /var/secrets/etcd_webui_pw.secure)
+	webuiPass=$(cat /var/home/wavelet/.ssh/secrets/etcd_webui_pw.secure)
 	echo -e "[Pod]
 PublishPort=80:80
 PublishPort=443:443
