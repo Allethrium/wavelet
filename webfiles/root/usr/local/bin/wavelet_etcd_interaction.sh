@@ -123,17 +123,18 @@ generate_etcd_core_roles(){
 generate_etcd_core_users(){
 	# Generate basic etcd users
 	# Root user
+	echo "Generating roles and users for initial system setup.."
 	local PassWord=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')	
-	echo ${PassWord} > /var/secrets/etcd_root_pw.secure
+	echo ${PassWord} > ~/.ssh/secrets/etcd_root_pw.secure
 	etcdctl --endpoints=${ETCDENDPOINT} user add root --new-user-password ${PassWord}
 	# Server
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
-	echo ${PassWord} > /var/secrets/etcd_svr_pw.secure
+	echo ${PassWord} > ~/.ssh/secrets/etcd_svr_pw.secure
 	etcdctl --endpoints=${ETCDENDPOINT} user add svr --new-user-password ${PassWord}
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role svr server
 	# WebUI
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
-	echo ${PassWord} > /var/secrets/etcd_webui_pw.secure
+	echo ${PassWord} > ~/.ssh/secrets/etcd_webui_pw.secure
 	etcdctl --endpoints=${ETCDENDPOINT} user add webui --new-user-password ${PassWord}
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role webui webui
 	# User backend pw if set during setup (add as option later)
@@ -141,9 +142,11 @@ generate_etcd_core_users(){
 	etcdctl auth enable
 	# add a test here to ensure everything is functional
 	# if all good? continue.
+	exit 0
 }
 
 generate_etcd_host_role(){
+	echo "Generating role and user for ETCD client.."
 	# Hosts can modify keys under themselves: /$(hostname)/$, they should not be able to write server/"root" keys
 	# These permissions can really only be added after the initial host provisioning is completed, because they do not exist prior to this.
 	# This must be processed by the server, as natively new hosts will not have permissions to write their own keys (if i do this 'right')
@@ -154,6 +157,7 @@ generate_etcd_host_role(){
 	# write key-val which the host will be watching to get the initial info back - this is insecure even though its deleted immediately. 
 	# find a better way to do this.
 	etcdctl --endpoints=${ETCDENDPOINT} put "/PROV/host-${clientHostName}" -- "${PassWord}"
+	exit 0
 }
 
 #####
@@ -176,9 +180,9 @@ revisionID=$7
 case $(hostname) in
 	# If we are the server we use a different password than a client machine
 	# This might be a silly way of doing this because:   a) the password is now a variable in this shell (b) will the variable be accessible from the above functions?
-	svr)		user="svr"; password=$(cat /var/secrets/etcd_svr_pw.secure)
+	svr*)		user="svr"; password=$(cat ~/.ssh/secrets/etcd_svr_pw.secure)
 	;;
-	*)			user="host-$(hostname)"; password=$(cat /var/secrets/etcd_client_pw.secure)
+	*)			user="host-$(hostname)"; password=$(cat ~/.ssh/secrets/etcd_client_pw.secure)
 	;;
 esac
 
