@@ -363,6 +363,8 @@ event_reveal(){
 }
 event_blankhost(){
 	# Tells specific host to display a black testcard on the screen, use this for privacy modes as necessary.
+	# Host Blank is necessary for the UI to load properly, so we always set it here
+	KEYNAME="/UI/${hostNameSys}/control/BLANK"; KEYVALUE="0"; write_etcd_global
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/\"%H\"/control/DECODER_BLANK 0 0 "wavelet_decoder_blank"
 }
 event_promote(){
