@@ -1,5 +1,6 @@
 <?php
 header('Content-type: application/json');
+include('get_auth_token.php');
 // this script curls etcd for available input devices, 
 // cleans out the cruft and re-encodes a JSON object that should be handled by the webui index.html via AJAX
 
@@ -10,7 +11,10 @@ function poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit) {
 		curl_setopt($ch, CURLOPT_POST, 1);
 		curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\": \"$keyPrefix\", \"range_end\": \"$keyPrefixPlusOneBit\"}");
 		$headers = array();
-		$headers[] = 'Content-Type: application/x-www-form-urlencoded';
+		$headers = [
+			"Authorization: $token",
+			"Content-Type: application/json"
+		];
 		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 		$result = curl_exec($ch);
 		if (curl_errno($ch)) {
@@ -40,5 +44,6 @@ $prefixstring = '/UI/interface';
 $prefixstringplusone = '/UI/interface0';
 $keyPrefix=base64_encode($prefixstring);
 $keyPrefixPlusOneBit=base64_encode($prefixstringplusone);
+$token=get_etcd_authtoken;
 poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit);
 ?>
