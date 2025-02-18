@@ -123,25 +123,32 @@ generate_etcd_core_roles(){
 generate_etcd_core_users(){
 	# Generate basic etcd users
 	# Root user
+	set -x
 	echo "Generating roles and users for initial system setup.."
 	local PassWord=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')	
 	echo ${PassWord} > ~/.ssh/secrets/etcd_root_pw.secure
-	etcdctl --endpoints=${ETCDENDPOINT} user add root --new-user-password ${PassWord}
+	echo "Doing: etcdctl --endpoints=${ETCDENDPOINT} user add root --new-user-password "${PassWord}""
+	etcdctl --endpoints=${ETCDENDPOINT} user add root --new-user-password "${PassWord}"
+	etcdctl --endpoints=${ETCDENDPOINT} user grant-role root root
+	unset PassWord
 	# Server
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	echo ${PassWord} > ~/.ssh/secrets/etcd_svr_pw.secure
-	etcdctl --endpoints=${ETCDENDPOINT} user add svr --new-user-password ${PassWord}
+	etcdctl --endpoints=${ETCDENDPOINT} user add svr --new-user-password "${PassWord}"
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role svr server
+	unset PassWord
 	# WebUI
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	echo ${PassWord} > ~/.ssh/secrets/etcd_webui_pw.secure
-	etcdctl --endpoints=${ETCDENDPOINT} user add webui --new-user-password ${PassWord}
+	etcdctl --endpoints=${ETCDENDPOINT} user add webui --new-user-password "${PassWord}"
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role webui webui
+	unset PassWord
 	# User backend pw if set during setup (add as option later)
 	# Populate necessary services (nginx) with these credentials so the webUI can get an auth token for the etcd server.
 	etcdctl auth enable
 	# add a test here to ensure everything is functional
 	# if all good? continue.
+	set +x
 	exit 0
 }
 
@@ -157,6 +164,7 @@ generate_etcd_host_role(){
 	# write key-val which the host will be watching to get the initial info back - this is insecure even though its deleted immediately. 
 	# find a better way to do this.
 	etcdctl --endpoints=${ETCDENDPOINT} put "/PROV/host-${clientHostName}" -- "${PassWord}"
+	unset PassWord
 	exit 0
 }
 
