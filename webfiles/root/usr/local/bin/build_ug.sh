@@ -52,7 +52,7 @@ generate_service(){
 }
 etcd_create_roles(){
 	# RunOnce for server provisioning, creates etcd roles.
-	/usr/local/bin/wavelet_etcd_interaction.sh "generate_roles"
+	/usr/local/bin/wavelet_etcd_interaction.sh "generate_etcd_core_roles"
 }
 
 
@@ -206,6 +206,7 @@ event_server(){
 		server_bootstrap
 	fi
 	# The server runs a superset of most of the client machines units, however it shouldn't support renaming.
+	etcd_create_roles
 	event_generate_wavelet_encoder_query
 	event_generate_wavelet_ui_service
 	event_clear_devicemap
