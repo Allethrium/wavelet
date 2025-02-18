@@ -34,12 +34,15 @@ main() {
 			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" \
 			--cert-file "${clientCertificateFile}" \
 			--key-file "${clientKeyFile}" \
-			--ca-file "${certificateAuthorityFile}" ${commandLine[@]})
+			--ca-file "${certificateAuthorityFile}" \
+			--user "${user}" \
+			--password "${password}" \
+			${commandLine[@]})
 		}
 	else
 		ETCDURI=http://${ETCDENDPOINT}/v3/kv/
 		etcdCommand(){
-			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" --user ${user} --password ${password} ${commandLine[@]})
+			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" --user "${user}" --password "${password}" ${commandLine[@]})
 		}
 	fi
 	etcdCommand
@@ -48,7 +51,7 @@ main() {
 	 	echo ${printvalue}
 	elif [[ ${printvalue} = "OK" ]]; then
 		# If we're performing a write, then we get OK back
-		echo -e "etcd key written successfully"
+		echo -e "OK"
 		exit 0
 	elif [[ ${printvalue} = *"revision"* ]]; then
 		# We're pulling other etcd data such as key revision
