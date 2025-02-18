@@ -39,7 +39,7 @@ main() {
 	else
 		ETCDURI=http://${ETCDENDPOINT}/v3/kv/
 		etcdCommand(){
-			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]})
+			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" --user ${user} --password ${password} ${commandLine[@]})
 		}
 	fi
 	etcdCommand
@@ -105,7 +105,7 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/${waveletModule}.s
 	exit 0
 }
 
-generate_roles(){
+generate_etcd_core_roles(){
 	# Generate etcd roles
 	# Etcd roles must be generated because the build_ug, detectv4l modules do not know if security is on or off, so they set role permissions as they generate and remove their keys.
 	# webui ensures the webui can only write to keys under the range "/UI/"
@@ -114,9 +114,43 @@ generate_roles(){
 	# The server should be able to modify everything, and has its own "root" role.  Most coordination happens on the server, so this is fine.
 	etcdctl --endpoints=${ETCDENDPOINT} role add server
 	etcdctl --endpoints=${ETCDENDPOINT} role grant-permission server --prefix=true readwrite "" 
+	generate_etcd_core_users
+}
+
+generate_etcd_core_users(){
+	# Generate basic etcd users
+	# Root user
+	local PassWord=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')	
+	echo ${PassWord} > /var/secrets/etcd_root_pw.secure
+	etcdctl --endpoints=${ETCDENDPOINT} user add root --new-user-password ${PassWord}
+	# Server
+	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
+	echo ${PassWord} > /var/secrets/etcd_svr_pw.secure
+	etcdctl --endpoints=${ETCDENDPOINT} user add svr --new-user-password ${PassWord}
+	etcdctl --endpoints=${ETCDENDPOINT} user grant-role svr server
+	# WebUI
+	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
+	echo ${PassWord} > /var/secrets/etcd_webui_pw.secure
+	etcdctl --endpoints=${ETCDENDPOINT} user add webui --new-user-password ${PassWord}
+	etcdctl --endpoints=${ETCDENDPOINT} user grant-role webui webui
+	# User backend pw if set during setup (add as option later)
+	# Populate necessary services (nginx) with these credentials so the webUI can get an auth token for the etcd server.
+	etcdctl auth enable
+	# add a test here to ensure everything is functional
+	# if all good? continue.
+}
+
+generate_etcd_host_role(){
 	# Hosts can modify keys under themselves: /$(hostname)/$, they should not be able to write server/"root" keys
 	# These permissions can really only be added after the initial host provisioning is completed, because they do not exist prior to this.
-	etcdctl --endpoints=${ETCDENDPOINT} role add host
+	# This must be processed by the server, as natively new hosts will not have permissions to write their own keys (if i do this 'right')
+	etcdctl --endpoints=${ETCDENDPOINT} role add "host-${clientHostName}" --prefix=true readwrite "/${clientHostName}/"
+	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
+	etcdctl --endpoints=${ETCDENDPOINT} user add "host-${clientHostName}" --new-user-password ${PassWord}
+	etcdctl --endpoints=${ETCDENDPOINT} user grant-role "host-${clientHostName}" "host-${clientHostName}"
+	# write key-val which the host will be watching to get the initial info back - this is insecure even though its deleted immediately. 
+	# find a better way to do this.
+	etcdctl --endpoints=${ETCDENDPOINT} put "/PROV/host-${clientHostName}" -- "${PassWord}"
 }
 
 #####
@@ -135,6 +169,15 @@ revisionID=$7
 
 # We want to convert the inputKeyValue to a base64 string, much like etcd does internally, otherwise we run into difficulty handling spacing, escape chars and other common issues.
 # This means that ALL key values are base64 now.
+
+case $(hostname) in
+	# If we are the server we use a different password than a client machine
+	# This might be a silly way of doing this because:   a) the password is now a variable in this shell (b) will the variable be accessible from the above functions?
+	svr)		user="svr"; password=$(cat /var/secrets/etcd_svr_pw.secure)
+	;;
+	*)			user="host-$(hostname)"; password=$(cat /var/secrets/etcd_client_pw.secure)
+	;;
+esac
 
 case ${action} in
 	# Read an etcd value stored under a hostname - note the preceding / 
@@ -186,7 +229,10 @@ case ${action} in
 	generate_service)			generate_service "${inputKeyName}" "${waveletModule}" "${additionalArg}"; fID="clearText";
 	;;
 	# Generates basic etcd role definitions
-	generate_roles)				generate_roles;
+	generate_etcd_core_roles)	generate_etcd_core_roles;
+	;;
+	# Generates etcd host role definition
+	generate_etcd_host_role)	generate_etcd_host_role;
 	;;
 	check_status)				commandLine=("endpoint status"); fID="clearText";
 	;;
