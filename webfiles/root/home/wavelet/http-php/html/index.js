@@ -99,25 +99,6 @@ function networkInputsAjax(){
 	});
 }
 
-function fetchHostLabelAndUpdateUI(getLabelHostName){
-	// This function gets hostname | label from etcd and is responsible for telling the server which text labels to produce for each host.
-	// We should probably fold this into get_hosts.php so it is provided at once.
-	$.ajax({
-		type: "POST",
-		url: "get_host_label.php",
-		dataType: "json",
-		success: function(returned_data) {
-			counter = 500;
-			console.log("JSON Hosts data received:");
-			console.log(returned_data);
-			returned_data.forEach(item, index => {
-				var key	=	item['key'];
-			})
-		}
-	});
-
-}
-
 function sendPHPID(buttonElement) {
 	// we use id here in place of value (both are same for static items in the html)
 	// Because javascript inexplicably can access everythign EXCEPT the value??
