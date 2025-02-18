@@ -65,9 +65,9 @@ function hostsAjax(){
 				var hostName		=	item['hostName'];
 				var hostHash		=	item['hostHash'];
 				var hostLabel 		=	item['hostLabel'];
-				// var hostIP 		=	item['hostIPAddress'];
-				// var blankstatus  =   item['hostBlankStatus'];
-				createNewHost(key, type, hostName, hostHash, hostLabel);
+				var hostIP 			=	item['hostIP'];
+				var blankstatus  	=   item['hostBlankStatus'];
+				createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, blankstatus);
 				})
 		},
 	complete: function(){
@@ -317,28 +317,6 @@ function handlePageLoad() {
 	inputsAjax();
 }
 
-async function getHostIPAJAX(hostName, divEntry) {
-	/* Takes the hostname on hover and gets the IP address of the device */
-	/* For simplicities' sake, I think folding this into get_hosts.php would be a better option.*/
-	var queryHostName			=		hostName;
-	console.log("Attempting AJAX PHP query for the IP Address of " + queryHostName);
-	$.ajax({
-			type: "POST",
-			url: "/get_host_ip.php",
-			data: {
-				key: queryHostName,
-			},
-			success: function(returned_data){
-				console.log(returned_data);
-				$(divEntry).attr("title", "IP: " + returned_data);
-			},
-			error: function (xhr, ajaxOption, thrownError) {
-			console.log("Failed to get IP Address for hostname", queryHostName);
-			throw new Error(thrownerror);
-			}
-	});
-}
-
 function getBluetoothMAC(bluetoothMACValue) {
 	// this function gets the audio status from etcd and sets the audio toggle button on/off upon page load
 	console.log ("Checking Bluetooth MAC..");
@@ -365,17 +343,17 @@ function getBluetoothMAC(bluetoothMACValue) {
 	})
 }
 
-function createHostButton(hostName, hostHash, buttonJob) {
+function createHostButton(hostName, hostHash, item) {
 /* add generic host button for controls */
 	var $btn				=		$('<button/>', {
 		type:   'button',
-		text:   '${buttonJob}-Host',
-		title:  '${buttonJob}-Host',
-		value:  '${buttonJob}-${hostHash}',      
+		text:   `${item} Host`,
+		title:  `${item} Host`,
+		value:  `${item}-${hostHash}`,      
 		class:  'btn renameButton',
-		id: 	'btn_Host-${hostHash}-${buttonJob}',
+		id: 	`btn_Host-${hostHash}-${item}`,
 		}).click(function(){
-			console.log("Instructing host:" + hostName + "\nHash Value:" + hostHash + "\nTo: " + buttonJob);
+			console.log("Instructing host:" + hostName + "\nHash Value:" + hostHash + "\nTo: " + item);
 			$.ajax({
 				type: "POST",
 				url: "/set_host_control.php",
@@ -383,7 +361,7 @@ function createHostButton(hostName, hostHash, buttonJob) {
 					key:				hostName,
 					hash:				hostHash,
 					value:				"1",
-					hostFunction:		buttonJob
+					hostFunction:		item
 					},
 				success: function(response){
 					console.log(response);
@@ -531,7 +509,8 @@ function createDecoderMenuSet(hostName, hostHash, type) {
 	console.log("Generating Decoder buttons in Hamburger Menu..");
 	let activeMenuSelector			=	(`#hamburgerMenu_${hostHash}`);
 	let buttonList 					=	['DEPROVISION','RESET','REBOOT','REVEAL'];
-	for (let item of array) {
+	for (let item of buttonList) {
+		console.log("Setting up" + item);
 		$(activeMenuSelector).append(createHostButton(hostName, hostHash, item));
 	}
 	$(activeMenuSelector).append(createCodecStateChangeButton(hostName, hostHash, type));
@@ -541,24 +520,26 @@ function createEncoderMenuSet(hostName, hostHash, type) {
 	console.log("Generating Decoder buttons in Hamburger Menu..");
 	let activeMenuSelector			=	(`#hamburgerMenu_${hostHash}`);
 	let buttonList 					=	['DEPROVISION','RESET','REBOOT','REVEAL'];
-	for (let item of array) {
+	for (let item of buttonList) {
+				console.log("Setting up " + item);
 		$(activeMenuSelector).append(createHostButton(hostName, hostHash, item));
 	}
 	$(activeMenuSelector).append(createCodecStateChangeButton(hostName, hostHash, type));
 }
 
 function createServerMenuSet(hostName, hostHash, type) {
-	console.log("Generating Decoder buttons in Hamburger Menu..");
+	console.log("Generating Server buttons in Hamburger Menu..");
 	let activeMenuSelector			=	(`#hamburgerMenu_${hostHash}`);
 	let buttonList 					=	['RESET','REBOOT'];
-	for (let item of array) {
+	for (let item of buttonList) {
+		console.log("Setting up " + item);
 		$(activeMenuSelector).append(createHostButton(hostName, hostHash, item));
 	}
 }
 
 function createDetailMenu(hostName, hostHash, type, divEntry) {
 	/* Generates an HTML span for the hamburger menu */
-	console.log("creating a detail menu element and populating with appropriate menu options.\n")
+	console.log("creating a detail menu element and populating with appropriate menu options for a:" + type)
 	var hostMenuElement		=	$("<div>",	{
 		class:	'hostMenuElement',
 		id:	`hostMenuElement_${hostHash}`,
@@ -708,7 +689,7 @@ function createInputButton(key, value, keyFull, functionIndex, IP) {
 	counter++;
 }
 
-function createNewHost(key, type, hostName, hostHash, hostLabel, functionIndex) {
+function createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, blankstatus, functionIndex) {
 	var divEntry						=		document.createElement("Div");
 	var type							=		type;
 	const id							=		document.createTextNode(counter + 1);
@@ -718,9 +699,11 @@ function createNewHost(key, type, hostName, hostHash, hostLabel, functionIndex) 
 	divEntry.setAttribute("data-fulltext", key);
 	divEntry.setAttribute("data-hostName", hostName);
 	divEntry.setAttribute("data-hostType", type);
+	divEntry.setAttribute("title", "IP: " + hostIP);
 	$(divEntry).addClass('host_divider');
+
 	/* This needs to be done "backwards" insofar as the type needs to be determined before we can start creating a new DIV */
-	console.log("Generating label and buttons with\nHost Label: "+hostLabel+"\nHost Name: "+hostName+"\nAnd Host Hash: "+hostHash+"\nAnd type: "+type);
+	console.log("Generating label and buttons with\nHost Label: "+hostLabel+"\nHost Name: "+hostName+"\nAnd Host Hash: "+hostHash+"\nAnd type: "+type+"\nAnd IP: "+hostIP);
 	function createClientButtonSet(hostLabel, hostName, hostHash, type){
 		var labelTextBox					=		document.createElement("input");
 		var labelTextBoxLabel				=		document.createElement("label");
@@ -756,16 +739,14 @@ function createNewHost(key, type, hostName, hostHash, hostLabel, functionIndex) 
 				}
 			});
 		}});
-		getHostIPAJAX(hostName, divEntry);
 		$(divEntry).append(labelTextBox);
-		$(divEntry).append(createBlankButton(hostName, hostHash, initialHostBlankStatus));
+		$(divEntry).append(createBlankButton(hostName, hostHash, blankstatus));
 		$(divEntry).append(createDetailMenu(hostName, hostHash, type, divEntry));
 		counter ++;
 	}
 	function createServerButtonSet(hostName, hostHash){
 		(divEntry).append("Host:" + hostName);
 		console.log("Generating Server label and buttons.");
-		getHostIPAJAX(hostName, divEntry);
 		$(divEntry).append(createDetailMenu(hostName, hostHash, type, divEntry));
 	}
 	function createGatewayButtonSet(hostName, hostHash){
