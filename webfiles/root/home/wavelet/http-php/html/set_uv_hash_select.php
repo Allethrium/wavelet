@@ -1,4 +1,7 @@
 <?php
+header('Content-type: application/json');
+include('get_auth_token.php');
+
 // POST fields from JS AJAX will only ever single entries.  We extract them both here.
 $hash = $_POST["value"];
 $label = $_POST["label"];
@@ -17,7 +20,10 @@ function curl_etcd($keyTarget, $keyValue) {
 	curl_setopt($ch, CURLOPT_POST, 1);
 	curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\":\"$b64KeyTarget\", \"value\":\"$b64KeyValue\"}");
 	$headers = array();
-	$headers[] = 'Content-Type: application/x-www-form-urlencoded';
+	$headers = [
+		"Authorization: $token",
+		"Content-Type: application/json"
+	];
 	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 	$result = curl_exec($ch);
 	if (curl_errno($ch)) {
@@ -28,6 +34,7 @@ function curl_etcd($keyTarget, $keyValue) {
 }
 
 // curl etcd uv_hash_select for the value of the device hash we want to see streaming on the system
+$token=get_etcd_authtoken;
 curl_etcd("/UI/UV_HASH_SELECT", $hash);
 curl_etcd("/UI/UV_INPUT", $label);
 curl_etcd("/UI/INPUT_UPDATE", "1");
