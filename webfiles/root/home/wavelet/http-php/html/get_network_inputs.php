@@ -1,5 +1,7 @@
 <?php
 header('Content-type: application/json');
+include('get_auth_token.php');
+
 // this script curls etcd for available NETWORKED input devices.  
 function poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit) {
 	$ch = curl_init();
@@ -8,7 +10,10 @@ function poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit) {
 	curl_setopt($ch, CURLOPT_POST, 1);
 	curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\": \"$keyPrefix\", \"range_end\": \"$keyPrefixPlusOneBit\"}");
 	$headers = array();
-	$headers[] = 'Content-Type: application/x-www-form-urlencoded';
+	$headers = [
+		"Authorization: $token",
+		"Content-Type: application/json"
+	];
 	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 	$result = curl_exec($ch);
 	if (curl_errno($ch)) {
@@ -42,7 +47,10 @@ function get_device_ip($decodedShortValue){
 	curl_setopt($ch, CURLOPT_POST, 1);
 	curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\": \"$networkIPHashValue\"}");
 	$headers = array();
-	$headers[] = 'Content-Type: application/x-www-form-urlencoded';
+	$headers = [
+		"Authorization: $token",
+		"Content-Type: application/json"
+	];
 	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 	$IPresult = curl_exec($ch);
 	if (curl_errno($ch)) {
@@ -61,5 +69,6 @@ $prefixstring = '/UI/network_interface/';
 $prefixstringplusone = '/UI/network_interface0';
 $keyPrefix=base64_encode($prefixstring);
 $keyPrefixPlusOneBit=base64_encode($prefixstringplusone);
+$token=get_etcd_authtoken;
 poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit);
 ?>
