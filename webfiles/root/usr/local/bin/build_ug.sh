@@ -206,7 +206,9 @@ event_server(){
 		server_bootstrap
 	fi
 	# The server runs a superset of most of the client machines units, however it shouldn't support renaming.
+	mkdir -p ~/.ssh/secrets
 	etcd_create_roles
+	svr_pw=$(cat /var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure)
 	event_generate_wavelet_encoder_query
 	event_generate_wavelet_ui_service
 	event_clear_devicemap
@@ -321,7 +323,6 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 	event_generate_watch_provision
 	event_generate_run_ug
 	systemctl --user enable wavelet_controller.service --now
-	systemctl --user enable watch_reflectorreload.service --now
 	systemctl --user enable wavelet_reflector.service --now
 	# uncomment a firefox exec command into sway config, this will bring up the management console on the server in a new sway window, as a backup control surface.
 	# - note we need to work on a firefox policy/autoconfig.
