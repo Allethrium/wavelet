@@ -1,5 +1,6 @@
 <?php
 header('Content-type: application/json');
+include('get_auth_token.php');
 // this script curls etcd for available hosts.
 
 function poll_etcd_hosts() {
@@ -46,7 +47,10 @@ function curl_etcd($key) {
 		curl_setopt($ch, CURLOPT_POST, 1);
 		curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\":\"$b64KeyTarget\"}");
 		$headers = array();
-		$headers[] = 'Content-Type: application/json';
+		$headers = [
+			"Authorization: $token",
+			"Content-Type: application/json"
+		];
 		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 		$hashresult = curl_exec($ch);
 		if (curl_errno($ch)) {
@@ -62,5 +66,6 @@ function curl_etcd($key) {
 		}
 }
 
+$token=get_etcd_authtoken;
 poll_etcd_hosts();
 ?>
