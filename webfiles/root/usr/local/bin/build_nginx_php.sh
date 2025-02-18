@@ -54,6 +54,8 @@ Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/nginx.container
 		cp /var/home/wavelet/config/nginx.secure.conf /var/home/wavelet/http-php/nginx/nginx.conf
 	fi
 	mkdir -p /var/home/wavelet/http-php/log
+	# We populate the webui password as an environment variable
+	webuiPass=$(cat /var/secrets/etcd_webui_pw.secure)
 	echo -e "[Pod]
 PublishPort=80:80
 PublishPort=443:443
@@ -61,6 +63,7 @@ Volume=/var/home/wavelet/http-php/certs/:/etc/pki/tls/certs/:z
 Volume=/var/home/wavelet/http-php/log:/var/log/nginx:Z
 Volume=/var/home/wavelet/http-php/html:/var/www/html:Z
 Volume=/var/home/wavelet/http-php/nginx:/etc/nginx/conf.d/:z
+Environment="PASSWORD=${webuiPass}"
 [Install]
 WantedBy=multi-user.target" > /var/home/wavelet/.config/containers/systemd/http-php.pod
 	echo -e "Podman pod and containers, generated, service has been enabled in systemd, and will start on next reboot."
