@@ -1,5 +1,6 @@
 <?php
 header('Content-type: application/json');
+include('get_auth_token.php');
 // this module handles all the host status controls for the webui.
 // Input is the host, the value to set and the value it is set to.
 // replaces the four previous host control modules
@@ -18,31 +19,10 @@ header('Content-type: application/json');
 //									The host modules can write to the UI subkeys, the UI is limited to only UI.
 // * - not modified by this module or the webUI, but populated always from the host.
 
-// Import the etcd password from..something..somewhere - nginx env?
-$password = base64_encode('test');
-$username = base64_encode('wavelet_webui');
-
 $hostName 		= $_POST["hostName"];			// The hostName of the device
 $hostHash 		= $_POST["hostHash"];			// Hash value of the target device
 $value			= $_POST["value"]; 				// this can be a bool or a label
 $hostFunction	= $_POST["hostFunction"];		// from JS
-
-function get_etcd_authtoken($password, $username) {
-	$ch = curl_init();
-	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-	curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-	// returns etcd authorization token utilizing the systemd ETCD_PASS variable and the username wavelet_webui
-	curl_setopt($ch, CURLOPT_URL, 'http://1982.168.1.32:2379/v3/auth/authenticate');
-	$headers = [
-		'Content-Type: application/x-www-form-urlencoded',
-	];
-	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-	curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"name\": \"$username\", \"password\": \"$password\"}");
-	curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-	$token = curl_exec($ch);
-	curl_close($ch);
-	return $token;
-}
 
 function set_etcd($keyPrefix, $keyValue) {
 	$ch = curl_init();
@@ -76,7 +56,7 @@ function validateValue($function, $value) {
 
 // The key context, everything this does happens below here.
 validateValue($function, $value);
-$token=get_etcd_authtoken($password, $username);
+$token=get_etcd_authtoken;
 
 $prefixstring = "/UI/hosts/$hostName/control/$function";
 
