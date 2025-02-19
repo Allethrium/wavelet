@@ -120,13 +120,27 @@ generate_etcd_core_roles(){
 	# The server should be able to modify everything, and has its own "root" role.  Most coordination happens on the server, so this is fine.
 	etcdctl --endpoints=${ETCDENDPOINT} role add server
 	etcdctl --endpoints=${ETCDENDPOINT} role grant-permission server --prefix=true readwrite "" 
+	# The PROV role is designed for provision requests and is 'wide open' so that an initial host can request a provision key
+	etcdctl --endpoints=${ETCDENDPOINT} role add PROV
+	etcdctl --endpoints=${ETCDENDPOINT} role grant-permission PROV --prefix=true readwrite "/PROV/" 
 	generate_etcd_core_users
 }
 
 generate_etcd_core_users(){
 	# Generate basic etcd users
 	# Root user
+
 	set -x
+	declare -a FILES=("/var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure" "/var/home/wavelet/.ssh/secrets/etcd_client_pw.secure" "/var/home/wavelet/.ssh/secrets/etcd_root_pw.secure")
+	for file in "${FILES[@]}"; do
+		if [[ -f $file ]]; then
+			echo "File '$file' is configured." > /var/home/wavelet/logs/etcdlog.log
+		fi
+	done
+	if (( ${#FILES[@]} )); then
+		echo "Files already generated!  Doing nothing, as overwriting them will result in an inaccessible keystore!" > /var/home/wavelet/logs/etcdlog.log
+		exit 0
+	fi
 	echo "Generating roles and users for initial system setup.."
 	mkdir -p ~/.ssh/secrets
 	local PassWord=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')	
@@ -145,28 +159,52 @@ generate_etcd_core_users(){
 	echo ${PassWord} > ~/.ssh/secrets/etcd_webui_pw.secure
 	etcdctl --endpoints=${ETCDENDPOINT} user add webui --new-user-password ${PassWord}
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role webui webui
+	# Create the PROV user
+	etcdctl --endpoints=${ETCDENDPOINT} user PROV --no-password
+	etcdctl --endpoints=${ETCDENDPOINT} user grant-role PROV PROV
+	# Create the base UI key and grant the webui user access to the prefix range
+	KEYNAME="/UI/"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+	etcdctl --endpoints=${ETCDENDPOINT} role grant-permission webui --prefix=true readwrite /UI/
 	unset PassWord
 	# User backend pw if set during setup (add as option later)
 	# Populate necessary services (nginx) with these credentials so the webUI can get an auth token for the etcd server.
-	etcdctl auth enable
 	# add a test here to ensure everything is functional
+	KEYNAME="Global_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+	etcdctl --endpoints
 	# if all good? continue.
+	etcdctl auth enable
+	KEYNAME="/UI/ui_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:$(cat ~/.ssh/secrets/etcd_webui_pw.secure) get "/UI/ui_test")
+	if [[ ${printvalue} = "True" ]]; then
+		echo "webui user can access /UI/ range for read access!"
+	else
+		exit
+	fi
+	etcdctl --endpoints=${ETCDENDPOINT} --user webui:$(cat ~/.ssh/secrets/etcd_webui_pw.secure) put "/UI/ui_write_test" -- "True")
+	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:$(cat ~/.ssh/secrets/etcd_webui_pw.secure) get "/UI/ui_write_test")
+	if [[ ${printvalue} = "True" ]]; then
+		echo "webui user can access /UI/ range for read/write access!"
+	else
+		exit 1
+	fi
 	set +x
 	exit 0
 }
 
 generate_etcd_host_role(){
-	echo "Generating role and user for ETCD client.."
-	# Hosts can modify keys under themselves: /$(hostname)/$, they should not be able to write server/"root" keys
+	# This is called from a specific systemd watcher service to handle provision requests.
+	# Hosts can modify keys under themselves: /$(hostname)/$, they should not be able to write global "root" keys.
 	# These permissions can really only be added after the initial host provisioning is completed, because they do not exist prior to this.
 	# This must be processed by the server, as natively new hosts will not have permissions to write their own keys (if i do this 'right')
-	etcdctl --endpoints=${ETCDENDPOINT} role add "host-${clientHostName}" --prefix=true readwrite "/${clientHostName}/"
+	echo "Generating role and user for ETCD client.."
+	KEYNAME="/PROV/REQUEST"; clientHostName=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
+	etcdctl --endpoints=${ETCDENDPOINT} role add "${clientHostName}" --prefix=true readwrite "/${clientHostName}/"
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	etcdctl --endpoints=${ETCDENDPOINT} user add "host-${clientHostName}" --new-user-password ${PassWord}
-	etcdctl --endpoints=${ETCDENDPOINT} user grant-role "host-${clientHostName}" "host-${clientHostName}"
+	etcdctl --endpoints=${ETCDENDPOINT} user grant-role host-${clientHostName} host-${clientHostName}
 	# write key-val which the host will be watching to get the initial info back - this is insecure even though its deleted immediately. 
 	# find a better way to do this.
-	etcdctl --endpoints=${ETCDENDPOINT} put "/PROV/host-${clientHostName}" -- ${PassWord}
+	etcdctl --endpoints=${ETCDENDPOINT} put "/PROV/${clientHostName}" -- ${PassWord}
 	unset PassWord
 	exit 0
 }
@@ -175,7 +213,7 @@ get_creds(){
 	declare -a FILES=("/var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure" "/var/home/wavelet/.ssh/secrets/etcd_client_pw.secure")
 	for file in "${FILES[@]}"; do
 		if [[ -f $file ]]; then
-			echo "File '$file' is configured."
+			echo "File '$file' is configured." > /var/home/wavelet/logs/etcdlog.log
 		fi
 	done
 	if (( ${#FILES[@]} )); then
@@ -190,7 +228,7 @@ get_creds(){
 				;;
 			esac
 	else
-		echo "no secrets files configured, userArg will be empty!"
+		echo "no secrets files configured, userArg will be empty!" > /var/home/wavelet/logs/etcdlog.log
 		userArg=""
 	fi
 }
@@ -265,7 +303,7 @@ case ${action} in
 	generate_etcd_core_roles)	generate_etcd_core_roles;
 	;;
 	# Generates etcd host role definition
-	generate_etcd_host_role)	generate_etcd_host_role;
+	generate_etcd_host_role)	generate_etcd_host_role "${inputKeyValue}";
 	;;
 	check_status)				declare -A commandLine=([4]="${userArg}" [2]="endpoint status"); fID="clearText";
 	;;
