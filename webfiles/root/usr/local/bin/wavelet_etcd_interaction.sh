@@ -31,6 +31,8 @@ main() {
 	if [[ -f /var/prod.security.enabled ]]; then
 		# Username / password is already stored in the variable ${userArg}, which is in the sparse ${commandLine} array
 		ETCDURI=https://${ETCDENDPOINT}/v3/kv/
+		echo -e "Attempting: \n
+			etcdctl --endpoints="${ETCDENDPOINT}" --cert-file "${clientCertificateFile}" --key-file "${clientKeyFile}" --ca-file "${certificateAuthorityFile}" ${commandLine[@]}" > /var/home/wavelet/logs/etcdlog.log
 		etcdCommand(){
 			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" \
 			--cert-file "${clientCertificateFile}" \
@@ -40,6 +42,7 @@ main() {
 		}
 	else
 		ETCDURI=http://${ETCDENDPOINT}/v3/kv/
+		echo "Attempting: etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]}" > /var/home/wavelet/logs/etcdlog.log
 		etcdCommand(){
 			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]})
 		}
@@ -107,7 +110,8 @@ Restart=always
 [Install]
 WantedBy=default.target" > /home/wavelet/.config/systemd/user/${waveletModule}.service
 	fi
-	echo -e "User Systemd service unit for etcd Key: ${inputKeyName} generated\nName: ${waveletModule}.service\nRemember to run 'systemctl --user daemon-reload' from your calling function!\n"
+	echo -e "Generated:\n$(cat /home/wavelet/.config/systemd/user/${waveletModule}.service)\n Service File!" > /var/home/wavelet/logs/etcdlog.log
+	echo -e "User Systemd service unit for etcd Key: ${inputKeyName} generated\nName: ${waveletModule}.service\nRemember to run 'systemctl --user daemon-reload' from your calling function.\n"
 	exit 0
 }
 
