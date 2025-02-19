@@ -29,20 +29,19 @@ main() {
 	# the commandline must be quoted, otherwise arguments such as "-t blablabla" aren't processed.
 	# This may mean we get quotation marks back out during queries, which will need to be stripped by their processing modules.
 	if [[ -f /var/prod.security.enabled ]]; then
+		# Username / password is already stored in the variable ${userArg}, which is in the sparse ${commandLine} array
 		ETCDURI=https://${ETCDENDPOINT}/v3/kv/
 		etcdCommand(){
 			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" \
 			--cert-file "${clientCertificateFile}" \
 			--key-file "${clientKeyFile}" \
 			--ca-file "${certificateAuthorityFile}" \
-			--user "${user}" \
-			--password "${password}" \
 			${commandLine[@]})
 		}
 	else
 		ETCDURI=http://${ETCDENDPOINT}/v3/kv/
 		etcdCommand(){
-			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" --user "${user}" --password "${password}" ${commandLine[@]})
+			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]})
 		}
 	fi
 	etcdCommand
@@ -74,6 +73,7 @@ generate_service(){
 	fi
 
 	if [[ -f /var/prod.security.enabled ]]; then
+	# We have additional security requirements of client/server certificates
 		ETCDURI=http://${ETCDENDPOINT}/v3/kv/
 		echo -e "[Unit]
 Description=Wavelet ${inputKeyName}
@@ -85,12 +85,14 @@ ExecStart=etcdctl --endpoints=${ETCDENDPOINT} \
 --cert-file ${clientCertificateFile} \
 --key-file ${clientKeyFile} \
 --ca-file ${certificateAuthorityFile} \
+${userArg} \
 watch ${inputKeyName} -w simple -- /usr/bin/bash -c \"/usr/local/bin/${waveletModule}.sh ${additionalArg}\"
 Restart=always
 
 [Install]
 WantedBy=default.target" > /home/wavelet/.config/systemd/user/${waveletModule}.service
 	else
+	# We still have defined server, root and webui roles
 		echo -e "[Unit]
 Description=Wavelet ${inputKeyName}
 After=network-online.target
@@ -98,6 +100,7 @@ Wants=network-online.target
 
 [Service]
 ExecStart=etcdctl --endpoints=${ETCDENDPOINT} \
+${userArg} \
 watch ${inputKeyName} -w simple -- /usr/bin/bash -c \"/usr/local/bin/${waveletModule}.sh ${additionalArg}\"
 Restart=always
 
@@ -125,6 +128,7 @@ generate_etcd_core_users(){
 	# Root user
 	set -x
 	echo "Generating roles and users for initial system setup.."
+	mkdir -p ~/.ssh/secrets
 	local PassWord=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')	
 	echo ${PassWord} > ~/.ssh/secrets/etcd_root_pw.secure
 	echo "Doing: etcdctl --endpoints=${ETCDENDPOINT} user add root --new-user-password "${PassWord}""
