@@ -44,7 +44,6 @@ main() {
 			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]})
 		}
 	fi
-	echo "trying: etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]}"
 	etcdCommand
 	# Process feedback
 	if	[[ ${fID} == "clearText" ]]; then
@@ -280,5 +279,4 @@ esac
 #exec >/var/home/wavelet/logs/etcdlog.log 2>&1
 hostNameSys=$(hostname)
 hostNamePretty=$(hostnamectl --pretty)
-echo "User Arguments are: ${userArg}"
 main "${action}" "${inputKeyName}" "${inputKeyValue}" "${valueOnlySwitch}" "${userArg}"
