@@ -309,6 +309,9 @@ case ${action} in
 	# Generates etcd host role definition
 	generate_etcd_host_role)	generate_etcd_host_role "${inputKeyValue}";
 	;;
+	# Generates etcd host role definition
+	client_provision_request)	declare -A commandLine=([4]="--user PROV" [2]="put" [1]="/PROV/REQUEST" [0]="${hostNameSys}"); fID="clearText";
+	;;
 	check_status)				declare -A commandLine=([4]="${userArg}" [2]="endpoint status"); fID="clearText";
 	;;
 	# exit with error because other commands are not valid!
