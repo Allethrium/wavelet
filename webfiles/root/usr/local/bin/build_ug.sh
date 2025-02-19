@@ -128,9 +128,10 @@ event_decoder(){
 		wavelet_promote --now
 	# Notifies the server to provision the client machine and give it a role for its own key range
 	# Might work terribly, will have to test.
-	KEYNAME="PROV_RQ"; KEYVALUE="${hostNameSys}"; write_etcd_global
+	KEYNAME="/PROV/REQUEST"; KEYVALUE="${hostNameSys}"; write_etcd_global
 	sleep .33
-	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd # if fails, we have a security rights issue!
+	# if fails, we have a security rights issue or the etcd_interaction module failed somehow.
+	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
 	# Set Type keys to "dec" for system, /hostLabel/ and also for UI
 	KEYVALUE="dec";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/UI/hosts/$hostNameSys/type"; write_etcd_global
@@ -319,6 +320,7 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 	systemctl --user daemon-reload
 	echo -e "Enabling server notification services"
 	event_generate_controller
+	event_generate_provision
 	event_generate_reflectorreload
 	event_generate_watch_provision
 	event_generate_run_ug
@@ -426,6 +428,16 @@ event_generate_controller(){
 		echo -e "Unit file does not exist, generating..\n"
 		# Generate userspace controller service
 		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "INPUT_UPDATE" 0 0 "wavelet_controller"
+	fi
+}
+event_generate_provision(){
+	if [[ -f ~/.config/systemd/user/wavelet_provision.service ]]; then
+		echo -e "Unit file already generated, moving on\n"
+		:
+	else
+		echo -e "Unit file does not exist, generating..\n"
+		# Generate userspace provision service
+		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/PROV/REQUEST" 0 0 "wavelet_provision"
 	fi
 }
 event_generate_reflectorreload(){
