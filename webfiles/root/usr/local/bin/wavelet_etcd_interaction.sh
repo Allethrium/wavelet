@@ -44,6 +44,7 @@ main() {
 			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]})
 		}
 	fi
+	echo "trying: etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]}"
 	etcdCommand
 	# Process feedback
 	if	[[ ${fID} == "clearText" ]]; then
@@ -131,20 +132,19 @@ generate_etcd_core_users(){
 	mkdir -p ~/.ssh/secrets
 	local PassWord=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')	
 	echo ${PassWord} > ~/.ssh/secrets/etcd_root_pw.secure
-	echo "Doing: etcdctl --endpoints=${ETCDENDPOINT} user add root --new-user-password "${PassWord}""
-	etcdctl --endpoints=${ETCDENDPOINT} user add root --new-user-password "${PassWord}"
+	etcdctl --endpoints=${ETCDENDPOINT} user add root --new-user-password ${PassWord}
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role root root
 	unset PassWord
 	# Server
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	echo ${PassWord} > ~/.ssh/secrets/etcd_svr_pw.secure
-	etcdctl --endpoints=${ETCDENDPOINT} user add svr --new-user-password "${PassWord}"
+	etcdctl --endpoints=${ETCDENDPOINT} user add svr --new-user-password ${PassWord}
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role svr server
 	unset PassWord
 	# WebUI
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	echo ${PassWord} > ~/.ssh/secrets/etcd_webui_pw.secure
-	etcdctl --endpoints=${ETCDENDPOINT} user add webui --new-user-password "${PassWord}"
+	etcdctl --endpoints=${ETCDENDPOINT} user add webui --new-user-password ${PassWord}
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role webui webui
 	unset PassWord
 	# User backend pw if set during setup (add as option later)
@@ -167,7 +167,7 @@ generate_etcd_host_role(){
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role "host-${clientHostName}" "host-${clientHostName}"
 	# write key-val which the host will be watching to get the initial info back - this is insecure even though its deleted immediately. 
 	# find a better way to do this.
-	etcdctl --endpoints=${ETCDENDPOINT} put "/PROV/host-${clientHostName}" -- "${PassWord}"
+	etcdctl --endpoints=${ETCDENDPOINT} put "/PROV/host-${clientHostName}" -- ${PassWord}
 	unset PassWord
 	exit 0
 }
@@ -212,7 +212,7 @@ revisionID=$7
 
 # We want to convert the inputKeyValue to a base64 string, much like etcd does internally, otherwise we run into difficulty handling spacing, escape chars and other common issues.
 # This means that ALL key values are base64 now.
-
+get_creds
 case ${action} in
 	# Read an etcd value stored under a hostname - note the preceding / 
 	# Etcd does not have a hierarchical structure so we're 'simulating' directories by adding the /
@@ -280,4 +280,5 @@ esac
 #exec >/var/home/wavelet/logs/etcdlog.log 2>&1
 hostNameSys=$(hostname)
 hostNamePretty=$(hostnamectl --pretty)
-main "${action}" "${inputKeyName}" "${inputKeyValue}" "${valueOnlySwitch}"
+echo "User Arguments are: ${userArg}"
+main "${action}" "${inputKeyName}" "${inputKeyValue}" "${valueOnlySwitch}" "${userArg}"
