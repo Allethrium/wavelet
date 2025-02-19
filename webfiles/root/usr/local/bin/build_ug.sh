@@ -416,7 +416,6 @@ event_generate_reflector(){
 		echo -e "Unit file does not exist, generating..\n"
 		# Generate userspace reflector service
 		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "REFLECTOR_ARGS" 0 0 "wavelet.reflector"
-		# ExecStart=/usr/local/bin/UltraGrid.AppImage $(etcdctl --endpoints=${ETCDENDPOINT} get REFLECTOR_ARGS --print-value-only)
 	fi
 }
 event_generate_controller(){
@@ -607,10 +606,11 @@ exec > "${logName}" 2>&1
 
 time=0
 event_connectwifi
+
 until [[ $(/usr/local/bin/wavelet_etcd_interaction.sh "check_status" | awk '{print $6}') = "true," ]]; do
-	echo -e "Etcd still down.. waiting two seconds.."
-	sleep 2
-	time=$(( ${time} + 2 ))
+	echo -e "Etcd still down.. waiting a second.."
+	sleep 1
+	time=$(( ${time} + 1 ))
 	if [[ $time -eq "60" ]]; then
 		echo "We have been waiting sixty seconds, there is likely a network issue."
 		echo "Running the wifi connection script.."
