@@ -312,6 +312,8 @@ case ${action} in
 	# Generates etcd host role definition
 	client_provision_request)	declare -A commandLine=([4]="--user PROV" [2]="put" [1]="/PROV/REQUEST" [0]="${hostNameSys}"); fID="clearText";
 	;;
+	client_provision_response)	declare -A commandLine=([4]="--user PROV" [2]="get" [1]="/PROV/REQUEST" [0]="--print-value-only"); fID="clearText";
+	;;
 	check_status)				declare -A commandLine=([4]="${userArg}" [2]="endpoint status"); fID="clearText";
 	;;
 	# exit with error because other commands are not valid!
