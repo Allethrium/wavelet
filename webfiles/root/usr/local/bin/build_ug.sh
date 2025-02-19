@@ -54,6 +54,15 @@ etcd_create_roles(){
 	# RunOnce for server provisioning, creates etcd roles.
 	/usr/local/bin/wavelet_etcd_interaction.sh "generate_etcd_core_roles"
 }
+etcd_provision_request(){
+	# RunOnce for client provisioning, server handles request from there.
+	/usr/local/bin/wavelet_etcd_interaction.sh "client_provision_request"
+	sleep .5
+	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "client_provision_response")
+	echo "${printvalue}" > ~/.ssh/secrets/etcd_client_pw.secure
+	# Perform a test here to ensure everything is good and the client can write its own keys.
+	echo "Client provision request completed, client username has been generated and access to appropriate keys granted."
+}
 
 
 detect_ug_version(){
@@ -107,6 +116,9 @@ detect_self(){
 event_decoder(){
 	echo -e "Decoder routine started."
 	event_connectwifi
+	# Provision request to etcd
+	etcd_provision_request
+	sleep .5
 	echo -e "Setting up systemd services to be a decoder, moving to run_ug"
 	event_generateHash dec
 	event_blankhost
