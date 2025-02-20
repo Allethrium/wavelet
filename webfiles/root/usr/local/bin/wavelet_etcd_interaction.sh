@@ -110,7 +110,6 @@ Restart=always
 [Install]
 WantedBy=default.target" > /home/wavelet/.config/systemd/user/${waveletModule}.service
 	fi
-	echo -e "Generated:\n$(cat /home/wavelet/.config/systemd/user/${waveletModule}.service)\n Service File!" >> /var/home/wavelet/logs/etcdlog.log
 	echo -e "User Systemd service unit for etcd Key: ${inputKeyName} generated\nName: ${waveletModule}.service\nRemember to run 'systemctl --user daemon-reload' from your calling function.\n"
 	exit 0
 }
@@ -133,16 +132,15 @@ generate_etcd_core_roles(){
 generate_etcd_core_users(){
 	# Generate basic etcd users
 	# Root user
-
-	set -x
 	declare -a FILES=("/var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure" "/var/home/wavelet/.ssh/secrets/etcd_client_pw.secure" "/var/home/wavelet/.ssh/secrets/etcd_root_pw.secure")
 	for file in "${FILES[@]}"; do
 		if [[ -f $file ]]; then
 			echo "File '$file' is configured." >> /var/home/wavelet/logs/etcdlog.log
+			fileFound=1
 		fi
 	done
-	if (( ${#FILES[@]} )); then
-		echo "Files already generated!  Doing nothing, as overwriting them will result in an inaccessible keystore!" >> /var/home/wavelet/logs/etcdlog.log
+	if [[ $fileFound -eq "1" ]]; then
+		echo 'Files already generated!  Doing nothing, as overwriting them will result in an inaccessible keystore!'
 		exit 0
 	fi
 	echo "Generating roles and users for initial system setup.."
@@ -164,11 +162,10 @@ generate_etcd_core_users(){
 	etcdctl --endpoints=${ETCDENDPOINT} user add webui --new-user-password ${PassWord}
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role webui webui
 	# Create the PROV user
-	etcdctl --endpoints=${ETCDENDPOINT} user PROV --no-password
+	etcdctl --endpoints=${ETCDENDPOINT} user add PROV --no-password
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role PROV PROV
 	# Create the base UI key and grant the webui user access to the prefix range
 	KEYNAME="/UI/"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
-	etcdctl --endpoints=${ETCDENDPOINT} role grant-permission webui --prefix=true readwrite /UI/
 	unset PassWord
 	# User backend pw if set during setup (add as option later)
 	# Populate necessary services (nginx) with these credentials so the webUI can get an auth token for the etcd server.
@@ -194,7 +191,6 @@ generate_etcd_core_users(){
 	else
 		exit 1
 	fi
-	set +x
 	exit 0
 }
 
@@ -218,10 +214,10 @@ generate_etcd_host_role(){
 
 get_creds(){
 	declare -a FILES=("/var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure" "/var/home/wavelet/.ssh/secrets/etcd_client_pw.secure")
-	userArg=""
-	for file in "${FILES[@]}"; do
-		if [[ -f $file ]]; then
-			echo "File '$file' is configured." >> /var/home/wavelet/logs/etcdlog.log
+	for i in "${FILES[@]}"; do
+		echo "looking for $i"
+		if [[ -f $i ]]; then
+			echo "File $i is configured." >> /var/home/wavelet/logs/etcdlog.log
 			case $(hostname) in
 				# If we are the server we use a different password than a client machine
 				# This might be a silly way of doing this because:   
@@ -232,6 +228,9 @@ get_creds(){
 				*)			userArg="--user host-$(hostname):$(cat /var/home/wavelet/.ssh/secrets/etcd_client_pw.secure)";
 				;;
 			esac
+		else
+			echo "File $i does not exist."
+			userArg=""
 		fi
 		done
 }
