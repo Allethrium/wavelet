@@ -32,7 +32,7 @@ main() {
 		# Username / password is already stored in the variable ${userArg}, which is in the sparse ${commandLine} array
 		ETCDURI=https://${ETCDENDPOINT}/v3/kv/
 		echo -e "Attempting: \n
-			etcdctl --endpoints="${ETCDENDPOINT}" --cert-file "${clientCertificateFile}" --key-file "${clientKeyFile}" --ca-file "${certificateAuthorityFile}" ${commandLine[@]}" > /var/home/wavelet/logs/etcdlog.log
+			etcdctl --endpoints="${ETCDENDPOINT}" --cert-file "${clientCertificateFile}" --key-file "${clientKeyFile}" --ca-file "${certificateAuthorityFile}" ${commandLine[@]}" >> /var/home/wavelet/logs/etcdlog.log
 		etcdCommand(){
 			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" \
 			--cert-file "${clientCertificateFile}" \
@@ -42,7 +42,7 @@ main() {
 		}
 	else
 		ETCDURI=http://${ETCDENDPOINT}/v3/kv/
-		echo "Attempting: etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]}" > /var/home/wavelet/logs/etcdlog.log
+		echo "Attempting: etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]}" >> /var/home/wavelet/logs/etcdlog.log
 		etcdCommand(){
 			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]})
 		}
@@ -110,7 +110,7 @@ Restart=always
 [Install]
 WantedBy=default.target" > /home/wavelet/.config/systemd/user/${waveletModule}.service
 	fi
-	echo -e "Generated:\n$(cat /home/wavelet/.config/systemd/user/${waveletModule}.service)\n Service File!" > /var/home/wavelet/logs/etcdlog.log
+	echo -e "Generated:\n$(cat /home/wavelet/.config/systemd/user/${waveletModule}.service)\n Service File!" >> /var/home/wavelet/logs/etcdlog.log
 	echo -e "User Systemd service unit for etcd Key: ${inputKeyName} generated\nName: ${waveletModule}.service\nRemember to run 'systemctl --user daemon-reload' from your calling function.\n"
 	exit 0
 }
@@ -138,11 +138,11 @@ generate_etcd_core_users(){
 	declare -a FILES=("/var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure" "/var/home/wavelet/.ssh/secrets/etcd_client_pw.secure" "/var/home/wavelet/.ssh/secrets/etcd_root_pw.secure")
 	for file in "${FILES[@]}"; do
 		if [[ -f $file ]]; then
-			echo "File '$file' is configured." > /var/home/wavelet/logs/etcdlog.log
+			echo "File '$file' is configured." >> /var/home/wavelet/logs/etcdlog.log
 		fi
 	done
 	if (( ${#FILES[@]} )); then
-		echo "Files already generated!  Doing nothing, as overwriting them will result in an inaccessible keystore!" > /var/home/wavelet/logs/etcdlog.log
+		echo "Files already generated!  Doing nothing, as overwriting them will result in an inaccessible keystore!" >> /var/home/wavelet/logs/etcdlog.log
 		exit 0
 	fi
 	echo "Generating roles and users for initial system setup.."
@@ -218,13 +218,11 @@ generate_etcd_host_role(){
 
 get_creds(){
 	declare -a FILES=("/var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure" "/var/home/wavelet/.ssh/secrets/etcd_client_pw.secure")
+	userArg=""
 	for file in "${FILES[@]}"; do
 		if [[ -f $file ]]; then
-			echo "File '$file' is configured." > /var/home/wavelet/logs/etcdlog.log
-		fi
-	done
-	if (( ${#FILES[@]} )); then
-		case $(hostname) in
+			echo "File '$file' is configured." >> /var/home/wavelet/logs/etcdlog.log
+			case $(hostname) in
 				# If we are the server we use a different password than a client machine
 				# This might be a silly way of doing this because:   
 				#	(a) the password is now a variable in this shell 
@@ -234,10 +232,8 @@ get_creds(){
 				*)			userArg="--user host-$(hostname):$(cat /var/home/wavelet/.ssh/secrets/etcd_client_pw.secure)";
 				;;
 			esac
-	else
-		echo "no secrets files configured, userArg will be empty!" > /var/home/wavelet/logs/etcdlog.log
-		userArg=""
-	fi
+		fi
+		done
 }
 
 #####
