@@ -184,8 +184,10 @@ generate_etcd_core_users(){
 	else
 		exit
 	fi
-	etcdctl --endpoints=${ETCDENDPOINT} --user webui:$(cat ~/.ssh/secrets/etcd_webui_pw.secure) put "/UI/ui_write_test" -- "True")
+	local passWord=$(cat ~/.ssh/secrets/etcd_webui_pw.secure) 
+	etcdctl --endpoints=${ETCDENDPOINT} --user webui:${passWord} "/UI/ui_write_test" -- "True")
 	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:$(cat ~/.ssh/secrets/etcd_webui_pw.secure) get "/UI/ui_write_test")
+	unset passWord
 	if [[ ${printvalue} = "True" ]]; then
 		echo "webui user can access /UI/ range for read/write access!"
 	else
