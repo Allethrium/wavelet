@@ -177,16 +177,17 @@ generate_etcd_core_users(){
 	etcdctl --endpoints
 	# if all good? continue.
 	etcdctl auth enable
+	local passWord=$(cat ~/.ssh/secrets/etcd_webui_pw.secure)
 	KEYNAME="/UI/ui_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
-	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:$(cat ~/.ssh/secrets/etcd_webui_pw.secure) get "/UI/ui_test")
+	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${passWord} get "/UI/ui_test")
 	if [[ ${printvalue} = "True" ]]; then
 		echo "webui user can access /UI/ range for read access!"
 	else
 		exit
 	fi
 	local passWord=$(cat ~/.ssh/secrets/etcd_webui_pw.secure) 
-	etcdctl --endpoints=${ETCDENDPOINT} --user webui:${passWord} "/UI/ui_write_test" -- "True")
-	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:$(cat ~/.ssh/secrets/etcd_webui_pw.secure) get "/UI/ui_write_test")
+	etcdctl --endpoints=${ETCDENDPOINT} --user webui:${passWord} "/UI/ui_write_test" -- "True"
+	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${passWord} get "/UI/ui_write_test")
 	unset passWord
 	if [[ ${printvalue} = "True" ]]; then
 		echo "webui user can access /UI/ range for read/write access!"
