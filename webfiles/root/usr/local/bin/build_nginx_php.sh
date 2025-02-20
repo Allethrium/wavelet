@@ -47,7 +47,7 @@ Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/nginx.container
 			# wait, this won't work because we cannot write to the directory.
 			echo -e "Certificate has not been generated on server, generating a snake oil certificate for testing..\n"
 			mkdir -p /var/home/wavelet/http-php/certs
-			openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /var/home/wavelet/http-php/certs/httpd.key -out /var/home/wavelet/http-php/certs/httpd.crt -subj "/C=US/ST=NewYork/L=NewYork/O=ALLETHRIUM/OU=DevOps/CN=WaveletInterface"
+			openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /var/home/wavelet/http-php/certs/httpd.key -out /var/home/wavelet/http-php/certs/httpd.crt -subj "/C=US/ST=NewYork/L=NewYork/O=ALLETHRIUM/OU=DevOps/CN=192.168.1.32"
 			openssl dhparam -out /var/home/wavelet/http-php/certs/dhparam.pem 4096
 		fi
 		# Cert directory mounted regardless, the conf file will determine if we bother looking for them.
@@ -57,8 +57,8 @@ Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/nginx.container
 	# We populate the webui password as an environment variable
 	webuiPass=$(cat /var/home/wavelet/.ssh/secrets/etcd_webui_pw.secure)
 	echo -e "[Pod]
-PublishPort=80:80
-PublishPort=443:443
+PublishPort=9080:80
+PublishPort=9443:443
 Volume=/var/home/wavelet/http-php/certs/:/etc/pki/tls/certs/:z
 Volume=/var/home/wavelet/http-php/log:/var/log/nginx:Z
 Volume=/var/home/wavelet/http-php/html:/var/www/html:Z
