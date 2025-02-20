@@ -219,8 +219,6 @@ event_server(){
 		server_bootstrap
 	fi
 	# The server runs a superset of most of the client machines units, however it shouldn't support renaming.
-	mkdir -p ~/.ssh/secrets
-	etcd_create_roles
 	svr_pw=$(cat /var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure)
 	event_generate_wavelet_encoder_query
 	event_generate_wavelet_ui_service
@@ -322,14 +320,15 @@ TimeoutStartSec=600
 [Install]
 WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestream.container
 	}
+	# Generate basic ETCD roles and key permissions
+	mkdir -p ~/.ssh/secrets
+	etcd_create_roles
 	bootstrap_http
 	bootstrap_nginx_php
 	#bootstrap_nodejs		#	WAY in the future for UI stuff.
 	#bootstrap_livestream 	#	Probably not necessary to spin up a whole container for this..
 	bootstrap_dnsmasq_watcher_service
 	touch /var/home/wavelet/server_bootstrap_completed
-	echo -e "Reloading systemctl user daemon, and enabling the controller service immediately"
-	systemctl --user daemon-reload
 	echo -e "Enabling server notification services"
 	event_generate_controller
 	event_generate_provision
@@ -339,7 +338,7 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 	systemctl --user enable wavelet_controller.service --now
 	systemctl --user enable wavelet_reflector.service --now
 	# uncomment a firefox exec command into sway config, this will bring up the management console on the server in a new sway window, as a backup control surface.
-	# - note we need to work on a firefox policy/autoconfig.
+	# - note we need to work on a firefox policy/autoconfig which FF will actually respect
 	sed -i 's|#exec /usr/local/bin/wavelet_start_UI.sh|exec /usr/local/bin/wavelet_start_UI.sh|g' /var/home/wavelet/.config/sway/config
 	# Next, we build the reflector prune function.  This is necessary for removing streams for old decoders and maintaining the long term health of the system
 		# Get decoderIP list
