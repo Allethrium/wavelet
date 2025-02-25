@@ -1,7 +1,8 @@
 #!/bin/bash
 
+#
 # This mods ignition_server to enable it to spinup in a VM with some reasonable settings.  No DHCP, simple password.
-# For testing purposes.
+# For testing the server spinup process on a VM host.
 
 STREAM="stable"
 mkdir -p $HOME/virt-wavelet

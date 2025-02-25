@@ -92,6 +92,7 @@ customization
 
 # user stuff
 init_users_yaml() {
+	# Ensure nothing adds TABS in the cat command below, YAML won't transpile correctly without indentation being entirely spaces.
 	cat <<EOF > users_yaml
     - name: USERNAMEGOESHERE
       password_hash: PASSWORDGOESHERE
