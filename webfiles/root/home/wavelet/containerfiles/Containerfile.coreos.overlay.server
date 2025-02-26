@@ -26,7 +26,16 @@ RUN	rpm-ostree install -y -A \
 		libva libva-utils libva-v4l2-request libva-vdpau-driver libvdpau-va-gl libvdpau \
 		oneVPL-intel-gpu oneapi-level-zero opencl-headers mpv libsrtp \
 		fastfetch btop mesa-libOpenCL srt srt-libs pipewire-utils \
-		rkhunter clamav clamd clamav-freshclam && \
+		rkhunter clamav clamd clamav-freshclam \
+		buildah butane kea inotify-tools \
+		make cmake coreutils binutils binutils-gold libtool \
+		libstdc++ zlib-ng-compat glibc-devel \
+		cpio dkms usbutils openssl openssl-devel \
+		autoconf automake libtirpc-devel libblkid-devel libaio-devel libattr-devel \
+		elfutils-libelf-devel ncompress libcurl-devel \
+		ascii asciidoc go bzip2-devel libffi-devel zlib-devel libuuid-devel \
+		libudev-devel chkconfig akmods kmod kmod-devel kmodtool mokutil \
+		libvdpau-devel firefox && \
 	rpm-ostree install -y -A \
 		https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
 		https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm && \
@@ -37,21 +46,4 @@ RUN	rpm-ostree install -y -A \
 		ndi-sdk ndi-sdk-documentation vlc mplayer \
 		gstreamer1-plugin-libav gstreamer1-plugins-bad-free-extras \
 		gstreamer1-plugins-bad-freeworld gstreamer1-plugins-ugly gstreamer1-vaapi && \
-	ostree container commit
-
-# This issue is now resolved, but leaving it in here for future as an example!
-# Install devel packages in addition to the pre-existing base layer
-# The additional steps are necessary to deal with some unsolvable dependency issues between the latest Fedora CoreOS container + RPMfusion specs
-# It's likely a temporary fix until their releases sync up again.
-RUN rpm-ostree override replace --install glibc-common libgomp gcc gcc-c++ --from repo="fedora" --experimental && \
-RUN	rpm-ostree install -y -A \
-	buildah butane kea inotify-tools \
-	make cmake coreutils binutils binutils-gold libtool \
-	libstdc++ zlib-ng-compat glibc-devel \
-	cpio dkms usbutils openssl openssl-devel \
-	autoconf automake libtirpc-devel libblkid-devel libaio-devel libattr-devel \
-	elfutils-libelf-devel ncompress libcurl-devel \
-	ascii asciidoc go bzip2-devel libffi-devel zlib-devel libuuid-devel \
-	libudev-devel chkconfig akmods kmod kmod-devel kmodtool mokutil \
-	libvdpau-devel firefox && \
 	ostree container commit
