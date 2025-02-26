@@ -43,7 +43,7 @@ RUN	rpm-ostree install -y -A \
 # Install devel packages in addition to the pre-existing base layer
 # The additional steps are necessary to deal with some unsolvable dependency issues between the latest Fedora CoreOS container + RPMfusion specs
 # It's likely a temporary fix until their releases sync up again.
-# RUN rpm-ostree override replace --install glibc-common libgomp gcc gcc-c++ --from repo="fedora" --experimental && \
+RUN rpm-ostree override replace --install glibc-common libgomp gcc gcc-c++ --from repo="fedora" --experimental && \
 RUN	rpm-ostree install -y -A \
 	buildah butane kea inotify-tools \
 	make cmake coreutils binutils binutils-gold libtool \
