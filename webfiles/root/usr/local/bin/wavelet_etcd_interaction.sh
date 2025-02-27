@@ -143,6 +143,9 @@ generate_etcd_core_users(){
 		echo 'Files already generated!  Doing nothing, as overwriting them will result in an inaccessible keystore!'
 		exit 0
 	fi
+	KEYNAME="Global_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+	# Create the base UI key and grant the webui user access to the prefix range
+	KEYNAME="/UI/"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	echo "Generating roles and users for initial system setup.."
 	mkdir -p ~/.ssh/secrets
 	local PassWord=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')	
@@ -164,12 +167,9 @@ generate_etcd_core_users(){
 	# Create the PROV user
 	etcdctl --endpoints=${ETCDENDPOINT} user add PROV --no-password
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role PROV PROV
-	# Create the base UI key and grant the webui user access to the prefix range
-	KEYNAME="/UI/"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	unset PassWord
 	# User backend pw if set during setup (add as option later)
 	# add a test here to ensure everything is functional
-	KEYNAME="Global_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
 	if [[ ${returnVal} == "True" ]];then
 		echo "Key value correct, enabling auth.."
