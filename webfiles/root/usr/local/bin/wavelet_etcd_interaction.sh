@@ -226,9 +226,10 @@ get_creds(){
 			echo "File $i is configured." >> /var/home/wavelet/logs/etcdlog.log
 			set_userArg
 		else
+			echo "No credentials files configured!" >> /var/home/wavelet/logs/etcdlog.log
 			userArg=""
 		fi
-		done
+	done
 }
 
 set_userArg() {
