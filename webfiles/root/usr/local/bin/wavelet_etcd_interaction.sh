@@ -234,10 +234,12 @@ get_creds(){
 				*)			userArg="--user host-$(hostname):$(cat /var/home/wavelet/.ssh/secrets/etcd_client_pw.secure)";
 				;;
 			esac
+			break
 		else
 			userArg=""
 		fi
 		done
+		echo "User args: ${userArg}" >> /var/home/wavelet/logs/etcdlog.log
 }
 
 #####
