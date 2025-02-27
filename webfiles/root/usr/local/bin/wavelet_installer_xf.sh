@@ -167,8 +167,8 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_hardening.serv
 
 get_ipValue(){
 	# Gets the current IP address for this host
-	nmcli_get=$(nmcli -t -f AUTOCONNECT,UUID con | grep 'yes' | tr -d 'yes:')
-	IPVALUE=$(nmcli -f 'IP4.ADDRESS' con show --active uuid ${nmcli_get} | awk '{ print $2 }')
+	nmcli_get=$(nmcli -t -f AUTOCONNECT,UUID con | grep 'yes')
+	IPVALUE=$(nmcli -f 'IP4.ADDRESS' con show --active uuid "${nmcli_get##*yes:}" | awk '{ print $2 }')
 	if [[ "${IPVALUE%/*}" == "" ]] then
 			# sleep for five seconds, then call yourself again
 			echo -e "\nIP Address is null, sleeping and calling function again\n"
