@@ -148,7 +148,6 @@ generate_etcd_core_users(){
 	KEYNAME="/UI/"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	if [[ ${returnVal} == "True" ]];then
 		echo "Key value correct, enabling auth.."
-		etcdctl auth enable
 	else
 		echo "The test key value was not successfully retrieved.  Please review logs to troubleshoot!"
 		exit 1
@@ -177,6 +176,7 @@ generate_etcd_core_users(){
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role PROV PROV
 	unset PassWord
 	# User backend pw if set during setup (add as option later)
+	etcdctl auth enable
 	test_auth "svr"
 	test_auth "webui"
 	set +x
