@@ -118,6 +118,7 @@ generate_etcd_core_roles(){
 	# Etcd roles must be generated because the build_ug, detectv4l modules do not know if security is on or off, so they set role permissions as they generate and remove their keys.
 	# webui ensures the webui can only write to keys under the range "/UI/"
 	etcdctl --endpoints=${ETCDENDPOINT} role add webui
+	KEYNAME="/UI/"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	etcdctl --endpoints=${ETCDENDPOINT} role grant-permission webui --prefix=true readwrite "/UI/" 
 	# The server should be able to modify everything, and has its own "root" role.  Most coordination happens on the server, so this is fine.
 	etcdctl --endpoints=${ETCDENDPOINT} role add server
@@ -145,7 +146,6 @@ generate_etcd_core_users(){
 	fi
 	KEYNAME="Global_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
-	KEYNAME="/UI/"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	if [[ ${returnVal} == "True" ]];then
 		echo "Key value correct, enabling auth.."
 	else
@@ -197,6 +197,7 @@ test_auth() {
 			exit 1
 		fi
 	else
+		echo "Testing webui auth.." >> /var/home/wavelet/logs/etcdlog.log
 		local webuipw=$(cat /var/home/wavelet/.ssh/secrets/etcd_webui_pw.secure)
 		etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} put "/UI/ui_auth" -- "True"
 		returnVal=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} get "/UI/ui_auth")
