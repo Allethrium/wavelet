@@ -261,7 +261,7 @@ revisionID=$7
 
 # We want to convert the inputKeyValue to a base64 string, much like etcd does internally, otherwise we run into difficulty handling spacing, escape chars and other common issues.
 # This means that ALL key values are base64 now.
-
+echo -e "\n\n**New log**\n\n" /var/home/wavelet/logs/etcdlog.log
 get_creds
 
 case ${action} in
