@@ -190,6 +190,7 @@ test_auth() {
 		KEYNAME="svr_auth"; KEYVALUE="True"
 		/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 		returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
+		echo "Returned: ${returnVal}" >> /var/home/wavelet/logs/etcdlog.log
 		if [[ ${returnVal} == "True" ]]; then
 			echo "Test successful!" >> /var/home/wavelet/logs/etcdlog.log
 		else
