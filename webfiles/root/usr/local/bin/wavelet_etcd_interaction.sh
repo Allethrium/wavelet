@@ -178,37 +178,26 @@ generate_etcd_core_users(){
 		echo "The test key value was not successfully retrieved.  Please review logs to troubleshoot!"
 		exit 1
 	fi
-	echo "Testing svr user and role.."
-	local passWord=$(cat /var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure)
-	userArg="--user svr:${passWord}"
-	inputKeyName="Global_auth"; inputKeyValue="True"
-	declare -A commandLine=([4]="${userArg}" [3]="put" [2]="${inputKeyName}" [1]="--" [0]="${inputKeyValue}");
-	main "${inputKeyName}" "${inputKeyValue}" "${valueOnlySwitch}" "${userArg}"
-	returnVal=$(etcdctl --endpoints=${ETCDENDPOINT} --user svr:${passWord} get "Global_auth")
-	unset passWord
-	if [[ ${returnVal} == "True" ]]; then
-		echo "server user can access root range for read access!"
-	else
-		echo "Write permissions error for server user!"
-		exit 1
-	fi
-	unset returnVal
-	echo "Testing webui user and role.."
-	local passWord=$(cat /var/home/wavelet/.ssh/secrets/etcd_webui_pw.secure)
-	userArg="--user webui:${passWord}"
-	declare -A commandLine=([4]="${userArg}" [3]="put" [2]="${inputKeyName}" [1]="--" [0]="${inputKeyValue}");
-	etcdctl --endpoints=${ETCDENDPOINT} --user webui:${passWord} "/UI/ui_write_test" -- "True"
-	returnVal=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${passWord} get "/UI/ui_write_test")
-	unset passWord
-	if [[ ${returnVal} = "True" ]]; then
-		echo "webui user can access /UI/ range for read/write access!"
-	else
-		echo "Write permissions error for webui user!"
-		exit 1
-	fi
-	unset returnVal
+	test_auth "svr"
+	test_auth "webui"
 	set +x
 	exit 0
+}
+
+test_auth() {
+	echo "testing $1"
+	if [[ $1 == "svr" ]]; then
+		returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "svr_auth" "True")
+	else
+		local webuipw=$(cat /var/home/wavelet/.ssh/secrets/etcd_webui_pw.secure)
+		returnVal=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} put "/UI/ui_auth" -- "True")
+	fi
+	if [[ ${returnVal} == "True" ]]; then
+		echo "Test successful!"
+	else
+		echo "Test failed!"
+		exit 1
+	fi
 }
 
 generate_etcd_host_role(){
@@ -267,7 +256,9 @@ revisionID=$7
 
 # We want to convert the inputKeyValue to a base64 string, much like etcd does internally, otherwise we run into difficulty handling spacing, escape chars and other common issues.
 # This means that ALL key values are base64 now.
+
 get_creds
+
 case ${action} in
 	# Read an etcd value stored under a hostname - note the preceding / 
 	# Etcd does not have a hierarchical structure so we're 'simulating' directories by adding the /
