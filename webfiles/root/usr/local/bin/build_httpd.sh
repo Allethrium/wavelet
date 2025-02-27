@@ -29,7 +29,6 @@ Tmpfs=/tmp
 Exec=httpd-foreground
 
 [Service]
-TimeOutStartSec=300
 Restart=always
 RestartSec=5
 
