@@ -25,7 +25,6 @@ main() {
 	set --
 	if [[ ${inputKeyValue} != "" ]]; then flagSeparator="-- "; fi
 	# Here we are going to parse the entire command line, otherwise injected '' for unused variables mess with the results.
-	# check for security layer
 	# the commandline must be quoted, otherwise arguments such as "-t blablabla" aren't processed.
 	# This may mean we get quotation marks back out during queries, which will need to be stripped by their processing modules.
 	if [[ -f /var/prod.security.enabled ]]; then
@@ -132,6 +131,7 @@ generate_etcd_core_roles(){
 generate_etcd_core_users(){
 	# Generate basic etcd users
 	# Root user
+	set -x
 	declare -a FILES=("/var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure" "/var/home/wavelet/.ssh/secrets/etcd_client_pw.secure" "/var/home/wavelet/.ssh/secrets/etcd_root_pw.secure")
 	for file in "${FILES[@]}"; do
 		if [[ -f $file ]]; then
@@ -168,7 +168,6 @@ generate_etcd_core_users(){
 	KEYNAME="/UI/"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	unset PassWord
 	# User backend pw if set during setup (add as option later)
-	# Populate necessary services (nginx) with these credentials so the webUI can get an auth token for the etcd server.
 	# add a test here to ensure everything is functional
 	KEYNAME="Global_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
@@ -179,23 +178,34 @@ generate_etcd_core_users(){
 		echo "The test key value was not successfully retrieved.  Please review logs to troubleshoot!"
 		exit 1
 	fi
-	local passWord=$(cat ~/.ssh/secrets/etcd_webui_pw.secure)
-	KEYNAME="/UI/ui_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
-	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${passWord} get "/UI/ui_test")
+	# Test server username/role
+	local passWord=$(cat /var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure)
+	userArg="--user svr:${passWord}"
+	inputKeyName="Global_auth"; inputKeyValue="True"
+	declare -A commandLine=([4]="${userArg}" [3]="put" [2]="${inputKeyName}" [1]="--" [0]="${inputKeyValue}");
+	main "${inputKeyName}" "${inputKeyValue}" "${valueOnlySwitch}" "${userArg}"
+	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} --user svr:${passWord} get "Global_auth")
+	unset passWord
 	if [[ ${printvalue} = "True" ]]; then
-		echo "webui user can access /UI/ range for read access!"
+		echo "server user can access /UI/ range for read access!"
 	else
+		echo "Write permissions error for server user!"
 		exit
 	fi
-	local passWord=$(cat ~/.ssh/secrets/etcd_webui_pw.secure) 
+	# Test webUI username/role
+	local passWord=$(cat /var/home/wavelet/.ssh/secrets/etcd_webui_pw.secure)
+	userArg="--user webui:${passWord}"
+	declare -A commandLine=([4]="${userArg}" [3]="put" [2]="${inputKeyName}" [1]="--" [0]="${inputKeyValue}");
 	etcdctl --endpoints=${ETCDENDPOINT} --user webui:${passWord} "/UI/ui_write_test" -- "True"
 	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${passWord} get "/UI/ui_write_test")
 	unset passWord
 	if [[ ${printvalue} = "True" ]]; then
 		echo "webui user can access /UI/ range for read/write access!"
 	else
+		echo "Write permissions error for webui user!"
 		exit 1
 	fi
+	set +x
 	exit 0
 }
 
@@ -234,7 +244,6 @@ get_creds(){
 				;;
 			esac
 		else
-			echo "File $i does not exist." >> /var/home/wavelet/logs/etcdlog.log
 			userArg=""
 		fi
 		done
