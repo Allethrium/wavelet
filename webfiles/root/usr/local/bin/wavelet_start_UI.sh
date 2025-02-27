@@ -24,7 +24,7 @@ get_authtoken(){
 #####
 
 logName=/var/home/wavelet/logs/webui.log
-#set -x
+set -x
 exec > "${logName}" 2>&1
 
 if [[ "$EUID" -eq 0 ]]; then echo "Cannot run as root"
