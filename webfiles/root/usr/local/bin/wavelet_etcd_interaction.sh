@@ -171,9 +171,14 @@ generate_etcd_core_users(){
 	# Populate necessary services (nginx) with these credentials so the webUI can get an auth token for the etcd server.
 	# add a test here to ensure everything is functional
 	KEYNAME="Global_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
-	etcdctl --endpoints
-	# if all good? continue.
-	etcdctl auth enable
+	returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
+	if [[ ${returnVal} == "True" ]];then
+		echo "Key value correct, enabling auth.."
+		etcdctl auth enable
+	else
+		echo "The test key value was not successfully retrieved.  Please review logs to troubleshoot!"
+		exit 1
+	fi
 	local passWord=$(cat ~/.ssh/secrets/etcd_webui_pw.secure)
 	KEYNAME="/UI/ui_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${passWord} get "/UI/ui_test")
