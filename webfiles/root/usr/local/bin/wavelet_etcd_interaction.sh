@@ -184,27 +184,29 @@ generate_etcd_core_users(){
 	inputKeyName="Global_auth"; inputKeyValue="True"
 	declare -A commandLine=([4]="${userArg}" [3]="put" [2]="${inputKeyName}" [1]="--" [0]="${inputKeyValue}");
 	main "${inputKeyName}" "${inputKeyValue}" "${valueOnlySwitch}" "${userArg}"
-	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} --user svr:${passWord} get "Global_auth")
+	returnVal=$(etcdctl --endpoints=${ETCDENDPOINT} --user svr:${passWord} get "Global_auth")
 	unset passWord
-	if [[ ${printvalue} = "True" ]]; then
+	if [[ ${returnVal} == "True" ]]; then
 		echo "server user can access root range for read access!"
 	else
 		echo "Write permissions error for server user!"
 		exit 1
 	fi
+	unset returnVal
 	echo "Testing webui user and role.."
 	local passWord=$(cat /var/home/wavelet/.ssh/secrets/etcd_webui_pw.secure)
 	userArg="--user webui:${passWord}"
 	declare -A commandLine=([4]="${userArg}" [3]="put" [2]="${inputKeyName}" [1]="--" [0]="${inputKeyValue}");
 	etcdctl --endpoints=${ETCDENDPOINT} --user webui:${passWord} "/UI/ui_write_test" -- "True"
-	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${passWord} get "/UI/ui_write_test")
+	returnVal=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${passWord} get "/UI/ui_write_test")
 	unset passWord
-	if [[ ${printvalue} = "True" ]]; then
+	if [[ ${returnVal} = "True" ]]; then
 		echo "webui user can access /UI/ range for read/write access!"
 	else
 		echo "Write permissions error for webui user!"
 		exit 1
 	fi
+	unset returnVal
 	set +x
 	exit 0
 }
