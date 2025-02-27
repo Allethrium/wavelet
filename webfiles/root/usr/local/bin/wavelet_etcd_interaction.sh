@@ -187,15 +187,17 @@ generate_etcd_core_users(){
 test_auth() {
 	echo "testing $1"
 	if [[ $1 == "svr" ]]; then
-		returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "svr_auth" "True")
+		echo "Testing svr auth.." >> /var/home/wavelet/logs/etcdlog.log
+		KEYNAME="svr_auth"; KEYVALUE="True"
+		returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}")
 	else
 		local webuipw=$(cat /var/home/wavelet/.ssh/secrets/etcd_webui_pw.secure)
 		returnVal=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} put "/UI/ui_auth" -- "True")
 	fi
 	if [[ ${returnVal} == "True" ]]; then
-		echo "Test successful!"
+		echo "Test successful!" >> /var/home/wavelet/logs/etcdlog.log
 	else
-		echo "Test failed!"
+		echo "Test failed!" >> /var/home/wavelet/logs/etcdlog.log
 		exit 1
 	fi
 }
