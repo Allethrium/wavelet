@@ -227,7 +227,6 @@ get_creds(){
 			set_userArg
 		else
 			echo "No credentials files configured!" >> /var/home/wavelet/logs/etcdlog.log
-			userArg=""
 		fi
 	done
 }
