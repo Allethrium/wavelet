@@ -215,7 +215,7 @@ generate_etcd_host_role(){
 get_creds(){
 	declare -a FILES=("/var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure" "/var/home/wavelet/.ssh/secrets/etcd_client_pw.secure")
 	for i in "${FILES[@]}"; do
-		echo "looking for $i"
+		echo "looking for $i" >> /var/home/wavelet/logs/etcdlog.log
 		if [[ -f $i ]]; then
 			echo "File $i is configured." >> /var/home/wavelet/logs/etcdlog.log
 			case $(hostname) in
@@ -229,7 +229,7 @@ get_creds(){
 				;;
 			esac
 		else
-			echo "File $i does not exist."
+			echo "File $i does not exist." >> /var/home/wavelet/logs/etcdlog.log
 			userArg=""
 		fi
 		done
