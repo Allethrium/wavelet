@@ -189,16 +189,24 @@ test_auth() {
 	if [[ $1 == "svr" ]]; then
 		echo "Testing svr auth.." >> /var/home/wavelet/logs/etcdlog.log
 		KEYNAME="svr_auth"; KEYVALUE="True"
-		returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}")
+		/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+		returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
+		if [[ ${returnVal} == "True" ]]; then
+			echo "Test successful!" >> /var/home/wavelet/logs/etcdlog.log
+		else
+			echo "Test failed!" >> /var/home/wavelet/logs/etcdlog.log
+			exit 1
+		fi
 	else
 		local webuipw=$(cat /var/home/wavelet/.ssh/secrets/etcd_webui_pw.secure)
-		returnVal=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} put "/UI/ui_auth" -- "True")
-	fi
-	if [[ ${returnVal} == "True" ]]; then
-		echo "Test successful!" >> /var/home/wavelet/logs/etcdlog.log
-	else
-		echo "Test failed!" >> /var/home/wavelet/logs/etcdlog.log
-		exit 1
+		etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} put "/UI/ui_auth" -- "True"
+		returnVal=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} get "/UI/ui_auth")
+		if [[ ${returnVal} == "True" ]]; then
+			echo "Test successful!" >> /var/home/wavelet/logs/etcdlog.log
+		else
+			echo "Test failed!" >> /var/home/wavelet/logs/etcdlog.log
+			exit 1
+		fi
 	fi
 }
 
