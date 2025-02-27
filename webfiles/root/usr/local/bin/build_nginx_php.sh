@@ -26,6 +26,7 @@ podman_quadlet(){
 	# The .kube file at the end basically allows us to link these two services into a podman pod.   
 	# The install wantedBy= section is how we do systemctl enable --now, basically.
 	mkdir -p /var/home/wavelet/.config/containers/systemd/
+	mkdir -p /var/home/wavelet/http-php/certs
 	echo -e "[Unit]
 Description=PHP + FPM
 [Container]
@@ -37,6 +38,7 @@ Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/php-fpm.contain
 Description=NGINX
 [Container]
 Image=docker.io/library/nginx:alpine
+Environment="PASSWORD=${webuiPass}"
 AutoUpdate=registry
 Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/nginx.container
 	if [[ -f /var/prod.security.enabled ]]; then
@@ -46,7 +48,6 @@ Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/nginx.container
 			# Since prod certs aren't there, we generate a crappy certificate so things work, at the very least..
 			# wait, this won't work because we cannot write to the directory.
 			echo -e "Certificate has not been generated on server, generating a snake oil certificate for testing..\n"
-			mkdir -p /var/home/wavelet/http-php/certs
 			openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /var/home/wavelet/http-php/certs/httpd.key -out /var/home/wavelet/http-php/certs/httpd.crt -subj "/C=US/ST=NewYork/L=NewYork/O=ALLETHRIUM/OU=DevOps/CN=192.168.1.32"
 			openssl dhparam -out /var/home/wavelet/http-php/certs/dhparam.pem 4096
 		fi
@@ -63,7 +64,6 @@ Volume=/var/home/wavelet/http-php/certs/:/etc/pki/tls/certs/:z
 Volume=/var/home/wavelet/http-php/log:/var/log/nginx:Z
 Volume=/var/home/wavelet/http-php/html:/var/www/html:Z
 Volume=/var/home/wavelet/http-php/nginx:/etc/nginx/conf.d/:z
-Environment="PASSWORD=${webuiPass}"
 [Install]
 WantedBy=multi-user.target" > /var/home/wavelet/.config/containers/systemd/http-php.pod
 	echo -e "Podman pod and containers, generated, service has been enabled in systemd, and will start on next reboot."
