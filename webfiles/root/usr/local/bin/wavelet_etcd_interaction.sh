@@ -178,7 +178,7 @@ generate_etcd_core_users(){
 		echo "The test key value was not successfully retrieved.  Please review logs to troubleshoot!"
 		exit 1
 	fi
-	# Test server username/role
+	echo "Testing svr user and role.."
 	local passWord=$(cat /var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure)
 	userArg="--user svr:${passWord}"
 	inputKeyName="Global_auth"; inputKeyValue="True"
@@ -187,12 +187,12 @@ generate_etcd_core_users(){
 	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} --user svr:${passWord} get "Global_auth")
 	unset passWord
 	if [[ ${printvalue} = "True" ]]; then
-		echo "server user can access /UI/ range for read access!"
+		echo "server user can access root range for read access!"
 	else
 		echo "Write permissions error for server user!"
-		exit
+		exit 1
 	fi
-	# Test webUI username/role
+	echo "Testing webui user and role.."
 	local passWord=$(cat /var/home/wavelet/.ssh/secrets/etcd_webui_pw.secure)
 	userArg="--user webui:${passWord}"
 	declare -A commandLine=([4]="${userArg}" [3]="put" [2]="${inputKeyName}" [1]="--" [0]="${inputKeyValue}");
