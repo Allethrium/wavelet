@@ -144,6 +144,14 @@ generate_etcd_core_users(){
 		exit 0
 	fi
 	KEYNAME="Global_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+	returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
+	if [[ ${returnVal} == "True" ]];then
+		echo "Key value correct, enabling auth.."
+		etcdctl auth enable
+	else
+		echo "The test key value was not successfully retrieved.  Please review logs to troubleshoot!"
+		exit 1
+	fi
 	# Create the base UI key and grant the webui user access to the prefix range
 	KEYNAME="/UI/"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	echo "Generating roles and users for initial system setup.."
@@ -169,15 +177,6 @@ generate_etcd_core_users(){
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role PROV PROV
 	unset PassWord
 	# User backend pw if set during setup (add as option later)
-	# add a test here to ensure everything is functional
-	returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
-	if [[ ${returnVal} == "True" ]];then
-		echo "Key value correct, enabling auth.."
-		etcdctl auth enable
-	else
-		echo "The test key value was not successfully retrieved.  Please review logs to troubleshoot!"
-		exit 1
-	fi
 	test_auth "svr"
 	test_auth "webui"
 	set +x
