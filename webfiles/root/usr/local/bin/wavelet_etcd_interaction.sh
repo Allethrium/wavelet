@@ -145,6 +145,7 @@ generate_etcd_core_users(){
 	fi
 	KEYNAME="Global_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
+	KEYNAME="/UI/"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	if [[ ${returnVal} == "True" ]];then
 		echo "Key value correct, enabling auth.."
 		etcdctl auth enable
@@ -153,7 +154,6 @@ generate_etcd_core_users(){
 		exit 1
 	fi
 	# Create the base UI key and grant the webui user access to the prefix range
-	KEYNAME="/UI/"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	echo "Generating roles and users for initial system setup.."
 	mkdir -p ~/.ssh/secrets
 	local PassWord=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')	
