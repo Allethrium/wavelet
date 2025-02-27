@@ -198,10 +198,11 @@ test_auth() {
 		fi
 	else
 		echo "Testing webui auth.." >> /var/home/wavelet/logs/etcdlog.log
+		KEYNAME="/UI/ui_auth"
 		local webuipw=$(cat /var/home/wavelet/.ssh/secrets/etcd_webui_pw.secure)
 		etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} put "/UI/ui_auth" -- "True"
 		echo "Attempting: etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} get ${KEYNAME}" >> /var/home/wavelet/logs/etcdlog.log
-		KEYNAME="/UI/ui_auth"; returnVal=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} get "${KEYNAME}")
+		returnVal=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} get "${KEYNAME}")
 		echo "Returned: ${returnVal}" >> /var/home/wavelet/logs/etcdlog.log
 		if [[ ${returnVal} == *"True"* ]]; then
 			echo "Test successful!" >> /var/home/wavelet/logs/etcdlog.log
