@@ -224,22 +224,25 @@ get_creds(){
 		echo "looking for $i" >> /var/home/wavelet/logs/etcdlog.log
 		if [[ -f $i ]]; then
 			echo "File $i is configured." >> /var/home/wavelet/logs/etcdlog.log
-			case $(hostname) in
-				# If we are the server we use a different password than a client machine
-				# This might be a silly way of doing this because:   
-				#	(a) the password is now a variable in this shell 
-				#	(b) will the variable be accessible from the above functions?
-				svr*)		userArg="--user svr:$(cat /var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure)";
-				;;
-				*)			userArg="--user host-$(hostname):$(cat /var/home/wavelet/.ssh/secrets/etcd_client_pw.secure)";
-				;;
-			esac
-			break
+			set_userArg
 		else
 			userArg=""
 		fi
 		done
-		echo "User args: ${userArg}" >> /var/home/wavelet/logs/etcdlog.log
+}
+
+set_userArg() {
+	case $(hostname) in
+		# If we are the server we use a different password than a client machine
+		# This might be a silly way of doing this because:   
+		#	(a) the password is now a variable in this shell 
+		#	(b) will the variable be accessible from the above functions?
+		svr*)		userArg="--user svr:$(cat /var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure)";
+		;;
+		*)			userArg="--user host-$(hostname):$(cat /var/home/wavelet/.ssh/secrets/etcd_client_pw.secure)";
+		;;
+	esac
+	echo "User args: ${userArg}" >> /var/home/wavelet/logs/etcdlog.log
 }
 
 #####
