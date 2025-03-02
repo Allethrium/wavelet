@@ -72,24 +72,24 @@ storage:
       contents:
         inline: DomainAdminPasswordGoesHere
     # WiFi Name
-    - path: /var/home/wavelet/wifi_ssid
+    - path: /var/home/wavelet/config/wifi_ssid
       overwrite: true
       contents:
         inline: SEDwaveletssid
     # WiFi BSSID
-    - path: /var/home/wavelet/wifi_bssid
+    - path: /var/home/wavelet/config/wifi_bssid
       mode: 0600
       overwrite: true
       contents:
         inline: SEDwaveletbssid
     # WiFi WPA Passphrase
-    - path: /var/home/wavelet/wifi_pw
+    - path: /var/home/wavelet/config/wifi_pw
       mode: 0600
       overwrite: true
       contents:
         inline: SEDwaveletwifipassword
     # The password Wavelet will use when attempting to configure network devices
-    - path: /var/home/wavelet/networkdevice_userpass
+    - path: /var/home/wavelet/config/networkdevice_userpass
       mode: 0600
       overwrite: true
       contents:
