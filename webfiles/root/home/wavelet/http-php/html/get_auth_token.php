@@ -1,5 +1,6 @@
 <?php
-// POST fields from JS AJAX will only ever single entries.  We extract them both here.
+// Grabs an auth token based on the password string set during server spinup in NGINX config
+// These vars shouldn't be accessible from the web browser side, and even if they are, they grant access only to /UI/
 function get_etcd_authtoken($password, $username) {
 	$password = base64_encode($_ENV['PASSWORD']);
 	$username = base64_encode('webui');
@@ -16,7 +17,15 @@ function get_etcd_authtoken($password, $username) {
 	curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 	$token = curl_exec($ch);
 	curl_close($ch);
-	return $token;
+	$dataArray = json_decode($result, true);
+	foreach ($dataArray['kvs'] as $x => $item) {
+			$decodedKey = base64_decode($item['key']);
+			$decodedValue = base64_decode($item['value']);
+	}
+	return $decodedValue;
 }
-get_etcd_authtoken;
+$password = $_ENV['PASSWORD'];
+$username = 'webui';
+$auth_token=get_etcd_authtoken($password, $username);
+return $auth_token;
 ?>
