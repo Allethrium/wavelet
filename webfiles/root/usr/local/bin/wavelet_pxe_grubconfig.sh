@@ -196,6 +196,8 @@ find /var/home/wavelet/http/ -type f -print0 | xargs -0 chmod 644
 find /var/home/wavelet/http-php/ -type f -print0 | xargs -0 chmod 644
 echo -e "\nPXE bootable images completed and populated in http serverdir, client provisioning should now be available..\n"
 touch /var/pxe.complete
+# Clean up
+rm -rf /var/home/wavelet/pxe
 
 # Check to see if the security layer is enabled, if not, we are done and should reboot..
 if [[ -f /var/prod.security/enabled ]]; then
