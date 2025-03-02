@@ -21,6 +21,7 @@ detect_self(){
 }
 
 podman_quadlet(){
+	local webuiPass=$(cat /var/home/wavelet/.ssh/secrets/etcd_webui_pw.secure)
 	# New Method - quadlets
 	# We also now know we don't have any other services running on port 80 so we can put nginx on standard HTTP(S) ports.
 	# The .kube file at the end basically allows us to link these two services into a podman pod.   
@@ -38,7 +39,6 @@ Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/php-fpm.contain
 Description=NGINX
 [Container]
 Image=docker.io/library/nginx:alpine
-Environment="PASSWORD=${webuiPass}"
 AutoUpdate=registry
 Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/nginx.container
 	if [[ -f /var/prod.security.enabled ]]; then
@@ -53,6 +53,7 @@ Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/nginx.container
 		fi
 		# Cert directory mounted regardless, the conf file will determine if we bother looking for them.
 		cp /var/home/wavelet/config/nginx.secure.conf /var/home/wavelet/http-php/nginx/nginx.conf
+		sed -i "s|#fastcgi_param PASSWORD "";|fastcgi_param PASSWORD "${webuiPass}";|g" /var/home/wavelet/http-php/nginx/nginx.conf
 	fi
 	mkdir -p /var/home/wavelet/http-php/log
 	# We populate the webui password as an environment variable
