@@ -28,11 +28,13 @@ podman_quadlet(){
 	# The install wantedBy= section is how we do systemctl enable --now, basically.
 	mkdir -p /var/home/wavelet/.config/containers/systemd/
 	mkdir -p /var/home/wavelet/http-php/certs
+	mkdir -p /var/home/wavelet/http-php/secrets
 	echo -e "[Unit]
 Description=PHP + FPM
 [Container]
 Image=docker.io/library/php:fpm
 AutoUpdate=registry
+Volume=/var/home/wavelet/http-php/secrets:/var/secrets:Z
 Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/php-fpm.container
 # For Nginx, ports are mapped to 9080 and 9443 respectively..
 	echo -e "[Unit]
@@ -56,7 +58,7 @@ Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/nginx.container
 		sed -i "s|#fastcgi_param PASSWORD "";|fastcgi_param PASSWORD "${webuiPass}";|g" /var/home/wavelet/http-php/nginx/nginx.conf
 	fi
 	mkdir -p /var/home/wavelet/http-php/log
-	# We populate the webui password as an environment variable
+	# Problems accessing /etc/pki/tls/certs from userland though?
 	webuiPass=$(cat /var/home/wavelet/.ssh/secrets/etcd_webui_pw.secure)
 	echo -e "[Pod]
 PublishPort=9080:80
