@@ -185,7 +185,7 @@ encrypt_pw_data() {
 	# This makes a poor man's two factor auth to get etcd access.
 	local user=$1
 	local pw=$2
-	local password2=$(head -c 16 /dev/urandom | base64)
+	local password2=$(head -c 16 /dev/urandom |  base64 | tr -dc 'a-zA-Z0-9')
 	if [[ "${user}" == "root" ]]; then
 		mkdir -p /var/roothome/.ssh/secrets; secretsDir="/var/roothome/.ssh/secrets"
 		mkdir -p /var/roothome/config; configDir="/var/roothome/config"
@@ -210,7 +210,7 @@ encrypt_pw_data() {
 encrypt_webui_data() {
 	#	webui goes to different spots as they need to be accessible by php-fpm for the web processes.
 	local pw=$1
-	local password2=$(head -c 16 /dev/urandom | base64)
+	local password2=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	mkdir -p /var/home/wavelet/http-php/secrets/; chown -R wavelet:wavelet /var/home/wavelet/http-php/secrets/
 	echo "${password2}" > /var/home/wavelet/http-php/secrets/pw2.txt
 	echo "${pw}" | base64 | openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -out /var/home/wavelet/http-php/secrets/crypt.bin
@@ -247,7 +247,7 @@ test_auth() {
 		echo "Testing webui auth.." >> /var/home/wavelet/logs/etcdlog.log
 		KEYNAME="/UI/ui_auth"
 		local webuipw=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/http-php/secrets/crypt.bin -d)
-		etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} put "/UI/ui_auth" -- "True"
+		etcdctl --endpoints=${ETCDENDPOINT} --user webui:$(echo ${webuipw} | base64 -d) put "/UI/ui_auth" -- "True"
 		echo "Attempting: etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} get ${KEYNAME}" >> /var/home/wavelet/logs/etcdlog.log
 		returnVal=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} get "${KEYNAME}" --print-value-only)
 		echo "Returned: ${returnVal}" >> /var/home/wavelet/logs/etcdlog.log
