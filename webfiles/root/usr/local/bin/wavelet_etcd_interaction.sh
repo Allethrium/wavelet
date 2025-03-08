@@ -250,7 +250,7 @@ test_auth() {
 		local password2=$(cat /var/home/wavelet/http-php/secrets/pw2.txt)
 		local decrypt=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/http-php/secrets/crypt.bin -d)
 		local webuipw=$(echo "${decrypt}" | base64 -d)
-		etcdctl --endpoints=${ETCDENDPOINT} --user webui:$(echo ${webuipw} | base64 -d) put "/UI/ui_auth" -- "True"
+		etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} put "/UI/ui_auth" -- "True"
 		echo "Attempting: etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} get ${KEYNAME}" >> /var/home/wavelet/logs/etcdlog.log
 		returnVal=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} get "${KEYNAME}" --print-value-only)
 		echo "Returned: ${returnVal}" >> /var/home/wavelet/logs/etcdlog.log
