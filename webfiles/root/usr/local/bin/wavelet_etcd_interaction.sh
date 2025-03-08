@@ -138,7 +138,7 @@ generate_etcd_core_users(){
 	# This should be invoked by the root user prior to everything getting spun up. 
 	# This is because the etcd root cred should be available only TO root.
 	# The other creds are in the wavelet userland.
-	set -x
+	# set -x
 	# Test for etcd accessibility, fail if no.
 	KEYNAME="Global_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
@@ -312,7 +312,7 @@ set_userArg() {
 		# This might be a silly way of doing this because:   
 		#   (a) the password is now a variable in this shell 
 		#   (b) will the variable be accessible from the above functions?
-		svr*)       userArg="--user svr:result=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/.ssh/secrets/svr.crypt.bin -d)";
+		svr*)       userArg="--user svr:$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/.ssh/secrets/svr.crypt.bin -d)";
 		;;
 		*)          userArg="--user host-$(hostname):$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/.ssh/secrets/client.crypt.bin -d)";
 		;;
@@ -336,7 +336,7 @@ revisionID=$7
 
 # We want to convert the inputKeyValue to a base64 string, much like etcd does internally, otherwise we run into difficulty handling spacing, escape chars and other common issues.
 # This means that ALL key values are base64 now.
-echo -e "\n\n**New log**\n\n" >> /var/home/wavelet/logs/etcdlog.log
+echo -e "\n\n**New log**\n" >> /var/home/wavelet/logs/etcdlog.log
 get_creds
 
 case ${action} in
