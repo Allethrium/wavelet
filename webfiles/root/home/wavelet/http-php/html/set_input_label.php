@@ -11,7 +11,7 @@ $hash = $_POST["value"];
 $label = $_POST["label"];
 $oldText = $_POST["oldvl"];
 
-function set_etcd_inputLabel($keyTarget, $keyValue) {
+function set_etcd_inputLabel($keyTarget, $keyValue, $token) {
 	$b64KeyTarget = base64_encode($keyTarget);
 	$b64KeyValue = base64_encode($keyValue);
 	$ch = curl_init();
@@ -20,10 +20,15 @@ function set_etcd_inputLabel($keyTarget, $keyValue) {
 	curl_setopt($ch, CURLOPT_POST, 1);
 	curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\":\"$b64KeyTarget\", \"value\":\"$b64KeyValue\"}");
 	$headers = array();
+<<<<<<< Updated upstream
 	$headers = [
 		"Authorization: $token",
 		"Content-Type: application/json"
 	];
+=======
+	$headers[] = 'Authorization: ' .  $token;
+	$headers[] = 'Content-Type: application/x-www-form-urlencoded';
+>>>>>>> Stashed changes
 	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 	$result = curl_exec($ch);
 	if (curl_errno($ch)) {
@@ -33,7 +38,7 @@ function set_etcd_inputLabel($keyTarget, $keyValue) {
 	echo "\nSuccesfully set $keyTarget for $keyValue";
 }
 
-function del_etcd($keyTarget) {
+function del_etcd($keyTarget, $token) {
 	$b64KeyTarget = base64_encode($keyTarget);
 	$b64KeyTargetPlusOne = base64_encode("$keyTarget\0");
 	$ch = curl_init();
@@ -52,7 +57,11 @@ function del_etcd($keyTarget) {
 			echo 'Error:' . curl_error($ch);
 	}
 	curl_close($ch);
+<<<<<<< Updated upstream
 	echo "\nSuccesfully deleted $keyTarget";
+=======
+	echo "\nSuccessfully deleted $keyTarget";
+>>>>>>> Stashed changes
 }
 
 
@@ -61,18 +70,23 @@ function del_etcd($keyTarget) {
 echo "posted data are: \n New Label: $label, \n Old Label: $oldText, \n Hash: $hash \n";
 
 // Here we need to determine if we are dealing with a USB or PCIe capture device attached to the server, or whether we are dealing with a network device, as they are written in different keys on etcd
+<<<<<<< Updated upstream
 $token=get_etcd_authtoken;
+=======
+$token	= get_etcd_auth_token();
+>>>>>>> Stashed changes
 if (str_contains ($hash, '/network_interface/')) {
 		echo "This is a network device, calling appropriate function for network device..";
 		$value=$hash;
-		$modHash=(str_replace("/network_interface/", "", $value));
-		set_etcd_inputLabel('/network_interface/short/' . $label, $modHash);
-		set_etcd_inputLabel('/network_shorthash/' . $modHash, $label);
-		del_etcd($oldText);
+		$modHash=(str_replace("/network_interface/", "", $value, $token));
+		set_etcd_inputLabel('/network_interface/short/' . $label, $modHash, $token);
+		set_etcd_inputLabel('/network_shorthash/' . $modHash, $label, $token);
+		del_etcd($oldText, $token);
 	} else {
 		echo "This is a local device, calling appropriate function for local device..";
-		set_etcd_inputLabel('/interface/' .$label, $hash);
-		set_etcd_inputLabel('/short_hash/' .$hash, $label);
-		del_etcd("$oldText");
+		set_etcd_inputLabel('/interface/' .$label, $hash, $token);
+		set_etcd_inputLabel('/short_hash/' .$hash, $label, $token);
+		del_etcd("$oldText", $token);
 	}
+
 ?>

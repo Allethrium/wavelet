@@ -1,8 +1,10 @@
 <?php
+header('Content-type: application/json');
+include 'get_auth_token.php';
 // Here we are called from JS with only one key to set a new bluetooth MAC address in the system
 $value = $_POST["btMAC"];
 
-function curl_etcd($value) {
+function curl_etcd($value, $token) {
 		echo "Attempting to set /audio_interface_bluetooth_mac for $value";
 		$b64KeyTarget = base64_encode("/audio_interface_bluetooth_mac");
 		$b64KeyValue = base64_encode($value);
@@ -25,5 +27,6 @@ function curl_etcd($value) {
 // curl etcd uv_hash_select for the value of the device hash we want to see streaming on the system
 // please note how we have to call the function twice to set the reverse lookup values as well as the fwd values!
 echo "posted data are:\nMAC Address: $value\nKey: audio_interface_bluetooth_mac\n";
-curl_etcd("$value");
+$token						=	get_etcd_auth_token();
+curl_etcd($value, $token);
 ?>
