@@ -203,17 +203,16 @@ encrypt_pw_data() {
 		echo "Decrypt failed, something is wrong!"
 		exit 1
 	fi
-	FILES=("${secretsDir}/${1}.crypt.bin","${configDir}/${1}.pw2.txt")
-	chown wavelet:wavelet ${FILES}
-	chmod 600 ${FILES}
+	chown wavelet:wavelet "${secretsDir}/${1}.crypt.bin"; chown wavelet:wavelet "${configDir}/${1}.pw2.txt"
+	chmod 600 "${secretsDir}/${1}.crypt.bin"; chmod 600 "${configDir}/${1}.pw2.txt"
 }
 
 encrypt_webui_data() {
 	#	webui goes to different spots as they need to be accessible by php-fpm for the web processes.
 	local pw=$1
 	local password2=$(head -c 16 /dev/urandom | base64)
-	echo ${password2} > /var/home/wavelet/http-php/secrets/pw2.txt
-	rm -rf /var/home/wavelet/http-php/secrets/{crypt.bin}
+	mkdir -p /var/home/wavelet/http-php/secrets/; chown -R wavelet:wavelet /var/home/wavelet/http-php/secrets/
+	echo "${password2}" > /var/home/wavelet/http-php/secrets/pw2.txt
 	echo "${pw}" | base64 | openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -out /var/home/wavelet/http-php/secrets/crypt.bin
 	local result=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/http-php/secrets/crypt.bin -d)
 	local result=$(echo $result | base64 -d)
