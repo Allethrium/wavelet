@@ -313,12 +313,12 @@ set_userArg() {
 		#   (a) the password is now a variable in this shell 
 		#   (b) will the variable be accessible from the above functions?
 		svr*)       password2=$(cat /var/home/wavelet/config/svr.pw2.txt);
-					password1=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/.ssh/secrets/svr.crypt.bin -d | base64 -d);
-					userArg="--user svr:${password1}";
+					password1=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/.ssh/secrets/svr.crypt.bin -d);
+					userArg="--user svr:$(echo ${password1} | base64 -d)";
 		;;
 		*)          password2=$(cat /var/home/wavelet/config/client.pw2.txt);
-					password1=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/.ssh/secrets/client.crypt.bin -d | base64 -d);
-					userArg="--user host-$(hostname):${password1}";
+					password1=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/.ssh/secrets/client.crypt.bin -d);
+					userArg="--user host-$(hostname):$(echo ${password1} | base64 -d)";
 		;;
 	esac
 	echo "User args: ${userArg}" >> /var/home/wavelet/logs/etcdlog.log
