@@ -31,10 +31,10 @@ function poll_etcd_hosts($token) {
 			'value'				=>	$value,
 			'type'				=>	$value,
 			'hostName'			=>	$key,
-			'hostHash'			=>	curl_etcd($key . '/hash', $token),
-			'hostLabel'			=>	curl_etcd($key . '/control/label', $token ),
-			'hostIP'			=>	curl_etcd($key . '/IP', $token ),
-			'hostBlankStatus'		=>	curl_etcd($key . '/control/BLANK', $token)
+			'hostHash'			=>	curl_etcd('/UI/hosts/' . $key . '/hash', $token),
+			'hostLabel'			=>	curl_etcd('/UI/hosts/' . $key . '/control/label', $token ),
+			'hostIP'			=>	curl_etcd('/UI/' . $key . '/IP', $token ),
+			'hostBlankStatus'	=>	curl_etcd('/UI/hosts/' . $key . '/control/BLANK', $token)
 		];
 	}
 	$output = json_encode($newData);
