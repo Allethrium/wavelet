@@ -193,9 +193,9 @@ encrypt_pw_data() {
 		secretsDir="/var/home/wavelet/.ssh/secrets"
 		configDir="/var/home/wavelet/config"
 	fi
-	echo ${password2} > {configDir}/${1}.pw2.txt
-	echo "${pw}" | base64 | openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -out {secretsDir}/${1}.crypt.bin
-	local result=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in {secretsDir}/${1}.crypt.bin -d)
+	echo ${password2} > ${configDir}/${1}.pw2.txt
+	echo "${pw}" | base64 | openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -out ${secretsDir}/${1}.crypt.bin
+	local result=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in ${secretsDir}/${1}.crypt.bin -d)
 	local result=$(echo $result | base64 -d)
 	if [[ $result == $pw ]]; then
 		echo "Password encrypted and tested successfully!"
