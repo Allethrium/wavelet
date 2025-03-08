@@ -20,15 +20,8 @@ function set_etcd_inputLabel($keyTarget, $keyValue, $token) {
 	curl_setopt($ch, CURLOPT_POST, 1);
 	curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\":\"$b64KeyTarget\", \"value\":\"$b64KeyValue\"}");
 	$headers = array();
-<<<<<<< Updated upstream
-	$headers = [
-		"Authorization: $token",
-		"Content-Type: application/json"
-	];
-=======
 	$headers[] = 'Authorization: ' .  $token;
 	$headers[] = 'Content-Type: application/x-www-form-urlencoded';
->>>>>>> Stashed changes
 	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 	$result = curl_exec($ch);
 	if (curl_errno($ch)) {
@@ -57,11 +50,7 @@ function del_etcd($keyTarget, $token) {
 			echo 'Error:' . curl_error($ch);
 	}
 	curl_close($ch);
-<<<<<<< Updated upstream
-	echo "\nSuccesfully deleted $keyTarget";
-=======
 	echo "\nSuccessfully deleted $keyTarget";
->>>>>>> Stashed changes
 }
 
 
@@ -70,11 +59,7 @@ function del_etcd($keyTarget, $token) {
 echo "posted data are: \n New Label: $label, \n Old Label: $oldText, \n Hash: $hash \n";
 
 // Here we need to determine if we are dealing with a USB or PCIe capture device attached to the server, or whether we are dealing with a network device, as they are written in different keys on etcd
-<<<<<<< Updated upstream
-$token=get_etcd_authtoken;
-=======
 $token	= get_etcd_auth_token();
->>>>>>> Stashed changes
 if (str_contains ($hash, '/network_interface/')) {
 		echo "This is a network device, calling appropriate function for network device..";
 		$value=$hash;
@@ -88,5 +73,4 @@ if (str_contains ($hash, '/network_interface/')) {
 		set_etcd_inputLabel('/short_hash/' .$hash, $label, $token);
 		del_etcd("$oldText", $token);
 	}
-
 ?>
