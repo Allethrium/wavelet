@@ -149,7 +149,7 @@ echo -e "Populating standard values into etcd, the last step will trigger the Co
 KEYNAME="uv_videoport"; KEYVALUE="5004"; write_etcd_global
 KEYNAME="uv_audioport"; KEYVALUE="5006"; write_etcd_global
 KEYNAME="/UI/livestream"; KEYVALUE="0"; write_etcd_global
-KEYNAME="UV_HASH_SELECT"; KEYVALUE="2"; write_etcd_global
+KEYNAME="/UI/UV_HASH_SELECT"; KEYVALUE="2"; write_etcd_global
 KEYNAME="/UI/banner"; KEYVALUE="0"; write_etcd_global
 KEYNAME="uv_filter_cmd"; delete_etcd_key_global
 
