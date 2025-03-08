@@ -226,10 +226,12 @@ rpm_overlay_install(){
 	# The second stage adds everything necessary for the server.
 	# We do this two-stage process to keep the overlay size down as much as we can
 	echo "Building client image and pushing to registry.."
-	podman build -t localhost/coreos_overlay_client \
-	--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
-	-v=/var/home/wavelet/containerfiles:/mount:z \
-	-f "/var/home/wavelet/containerfiles/${containerFile}"
+	if podman build -t localhost/coreos_overlay_client --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -v=/var/home/wavelet/containerfiles:/mount:z -f "/var/home/wavelet/containerfiles/${containerFile}"; then
+		echo "Base layer container build success!"
+	else
+		echo "Base layer container build failed! Retrying.."
+		podman build -t localhost/coreos_overlay_client --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -v=/var/home/wavelet/containerfiles:/mount:z -f "/var/home/wavelet/containerfiles/${containerFile}"
+	fi
 	podman tag localhost/coreos_overlay_client localhost:5000/coreos_overlay_client:latest
 	touch /var/rpm-ostree-overlay.complete
 	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
@@ -239,10 +241,18 @@ rpm_overlay_install(){
 
 	# Build the server overlay
 	echo "Building server image and rebasing.."
-	podman build -t localhost/coreos_overlay_server \
+	if podman build -t localhost/coreos_overlay_server \
+	--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
+	-v=/home/wavelet/containerfiles:/mount:z \
+	-f /home/wavelet/containerfiles/Containerfile.coreos.overlay.server; then
+		echo "Server overlay build success!"
+	else
+		echo "Server overlay build failed! retrying.."
+		podman build -t localhost/coreos_overlay_server \
 	--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
 	-v=/home/wavelet/containerfiles:/mount:z \
 	-f /home/wavelet/containerfiles/Containerfile.coreos.overlay.server
+	fi
 	podman tag localhost/coreos_overlay_server localhost:5000/coreos_overlay_server:latest
 	# We don't need to push the server overlay to the registry, because this it the only host which will use it.
 	# Rebase server on server overlay image
