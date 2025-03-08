@@ -194,7 +194,7 @@ get_ipValue(){
 				if [[ $ip =~ $regex ]]; then
 					echo -e "\nIP Address is valid as ${ip}, continuing.."
 					KEYNAME="/hostHash/${hostNameSys}/ipaddr"; KEYVALUE="${ip}"; write_etcd_global
-					KEYNAME="/UI/${hostNameSys}/IP"; write_etcd_global
+					KEYNAME="/UI/hosts/${hostNameSys}/IP"; write_etcd_global
 				else
 					echo -e "IP Address is not valid, sleeping and calling function again\n"
 					get_ipValue
