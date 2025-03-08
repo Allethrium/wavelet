@@ -20,15 +20,8 @@ function curl_etcd($keyTarget, $keyValue, $token) {
 	curl_setopt($ch, CURLOPT_POST, 1);
 	curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\":\"$b64KeyTarget\", \"value\":\"$b64KeyValue\"}");
 	$headers = array();
-<<<<<<< Updated upstream
-	$headers = [
-		"Authorization: $token",
-		"Content-Type: application/json"
-	];
-=======
 	$headers[] = 'Authorization: ' .  $token;
 	$headers[] = 'Content-Type: application/x-www-form-urlencoded';
->>>>>>> Stashed changes
 	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 	$result = curl_exec($ch);
 	if (curl_errno($ch)) {
@@ -39,12 +32,8 @@ function curl_etcd($keyTarget, $keyValue, $token) {
 }
 
 // curl etcd uv_hash_select for the value of the device hash we want to see streaming on the system
-<<<<<<< Updated upstream
-$token=get_etcd_authtoken;
-=======
-$token	= get_etcd_auth_token();
->>>>>>> Stashed changes
-curl_etcd("/UI/UV_HASH_SELECT", $hash);
-curl_etcd("/UI/UV_INPUT", $label);
-curl_etcd("/UI/INPUT_UPDATE", "1");
+$token			=	get_etcd_auth_token();
+curl_etcd("/UI/UV_HASH_SELECT", $hash, $token);
+curl_etcd("/UI/UV_INPUT", $label, $token);
+curl_etcd("/UI/INPUT_UPDATE", "1", $token);
 ?>

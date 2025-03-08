@@ -54,13 +54,10 @@ function validateValue($function, $value) {
 	}
 }
 
-// The key context, everything this does happens below here.
 validateValue($function, $value);
-$token=get_etcd_authtoken;
-
-$prefixstring = "/UI/hosts/$hostName/control/$function";
-
-$keyPrefix=base64_encode($prefixstring);
-$keyValue=base64_encode($value);
+$token				=	get_etcd_auth_token();
+$prefixstring		=	"/UI/hosts/$hostName/control/$function";
+$keyPrefix			=	base64_encode($prefixstring);
+$keyValue			=	base64_encode($value);
 set_etcd($keyPrefix, $keyValue);
 ?>

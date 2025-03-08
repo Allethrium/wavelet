@@ -16,15 +16,8 @@ function del_etcd($input, $token) {
 	curl_setopt($ch, CURLOPT_POST, 1);
 	curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\": \"$keyPrefix\", \"range_end\": \"$keyPrefixPlusOneBit\"}");
 	$headers = array();
-<<<<<<< Updated upstream
-	$headers = [
-		"Authorization: $token",
-		"Content-Type: application/json"
-	];
-=======
 	$headers[] = 'Authorization: ' .  $token;
 	$headers[] = 'Content-Type: application/x-www-form-urlencoded';
->>>>>>> Stashed changes
 	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 	error_log("Calling delete_input_labels() function for key prefix \"$prefixstring\"");
 	$result = curl_exec($ch);
@@ -43,15 +36,8 @@ function get_device_ip($input, $token){
 	curl_setopt($ch, CURLOPT_POST, 1);
 	curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\": \"$networkIPHashValue\"}");
 	$headers = array();
-<<<<<<< Updated upstream
-	$headers = [
-		"Authorization: $token",
-		"Content-Type: application/json"
-	];
-=======
 	$headers[] = 'Authorization: ' .  $token;
 	$headers[] = 'Content-Type: application/x-www-form-urlencoded';
->>>>>>> Stashed changes
 	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 	$IPresult = curl_exec($ch);
 	if (curl_errno($ch)) {
@@ -75,15 +61,8 @@ function get_etcd($key, $token) {
 	curl_setopt($ch, CURLOPT_POST, 1);
 	curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\":\"$b64KeyTarget\"}");
 	$headers = array();
-<<<<<<< Updated upstream
-	$headers = [
-		"Authorization: $token",
-		"Content-Type: application/json"
-	];
-=======
 	$headers[] = 'Authorization: ' .  $token;
 	$headers[] = 'Content-Type: application/x-www-form-urlencoded';
->>>>>>> Stashed changes
 	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 	$result = curl_exec($ch);
 	if (curl_errno($ch)) {
@@ -94,13 +73,9 @@ function get_etcd($key, $token) {
 	return $keyValue;
 }
 
-<<<<<<< Updated upstream
-$token=get_etcd_authtoken;
-
-=======
 $token						=	get_etcd_auth_token();
->>>>>>> Stashed changes
 echo "PHP set_remove_input Received removal request for Key:\n$key\nAnd value:\n$value\n";
+
 if (str_contains ($value, '/network_ip/')) {
 	echo "\nThis is a network device, calling appropriate function for network device..\n";
 	$modHash		=	(str_replace("/network_ip/", "", $value));

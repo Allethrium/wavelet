@@ -36,12 +36,8 @@ function poll_etcd_inputs($token, $keyPrefix) {
 	echo $decodedValue;
 }
 
-// modify these strings if you want to get a different key prefix out of etcd.  For Wavelet, there's no reason to change them.
-
-error_reporting(E_ALL);
-$prefixstring = "/ui/$toggleKey";
-$keyPrefix=base64_encode($prefixstring);
-$token=get_etcd_authtoken($password, $username);
-$token=get_etcd_authtoken;
+$prefixstring		= 	"/ui/$toggleKey";
+$keyPrefix			=	base64_encode($prefixstring);
+$token 				=	get_etcd_authtoken($password, $username);
 poll_etcd_inputs($token, $keyPrefix);
 ?>

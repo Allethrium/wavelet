@@ -59,7 +59,7 @@ function del_etcd($keyTarget, $token) {
 echo "posted data are: \n New Label: $label, \n Old Label: $oldText, \n Hash: $hash \n";
 
 // Here we need to determine if we are dealing with a USB or PCIe capture device attached to the server, or whether we are dealing with a network device, as they are written in different keys on etcd
-$token	= get_etcd_auth_token();
+$token	=	get_etcd_auth_token();
 if (str_contains ($hash, '/network_interface/')) {
 		echo "This is a network device, calling appropriate function for network device..";
 		$value=$hash;

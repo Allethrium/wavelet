@@ -35,7 +35,6 @@ function poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit, $token) {
 	echo $output;
 }
 
-// modify these strings if you want to get a different key prefix out of etcd.  For Wavelet, there's no reason to change them.
 $prefixstring				=	'/audio_interface_bluetooth_mac';
 $prefixstringplusone		=	'/audio_interface_bluetooth_mac0';
 $keyPrefixPlusOneBit		=	base64_encode($prefixstring);
