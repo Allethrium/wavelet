@@ -294,7 +294,7 @@ generate_etcd_host_role(){
 }
 
 get_creds(){
-	declare -a FILES=("/var/home/wavelet/.ssh/secrets/svr_crypt.bin" "/var/home/wavelet/.ssh/secrets/client.crypt.bin")
+	declare -a FILES=("/var/home/wavelet/.ssh/secrets/svr.crypt.bin" "/var/home/wavelet/.ssh/secrets/client.crypt.bin")
 	for i in "${FILES[@]}"; do
 		echo "looking for $i" >> /var/home/wavelet/logs/etcdlog.log
 		if [[ -f $i ]]; then
