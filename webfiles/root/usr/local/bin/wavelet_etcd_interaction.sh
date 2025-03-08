@@ -301,7 +301,7 @@ get_creds(){
 			echo "File $i is configured." >> /var/home/wavelet/logs/etcdlog.log
 			set_userArg
 		else
-			echo "No credentials files configured!" >> /var/home/wavelet/logs/etcdlog.log
+			echo "No credential for $i configured!" >> /var/home/wavelet/logs/etcdlog.log
 		fi
 	done
 }
@@ -313,11 +313,11 @@ set_userArg() {
 		#   (a) the password is now a variable in this shell 
 		#   (b) will the variable be accessible from the above functions?
 		svr*)       password2=$(cat /var/home/wavelet/config/svr.pw2.txt);
-					password1=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/.ssh/secrets/svr.crypt.bin -d);
+					password1=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/.ssh/secrets/svr.crypt.bin -d | base64 -d);
 					userArg="--user svr:${password1}";
 		;;
 		*)          password2=$(cat /var/home/wavelet/config/client.pw2.txt);
-					password1=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/.ssh/secrets/client.crypt.bin -d);
+					password1=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/.ssh/secrets/client.crypt.bin -d | base64 -d);
 					userArg="--user host-$(hostname):${password1}";
 		;;
 	esac
