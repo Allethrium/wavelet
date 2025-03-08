@@ -142,7 +142,7 @@ event_decoder(){
 	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
 	# Set Type keys to "dec" for system, /hostLabel/ and also for UI
 	KEYVALUE="dec";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
-	KEYNAME="/UI/hosts/$hostNameSys/type"; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/UI/hostlist/${hostNameSys}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
 	# Executes run_ug in order to start the video streaming window
@@ -242,6 +242,8 @@ event_server(){
 		wavelet_reset \
 		wavelet_set_bluetooth_connect \
 		wavelet_ui --now
+	# Ensure host blank key populated and OFF for server every load.
+	KEYNAME="/UI/hosts/${hostNameSys}/control/BLANK"; KEYVALUE="0" write_etcd_global
 	echo "System services generated, starting services now.."
 }
 
@@ -344,7 +346,6 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 	KEYVALUE="svr";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/UI/hosts/$hostNameSys/type"; write_etcd_global
 	KEYNAME="/UI/hostlist/${hostNameSys}"; write_etcd_global
-	KEYNAME="/UI/hosts/${hostNameSys}/control/BLANK"; KEYVALUE="0" write_etcd_global
 	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
 	# Add a service to prune dead FUSE mountpoints.  Every time the UltraGrid AppImage is restarted, it leaves stale mountpoints.  This timed task will help keep everything clean.
 		# Get "alive mountpoints"

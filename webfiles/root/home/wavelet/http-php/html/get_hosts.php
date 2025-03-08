@@ -31,10 +31,10 @@ function poll_etcd_hosts($token) {
 			'value'				=>	$value,
 			'type'				=>	$value,
 			'hostName'			=>	$key,
-			'hostHash'			=>	curl_etcd('/UI/hosts/' . $key . '/hash', $token),
-			'hostLabel'			=>	curl_etcd('/UI/hosts/' . $key . '/control/label', $token ),
-			'hostIP'			=>	curl_etcd('/UI/' . $key . '/IP', $token ),
-			'hostBlankStatus'	=>	curl_etcd('/UI/hosts/' . $key . '/control/BLANK', $token)
+			'hostHash'			=>	curl_etcd($key . '/hash', $token),
+			'hostLabel'			=>	curl_etcd($key . '/control/label', $token ),
+			'hostIP'			=>	curl_etcd($key . '/IP', $token ),
+			'hostBlankStatus'	=>	curl_etcd($key . '/control/BLANK', $token)
 		];
 	}
 	$output = json_encode($newData);
@@ -42,7 +42,7 @@ function poll_etcd_hosts($token) {
 }
 
 function curl_etcd($key, $token) {
-	//echo nl2br ("Attempting to get: /UI/hosts/$key\n");
+	// - useful for debugging but will BREAK return vals! echo nl2br ("Attempting to get: /UI/hosts/$key\n");
 	$b64KeyTarget = base64_encode("/UI/hosts/$key");
 	$ch = curl_init();
 	curl_setopt($ch, CURLOPT_URL, 'http://192.168.1.32:2379/v3/kv/range');
