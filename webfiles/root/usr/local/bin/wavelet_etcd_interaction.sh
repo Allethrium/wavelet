@@ -269,17 +269,32 @@ generate_etcd_host_role(){
 	KEYNAME="/PROV/REQUEST"; clientHostName=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
 	etcdctl --endpoints=${ETCDENDPOINT} role add "${clientHostName}" --prefix=true readwrite "/${clientHostName}/"
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
+	# This makes a poor man's two factor auth to get etcd access.
+	local user="${clientHostName}"
+	local password2=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
+	KEYNAME="/PROV/FACTOR2"; KEYVALUE="${password2}"; write_etcd_global
+	echo "${pw}" | base64 | openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -out /var/home/wavelet/config/${clientHostName}.crypt.bin
+	local result=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in ${secretsDir}/${1}.crypt.bin -d)
+	local result=$(echo $result | base64 -d)
+	if [[ $result == $pw ]]; then
+		echo "Password encrypted and tested successfully!"
+	else
+		echo "Decrypt failed, something is wrong!"
+		exit 1
+	fi
+	# Upload 
+	KEYNAME="/PROV/CRYPT"; KEYVALUE="$(cat /var/home/wavelet/config/${clientHostName}.crypt.bin | base64)"; write_etcd_global
 	etcdctl --endpoints=${ETCDENDPOINT} user add "host-${clientHostName}" --new-user-password ${PassWord}
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role host-${clientHostName} host-${clientHostName}
-	# write key-val which the host will be watching to get the initial info back - this is insecure even though its deleted immediately. 
-	# find a better way to do this.
-	etcdctl --endpoints=${ETCDENDPOINT} put "/PROV/${clientHostName}" -- ${PassWord}
 	unset PassWord
+	# From here the host should download the PW2 (FACTOR2) and crypt.bin (CRYPT) then delete them from /PROV after they are stored locally.
+	# remove client crypt file
+	rm -rf /var/home/wavelet/config/${clientHostName}.crypt.bin
 	exit 0
 }
 
 get_creds(){
-	declare -a FILES=("/var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure" "/var/home/wavelet/.ssh/secrets/etcd_client_pw.secure")
+	declare -a FILES=("/var/home/wavelet/.ssh/secrets/svr_crypt.bin" "/var/home/wavelet/.ssh/secrets/client.crypt.bin")
 	for i in "${FILES[@]}"; do
 		echo "looking for $i" >> /var/home/wavelet/logs/etcdlog.log
 		if [[ -f $i ]]; then
