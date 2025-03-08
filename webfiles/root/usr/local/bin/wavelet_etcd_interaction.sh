@@ -115,8 +115,12 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/${waveletModule}.s
 
 generate_etcd_core_roles(){
 	# Generate etcd roles
-	# Etcd roles must be generated because the build_ug, detectv4l modules do not know if security is on or off, so they set role permissions as they generate and remove their keys.
-	# webui ensures the webui can only write to keys under the range "/UI/"
+	# Etcd roles must be generated because the build_ug, detectv4l modules do not know if security is on or off
+	# webui ensures the webui can only write to keys under the range "/UI/" and all other orchestration happens separately.
+	if [ "$EUID" -ne 0 ]
+		then echo "Only runs during initial setup as root."
+		exit 1
+	fi
 	etcdctl --endpoints=${ETCDENDPOINT} role add webui
 	KEYNAME="/UI/"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	etcdctl --endpoints=${ETCDENDPOINT} role grant-permission webui --prefix=true readwrite "/UI/" 
@@ -131,19 +135,11 @@ generate_etcd_core_roles(){
 
 generate_etcd_core_users(){
 	# Generate basic etcd users
-	# Root user
+	# This should be invoked by the root user prior to everything getting spun up. 
+	# This is because the etcd root cred should be available only TO root.
+	# The other creds are in the wavelet userland.
 	set -x
-	declare -a FILES=("/var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure" "/var/home/wavelet/.ssh/secrets/etcd_client_pw.secure" "/var/home/wavelet/.ssh/secrets/etcd_root_pw.secure")
-	for file in "${FILES[@]}"; do
-		if [[ -f $file ]]; then
-			echo "File '$file' is configured." >> /var/home/wavelet/logs/etcdlog.log
-			fileFound=1
-		fi
-	done
-	if [[ $fileFound -eq "1" ]]; then
-		echo 'Files already generated!  Doing nothing, as overwriting them will result in an inaccessible keystore!'
-		exit 0
-	fi
+	# Test for etcd accessibility, fail if no.
 	KEYNAME="Global_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
 	if [[ ${returnVal} == "True" ]];then
@@ -156,13 +152,15 @@ generate_etcd_core_users(){
 	echo "Generating roles and users for initial system setup.."
 	mkdir -p ~/.ssh/secrets
 	local PassWord=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9') 
-	echo ${PassWord} > ~/.ssh/secrets/etcd_root_pw.secure
+	encrypt_pw_data "root" "${PassWord}"
+	#echo ${PassWord} > ~/.ssh/secrets/etcd_root_pw.secure
 	etcdctl --endpoints=${ETCDENDPOINT} user add root --new-user-password ${PassWord}
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role root root
 	unset PassWord
 	# Server
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
-	echo ${PassWord} > ~/.ssh/secrets/etcd_svr_pw.secure
+	encrypt_pw_data "svr" "${PassWord}"
+	#echo ${PassWord} > ~/.ssh/secrets/etcd_svr_pw.secure
 	etcdctl --endpoints=${ETCDENDPOINT} user add svr --new-user-password ${PassWord}
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role svr server
 	unset PassWord
@@ -183,21 +181,52 @@ generate_etcd_core_users(){
 	exit 0
 }
 
-encrypt_webui_data() {	
-	local pw=$1
+encrypt_pw_data() {	
+	# This makes a poor man's two factor auth to get etcd access.
+	local user=$1
+	local pw=$2
 	local password2=$(head -c 16 /dev/urandom | base64)
-	echo ${password2} > /var/home/wavelet/http-php/secrets/pw2.txt
-	rm -rf /var/home/wavelet/http-php/secrets/{crypt.bin}
-	echo "${pw}" | base64 | openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -out crypt.bin
-	local result=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in crypt.bin -d)
-	result=$(echo $result | base64 -d)
+	if [[ "${user}" == "root" ]]; then
+		mkdir -p /var/roothome/.ssh/secrets; secretsDir="/var/roothome/.ssh/secrets"
+		mkdir -p /var/roothome/config; configDir="/var/roothome/config"
+	else
+		secretsDir="/var/home/wavelet/.ssh/secrets"
+		configDir="/var/home/wavelet/config"
+	fi
+	echo ${password2} > {configDir}/${1}.pw2.txt
+	echo "${pw}" | base64 | openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -out {secretsDir}/${1}.crypt.bin
+	local result=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in {secretsDir}/${1}.crypt.bin -d)
+	local result=$(echo $result | base64 -d)
 	if [[ $result == $pw ]]; then
 		echo "Password encrypted and tested successfully!"
 	else
 		echo "Decrypt failed, something is wrong!"
 		exit 1
 	fi
-	# inject password some other place, for now... dump it in secrets too.  lol.
+	FILES=("{secretsDir}/${1}.crypt.bin","${configDir}/${1}.pw2.txt")
+	chown wavelet:wavelet ${FILES}
+	chmod 600 ${FILES}
+}
+
+encrypt_webui_data() {
+	#	webui goes to different spots as they need to be accessible by php-fpm for the web processes.
+	local pw=$1
+	local password2=$(head -c 16 /dev/urandom | base64)
+	echo ${password2} > /var/home/wavelet/http-php/secrets/pw2.txt
+	rm -rf /var/home/wavelet/http-php/secrets/{crypt.bin}
+	echo "${pw}" | base64 | openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -out /var/home/wavelet/http-php/secrets/crypt.bin
+	local result=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/http-php/secrets/crypt.bin -d)
+	local result=$(echo $result | base64 -d)
+	if [[ $result == $pw ]]; then
+		echo "Password encrypted and tested successfully!"
+	else
+		echo "Decrypt failed, something is wrong!"
+		exit 1
+	fi
+	# Remember to chown and chmod
+	chown -R wavelet:wavelet /var/home/wavelet/http-php/secrets/
+	chmod -R 600 /var/home/wavelet/http-php/secrets/
+	# try to work out some other less obvious place to stash pw2..
 }
 
 
@@ -218,7 +247,7 @@ test_auth() {
 	else
 		echo "Testing webui auth.." >> /var/home/wavelet/logs/etcdlog.log
 		KEYNAME="/UI/ui_auth"
-		local webuipw=$(cat /var/home/wavelet/.ssh/secrets/etcd_webui_pw.secure)
+		local webuipw=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/http-php/secrets/crypt.bin -d)
 		etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} put "/UI/ui_auth" -- "True"
 		echo "Attempting: etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} get ${KEYNAME}" >> /var/home/wavelet/logs/etcdlog.log
 		returnVal=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} get "${KEYNAME}" --print-value-only)
@@ -269,9 +298,9 @@ set_userArg() {
 		# This might be a silly way of doing this because:   
 		#   (a) the password is now a variable in this shell 
 		#   (b) will the variable be accessible from the above functions?
-		svr*)       userArg="--user svr:$(cat /var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure)";
+		svr*)       userArg="--user svr:result=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/.ssh/secrets/svr.crypt.bin -d)";
 		;;
-		*)          userArg="--user host-$(hostname):$(cat /var/home/wavelet/.ssh/secrets/etcd_client_pw.secure)";
+		*)          userArg="--user host-$(hostname):$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/.ssh/secrets/client.crypt.bin -d)";
 		;;
 	esac
 	echo "User args: ${userArg}" >> /var/home/wavelet/logs/etcdlog.log

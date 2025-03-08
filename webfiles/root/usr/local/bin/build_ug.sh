@@ -50,10 +50,6 @@ generate_service(){
 	# Can be called with more args with "generate_service" ${keyToWatch} 0 0 "${serviceName}"
 	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
 }
-etcd_create_roles(){
-	# RunOnce for server provisioning, creates etcd roles.
-	/usr/local/bin/wavelet_etcd_interaction.sh "generate_etcd_core_roles"
-}
 etcd_provision_request(){
 	# RunOnce for client provisioning, server handles request from there.
 	/usr/local/bin/wavelet_etcd_interaction.sh "client_provision_request"
@@ -322,7 +318,6 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 	}
 	# Generate basic ETCD roles and key permissions
 	mkdir -p ~/.ssh/secrets
-	etcd_create_roles
 	bootstrap_http
 	bootstrap_nginx_php
 	#bootstrap_nodejs		#	WAY in the future for UI stuff.
@@ -353,8 +348,6 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 	# Add a service to prune dead FUSE mountpoints.  Every time the UltraGrid AppImage is restarted, it leaves stale mountpoints.  This timed task will help keep everything clean.
 		# Get "alive mountpoints"
 		# Prune anything !=alive
-	# Setup basic etcd roles (need to exist regardless of security layer)
-	etcd_create_roles
 	echo -e "Server configuration is now complete, bringing services up.."
 	event_server
 }

@@ -607,6 +607,12 @@ storage:
         name: wavelet
       group:
         name: wavelet
+    - path: /home/wavelet/.ssh/secrets
+      mode: 0755
+      user:
+        name: wavelet
+      group:
+        name: wavelet
     - path: /home/wavelet/config
       mode: 0755
       user:
