@@ -203,7 +203,7 @@ encrypt_pw_data() {
 		echo "Decrypt failed, something is wrong!"
 		exit 1
 	fi
-	FILES=("{secretsDir}/${1}.crypt.bin","${configDir}/${1}.pw2.txt")
+	FILES=("${secretsDir}/${1}.crypt.bin","${configDir}/${1}.pw2.txt")
 	chown wavelet:wavelet ${FILES}
 	chmod 600 ${FILES}
 }
