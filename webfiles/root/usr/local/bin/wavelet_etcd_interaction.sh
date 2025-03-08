@@ -230,6 +230,7 @@ encrypt_webui_data() {
 
 
 test_auth() {
+	set -x
 	echo "testing $1"
 	if [[ $1 == "svr" ]]; then
 		echo "Testing svr auth.." >> /var/home/wavelet/logs/etcdlog.log
@@ -246,7 +247,8 @@ test_auth() {
 	else
 		echo "Testing webui auth.." >> /var/home/wavelet/logs/etcdlog.log
 		KEYNAME="/UI/ui_auth"
-		local webuipw=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/http-php/secrets/crypt.bin -d)
+		local decrypt=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/http-php/secrets/crypt.bin -d)
+		local webuipw=$(echo "${decrypt}" | base64 -d)
 		etcdctl --endpoints=${ETCDENDPOINT} --user webui:$(echo ${webuipw} | base64 -d) put "/UI/ui_auth" -- "True"
 		echo "Attempting: etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} get ${KEYNAME}" >> /var/home/wavelet/logs/etcdlog.log
 		returnVal=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} get "${KEYNAME}" --print-value-only)
@@ -258,6 +260,7 @@ test_auth() {
 			exit 1
 		fi
 	fi
+	set +x
 }
 
 generate_etcd_host_role(){
