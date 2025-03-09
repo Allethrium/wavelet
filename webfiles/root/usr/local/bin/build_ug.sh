@@ -242,8 +242,6 @@ event_server(){
 		wavelet_reset \
 		wavelet_set_bluetooth_connect \
 		wavelet_ui --now
-	# Ensure host blank key populated and OFF for server every load.
-	KEYNAME="/UI/hosts/${hostNameSys}/control/BLANK"; KEYVALUE="0" write_etcd_global
 	echo "System services generated, starting services now.."
 }
 
@@ -433,7 +431,7 @@ event_generate_controller(){
 	else
 		echo -e "Unit file does not exist, generating..\n"
 		# Generate userspace controller service
-		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "INPUT_UPDATE" 0 0 "wavelet_controller"
+		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/UI/INPUT_UPDATE" 0 0 "wavelet_controller"
 	fi
 }
 event_generate_provision(){

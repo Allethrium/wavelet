@@ -152,6 +152,8 @@ KEYNAME="/UI/livestream"; KEYVALUE="0"; write_etcd_global
 KEYNAME="/UI/UV_HASH_SELECT"; KEYVALUE="2"; write_etcd_global
 KEYNAME="/UI/banner"; KEYVALUE="0"; write_etcd_global
 KEYNAME="uv_filter_cmd"; delete_etcd_key_global
+# Ensure host blank key populated and OFF for server every load, or hosts will fail to launch.
+KEYNAME="/UI/hosts/${hostNameSys}/control/BLANK"; KEYVALUE="0" write_etcd_global
 
 event_init_av1
 
