@@ -138,7 +138,7 @@ generate_etcd_core_users(){
 	# This should be invoked by the root user prior to everything getting spun up. 
 	# This is because the etcd root cred should be available only TO root.
 	# The other creds are in the wavelet userland.
-	# set -x
+	#set -x
 	# Test for etcd accessibility, fail if no.
 	KEYNAME="Global_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
@@ -190,6 +190,7 @@ encrypt_pw_data() {
 		mkdir -p /var/roothome/.ssh/secrets; secretsDir="/var/roothome/.ssh/secrets"
 		mkdir -p /var/roothome/config; configDir="/var/roothome/config"
 	else
+		#mkdir -p /var/home/wavelet/.ssh/secrets & chown -R wavelet:wavelet /var/home/wavelet/.ssh/secrets
 		secretsDir="/var/home/wavelet/.ssh/secrets"
 		configDir="/var/home/wavelet/config"
 	fi
@@ -198,7 +199,7 @@ encrypt_pw_data() {
 	local result=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in ${secretsDir}/${1}.crypt.bin -d)
 	local result=$(echo $result | base64 -d)
 	if [[ $result == $pw ]]; then
-		echo "Password encrypted and tested successfully!"
+		echo "Password for $1 encrypted and tested successfully!"
 	else
 		echo "Decrypt failed, something is wrong!"
 		exit 1
