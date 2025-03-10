@@ -75,7 +75,7 @@ read -p "Please input the system's desired static IP address.  This is highly re
 		echo -e "Static IP stored"
 	fi
 # SED for 192.168.1.32 and replace with ${STATICIP} in server.ign, dnsmasq.conf, etcd, etc
-INPUTFILES="server_custom.yml encoder_custom.yml decoder_custom.yml"
+INPUTFILES="server_custom.yml decoder_custom.yml"
 sed -i "s/192.168.1.32/${STATICIP}/g" ${INPUTFILES}
 INPUTFILES=./webfiles/root/usr/local/bin/build_ug.sh
 sed -i "s/192.168.1.32/${STATICIP}/g" ${INPUTFILES}
@@ -83,7 +83,6 @@ INPUTFILES=./webfiles/root/etc/dnsmasq.conf
 sed -i "s/192.168.1.32/${STATICIP}/g" ${INPUTFILES}
 
 # SED for svr.wavelet.local and replace with ${FQDN} in server.ign, dnsmasq.conf, etcd, etc
-INPUTFILES="server_custom.yml encoder_custom.yml decoder_custom.yml"
 sed -i "s/192.168.1.32/${FQDN}/g" ${INPUTFILES}
 INPUTFILES=./webfiles/root/etc/dnsmasq.conf
 sed -i "s/192.168.1.32\/${FQDN}/g" ${INPUTFILES}
@@ -231,7 +230,7 @@ customization(){
 					awk -vf2="$f2" '/#ADD_USER_YAML_HERE/{print f2;print;next}1' "${file}" > tmp && mv tmp "${file}"
 					echo -e "	YAML block for ${user} added to ignition file ${file}..\n"
 				else
-					echo "	Warning: ${file} does not exist or is inacessible!"
+					echo "	Warning: ${file} does not exist or is inaccessible!"
 				fi
 			done
 		fi
@@ -288,8 +287,8 @@ customization(){
 		repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_password}")
 		sed -i "s/SEDwaveletwifipassword/${repl}/g" ${INPUTFILES}
 
-		echo "Copying customized yml back to ignition folder.."
-		cp ./decoder_custom.yml ./ignition_files/
+		echo "Moving customized yml back to ignition folder.."
+		mv ./decoder_custom.yml ignition_files/
 		echo -e "\n${GREEN} ***Customization complete, moving to injecting configurations to CoreOS images for initial installation..*** \n${NC}"
 }
 
@@ -318,8 +317,8 @@ echo -e "Is the target network configured with an active gateway, and are you pr
 read -p "Continue? (Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit
 
 echo -e "Continuing, copying base ignition files for customization.."
-cp ./ignition_files/ignition_server.yml ./server_custom.yml
-cp ./ignition_files/ignition_decoder.yml ./decoder_custom.yml
+cp ignition_files/ignition_server.yml server_custom.yml
+cp ignition_files/ignition_decoder.yml decoder_custom.yml
 # IPv6 mode eventually? Just to be snazzy?
 # remove old iso files
 rm -rf $HOME/Downloads/wavelet_server.iso
@@ -335,7 +334,10 @@ read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] 
 
 customization
 
-echo "Removing old ignition files.."
+echo "Removing old ignition files and cleaning up.."
 rm -rf ignition/*.ign
+rm -rf *.secure
+rm -rf users_yaml dev.flag
+rm -rf *.yml
 echo -e "Calling coreos_installer.sh to generate ISO images.  You will then need to burn them to USB/SD cards."
 ./coreos_installer.sh "${developerMode}" "${isoMode}"

@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#set -x
 for i in "$@"
 	do
 		case $i in
@@ -77,4 +77,5 @@ echo "Customizing ISO files with Ignition\n"
 		-o /var/home/wavelet/http/ignition/wavelet_decoder.iso ${IMAGEFILE}
 	fi
 
+echo "Done, please note customized yml and transpiled files will remain in the /ignition_files/ folder for inspection and debugging purposes."
 echo -e "Image(s) generated,\n If this is initial setup please burn wavelet_server.iso to a USB stick and boot to continue setup..\n"
