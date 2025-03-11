@@ -14,10 +14,12 @@
 
 generate_tftpboot() {
 	# The Containerfile will generate an output direct to /var/lib/tftpboot with a populated set of UEFI secure boot files.
+	# Note that the shim may only load if the client host's BIOS/EFI is set to OS:Other - the shim may not work with the microsoft defaults on most machines.
+	# If none of that works, secure boot can be disabled, but that feels like defeat.
 	sudo podman build --tag shim -f /home/wavelet/containerfiles/Containerfile.tftpboot
 	podman run --privileged --security-opt label=disable -v /var/lib:/tmp/ shim
 	# Grub aarch64 boot option (just here as placeholder)
-	curl http://ports.ubuntu.com/ubuntu-ports/dists/focal/main/uefi/grub2-arm64/current/grubnetaa64.efi.signed -o /var/lib/tftpboot/grubnetaa64.efi.signed
+	# curl http://ports.ubuntu.com/ubuntu-ports/dists/focal/main/uefi/grub2-arm64/current/grubnetaa64.efi.signed -o /var/lib/tftpboot/grubnetaa64.efi.signed
 }
 
 generate_coreos_image() {
