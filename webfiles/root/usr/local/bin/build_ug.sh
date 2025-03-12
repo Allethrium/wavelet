@@ -50,14 +50,23 @@ generate_service(){
 	# Can be called with more args with "generate_service" ${keyToWatch} 0 0 "${serviceName}"
 	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
 }
+
+
 etcd_provision_request(){
 	# RunOnce for client provisioning, server handles request from there.
+	# The client side runs as wavelet / 1337
+	echo "Calling client provision.."
 	/usr/local/bin/wavelet_etcd_interaction.sh "client_provision_request"
 	sleep .5
-	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "client_provision_response")
-	echo "${printvalue}" > ~/.ssh/secrets/etcd_client_pw.secure
 	# Perform a test here to ensure everything is good and the client can write its own keys.
-	echo "Client provision request completed, client username has been generated and access to appropriate keys granted."
+	KEYNAME="PROV_TEST"; KEYVALUE="True"; write_etcd
+	read_etcd
+	if [[ ${printvalue} = "True" ]]; then
+		echo "Client provision request completed, client username has been generated and access to appropriate keys granted."
+	else 
+		echo "Client provisioning has failed.  Key value is not accessible, or does not match!"
+		exit 1
+	fi
 }
 
 
@@ -92,13 +101,16 @@ detect_self(){
 	echo -e "Host type is: ${printvalue}\n"
 	# test if i'm the server
 	if [[ $(hostname) = *"svr"* ]]; then
+		# This is fine because a server always has etcd rights
 		echo -e "I am a Server. Proceeding..."; event_server
 	else
 		# Handle encoder or decoder paths
+		# This is fine because an encoder will have previously been a decoder, and have etcd rights.
 		if [[ ${printvalue} = *"enc"* ]]; then
 			echo "I am an encoder"; event_encoder
 		else
 			# This is for anything NOT a svr or enc, including an unpopulated new device.
+			# This COULD have etcd rights, or not and just "fail".  This is why it's not specific.
 			echo "I am a decoder"; event_decoder
 		fi
 	fi
@@ -113,9 +125,14 @@ event_decoder(){
 	echo -e "Decoder routine started."
 	event_connectwifi
 	# Provision request to etcd
-	etcd_provision_request
+	if [[ -f /var/provisioned.complete ]]; then
+		echo "Provisioning completed, skipping step!"
+	else
+		echo "First run, sending provision request to server.."
+		echo "If provisioning has failed, perform rm -rf /var/provisioned.complete will cause the device to generate a new provision request on next boot."
+		etcd_provision_request
+	fi
 	sleep .5
-	echo -e "Setting up systemd services to be a decoder, moving to run_ug"
 	event_generateHash dec
 	event_blankhost
 	event_reveal
@@ -134,18 +151,13 @@ event_decoder(){
 		wavelet_deprovision \
 		wavelet_device_relabel \
 		wavelet_promote --now
-	# Notifies the server to provision the client machine and give it a role for its own key range
-	# Might work terribly, will have to test.
-	KEYNAME="/PROV/REQUEST"; KEYVALUE="${hostNameSys}"; write_etcd_global
-	sleep .33
-	# if fails, we have a security rights issue or the etcd_interaction module failed somehow.
 	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
 	# Set Type keys to "dec" for system, /hostLabel/ and also for UI
 	KEYVALUE="dec";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/UI/hosts/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/UI/hostlist/${hostNameSys}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
-	# Executes run_ug in order to start the video streaming window
+	# Executes run_ug in order to start the UltraGrid application
 	systemctl --user start run_ug.service
 }
 event_encoder(){
@@ -434,16 +446,6 @@ event_generate_controller(){
 		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/UI/INPUT_UPDATE" 0 0 "wavelet_controller"
 	fi
 }
-event_generate_provision(){
-	if [[ -f ~/.config/systemd/user/wavelet_provision.service ]]; then
-		echo -e "Unit file already generated, moving on\n"
-		:
-	else
-		echo -e "Unit file does not exist, generating..\n"
-		# Generate userspace provision service
-		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/PROV/REQUEST" 0 0 "wavelet_provision"
-	fi
-}
 event_generate_reflectorreload(){
 	if [[ -f ~/.config/systemd/user/wavelet_reflector_reload.service ]]; then
 		echo -e "Unit file already generated, moving on."
@@ -554,10 +556,6 @@ event_host_relabel_watcher(){
 	# Watches for a device relabel flag, then runs wavelet_device_relabel.sh
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/%H/control/RELABEL 0 0 "wavelet_device_relabel" \"relabel\"
 }
-event_generate_watch_provision(){
-	# Watches for device provision requests
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "PROV_RQ" 0 0 "wavelet_device_provision"
-}
 event_clear_devicemap(){
 	# Clears the device map file so it will be regenerated.  Since the paths under v4l2 aren't stable, 
 	# we need to do this to avoid the channel indexing becoming incorrect
@@ -622,18 +620,22 @@ exec > "${logName}" 2>&1
 time=0
 event_connectwifi
 
-until [[ $(/usr/local/bin/wavelet_etcd_interaction.sh "check_status" | awk '{print $6}') = "true," ]]; do
-	echo -e "Etcd still down.. waiting a second.."
-	sleep 1
-	time=$(( ${time} + 1 ))
-	if [[ $time -eq "60" ]]; then
-		echo "We have been waiting sixty seconds, there is likely a network issue."
-		echo "Running the wifi connection script.."
-		until /usr/local/bin/connectwifi.sh; do
-			sleep .5
-		done
-	fi
-done
-
+if [[ $(hostname) == *"svr"* ]];then
+	until [[ $(/usr/local/bin/wavelet_etcd_interaction.sh "check_status" | awk '{print $6}') = "true," ]]; do
+		echo -e "Etcd still down.. waiting a second.."
+		sleep 1
+		time=$(( ${time} + 1 ))
+		if [[ $time -eq "60" ]]; then
+			echo "We have been waiting sixty seconds, there is likely a network issue."
+			echo "Running the wifi connection script.."
+			until /usr/local/bin/connectwifi.sh; do
+				sleep .5
+			done
+		fi
+	done
+else
+	echo "Not a server, skipping etcd check.."
+	sleep 2
+fi
 
 detect_self
