@@ -136,10 +136,14 @@ generate_etcd_core_roles(){
 generate_etcd_core_users(){
 	# Generate basic etcd users
 	# This should be invoked by the root user prior to everything getting spun up. 
-	# This is because the etcd root cred should be available only TO root.
+	# This is because the etcd root cred should be available only root or wavelet-root.
 	# The other creds are in the wavelet userland.
 	#set -x
 	# Test for etcd accessibility, fail if no.
+	if [[ "$EUID" -ne 0 ]]; then 
+		echo "Please run as root"
+  	exit
+	fi
 	KEYNAME="Global_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 	returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
 	if [[ ${returnVal} == "True" ]];then
@@ -150,17 +154,15 @@ generate_etcd_core_users(){
 	fi
 	# Create the base UI key and grant the webui user access to the prefix range
 	echo "Generating roles and users for initial system setup.."
-	mkdir -p ~/.ssh/secrets
+	mkdir -p /var/home/wavelet-root/.ssh/secrets
 	local PassWord=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9') 
 	encrypt_pw_data "root" "${PassWord}"
-	#echo ${PassWord} > ~/.ssh/secrets/etcd_root_pw.secure
 	etcdctl --endpoints=${ETCDENDPOINT} user add root --new-user-password ${PassWord}
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role root root
 	unset PassWord
 	# Server
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	encrypt_pw_data "svr" "${PassWord}"
-	#echo ${PassWord} > ~/.ssh/secrets/etcd_svr_pw.secure
 	etcdctl --endpoints=${ETCDENDPOINT} user add svr --new-user-password ${PassWord}
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role svr server
 	unset PassWord
@@ -170,7 +172,7 @@ generate_etcd_core_users(){
 	etcdctl --endpoints=${ETCDENDPOINT} user add webui --new-user-password ${PassWord}
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role webui webui
 	# Create the PROV user
-	etcdctl --endpoints=${ETCDENDPOINT} user add PROV --no-password
+	etcdctl --endpoints=${ETCDENDPOINT} user add PROV --new-user-password "wavelet_provision"
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role PROV PROV
 	unset PassWord
 	# User backend pw if set during setup (add as option later)
@@ -187,10 +189,12 @@ encrypt_pw_data() {
 	local pw=$2
 	local password2=$(head -c 16 /dev/urandom |  base64 | tr -dc 'a-zA-Z0-9')
 	if [[ "${user}" == "root" ]]; then
-		mkdir -p /var/roothome/.ssh/secrets; secretsDir="/var/roothome/.ssh/secrets"
-		mkdir -p /var/roothome/config; configDir="/var/roothome/config"
+		mkdir -p /var/home/wavelet-root/.ssh/secrets; secretsDir="/var/home/wavelet-root/.ssh/secrets"
+		mkdir -p /var/home/wavelet-root/config; configDir="/var/home/wavelet-root/config"
+		user="wavelet-root"
 	else
 		#mkdir -p /var/home/wavelet/.ssh/secrets & chown -R wavelet:wavelet /var/home/wavelet/.ssh/secrets
+		user="wavelet"
 		secretsDir="/var/home/wavelet/.ssh/secrets"
 		configDir="/var/home/wavelet/config"
 	fi
@@ -204,7 +208,7 @@ encrypt_pw_data() {
 		echo "Decrypt failed, something is wrong!"
 		exit 1
 	fi
-	chown wavelet:wavelet "${secretsDir}/${1}.crypt.bin"; chown wavelet:wavelet "${configDir}/${1}.pw2.txt"
+	chown ${user}:${user} "${secretsDir}/${1}.crypt.bin"; chown ${user}:${user} "${configDir}/${1}.pw2.txt"
 	chmod 600 "${secretsDir}/${1}.crypt.bin"; chmod 600 "${configDir}/${1}.pw2.txt"
 }
 
@@ -269,7 +273,11 @@ generate_etcd_host_role(){
 	# This is called from a specific systemd watcher service to handle provision requests.
 	# Hosts can modify keys under themselves: /$(hostname)/$, they should not be able to write global "root" keys.
 	# These permissions can really only be added after the initial host provisioning is completed, because they do not exist prior to this.
-	# This must be processed by the server, as natively new hosts will not have permissions to write their own keys (if i do this 'right')
+	# This is processed on the server only.
+	if [[ "$EUID" -ne 9337 ]]; then 
+		echo "Please run as wavelet-root"
+  	exit
+	fi
 	echo "Generating role and user for ETCD client.."
 	KEYNAME="/PROV/REQUEST"; clientHostName=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
 	etcdctl --endpoints=${ETCDENDPOINT} role add "${clientHostName}" --prefix=true readwrite "/${clientHostName}/"
@@ -277,9 +285,9 @@ generate_etcd_host_role(){
 	# This makes a poor man's two factor auth to get etcd access.
 	local user="${clientHostName}"
 	local password2=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
-	KEYNAME="/PROV/FACTOR2"; KEYVALUE="${password2}"; write_etcd_global
+	KEYNAME="/PROV/FACTOR2_${clientHostName}"; KEYVALUE="${password2}"; write_etcd_global
 	echo "${pw}" | base64 | openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -out /var/home/wavelet/config/${clientHostName}.crypt.bin
-	local result=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in ${secretsDir}/${1}.crypt.bin -d)
+	local result=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in ${secretsDir}/${clientHostName}.crypt.bin -d)
 	local result=$(echo $result | base64 -d)
 	if [[ $result == $pw ]]; then
 		echo "Password encrypted and tested successfully!"
@@ -287,8 +295,8 @@ generate_etcd_host_role(){
 		echo "Decrypt failed, something is wrong!"
 		exit 1
 	fi
-	# Upload 
-	KEYNAME="/PROV/CRYPT"; KEYVALUE="$(cat /var/home/wavelet/config/${clientHostName}.crypt.bin | base64)"; write_etcd_global
+	# Upload generated files
+	KEYNAME="/PROV/CRYPT_${clientHostName}"; KEYVALUE="$(cat ${secretsDir}/${clientHostName}.crypt.bin | base64)"; write_etcd_global
 	etcdctl --endpoints=${ETCDENDPOINT} user add "host-${clientHostName}" --new-user-password ${PassWord}
 	etcdctl --endpoints=${ETCDENDPOINT} user grant-role host-${clientHostName} host-${clientHostName}
 	unset PassWord
@@ -401,12 +409,12 @@ case ${action} in
 	generate_etcd_core_roles)   generate_etcd_core_roles;
 	;;
 	# Generates etcd host role definition
-	generate_etcd_host_role)    generate_etcd_host_role "${inputKeyValue}";
+	generate_etcd_host_role)    generate_etcd_host_role;
 	;;
 	# Generates etcd host role definition
-	client_provision_request)   declare -A commandLine=([4]="--user PROV" [2]="put" [1]="/PROV/REQUEST" [0]="${hostNameSys}"); fID="clearText";
+	client_provision_request)   declare -A commandLine=([4]="--user PROV:wavelet:provision" [2]="put" [1]="/PROV/REQUEST" [0]="${hostNameSys}"); fID="clearText";
 	;;
-	client_provision_response)  declare -A commandLine=([4]="--user PROV" [2]="get" [1]="/PROV/REQUEST" [0]="--print-value-only"); fID="clearText";
+	client_provision_response)  declare -A commandLine=([4]="--user PROV:wavelet:provision" [2]="get" [1]="/PROV/REQUEST" [0]="--print-value-only"); fID="clearText";
 	;;
 	check_status)               declare -A commandLine=([4]="${userArg}" [2]="endpoint status"); fID="clearText";
 	;;
