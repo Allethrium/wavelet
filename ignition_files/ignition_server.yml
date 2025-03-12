@@ -565,8 +565,31 @@ storage:
         name: wavelet
       group:
         name: wavelet
+    # wavelet-root owns provision_request
+    - path: /home/wavelet-root/.config/systemd/user/wavelet_provision_request.service
+      mode: 0664
+      overwrite: true
+      contents:
+        inline: |
+          [Unit]
+          Description=Wavelet Provision Watcher Bootstrap
+          After=network-online.target etcd-quadlet.service sway-session.target
+          Wants=network-online.target sway-session.target
+          [Service]
+          Type=simple
+          ExecStartPre=/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/PROV/REQUEST" 0 0 "wavelet_provision"
+          ExecStartPre=systemctl daemon-reload
+          ExecStart=systemctl --user enable wavelet_provision.service --now
+          [Install]
+          WantedBy=multi-user.target
+      user:
+        name: wavelet-root
+      group:
+        name: wavelet-root
     # Linger services for containers/systemd units which the wavelet user is required to access
     - path: /var/lib/systemd/linger/wavelet
+      mode: 0644
+    - path: /var/lib/systemd/linger/wavelet-root
       mode: 0644
   directories:
     - path: /home/wavelet/.config/systemd/user/default.target.wants
@@ -619,6 +642,18 @@ storage:
         name: wavelet
       group:
         name: wavelet
+    - path: /home/wavelet-root/.ssh/secrets
+      mode: 0755
+      user:
+        name: wavelet-root
+      group:
+        name: wavelet-root
+    - path: /home/wavelet-root/config
+      mode: 0755
+      user:
+        name: wavelet-root
+      group:
+        name: wavelet-root
     - path: /home/wavelet/http
       mode: 0755
       user:
@@ -656,7 +691,7 @@ storage:
         name: root
       group:
         name: root
-# user accounts, passwords and pubkeys
+# user accounts, passwords and pubkeys (populated from installer)
 passwd:
   users:
       #ADD_USER_YAML_HERE
