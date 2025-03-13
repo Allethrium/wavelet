@@ -138,7 +138,7 @@ generate_etcd_core_users(){
 	# This should be invoked by the root user prior to everything getting spun up. 
 	# This is because the etcd root cred should be available only root or wavelet-root.
 	# The other creds are in the wavelet userland.
-	#set -x
+	# set -x
 	# Test for etcd accessibility, fail if no.
 	if [[ "$EUID" -ne 0 ]]; then 
 		echo "Please run as root"
@@ -179,7 +179,7 @@ generate_etcd_core_users(){
 	etcdctl auth enable
 	test_auth "svr"
 	test_auth "webui"
-	set +x
+	#set +x
 	exit 0
 }
 
@@ -235,7 +235,7 @@ encrypt_webui_data() {
 
 
 test_auth() {
-	set -x
+	# set -x
 	echo "testing $1"
 	if [[ $1 == "svr" ]]; then
 		echo "Testing svr auth.." >> /var/home/wavelet/logs/etcdlog.log
@@ -412,9 +412,9 @@ case ${action} in
 	generate_etcd_host_role)    generate_etcd_host_role;
 	;;
 	# Generates etcd host role definition
-	client_provision_request)   declare -A commandLine=([4]="--user PROV:wavelet:provision" [2]="put" [1]="/PROV/REQUEST" [0]="${hostNameSys}"); fID="clearText";
+	client_provision_request)   declare -A commandLine=([4]="--user PROV:wavelet_provision" [2]="put" [1]="/PROV/REQUEST" [0]="${hostNameSys}"); fID="clearText";
 	;;
-	client_provision_response)  declare -A commandLine=([4]="--user PROV:wavelet:provision" [2]="get" [1]="/PROV/REQUEST" [0]="--print-value-only"); fID="clearText";
+	client_provision_response)  declare -A commandLine=([4]="--user PROV:wavelet_provision" [2]="get" [1]="/PROV/REQUEST" [0]="--print-value-only"); fID="clearText";
 	;;
 	check_status)               declare -A commandLine=([4]="${userArg}" [2]="endpoint status"); fID="clearText";
 	;;
@@ -424,7 +424,7 @@ case ${action} in
 esac
 
 # Because we need an output from this script, we can't enable logging (unless something's broken..)
-#set -x
+# set -x
 #exec >/var/home/wavelet/logs/etcdlog.log 2>&1
 hostNameSys=$(hostname)
 hostNamePretty=$(hostnamectl --pretty)
