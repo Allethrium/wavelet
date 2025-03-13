@@ -256,6 +256,29 @@ storage:
                 }
               }
           });
+    # SystemD unit control
+    - path: /etc/polkit-1/rules.d/9337-wavelet.rules
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          polkit.addRule(function(action, subject) {
+            if ((action.id == "org.freedesktop.systemd1.manage-units" &&
+                 subject.user == "wavelet-root")) {
+                  polkit.log("action=" + action)
+                  polkit.log("subject=" + subject)
+                  polkit.log("unit="+action.lookup("unit"))
+                  polkit.log("verb="+action.lookup("verb"))
+            if (action.lookup("unit") == "dnsmasq.service" ||
+                action.lookup("unit") == "etcd-quadlet.service") {
+                 var verb = action.lookup("verb");
+                 if (verb == "start" || verb == "stop" || verb == "restart" || verb == "enable" || verb == "disable") {
+                  polkit.log("returning YES")
+                  return polkit.Result.YES;
+                  }
+                }
+              }
+          });
     # Wifi control
     - path: /etc/polkit-1/rules.d/1338-wavelet-wifi.rules
       mode: 0644
@@ -566,26 +589,32 @@ storage:
       group:
         name: wavelet
     # wavelet-root owns provision_request
-    - path: /home/wavelet-root/.config/systemd/user/wavelet_provision_request.service
-      mode: 0664
+    - path: /home/wavelet-root/.config/systemd/user/wavelet_provision.service
+      mode: 0644
       overwrite: true
       contents:
         inline: |
           [Unit]
-          Description=Wavelet Provision Watcher Bootstrap
+          Description=Wavelet Provision key watcher (UID 9337)
           After=network-online.target etcd-quadlet.service sway-session.target
           Wants=network-online.target sway-session.target
           [Service]
           Type=simple
-          ExecStartPre=/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/PROV/REQUEST" 0 0 "wavelet_provision"
-          ExecStartPre=systemctl daemon-reload
-          ExecStart=systemctl --user enable wavelet_provision.service --now
+          ExecStart=etcdctl --endpoints=192.168.1.32:2379 --user PROV:wavelet-provision watch /PROV/REQUEST -w simple -- /usr/bin/bash -c "/usr/local/bin/wavelet_provision.sh"
           [Install]
           WantedBy=multi-user.target
       user:
         name: wavelet-root
       group:
         name: wavelet-root
+    # We need to set the user level service link manually
+    - path: /home/wavelet-root/.config/systemd/user/default.target.wants/wavelet_provision.service
+      mode: 0644
+      user:
+        name: wavelet-root
+      group:
+        name: wavelet-root
+      target: /home/wavelet-root/.config/systemd/user/wavelet_provision.service
     # Linger services for containers/systemd units which the wavelet user is required to access
     - path: /var/lib/systemd/linger/wavelet
       mode: 0644
