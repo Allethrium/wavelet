@@ -58,6 +58,7 @@ etcd_provision_request(){
 	echo "Calling client provision.."
 	/usr/local/bin/wavelet_etcd_interaction.sh "client_provision_request"
 	sleep .5
+	/usr/local/bin/wavelet_etcd_interaction.sh "client_provision_response"
 	# Perform a test here to ensure everything is good and the client can write its own keys.
 	KEYNAME="PROV_TEST"; KEYVALUE="True"; write_etcd
 	read_etcd
