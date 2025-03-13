@@ -51,6 +51,22 @@ generate_service(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
 }
 
+etcd_provision_watcher(){
+	# wavelet user systemd service to get provision data back after processing from svr
+	etcdIP=$(cat /var/home/wavelet/config/etcd_ip)
+	echo -e "[Unit]
+Description=Wavelet provision retrieval
+After=network-online.target etcd-member.service
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/etcdctl --endpoints=${etcdIP}:2379 --user PROV:wavelet_provision watch /PROV/RESPONSE -w simple -- /usr/bin/bash -c \"/usr/local/bin/wavelet_provision.sh 2\"
+StartLimitBurst=30
+
+[Install]
+WantedBy=default.target" > /var/home/wavelet/.config/systemd/user/wavelet_provision_watcher.service
+	systemctl --user daemon-reload && systemctl --user enable wavelet_provision_watcher.service	
+}
 
 etcd_provision_request(){
 	# RunOnce for client provisioning, server handles request from there.
@@ -124,6 +140,7 @@ detect_self(){
 
 event_decoder(){
 	echo -e "Decoder routine started."
+	event_provision_watcher
 	# Provision request to etcd
 	if [[ -f /var/provisioned.complete ]]; then
 		echo "Provisioning completed, skipping step!"
@@ -621,22 +638,23 @@ exec > "${logName}" 2>&1
 time=0
 event_connectwifi
 
-if [[ $(hostname) == *"svr"* ]];then
-	until [[ $(/usr/local/bin/wavelet_etcd_interaction.sh "check_status" | awk '{print $6}') = "true," ]]; do
-		echo -e "Etcd still down.. waiting a second.."
-		sleep 1
-		time=$(( ${time} + 1 ))
-		if [[ $time -eq "60" ]]; then
-			echo "We have been waiting sixty seconds, there is likely a network issue."
-			echo "Running the wifi connection script.."
-			until /usr/local/bin/connectwifi.sh; do
-				sleep .5
-			done
-		fi
-	done
-else
-	echo "Not a server, skipping etcd check.."
-	sleep 2
-fi
+# This seems problematic and fragile..
+#if [[ $(hostname) == *"svr"* ]];then
+#	until [[ $(/usr/local/bin/wavelet_etcd_interaction.sh "check_status" | awk '{print $6}' | tail -1) = "true," ]]; do
+		#echo -e "Etcd still down.. waiting a second.."
+		#sleep 1
+		#time=$(( ${time} + 1 ))
+		#if [[ $time -eq "60" ]]; then
+			#echo "We have been waiting sixty seconds, there is likely a network issue."
+			#echo "Running the wifi connection script.."
+			#until /usr/local/bin/connectwifi.sh; do
+				#sleep .5
+			#done
+		#fi
+	#done
+#else
+#	echo "Not a server, skipping etcd check.."
+	#sleep 2
+#fi
 
 detect_self
