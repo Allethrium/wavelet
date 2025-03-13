@@ -123,7 +123,6 @@ detect_self(){
 
 event_decoder(){
 	echo -e "Decoder routine started."
-	event_connectwifi
 	# Provision request to etcd
 	if [[ -f /var/provisioned.complete ]]; then
 		echo "Provisioning completed, skipping step!"
@@ -133,6 +132,7 @@ event_decoder(){
 		etcd_provision_request
 	fi
 	sleep .5
+	event_connectwifi
 	event_generateHash dec
 	event_blankhost
 	event_reveal
