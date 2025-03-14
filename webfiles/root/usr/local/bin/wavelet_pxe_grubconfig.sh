@@ -191,8 +191,9 @@ cp -R /var/lib/tftpboot/boot /home/wavelet/http/pxe
 cp -R /var/lib/tftpboot/efi /home/wavelet/http/pxe
 cp /var/home/wavelet/config/etcd_ip /home/wavelet/http/ignition
 # Ensure the wavelet user owns the http folder, and set +x and read perms on http folder and subfolders
-chmod -R 0755 /home/wavelet/http
-chown -R wavelet /home/wavelet/
+chmod -R 0755 /var/home/wavelet/http
+chown -R wavelet /var/home/wavelet/
+chown -R wavelet-root /var/home/wavelet-root
 # Remove executable bit from all FILES in http (folders need +x for apache to traverse them) - apparently this breaks PXE though?
 find /var/home/wavelet/http/ -type f -print0 | xargs -0 chmod 644
 find /var/home/wavelet/http-php/ -type f -print0 | xargs -0 chmod 644
@@ -206,7 +207,7 @@ if [[ -f /var/prod.security/enabled ]]; then
 	systemctl start wavelet_install_hardening.service
 	exit 0
 else
-	systemctl --machine=wavelet-root@.host --user enable wavelet_provision.service --now
+	machinectl shell wavelet-root@ $(which bash) -c "systemctl --user daemon-reload && systemctl --user enable wavelet_provision.service --now"
 	# restart getty@tty1 to reload UI and start userland build process
 	systemctl restart getty@tty1
 fi
