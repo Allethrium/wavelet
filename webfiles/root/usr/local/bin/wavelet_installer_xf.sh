@@ -263,7 +263,7 @@ rpm_overlay_install(){
 		-f /home/wavelet/containerfiles/Containerfile.coreos.overlay.server
 		export_svr_container_image
 	}
-	export_client_container_image() {
+	export_svr_container_image() {
 		if podman tag localhost/coreos_overlay_server localhost:5000/coreos_overlay_server:latest; then
 			fail=0
 			echo "${GREEN}Server overlay build success!${NC}"
