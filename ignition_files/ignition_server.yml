@@ -607,14 +607,6 @@ storage:
         name: wavelet-root
       group:
         name: wavelet-root
-    # We need to set the user level service link
-    - path: /home/wavelet-root/.config/systemd/user/default.target.wants/wavelet_provision.service
-      mode: 0644
-      user:
-        name: wavelet-root
-      group:
-        name: wavelet-root
-      target: /home/wavelet-root/.config/systemd/user/wavelet_provision.service
     # Linger services for containers/systemd units which the wavelet user is required to access
     - path: /var/lib/systemd/linger/wavelet
       mode: 0644
