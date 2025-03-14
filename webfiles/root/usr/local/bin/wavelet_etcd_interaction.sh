@@ -235,6 +235,7 @@ encrypt_webui_data() {
 
 test_auth() {
 	echo "testing $1"
+	mkdir -p $HOME/logs
 	if [[ $1 == "svr" ]]; then
 		echo "Testing svr auth.." >> $HOME/logs/etcdlog.log
 		KEYNAME="svr_auth"; KEYVALUE="True"
