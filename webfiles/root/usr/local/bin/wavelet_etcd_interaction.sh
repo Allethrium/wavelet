@@ -31,7 +31,7 @@ main() {
 		# Username / password is already stored in the variable ${userArg}, which is in the sparse ${commandLine} array
 		ETCDURI=https://${ETCDENDPOINT}/v3/kv/
 		echo -e "Attempting: \n
-			etcdctl --endpoints="${ETCDENDPOINT}" --cert-file "${clientCertificateFile}" --key-file "${clientKeyFile}" --ca-file "${certificateAuthorityFile}" ${commandLine[@]}" >> $HOME/logs/etcdlog.log
+			etcdctl --endpoints="${ETCDENDPOINT}" --cert-file "${clientCertificateFile}" --key-file "${clientKeyFile}" --ca-file "${certificateAuthorityFile}" ${commandLine[@]}" >> /var/home/${user}/logs/etcdlog.log
 		etcdCommand(){
 			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" \
 			--cert-file "${clientCertificateFile}" \
@@ -41,7 +41,7 @@ main() {
 		}
 	else
 		ETCDURI=http://${ETCDENDPOINT}/v3/kv/
-		echo "Attempting: etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]}" >> $HOME/logs/etcdlog.log
+		echo "Attempting: etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]}" >> /var/home/${user}/logs/etcdlog.log
 		etcdCommand(){
 			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]})
 		}
@@ -92,7 +92,7 @@ watch ${inputKeyName} -w simple -- /usr/bin/bash -c \"/usr/local/bin/${waveletMo
 Restart=always
 
 [Install]
-WantedBy=default.target" > $HOME/.config/systemd/user/${waveletModule}.service
+WantedBy=default.target" > /var/home/${user}/.config/systemd/user/${waveletModule}.service
 	else
 	# We still have defined server, root and webui roles
 		echo -e "[Unit]
@@ -107,7 +107,7 @@ watch ${inputKeyName} -w simple -- /usr/bin/bash -c \"/usr/local/bin/${waveletMo
 Restart=always
 
 [Install]
-WantedBy=default.target" > $HOME/.config/systemd/user/${waveletModule}.service
+WantedBy=default.target" >> /var/home/${user}/.config/systemd/user/${waveletModule}.service
 	fi
 	echo -e "User Systemd service unit for etcd Key: ${inputKeyName} generated\nName: ${waveletModule}.service\nRemember to run 'systemctl --user daemon-reload' from your calling function.\n"
 	exit 0
@@ -178,7 +178,6 @@ generate_etcd_core_users(){
 	etcdctl auth enable
 	test_auth "svr"
 	test_auth "webui"
-	#set +x
 	exit 0
 }
 
@@ -192,7 +191,6 @@ encrypt_pw_data() {
 		mkdir -p /var/home/wavelet-root/config; configDir="/var/home/wavelet-root/config"
 		user="wavelet-root"
 	else
-		#mkdir -p /var/home/wavelet/.ssh/secrets & chown -R wavelet:wavelet /var/home/wavelet/.ssh/secrets
 		user="wavelet"
 		secretsDir="/var/home/wavelet/.ssh/secrets"
 		configDir="/var/home/wavelet/config"
@@ -235,37 +233,35 @@ encrypt_webui_data() {
 
 test_auth() {
 	echo "testing $1"
-	mkdir -p $HOME/logs
 	if [[ $1 == "svr" ]]; then
-		echo "Testing svr auth.." >> $HOME/logs/etcdlog.log
+		echo "Testing svr auth.." >> /var/home/${user}/logs
 		KEYNAME="svr_auth"; KEYVALUE="True"
 		/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 		returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
-		echo "Returned: ${returnVal}" >> $HOME/logs/etcdlog.log
+		echo "Returned: ${returnVal}" >> /var/home/${user}/logs
 		if [[ ${returnVal} == "True" ]]; then
-			echo "Test successful!" >> $HOME/logs/etcdlog.log
+			echo "Test successful!" >> /var/home/${user}/logs
 		else
-			echo "Test failed!" >> $HOME/logs/etcdlog.log
+			echo "Test failed!" >> /var/home/${user}/logs
 			exit 1
 		fi
 	else
-		echo "Testing webui auth.." >> $HOME/logs/etcdlog.log
+		echo "Testing webui auth.." >> /var/home/${user}/logs
 		KEYNAME="/UI/ui_auth"
 		local password2=$(cat /var/home/wavelet/http-php/secrets/pw2.txt)
 		local decrypt=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/http-php/secrets/crypt.bin -d)
 		local webuipw=$(echo "${decrypt}" | base64 -d)
 		etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} put "/UI/ui_auth" -- "True"
-		echo "Attempting: etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} get ${KEYNAME}" >> $HOME/logs/etcdlog.log
+		echo "Attempting: etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} get ${KEYNAME}" >> /var/home/${user}/logs/etcdlog.log
 		returnVal=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} get "${KEYNAME}" --print-value-only)
-		echo "Returned: ${returnVal}" >> $HOME/logs/etcdlog.log
+		echo "Returned: ${returnVal}" >> /var/home/${user}/logs
 		if [[ ${returnVal} == *"True"* ]]; then
-			echo "Test successful!" >> $HOME/logs/etcdlog.log
+			echo "Test successful!" >> /var/home/${user}/logs
 		else
-			echo "Test failed!" >> $HOME/logs/etcdlog.log
+			echo "Test failed!" >> /var/home/${user}/logs
 			exit 1
 		fi
 	fi
-	set +x
 }
 
 generate_etcd_host_role(){
@@ -274,12 +270,12 @@ generate_etcd_host_role(){
 	# These permissions can really only be added after the initial host provisioning is completed, because they do not exist prior to this.
 	# This is processed on the server only from wavelet-root user.
 	if [[ "$EUID" -ne 9337 ]]; then 
-		echo "Please run as wavelet-root" >> $HOME/logs/etcdlog.log
+		echo "Please run as wavelet-root" >> /var/home/${user}/logs
   	exit
 	fi
-	echo "Generating role and user for ETCD client.." >> $HOME/logs/etcdlog.log
+	echo "Generating role and user for ETCD client.." >> /var/home/wavelet-root/logs/etcdlog.log
 	KEYNAME="/PROV/REQUEST"; clientHostName=$(etcdctl --endpoints=${ETCDENDPOINT} --user PROV:wavelet_provision get "${KEYNAME}" --print-value-only)
-	echo "Client hostname retrieved for: ${clientHostName}" >> $HOME/logs/etcdlog.log
+	echo "Client hostname retrieved for: ${clientHostName}" >> /var/home/wavelet-root/logs/etcdlog.log
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role add ${clientHostName:0:7}
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put /UI/hosts/${clientHostName} -- 1
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put /${clientHostName} -- 1
@@ -287,64 +283,67 @@ generate_etcd_host_role(){
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/${clientHostName}/" --prefix=true
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} user add "${clientHostName:0:7}" --new-user-password "${PassWord}"
-	echo "Testing access.." >> $HOME/logs/etcdlog.log
+	echo "Testing access.." >> /var/home/wavelet-root/logs/etcdlog.log
 	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} --user ${clientHostName:0:7}:${PassWord} get "/${clientHostName}/")
-	echo "Returned value should be 1:  ${printvalue}" >> $HOME/logs/etcdlog.log
+	echo "Returned value should be 1:  ${printvalue}" >> /var/home/wavelet-root/logs/etcdlog.log
 	# This makes a poor man's two factor auth to get etcd access.
 	local user="${clientHostName}"
 	local password2=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
-	echo "${PassWord}" | base64 | openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -out $HOME/config/${clientHostName:0:7}.crypt.bin
-	local result=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in $HOME/config/${clientHostName:0:7}.crypt.bin -d)
+	echo "${PassWord}" | base64 | openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -out /var/home/wavelet-root/config/${clientHostName:0:7}.crypt.bin
+	local result=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet-root/config/${clientHostName:0:7}.crypt.bin -d)
 	local result=$(echo $result | base64 -d)
 	if [[ $result == $PassWord ]]; then
-		echo "Password encrypted and tested successfully!" >> $HOME/logs/etcdlog.log
+		echo "Password encrypted and tested successfully!" >> /var/home/wavelet-root/logs/etcdlog.log
 	else
-		echo "Decrypt failed, something is wrong!" >> $HOME/logs/etcdlog.log
+		echo "Decrypt failed, something is wrong!" >> /var/home/wavelet-root/logs/etcdlog.log
 		exit 1
 	fi
 	# Upload generated files
-	declare -A commandLine=([4]="--user PROV:wavelet_provision" [3]="put" [2]="/PROV/CRYPT" [1]="--" [0]="$(cat $HOME/config/${clientHostName:0:7}.crypt.bin | base64)"); fID="clearText"; main
+	declare -A commandLine=([4]="--user PROV:wavelet_provision" [3]="put" [2]="/PROV/CRYPT" [1]="--" [0]="$(cat /var/home/wavelet-root/config/${clientHostName:0:7}.crypt.bin | base64)"); fID="clearText"; main
 	declare -A commandLine=([4]="--user PROV:wavelet_provision" [3]="put" [2]="/PROV/FACTOR2" [1]="--" [0]="${password2}"); fID="clearText"; main
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} user grant-role ${clientHostName:0:7} ${clientHostName:0:7}
 	unset PassWord
 	# From here the host should download the PW2 (FACTOR2) and crypt.bin (CRYPT) then delete them from /PROV after they are stored locally.
 	# remove client crypt file from the server, it lives in etcd until the client has downloaded and tested it, then it's removed.
-	rm -rf $HOME/config/${clientHostName}.crypt.bin
+	rm -rf /var/home/wavelet-root/config/${clientHostName}.crypt.bin
 	KEYNAME="/PROV/RESPONSE" KEYVALUE="True"; etcdctl --endpoints=${ETCDENDPOINT} --user PROV:wavelet_provision put "${KEYNAME}" -- "${clientHostName}"
 	exit 0
 }
 
 client_provision_get_data() {
-	set -x
+	if [[ "$EUID" -ne 1337 ]]; then 
+		echo "Please run as wavelet" >> /var/home/${user}/logs
+  	exit
+	fi
 	# This is run from the client side as 1337/wavelet, from provision_watcher, and retrieves the populated data from etcd
-	echo "Getting client data from previous provision request.." >> $HOME/logs/etcdlog.log
-	mkdir -p $HOME/.ssh/secrets
+	echo "Getting client data from previous provision request.." >> /var/home/wavelet/logs/etcdlog.log
+	mkdir -p /var/home/wavelet/.ssh/secrets
 	userArg="--user PROV:wavelet_provision" 
 	declare -A commandLine=([3]="${userArg}" [2]="get" [1]="/PROV/RESPONSE" [0]="--print-value-only"); fID="clearText"; local output=$(main)
-	echo "Got host: $output" >> $HOME/logs/etcdlog.log
+	echo "Got host: $output" >> /var/home/wavelet/logs/etcdlog.log
 	if [[ $(hostname) != ${output} ]]; then
-		echo "this request isn't for me.  Ignoring." >> $HOME/logs/etcdlog.log
+		echo "this request isn't for me.  Ignoring." >> /var/home/wavelet/logs/etcdlog.log
 		exit 0
 	fi
 	declare -A commandLine=([3]="${userArg}" [2]="get" [1]="/PROV/CRYPT" [0]="--print-value-only"); fID="clearText"; local output=$(main)
-	#echo "Got Crypt: $output" >> $HOME/logs/etcdlog.log
-	echo ${output} | base64 -d > $HOME/.ssh/secrets/$(hostname).crypt.bin
+	#echo "Got Crypt: $output" >> /var/home/${user}/logs/etcdlog.log
+	echo ${output} | base64 -d > /var/home/wavelet/.ssh/secrets/$(hostname).crypt.bin
 	declare -A commandLine=([3]="${userArg}" [2]="get" [1]="/PROV/FACTOR2" [0]="--print-value-only"); fID="clearText"; local output=$(main)
-	#echo "Got factor2: $output" >> $HOME/logs/etcdlog.log
-	echo ${output} > $HOME/config/pw2.txt 
+	#echo "Got factor2: $output" >> /var/home/${user}/etcdlog.log
+	echo ${output} > /var/home/wavelet/config/pw2.txt 
 	# test Auth now we have the appropriate keys
 	KEYNAME="Client_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" "${KEYNAME}")
 	if [[ ${printvalue} == "${KEYVALUE}" ]]; then
-		echo "Client test successful!" >> $HOME/logs/etcdlog.log
+		echo "Client test successful!" >> /var/home/wavelet/logs/etcdlog.log
 		# Delete keys now that we are done
 		declare -A commandLine=([4]="${userArg}" [1]="del" [0]="/PROV/CRYPT"); fID="clearText"; main
 		declare -A commandLine=([4]="${userArg}" [1]="del" [0]="/PROV/FACTOR2"); fID="clearText"; main
 		declare -A commandLine=([4]="${userArg}" [1]="del" [0]="/PROV/RESPONSE"); fID="clearText"; main
 		echo "Provisioning process completed.  Client may resume normal operation!"
 	else
-		echo "Client test unsuccessful!  Please see logs." >> $HOME/logs/etcdlog.log
-		echo "We got ${printvalue} back" >> $HOME/logs/etcdlog.log
+		echo "Client test unsuccessful!  Please see logs." >> /var/home/wavelet/logs/etcdlog.log
+		echo "We got ${printvalue} back" >> /var/home/wavelet/logs/etcdlog.log
 		exit 1
 	fi
 }
@@ -362,18 +361,18 @@ set_userArg() {
 					userArg="--user ${hostname:0:7}:${password1}";
 		;;
 	esac
-	echo "User args: ${userArg}" >> $HOME/logs/etcdlog.log
+	echo "User args: ${userArg}" >> /var/home/wavelet/logs/etcdlog.log
 }
 
 svr_userArg() {
 	# Special case for server, we need to determine if we are in wavelet-root and therefore need etcd root for prov request
 	if [[ "$EUID" -eq 9337 ]]; then 
-		echo "Called from wavelet root, we are dealing with a provision request" >> $HOME/logs/etcdlog.log
+		echo "Called from wavelet root, we are dealing with a provision request" >> /var/home/wavelet-root/logs/etcdlog.log
 		local password2=$(cat /var/home/wavelet-root/config/root.pw2.txt);
-		local password1=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in $HOME/.ssh/secrets/root.crypt.bin -d | base64 -d);
+		local password1=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet-root/.ssh/secrets/root.crypt.bin -d | base64 -d);
 		userArg="--user root:${password1}"
 	else
-		echo "Using svr account for normal operations." >> $HOME/logs/etcdlog.log
+		echo "Using svr account for normal operations." >> /var/home/${user}/logs/etcdlog.log
 		local password2=$(cat /var/home/wavelet/config/svr.pw2.txt);
 		local password1=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/.ssh/secrets/svr.crypt.bin -d | base64 -d);
 		userArg="--user svr:${password1}"
@@ -398,8 +397,9 @@ revisionID=$7
 # This means that ALL key values are base64 now.
 
 # Logfile has to live in $HOME here, because wavelet-root cannot write to wavelet's homedir.
-mkdir -p $HOME/logs
-echo -e "\n\n**New log**" >> $HOME/logs/etcdlog.log
+user=$(whoami)
+mkdir -p /var/home/${user}/logs
+echo -e "\n\n**New log**" >> /var/home/${user}/logs/etcdlog.log
 
 set_userArg
 
@@ -474,7 +474,7 @@ esac
 
 # Because we need an output from this script, we can't enable logging (unless something's broken..)
 # set -x
-#exec >$HOME/logs/etcdlog.log 2>&1
+#exec >> /var/home/${user}/logs/etcdlog.log 2>&1
 hostNameSys=$(hostname)
 hostNamePretty=$(hostnamectl --pretty)
 main "${action}" "${inputKeyName}" "${inputKeyValue}" "${valueOnlySwitch}" "${userArg}"
