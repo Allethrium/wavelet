@@ -278,6 +278,7 @@ generate_etcd_host_role(){
 	echo "Client hostname retrieved for: ${clientHostName}" >> /var/home/wavelet-root/logs/etcdlog.log
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role add ${clientHostName:0:7}
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put /UI/hosts/${clientHostName} -- 1
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put /UI/hostlist/${clientHostName} -- 1
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put /${clientHostName} -- 1
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/UI/hosts/${clientHostName}/" --prefix=true
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/UI/hostlist/${clientHostName}/" --prefix=true
