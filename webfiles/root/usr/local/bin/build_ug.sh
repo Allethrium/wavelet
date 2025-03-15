@@ -136,7 +136,7 @@ detect_self(){
 			fi
 		fi
 	else
-		if [[ ${hostNameSys} = *"dec" ]]; then
+		if [[ ${hostNameSys} = *"dec"* ]]; then
 			echo "I am a fresh decoder, or the etcd cluster is broken."
 			event_decoder
 		fi
