@@ -340,7 +340,7 @@ client_provision_get_data() {
 		declare -A commandLine=([4]="${userArg}" [1]="del" [0]="/PROV/CRYPT"); fID="clearText"; main
 		declare -A commandLine=([4]="${userArg}" [1]="del" [0]="/PROV/FACTOR2"); fID="clearText"; main
 		declare -A commandLine=([4]="${userArg}" [1]="del" [0]="/PROV/RESPONSE"); fID="clearText"; main
-		echo "Provisioning process completed.  Client may resume normal operation!"
+		echo "Provisioning process completed.  Client may resume normal operation!" >> /var/home/wavelet/logs/etcdlog.log
 	else
 		echo "Client test unsuccessful!  Please see logs." >> /var/home/wavelet/logs/etcdlog.log
 		echo "We got ${printvalue} back" >> /var/home/wavelet/logs/etcdlog.log
