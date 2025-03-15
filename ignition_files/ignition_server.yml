@@ -602,7 +602,7 @@ storage:
           Type=simple
           ExecStart=etcdctl --endpoints=192.168.1.32:2379 --user PROV:wavelet_provision watch /PROV/REQUEST -w simple -- /usr/bin/bash -c "/usr/local/bin/wavelet_provision.sh"
           [Install]
-          WantedBy=multi-user.target
+          WantedBy=default.target
       user:
         name: wavelet-root
       group:
