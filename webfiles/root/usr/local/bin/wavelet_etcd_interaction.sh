@@ -41,6 +41,7 @@ main() {
 		}
 	else
 		ETCDURI=http://${ETCDENDPOINT}/v3/kv/
+		user=$(whoami)
 		echo "Attempting: etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]}" >> /var/home/${user}/logs/etcdlog.log
 		etcdCommand(){
 			printvalue=$(etcdctl --endpoints="${ETCDENDPOINT}" ${commandLine[@]})
@@ -281,11 +282,11 @@ generate_etcd_host_role(){
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put /UI/hostlist/${clientHostName} -- 1
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put /UI/hostHash/${clientHostName} -- 1
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put /${clientHostName} -- 1
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/UI/hosts/${clientHostName}/" --prefix=true
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/UI/hostlist/" --prefix=true # This one could be dangerous.
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/UI/hosthash/" --prefix=true # This one could be dangerous.
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/hosthash/" --prefix=true # This one could be dangerous.
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/${clientHostName}/" --prefix=true
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite "/UI/hosts/${clientHostName}/" --prefix=true
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite "/UI/hostlist/" --prefix=true # This one could be dangerous.
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite "/UI/hosthash/" --prefix=true # This one could be dangerous.
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite "/hosthash/" --prefix=true # This one could be dangerous.
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite "/${clientHostName}/" --prefix=true
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} user add "${clientHostName:0:7}" --new-user-password "${PassWord}"
 	echo "Testing access.." >> /var/home/wavelet-root/logs/etcdlog.log
@@ -484,7 +485,7 @@ case ${action} in
 	check_status)               declare -A commandLine=([4]="${userArg}" [2]="endpoint status"); fID="clearText";
 	;;
 	# exit with error because other commands are not valid!
-	*)          echo -e "\nInvalid command\n"; exit 1;
+	*)         					 echo -e "\nInvalid command\n"; exit 1;
 	;;
 esac
 
