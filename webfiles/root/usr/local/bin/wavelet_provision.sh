@@ -1,6 +1,6 @@
 #!/bin/bash
 # Calls etcd_interaction in order to provision a client
-# This is the only service that runs from wavelet-root, because it needs root privs to the etcd cluster
+# This is the only service that runs from wavelet-root on the server side, because it needs root privs to the etcd cluster
 # I didn't want those to be accessible from the wavelet user in an effort to be more secure, nor did I want this stuff running as root.
 
 step1() {
