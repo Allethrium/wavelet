@@ -607,8 +607,6 @@ event_connectwifi(){
 	# Attempt to connect to the configured wifi before proceeding
 	if nmcli con up $(cat /var/home/wavelet/config/wifi_ssid); then
 		echo "Configured connection established, continuing."
-		# We'll use this flag for future UI improvements to help determine if a host is wired or wireless
-		KEYNAME="/${hostNameSys}/WIFI"; KEYVALUE="1"; write_etcd_global
 	fi
 }
 
