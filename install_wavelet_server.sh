@@ -10,35 +10,33 @@ NC="\033[0m"
 
 client_networks(){
 	echo -e "\nSystem configured to be run on a larger network.\n"
-		echo -e "Please input the system's gateway IP address, and subnet mask\n"
-		read -p "Gateway IPv4 Address: " GW
-		read -p "Subnet Mask CIDR I.E 24 for class C network: " SN
-		# Validate user input
-		if ! [[ $GW =~ ^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$ ]]; then
-					echo -e "Invalid Gateway IPv4 Address format. Please use the format A.B.C.D."
-					return
-		fi
-
+	echo -e "Please input the system's gateway IP address, and subnet mask\n"
+	read -p "Gateway IPv4 Address: " GW
+	read -p "Subnet Mask CIDR I.E 24 for class C network: " SN
+	# Validate user input
+	if ! [[ $GW =~ ^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$ ]]; then
+				echo -e "Invalid Gateway IPv4 Address format. Please use the format A.B.C.D."
+				return
+	fi
 		if ! [[ $SN =~ ^[0-9]+$ ]]; then
-			echo -e "Invalid Subnet Mask CIDR format. Please use only digits."
-			return
-		fi
-		if ! [[ $SN -ge 16 && $SN -le 32 ]]; then
-			echo -e "Subnet Mask CIDR value must be between 16 and 32."
-			return
-		fi
-
+		echo -e "Invalid Subnet Mask CIDR format. Please use only digits."
+		return
+	fi
+	if ! [[ $SN -ge 16 && $SN -le 32 ]]; then
+		echo -e "Subnet Mask CIDR value must be between 16 and 32."
+		return
+	fi
 		grIP="${GW}/${SN}"
-			if [[ SN > 28 ]]; then
-					echo -e "Subnet mask is too small for a Wavelet system, we need at least 32 host IP's to be available!"
-			elif [[ SN < 24 ]]; then
-					echo -e "Subnet mask seems very large - please note this system would work best on a more isolated network in authoritative mode!\n
-							effective operation cannot be guaranteed when taking into account issues on larger networks with congestion, security appliances etc.\n"
-			else
-					echo -e "Subnet mask selected, continuing.."
-					hostname_domain
-			fi
-			#echo -e "IPv6 not supported at the current time."
+		if [[ SN > 28 ]]; then
+				echo -e "Subnet mask is too small for a Wavelet system, we need at least 32 host IP's to be available!"
+		elif [[ SN < 24 ]]; then
+				echo -e "Subnet mask seems very large - please note this system would work best on a more isolated network in authoritative mode!\n
+						effective operation cannot be guaranteed when taking into account issues on larger networks with congestion, security appliances etc.\n"
+		else
+				echo -e "Subnet mask selected, continuing.."
+				hostname_domain
+		fi
+		#echo -e "IPv6 not supported at the current time."
 	# SED for 192.168.1.1 and set ${GW}
 	sed -i 's/192.168.1.1/${GW}/g' ${INPUTFILES}
 	# SED for subnet mask and set appropriately
@@ -63,30 +61,29 @@ dnsmasq_no_dhcp(){
 }
 
 hostname_domain(){
-echo -e "\n"
-echo -e "An isolated network appliance should be labeled as per your organization's location, department, room number.\n"
-echo -e "A non-isolated appliance should be labeled in accordance with your organizations standards.\n"
-read -p "Please input the system's target Domain and desired fully qualified hostname: " FQDN
-read -p "Please input the system's desired static IP address.  This is highly recommended." STATICIP
+	echo -e "\n"
+	echo -e "An isolated network appliance should be labeled as per your organization's location, department, room number.\n"
+	echo -e "A non-isolated appliance should be labeled in accordance with your organizations standards.\n"
+	read -p "Please input the system's target Domain and desired fully qualified hostname: " FQDN
+	read -p "Please input the system's desired static IP address.  This is highly recommended." STATICIP
 	if [[ $STATICIP = "" ]]; then
 		echo -e "Preference for DHCP noted, we will attempt to utilize hostnames instead of IP addresses.  \n
 		Please note this will result in unreliable operation if your DHCP server is improperly configured, slow, or ever unreachable to the Wavelet system. \n"
 	else
 		echo -e "Static IP stored"
 	fi
-# SED for 192.168.1.32 and replace with ${STATICIP} in server.ign, dnsmasq.conf, etcd, etc
-INPUTFILES="server_custom.yml decoder_custom.yml"
-sed -i "s/192.168.1.32/${STATICIP}/g" ${INPUTFILES}
-INPUTFILES=./webfiles/root/usr/local/bin/build_ug.sh
-sed -i "s/192.168.1.32/${STATICIP}/g" ${INPUTFILES}
-INPUTFILES=./webfiles/root/etc/dnsmasq.conf
-sed -i "s/192.168.1.32/${STATICIP}/g" ${INPUTFILES}
-
-# SED for svr.wavelet.local and replace with ${FQDN} in server.ign, dnsmasq.conf, etcd, etc
-sed -i "s/192.168.1.32/${FQDN}/g" ${INPUTFILES}
-INPUTFILES=./webfiles/root/etc/dnsmasq.conf
-sed -i "s/192.168.1.32\/${FQDN}/g" ${INPUTFILES}
-customization
+	# SED for 192.168.1.32 and replace with ${STATICIP} in server.ign, dnsmasq.conf, etcd, etc
+	INPUTFILES="server_custom.yml decoder_custom.yml"
+	sed -i "s/192.168.1.32/${STATICIP}/g" ${INPUTFILES}
+	INPUTFILES=./webfiles/root/usr/local/bin/build_ug.sh
+	sed -i "s/192.168.1.32/${STATICIP}/g" ${INPUTFILES}
+	INPUTFILES=./webfiles/root/etc/dnsmasq.conf
+	sed -i "s/192.168.1.32/${STATICIP}/g" ${INPUTFILES}
+	# SED for svr.wavelet.local and replace with ${FQDN} in server.ign, dnsmasq.conf, etcd, etc
+	sed -i "s/192.168.1.32/${FQDN}/g" ${INPUTFILES}
+	INPUTFILES=./webfiles/root/etc/dnsmasq.conf
+	sed -i "s/192.168.1.32\/${FQDN}/g" ${INPUTFILES}
+	customization
 }
 
 # user stuff
@@ -128,13 +125,13 @@ generate_user_yaml(){
 	# We use a pipe instead of a / here, because the pubkeys and passwords hashes may contain a / and therefore escape the rest of the data.
 	echo -e "Working on user ${name}\n"
 	sed -i "s|#ADD_USER_YAMLHERE|""|" ${user_yaml}
-  sed -i "s|PASSWORDGOESHERE|$password_hash|" ${user_yaml}
+	sed -i "s|PASSWORDGOESHERE|$password_hash|" ${user_yaml}
 	sed -i "s|PUBKEYGOESHERE|$ssh_authorized_keys|" "${user_yaml}"
-  sed -i "s|USERNAMEGOESHERE|$name|" ${user_yaml}
-  sed -i "s|USERHOMEDIR|$name|" ${user_yaml}
-  echo -e "\nGenerated user YML\n"
-  cat ${user_yaml}
-  echo -e "\n\n"
+	sed -i "s|USERNAMEGOESHERE|$name|" ${user_yaml}
+	sed -i "s|USERHOMEDIR|$name|" ${user_yaml}
+	echo -e "\nGenerated user YML\n"
+	cat ${user_yaml}
+	echo -e "\n\n"
 }
 
 set_pw(){
@@ -236,23 +233,21 @@ customization(){
 		fi
 	done
 
-	echo -e "Ignition customization completed, and .ign files have been generated."
+	echo -e "Ignition customization completed, and .ign files have been generated.\n"
 
 	# We set DevMode disabled here, even though it's enabled by default in ignition
 	sed -i "s|/var/developerMode.enabled|/var/developerMode.disabled|g" ${INPUTFILES}
 	sed -i "s|DeveloperModeEnabled - will pull from working branch (default behavior)|DeveloperModeDisabled - pulling from master|g" ${INPUTFILES}
-
 	# Check for developermode flag so we pull from working branch rather than continually pushing messy and embarassing broken commits to the main branch..
 	if [[ "${developerMode}" -eq "1" ]]; then
 		echo -e "${RED}Injecting dev branch into files..\n${NC}"
 		repl="https://raw.githubusercontent.com/Allethrium/wavelet/armelvil-working"
 		sed -i "s|https://github.com/Allethrium/wavelet/raw/master|${repl}|g" ${INPUTFILES}
-		# Yepm I set it enabled again here, if the devmode arg is on.
+		# Yep I set it enabled again here, if the devmode arg is on.
 		sed -i "s|/var/developerMode.disabled|/var/developerMode.enabled|g" ${INPUTFILES}
 		sed -i "s|DeveloperModeDisabled - pulling from master|DeveloperModeEnabled - will pull from working branch|g" ${INPUTFILES}
 		sed -i "s|https://raw.githubusercontent.com/Allethrium/wavelet/master|${repl}|g" ${INPUTFILES}
 	fi
-
 	if [[ $(cat dev_flag) == "DEV" ]]; then
 		echo -e "\n${RED}	Targeting UltraGrid continuous build for initial startup.\n	Please bear in mind that although this comes with additional features,\n	The continuous build might introduce experimental features, or less predictable behavior.\n${NC}"
 		sed -i "s|CESNET/UltraGrid/releases/download/v1.9.8/UltraGrid-1.9.8-x86_64.AppImage|CESNET/UltraGrid/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage|g" ${INPUTFILES}
@@ -278,62 +273,164 @@ customization(){
 		wifi_password="Not used, security handled via RADIUS."
 	fi
 
+	repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_ssid}")
+	sed -i "s/SEDwaveletssid/${repl}/g" ${INPUTFILES}
+
+	repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_bssid}")
+	sed -i "s/SEDwaveletbssid/${repl}/g" ${INPUTFILES}
+
+	repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_password}")
+	sed -i "s/SEDwaveletwifipassword/${repl}/g" ${INPUTFILES}
+	echo -e "\n${GREEN} ***Customization complete, moving to injecting configurations to CoreOS images for initial installation..*** \n${NC}"
+}
+
+interactive_setup() {
+	echo -e "Is the target network configured with an active gateway, and are you prepared to deal with downloading approximately 4gb of initial files?"
+	read -p "Continue? (Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit
+	echo -e "Will this system run on an isolated network?"
+	read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || client_networks || echo -e "${GREEN}System configured for isolated, authoritative mode." && isoMode="mode=iso"
+	echo -e "Target UltraGrid Continuous build (best used with Developer Mode)?"
+	read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] && echo "DEV" > dev_flag || echo "" > dev_flag
+	customization
+}
+
+automatic_setup() {
+	# Streamlined automatic setup.  I need to work out how to define both users w/ different passwords in the forEach loop, though.
+	if [[ -z ${PASSWORD} || -z ${wifi_ssid} || -z ${wifi_bssid} ]]; then
+		echo "Automatic setup requires minimum valid arguments, please ensure you've provided a password, wifi SSID and BSSID at the minimum. more if you need further customizations."
+		print_help
+	fi
+	INPUTFILES="server_custom.yml decoder_custom.yml"
+	init_users_yaml
+	users=("wavelet-root" "wavelet")
+	for user in "${users[@]}"; do
+		mkpasswd --method=yescrypt "${lab_pw}" > ${user}.pw.secure
+		ssh-keygen -t ed25519 -C "${user}@wavelet.local" -N '' <<< $'\ny' >/dev/null 2>&1
+		cp users_yaml ${user}_yaml.yml
+		generate_user_yaml ${user}
+		echo -e "	Adding generated YAML block to ignition file for ${user}..\n"
+		f2="$(<${user}_yaml.yml)"
+		input_files_arr=($INPUTFILES)
+		for file in "${input_files_arr[@]}"; do
+			if [ -f "$file" ]; then
+				awk -vf2="$f2" '/#ADD_USER_YAML_HERE/{print f2;print;next}1' "${file}" > tmp && mv tmp "${file}"
+				echo -e "	YAML block for ${user} added to ignition file ${file}..\n"
+			else
+				echo "	Warning: ${file} does not exist or is inaccessible!"
+			fi
+		done
+	done
+	echo -e "Ignition customization completed, and .ign files have been generated."
+	sed -i "s|/var/developerMode.enabled|/var/developerMode.disabled|g" ${INPUTFILES}
+	sed -i "s|DeveloperModeEnabled - will pull from working branch (default behavior)|DeveloperModeDisabled - pulling from master|g" ${INPUTFILES}
+	if [[ "${developerMode}" -eq "1" ]]; then
+		echo -e "${RED}Injecting dev branch into files..\n${NC}"
+		repl="https://raw.githubusercontent.com/Allethrium/wavelet/armelvil-working"
+		sed -i "s|https://github.com/Allethrium/wavelet/raw/master|${repl}|g" ${INPUTFILES}
+		sed -i "s|/var/developerMode.disabled|/var/developerMode.enabled|g" ${INPUTFILES}
+		sed -i "s|DeveloperModeDisabled - pulling from master|DeveloperModeEnabled - will pull from working branch|g" ${INPUTFILES}
+		sed -i "s|https://raw.githubusercontent.com/Allethrium/wavelet/master|${repl}|g" ${INPUTFILES}
+	fi
+	if [[ $(cat dev_flag) == "DEV" ]]; then
+		echo -e "\n${RED}	Targeting UltraGrid continuous build for initial startup.\n	Please bear in mind that although this comes with additional features,\n	The continuous build might introduce experimental features, or less predictable behavior.\n${NC}"
+		sed -i "s|CESNET/UltraGrid/releases/download/v1.9.8/UltraGrid-1.9.8-x86_64.AppImage|CESNET/UltraGrid/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage|g" ${INPUTFILES}
+	else
+		echo -e "\n${GREEN}Tracking UltraGrid release build.\n${NC}"
+	fi
+	if [[ ${secActive} = 0 ]]; then
+			echo "Security layer inactive.  This installation will not be hardened and is not recommended for a production deployment.  Use at your own risk."
+	else
+		wifi_password="DISABLED in secure mode, please check documentation."
+		enable_security
+	fi
 		repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_ssid}")
 		sed -i "s/SEDwaveletssid/${repl}/g" ${INPUTFILES}
-
 		repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_bssid}")
 		sed -i "s/SEDwaveletbssid/${repl}/g" ${INPUTFILES}
-
 		repl=$(sed -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//' <<< "${wifi_password}")
 		sed -i "s/SEDwaveletwifipassword/${repl}/g" ${INPUTFILES}
 		echo -e "\n${GREEN} ***Customization complete, moving to injecting configurations to CoreOS images for initial installation..*** \n${NC}"
 }
 
 
+print_help(){
+	echo -e "Initial wavelet install help prompts:"
+	echo -e "Lab Mode: -l, --lab\nEnables a streamlined automatic setup for quicker testing"
+	echo -e "Developer Mode: -d, --dev\nPulls from development branch on git."
+	echo -e "-ugd=, --ugdev, --ugcontinuous=\nTargets the continuous build of UltraGrid for newer and possibly less stable features."
+	echo -e "-p=, --pass=,--password=\nSets the wavelet-root password"
+	echo -e "-ws=, --wifissid=\nSets the preconfigured WiFi SSID"
+	echo -e "-wb=, --wifibssid=\nSets the preconfigured WiFi BSSID (WiFi Access Point's MAC address)"
+	echo -e "-wp=, --wifipass=\nSets the preconfigured WiFi PSK for use in WPA2/WPA2 networks.  Less secure than enabling security layer."
+	echo -e "-4=, --ip4subnet=\nDefines the target IP4 subnet in CIDR notation (I.E 192.168.0.0/24)"
+	echo -e "-6=, --ip6subnet=\nDefines the target IP6 subnet in CIDR notation (I.E 2001:db8:1:2::/64)"
+	echo -e "-ip=, --serverip=\nDefines the server static IP4 address (I.E 192.168.0.2)"	
+	echo -e "-g=, --servergateway=\nDefines the server static IP4 gateway (I.E 192.168.0.1)"	
+	echo -e "-dns=, --serverdns=\nDefines the server DNS forwarder (I.E 192.168.0.53)"	
+	exit 0
+}
+
 ####
 #
 # Main
 #
 ####
-#set -x
 
+secActive=0
+echo "Input Args: ${@}"
 
 for i in "$@"
 	do
 		case $i in
-			*d*)	echo -e "\n${RED}Dev mode enabled, switching git tree to working branch\n${NC}"	;	developerMode="1"
+			-l|--lab)																		echo "Labmode enabled, skipping prompts.  Please ensure your commandline contains all necessary arguments!"; labMode="True";
 			;;
-			h)		echo -e "\nSimple command line switches:\n D for developer mode, will clone git from ARMELVIL working branch for non-release features.\n";	exit 0
+			-d|--dev)																		echo -e "${RED}Dev mode enabled, switching git tree to working branch${NC}"	;	developerMode="1";
 			;;
-			*)		echo -e "\nBad input argument, ignoring"
+			-h|--help)																	print_help;	exit 0
+			;;
+			-p=*|--password=*|--pass=*)									PASSWORD=${i#*=}; echo -e "password defined for BOTH user accounts in labmode!";
+			;;
+			-s|--sec|--security)												echo -e "WIP! Security layer is enabled!"; secActive=1
+			;;
+			-ws=*|--wifissid=*)													wifi_ssid=${i#*=}; echo -e "WiFi SSID defined as ${i}";
+			;;
+			-wb=*|--wifibssid=*)												wifi_bssid=${i#*=}; echo -e "WiFi BSSID/MAC defined as ${i}";
+			;;
+			-wp=*|--wifipass=*)													wifi_password=${i#*=}; echo -e "WiFi WPA PSK defined as: ${wifi_password} (will have no effect with Security layer active!)";
+			;;
+			-ugd|--ugdev|--ugcontinuous)								dev_flag="DEV";
+			;;
+			-4=*|--ip4subnet=*)													ip4=${i#*=}; echo -e "WIP! IPv4 Subnet (CIDR) defined as: ${i}";
+			;;
+			-6=*|--ipv6subnet=*)												ip6=${i#*=}; echo -e "WIP! IPv6 Subnet fefined as: ${i}";
+			;;
+			-ip=*|--serverip=*)													svr_ip=${i#*=}; echo -e "WIP! Server Static IPv4 defined as ${i}";
+			;;		
+			-g=*|--servergateway=*)											svr_gw=${i#*=}; echo -e "WIP! Server IPv4 gateway defined as ${i}";
+			;;		
+			-dns=*|--serverdns=*)												svr_dns=${i#*=}; echo -e "WIP! Server IPv4 dns defined as ${i}";
+			;;											
+			*)																					echo "bad input argument: $i";
 			;;
 		esac
 done
 
-echo -e "Is the target network configured with an active gateway, and are you prepared to deal with downloading approximately 4gb of initial files?"
-read -p "Continue? (Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit
-
-echo -e "Continuing, copying base ignition files for customization.."
+echo -e "\nCopying base ignition files for customization.."
 cp ignition_files/ignition_server.yml server_custom.yml
 cp ignition_files/ignition_decoder.yml decoder_custom.yml
-# IPv6 mode eventually? Just to be snazzy?
 # remove old iso files
 rm -rf $HOME/Downloads/wavelet_server.iso
 rm -rf $HOME/Downloads/wavelet_decoder.iso
 
-
-echo -e "Will this system run on an isolated network?"
-read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || client_networks || echo -e "${GREEN}System configured for isolated, authoritative mode." && isoMode="mode=iso"
-
-echo -e "Target UltraGrid Continuous build (best used with Developer Mode)?"
-read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] && echo "DEV" > dev_flag || echo "" > dev_flag
-#read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || UGMode="DEV" && echo -e "System configured for UG Continuous Build!" || echo -e "System targeting UltraGrid release.." && UGMode="STD"
-
-customization
+if [[ ${labMode} == "True" ]]; then
+	automatic_setup
+else
+	interactive_setup
+fi
 
 echo "Removing old ignition files and cleaning up.."
 rm -rf ignition/*.ign
 rm -rf *.secure
 rm -rf users_yaml dev.flag
-echo -e "Calling coreos_installer.sh to generate ISO images.  You will then need to burn them to USB/SD cards."
+echo -e "${GREEN}Calling coreos_installer.sh to generate ISO images.  You will then need to burn them to USB/SD cards.${NC}"
 ./coreos_installer.sh "${developerMode}" "${isoMode}"
