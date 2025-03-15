@@ -633,7 +633,7 @@ if [[ -e $logName || -L $logName ]] ; then
 	logName=$logName-$i
 fi
 
-#set -x
+set -x
 exec > "${logName}" 2>&1
 
 time=0
