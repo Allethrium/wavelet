@@ -65,7 +65,8 @@ StartLimitBurst=30
 
 [Install]
 WantedBy=default.target" > /var/home/wavelet/.config/systemd/user/wavelet_provision_watcher.service
-	systemctl --user daemon-reload && systemctl --user enable wavelet_provision_watcher.service	
+	systemctl --user daemon-reload && systemctl --user enable wavelet_provision_watcher.service	--now
+	sleep .5
 }
 
 etcd_provision_request(){
