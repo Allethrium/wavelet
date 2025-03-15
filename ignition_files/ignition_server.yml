@@ -600,6 +600,8 @@ storage:
           Wants=network-online.target sway-session.target
           [Service]
           Type=simple
+          RestartSec=2s
+          Restart=always
           ExecStart=etcdctl --endpoints=192.168.1.32:2379 --user PROV:wavelet_provision watch /PROV/REQUEST -w simple -- /usr/bin/bash -c "/usr/local/bin/wavelet_provision.sh"
           [Install]
           WantedBy=default.target
