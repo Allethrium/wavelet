@@ -182,6 +182,7 @@ event_decoder(){
 	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
 	# Set Type keys to "dec" for system, /hostLabel/ and also for UI
 	KEYVALUE="dec";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
+	KEYVALUE="dec";	KEYNAME="/hostLabel/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/UI/hosts/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/UI/hostlist/${hostNameSys}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
