@@ -38,7 +38,7 @@ step2() {
 #
 #####
 
-#set -x
+set -x
 user=$(whoami)
 mkdir -p /var/home/${user}/logs
 exec > /var/home/${user}/logs/provision_request.log 2>&1
