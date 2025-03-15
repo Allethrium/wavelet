@@ -279,10 +279,12 @@ generate_etcd_host_role(){
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role add ${clientHostName:0:7}
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put /UI/hosts/${clientHostName} -- 1
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put /UI/hostlist/${clientHostName} -- 1
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put /UI/hostHash/${clientHostName} -- 1
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put /${clientHostName} -- 1
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/UI/hosts/${clientHostName}/" --prefix=true
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/UI/hostlist/${clientHostName}/" --prefix=true
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/UI/hosthash/" --prefix=true
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/UI/hostlist/${clientHostName}/" --prefix=true # This one could be dangerous.
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/UI/hosthash/${clientHostName}/" --prefix=true # This one could be dangerous.
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/hosthash/" --prefix=true # This one could be dangerous.
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/${clientHostName}/" --prefix=true
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} user add "${clientHostName:0:7}" --new-user-password "${PassWord}"
@@ -359,12 +361,22 @@ set_userArg() {
 		#   (b) will the variable be accessible from the above functions?
 		svr*)       svr_userArg;
 		;;
-		*)          local password2=$(cat /var/home/wavelet/config/pw2.txt); hostname=$(hostname);
-					local password1=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/.ssh/secrets/$(hostname).crypt.bin -d | base64 -d);
-					userArg="--user ${hostname:0:7}:${password1}";
+		*)          get_client_pw
 		;;
 	esac
-	echo "User args: ${userArg}" >> /var/home/wavelet/logs/etcdlog.log
+	#echo "User args: ${userArg}" >> /var/home/wavelet/logs/etcdlog.log
+}
+
+get_client_pw(){
+	# Checks if we are provisioned or not, if we aren't we use PROV, if we are, generates password from available factors.
+	if [[ -f /var/provisioned.complete ]]; then
+		echo "ETCD provisioning is not complete, defaulting to PROV" >> /var/home/wavelet/logs/etcdlog.log
+		userArg="--user PROV:wavelet_provision"
+	else
+		local password2=$(cat /var/home/wavelet/config/pw2.txt); hostname=$(hostname);
+		local password1=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/.ssh/secrets/$(hostname).crypt.bin -d | base64 -d);
+		userArg="--user ${hostname:0:7}:${password1}";
+	fi
 }
 
 svr_userArg() {
