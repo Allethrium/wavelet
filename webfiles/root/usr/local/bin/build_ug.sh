@@ -55,7 +55,7 @@ etcd_provision_watcher(){
 	# wavelet user systemd service to get provision data back after processing from svr
 	etcdIP=$(cat /var/home/wavelet/config/etcd_ip)
 	echo -e "[Unit]
-Description=Wavelet provision retrieval
+Description=Wavelet provision retrieval (UID 1337)
 After=network-online.target etcd-member.service
 Wants=network-online.target
 
@@ -356,7 +356,6 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 	touch /var/home/wavelet/server_bootstrap_completed
 	echo -e "Enabling server notification services"
 	event_generate_controller
-	event_generate_provision
 	event_generate_reflectorreload
 	event_generate_watch_provision
 	event_generate_run_ug
