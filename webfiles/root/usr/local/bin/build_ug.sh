@@ -115,22 +115,30 @@ detect_ug_version(){
 detect_self(){
 	systemctl --user daemon-reload
 	systemctl --user enable foot-server.socket --now
-	# Detect_self in this case relies on the etcd type key
-	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
-	echo -e "Host type is: ${printvalue}\n"
-	# test if i'm the server
-	if [[ $(hostname) = *"svr"* ]]; then
-		# This is fine because a server always has etcd rights
-		echo -e "I am a Server. Proceeding..."; event_server
-	else
-		# Handle encoder or decoder paths
-		# This is fine because an encoder will have previously been a decoder, and have etcd rights.
-		if [[ ${printvalue} = *"enc"* ]]; then
-			echo "I am an encoder"; event_encoder
+	if [[ -f /var/provisioned.complete ]]; then
+		echo "Provisioning completed, detecting self via etcd.."
+		# Detect_self in this case relies on the etcd type key
+		KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+		echo -e "Host type is: ${printvalue}\n"
+		# test if i'm the server
+		if [[ $(hostname) = *"svr"* ]]; then
+			# This is fine because a server always has etcd rights
+			echo -e "I am a Server. Proceeding..."; event_server
 		else
-			# This is for anything NOT a svr or enc, including an unpopulated new device.
-			# This COULD have etcd rights, or not and just "fail".  This is why it's not specific.
-			echo "I am a decoder"; event_decoder
+			# Handle encoder or decoder paths
+			# This is fine because an encoder will have previously been a decoder, and have etcd rights.
+			if [[ ${printvalue} = *"enc"* ]]; then
+				echo "I am an encoder"; event_encoder
+			else
+				# This is for anything NOT a svr or enc, including an unpopulated new device.
+				# This COULD have etcd rights, or not and just "fail".  This is why it's not specific.
+				echo "I am a decoder"; event_decoder
+			fi
+		fi
+	else
+		if [[ ${hostNameSys} = *"dec" ]]; then
+			echo "I am a fresh decoder, or the etcd cluster is broken."
+			event_decoder
 		fi
 	fi
 }
