@@ -282,8 +282,8 @@ generate_etcd_host_role(){
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put /UI/hostHash/${clientHostName} -- 1
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put /${clientHostName} -- 1
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/UI/hosts/${clientHostName}/" --prefix=true
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/UI/hostlist/${clientHostName}/" --prefix=true # This one could be dangerous.
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/UI/hosthash/${clientHostName}/" --prefix=true # This one could be dangerous.
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/UI/hostlist/" --prefix=true # This one could be dangerous.
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/UI/hosthash/" --prefix=true # This one could be dangerous.
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/hosthash/" --prefix=true # This one could be dangerous.
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant ${clientHostName:0:7} readwrite "/${clientHostName}/" --prefix=true
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
@@ -412,6 +412,7 @@ revisionID=$7
 # This means that ALL key values are base64 now.
 
 # Logfile has to live in $HOME here, because wavelet-root cannot write to wavelet's homedir.
+set -x
 user=$(whoami)
 mkdir -p /var/home/${user}/logs
 echo -e "\n\n**New log**" >> /var/home/${user}/logs/etcdlog.log
