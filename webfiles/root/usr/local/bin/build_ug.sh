@@ -140,7 +140,7 @@ detect_self(){
 
 event_decoder(){
 	echo -e "Decoder routine started."
-	event_provision_watcher
+	etcd_provision_watcher
 	# Provision request to etcd
 	if [[ -f /var/provisioned.complete ]]; then
 		echo "Provisioning completed, skipping step!"
