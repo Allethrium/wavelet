@@ -277,15 +277,15 @@ generate_etcd_host_role(){
 	echo "Generating role and user for ETCD client.." >> /var/home/wavelet-root/logs/etcdlog.log
 	KEYNAME="/PROV/REQUEST"; clientHostName=$(etcdctl --endpoints=${ETCDENDPOINT} --user PROV:wavelet_provision get "${KEYNAME}" --print-value-only)
 	echo "Client hostname retrieved for: ${clientHostName}" >> /var/home/wavelet-root/logs/etcdlog.log
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role add ${clientHostName:0:7}
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put /UI/hosts/${clientHostName} -- 1
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put /UI/hostlist/${clientHostName} -- 1
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put /UI/hostHash/${clientHostName} -- 1
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put /${clientHostName} -- 1
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role add "${clientHostName:0:7}"
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put "/UI/hosts/${clientHostName}" -- 1
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put "/UI/hostlist/${clientHostName}" -- 1
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put "/UI/hostHash/${clientHostName}" -- 1
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put "/${clientHostName}/" -- 1
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite "/UI/hosts/${clientHostName}/" --prefix=true
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite "/UI/hostlist/" --prefix=true # This one could be dangerous.
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite "/UI/hosthash/" --prefix=true # This one could be dangerous.
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite "/hosthash/" --prefix=true # This one could be dangerous.
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite "/UI/hostHash/" --prefix=true # This one could be dangerous.
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite "/hostHash/" --prefix=true # This one could be dangerous.
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite "/${clientHostName}/" --prefix=true
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} user add "${clientHostName:0:7}" --new-user-password "${PassWord}"
