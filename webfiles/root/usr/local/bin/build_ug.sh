@@ -136,10 +136,13 @@ detect_self(){
 			fi
 		fi
 	else
-		if [[ ${hostNameSys} = *"dec"* ]]; then
-			echo "I am a fresh decoder, or the etcd cluster is broken."
-			event_decoder
-		fi
+		echo "Provisioning is NOT complete, detecting via system hostname.."
+		case $(hostname) in
+			svr*)		echo "Server detected"; event_server
+			;;
+			dec*)		echo "Decoder detected"; event_decoder
+			;;
+		esac
 	fi
 }
 
