@@ -3,7 +3,7 @@
 
 detect_self(){
 	# Detect_self in this case relies on the etcd type key
-	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/type"; read_etcd_global
 	echo -e "Host type is: ${printvalue}\n"
 	case "${printvalue}" in
 		enc*) 					echo -e "I am an Encoder"; event_encoder
@@ -108,15 +108,15 @@ event_encoder(){
 event_decoder(){
 	# Registers self as a decoder in etcd for the reflector to query & include in its client args
 	echo -e "Populated IP Address is: ${IPVALUE}"
-	KEYVALUE=${IPVALUE}
+	KEYVALUE="${IPVALUE}"
 	write_etcd_client_ip
 	# Ensure all reset, reveal and reboot flags are set to 0 so they are
 	# 1) populated
 	# 2) not active so the new device goes into a reboot/reset/reveal loop
-	KEYNAME="/${hostNameSys}/DECODER_RESET"; KEYVALUE="0"; write_etcd_global
-	KEYNAME="/${hostNameSys}/DECODER_REVEAL"; write_etcd_global
-	KEYNAME="/${hostNameSys}/DECODER_REBOOT"; write_etcd_global
-	KEYNAME="/${hostNameSys}/DECODER_BLANK"; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/DECODER_RESET"; KEYVALUE="0"; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/DECODER_REVEAL"; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/DECODER_REBOOT"; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/DECODER_BLANK"; write_etcd_global
 	# Enable watcher services now all task activation keys are set to 0
 	systemctl --user enable \
 		wavelet_decoder_reset.service \
