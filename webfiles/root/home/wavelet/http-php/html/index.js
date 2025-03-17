@@ -23,7 +23,7 @@ function escapeHTML(val) {
 function inputsAjax(){
 // get dynamic devices from etcd, and call createInputButton function to generate entries for them.
 // value = generated hash value of the device from detectv4l, this is how we track it, and how wavelet can find it
-// keyfull = the pathname of the device in /interface/friendlyname
+// keyfull = the pathname of the device in /UI/friendlyname
 // key = the key of the device (also a UI-modifiable label attribute)
 	$.ajax({
 		type: "POST",
@@ -38,7 +38,8 @@ function inputsAjax(){
 				var key			=	item['key'];
 				var value		=	item['value'];
 				var keyFull		=	item['keyFull'];
-				createInputButton(key, value, keyFull, functionIndex);
+				var inputHost 	=	item['host'];
+				createInputButton(key, value, keyFull, inputHost, functionIndex);
 				})
 		},
 		complete: function(){
@@ -543,13 +544,13 @@ function createDetailMenu(hostName, hostHash, type, divEntry) {
 	}
 }
 
-function createInputButton(key, value, keyFull, functionIndex, IP) {
+function createInputButton(key, value, keyFull, inputHost, functionIndex, IP) {
 	var divEntry					=		document.createElement("Div");
 	var dynamicButton				=		document.createElement("Button");
 	const text						=		document.createTextNode(key);
 	const id						=		document.createTextNode(counter + 1);
 	dynamicButton.id				=		counter;
-	hostNameAndDevice				=		key.replace(/\//, ':\n');
+	hostNameAndDevice				=		(inputHost + ":" + key);
 	/* create a div container, where the button, relabel button and any other associated elements reside */
 	if (functionIndex === 1) {
 		console.log("called from firstAjax, so this is a local video source");
@@ -569,10 +570,10 @@ function createInputButton(key, value, keyFull, functionIndex, IP) {
 	var currentInputsHash			=		getActiveInputHash();
 	
 	divEntry.setAttribute("divDeviceHash", value);
-	divEntry.setAttribute("data-fulltext", keyFull);
+	divEntry.setAttribute("data-fulltext", inputHost + keyFull);
 	divEntry.setAttribute("divDevID", dynamicButton.id);
 	$(divEntry).addClass('input_divider_device');
-	console.log("dynamic video source div created for device hash: " + value + " and label:  " + key);
+	console.log("dynamic video source div created for device hash: " + value + " and label:  " + key + "on host: ");
 	// Create the device button
 	function createInputButton(text, value) {
 		var $btn = $('<button/>', {
