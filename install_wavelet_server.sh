@@ -304,7 +304,7 @@ automatic_setup() {
 	init_users_yaml
 	users=("wavelet-root" "wavelet")
 	for user in "${users[@]}"; do
-		mkpasswd --method=yescrypt "${lab_pw}" > ${user}.pw.secure
+		mkpasswd --method=yescrypt "${PASSWORD}" > ${user}.pw.secure
 		ssh-keygen -t ed25519 -C "${user}@wavelet.local" -N '' <<< $'\ny' >/dev/null 2>&1
 		cp users_yaml ${user}_yaml.yml
 		generate_user_yaml ${user}
@@ -388,27 +388,27 @@ for i in "$@"
 			;;
 			-h|--help)																	print_help;	exit 0
 			;;
-			-p=*|--password=*|--pass=*)									PASSWORD=${i#*=}; echo -e "password defined for BOTH user accounts in labmode!";
+			-p=*|--password=*|--pass=*)									PASSWORD=${i#*=}; echo -e "Password defined for BOTH user accounts in labmode as: ${PASSWORD}";
 			;;
 			-s|--sec|--security)												echo -e "WIP! Security layer is enabled!"; secActive=1
 			;;
-			-ws=*|--wifissid=*)													wifi_ssid=${i#*=}; echo -e "WiFi SSID defined as ${i}";
+			-ws=*|--wifissid=*)													wifi_ssid=${i#*=}; echo -e "WiFi SSID defined as: ${wifi_ssid}";
 			;;
-			-wb=*|--wifibssid=*)												wifi_bssid=${i#*=}; echo -e "WiFi BSSID/MAC defined as ${i}";
+			-wb=*|--wifibssid=*)												wifi_bssid=${i#*=}; echo -e "WiFi BSSID/MAC defined as: ${wifi_bssid}";
 			;;
 			-wp=*|--wifipass=*)													wifi_password=${i#*=}; echo -e "WiFi WPA PSK defined as: ${wifi_password} (will have no effect with Security layer active!)";
 			;;
 			-ugd|--ugdev|--ugcontinuous)								dev_flag="DEV";
 			;;
-			-4=*|--ip4subnet=*)													ip4=${i#*=}; echo -e "WIP! IPv4 Subnet (CIDR) defined as: ${i}";
+			-4=*|--ip4subnet=*)													ip4=${i#*=}; echo -e "WIP! IPv4 Subnet (CIDR) defined as: ${ip4}";
 			;;
-			-6=*|--ipv6subnet=*)												ip6=${i#*=}; echo -e "WIP! IPv6 Subnet fefined as: ${i}";
+			-6=*|--ipv6subnet=*)												ip6=${i#*=}; echo -e "WIP! IPv6 Subnet fefined as: ${ip6}";
 			;;
-			-ip=*|--serverip=*)													svr_ip=${i#*=}; echo -e "WIP! Server Static IPv4 defined as ${i}";
+			-ip=*|--serverip=*)													svr_ip=${i#*=}; echo -e "WIP! Server Static IPv4 defined as ${svr_ip}}";
 			;;		
-			-g=*|--servergateway=*)											svr_gw=${i#*=}; echo -e "WIP! Server IPv4 gateway defined as ${i}";
+			-g=*|--servergateway=*)											svr_gw=${i#*=}; echo -e "WIP! Server IPv4 gateway defined as ${svr_gw}";
 			;;		
-			-dns=*|--serverdns=*)												svr_dns=${i#*=}; echo -e "WIP! Server IPv4 dns defined as ${i}";
+			-dns=*|--serverdns=*)												svr_dns=${i#*=}; echo -e "WIP! Server IPv4 dns defined as ${svr_dns}";
 			;;											
 			*)																					echo "bad input argument: $i";
 			;;
