@@ -378,11 +378,6 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 	# uncomment a firefox exec command into sway config, this will bring up the management console on the server in a new sway window, as a backup control surface.
 	# - note we need to work on a firefox policy/autoconfig which FF will actually respect
 	sed -i 's|#exec /usr/local/bin/wavelet_start_UI.sh|exec /usr/local/bin/wavelet_start_UI.sh|g' /var/home/wavelet/.config/sway/config
-	# Next, we build the reflector prune function.  This is necessary for removing streams for old decoders and maintaining the long term health of the system
-		# Get decoderIP list
-		# Ping each decoder on list
-		# If dead, ping more intensively for 30s
-		# If still dead, remove from reflector subscription
 	# Add server type ID into etcd (note the webUI could change the server's type from the UI side but would be prevented from changing the server SYSTEM type)
 	KEYVALUE="svr";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/UI/hosts/$hostNameSys/type"; write_etcd_global
@@ -571,7 +566,7 @@ event_generateHash(){
 			KEYNAME="/UI/hosts/${hostNameSys}/control/label"; KEYVALUE="${hostNamePretty}"; write_etcd_global
 			# Populate SYSTEM values
 			KEYNAME="/${hostNameSys}/Hash"; write_etcd_global
-			KEYNAME="/hostHash/${hostHash}"; KEYVALUE="${hostNameSys}"; write_etcd_global
+			KEYNAME="/hostHash/${hostNameSys}"; KEYVALUE="${hostHash}"; write_etcd_global
 			KEYNAME="/hostHash/${hostNameSys}/label"; KEYVALUE="${hostNamePretty}"; write_etcd_global
 			KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
 		else
@@ -643,7 +638,7 @@ if [[ -e $logName || -L $logName ]] ; then
 	logName=$logName-$i
 fi
 
-set -x
+#set -x
 exec > "${logName}" 2>&1
 
 time=0
