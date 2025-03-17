@@ -28,14 +28,42 @@ function poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit, $token) {
 	// This is the "long" device name which is used as a reverse lookup w/ the device hash
 	$decodedValue			=	base64_decode($item['value']);
 		$newData[]			=	[
-			'key' => trim($decodedKeyShort),
-			'value' => $decodedValue,
-			'keyFull' => $decodedKey
+			'key'			=>	trim($decodedKeyShort),
+			'value'			=>	$decodedValue,
+			'keyFull'		=>	$decodedKey,
+			'host'			=>	str_replace("\"", "", (curl_etcd('/UI/short_hash/' . $decodedValue, $token)))
 		];
 	}
 	$output = json_encode($newData);
 	echo $output;
 }
+
+function curl_etcd($key, $token) {
+	// - useful for debugging but will BREAK return vals! echo nl2br ("Attempting to get: $key\n");
+	$b64KeyTarget	=	base64_encode("$key");
+	$ch = curl_init();
+	curl_setopt($ch, CURLOPT_URL, 'http://192.168.1.32:2379/v3/kv/range');
+	curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+	curl_setopt($ch, CURLOPT_POST, 1);
+	curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\":\"$b64KeyTarget\"}");
+		$headers	=	array();
+		$headers[]	=	'Authorization: ' .  $token;
+		$headers[]	=	'Content-Type: application/x-www-form-urlencoded';
+		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+		$result = curl_exec($ch);
+		if (curl_errno($ch)) {
+			echo 'Error:' . curl_error($ch);
+		}
+		curl_close($ch);
+	$hashDataArray = json_decode($result, true); 
+	foreach ($hashDataArray['kvs'] as $x => $item) {
+		$decodedHashKey		=	base64_decode($item['key']);
+		$decodedHashValue	=	base64_decode($item['value']);
+		$HashDecoded		=	json_encode($decodedHashValue);
+		return substr($HashDecoded, 0, (strpos($HashDecoded, '\\')));
+	}
+}
+
 
 $prefixstring 				=	'/UI/interface';
 $prefixstringplusone		=	'/UI/interface0';
