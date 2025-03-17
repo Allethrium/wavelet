@@ -11,7 +11,7 @@ clientCertificateKeyFile="/etc/pki/tls/private/etcd.key"
 certificateAuthorityFile="/etc/ipa/ca.crt"
 
 # This script is called with args.  
-	# Arg 1 is action (simplified from previous version with read_etcd, read_etcd_globa, write_etcd etc.)
+	# Arg 1 is action (simplified from previous version with read_etcd, read_etcd_global, write_etcd etc.)
 	# Arg 2 is the input key name
 	# Arg 3 is the input key value
 	# Arg 4 is the print-value-only request (true if exists, false otherwise)
@@ -277,18 +277,30 @@ generate_etcd_host_role(){
 	echo "Generating role and user for ETCD client.." >> /var/home/wavelet-root/logs/etcdlog.log
 	KEYNAME="/PROV/REQUEST"; clientHostName=$(etcdctl --endpoints=${ETCDENDPOINT} --user PROV:wavelet_provision get "${KEYNAME}" --print-value-only)
 	echo "Client hostname retrieved for: ${clientHostName}" >> /var/home/wavelet-root/logs/etcdlog.log
+	clientIP=$(dig +short ${clientHostName}  | head -n1)
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role add "${clientHostName:0:7}"
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put "/UI/hosts/${clientHostName}" -- 1
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put "/UI/hostlist/${clientHostName}" -- 1
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put "/UI/hostHash/${clientHostName}" -- 1
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put "/UI/hostLabel/${clientHostName}" -- 1
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put "/${clientHostName}/" -- 1
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite "/UI/hosts/${clientHostName}/" --prefix=true
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite "/UI/hostlist/" --prefix=true # This one could be dangerous.
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite "/UI/hostHash/" --prefix=true # This one could be dangerous.
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite "/hostHash/" --prefix=true # This one could be dangerous.
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite "/hostLabel/" --prefix=true # This one could be dangerous.
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite "/${clientHostName}/" --prefix=true
+	createCmd="etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put ${KEY} -- ${VAL}"
+	roleCmd="etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite $KEY --prefix=true"
+
+	# The below represents an exhaustive list of any keys the client machine being provisioned may need to write to.
+	# These probably need to be rethought, or orchestrated via the security layer controller.
+
+	# UI commands
+	VAL=1; KEY="/UI/hosts/${clientHostName}"				; /usr/bin/bash -c "$(echo "${createCmd}")"; /usr/bin/bash -c "$(echo "${roleCmd}")";
+	KEY="/UI/hostlist/${clientHostName}"					; /usr/bin/bash -c "$(echo "${createCmd}")"; /usr/bin/bash -c "$(echo "${roleCmd}")";
+	KEY="/UI/hostHash/${clientHostName}"					; /usr/bin/bash -c "$(echo "${createCmd}")"; /usr/bin/bash -c "$(echo "${roleCmd}")";
+	KEY="/UI/hostLabel/${clientHostName}"					; /usr/bin/bash -c "$(echo "${createCmd}")"; /usr/bin/bash -c "$(echo "${roleCmd}")";
+
+	# SYSTEM commands
+	VAL="${clientIP}"; KEY="/DECODERIP/${clientHostName}"	; /usr/bin/bash -c "$(echo "${createCmd}")"; /usr/bin/bash -c "$(echo "${roleCmd}")";
+	KEY="/hostHash/${clientHostName}"						; /usr/bin/bash -c "$(echo "${createCmd}")"; /usr/bin/bash -c "$(echo "${roleCmd}")";
+	KEY="${clientHostName}"									; /usr/bin/bash -c "$(echo "${createCmd}")"; /usr/bin/bash -c "$(echo "${roleCmd}")";
+	KEY="/${clientHostName}/Hash"							; /usr/bin/bash -c "$(echo "${createCmd}")"; /usr/bin/bash -c "$(echo "${roleCmd}")";
+	
+	# I think these would be better served orchestrated via the controller, as they are for the device "backend"
+	KEY="/UI/interface/"									; /usr/bin/bash -c "$(echo "${roleCmd}")";
+	KEY="/UI/short_hash/"									; /usr/bin/bash -c "$(echo "${roleCmd}")";
+
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} user add "${clientHostName:0:7}" --new-user-password "${PassWord}"
 	echo "Testing access.." >> /var/home/wavelet-root/logs/etcdlog.log
@@ -453,11 +465,11 @@ case ${action} in
 	# Write a global etcd value where the key is root and not considered "under" a host.  Keys here are clear text.
 	write_etcd_global)          declare -A commandLine=([4]="${userArg}" [3]="put" [2]="${inputKeyName}" [1]="--" [0]="${inputKeyValue}");
 	;;
-	# Special function for writing ip addresses under /decoderip/ 
-	write_etcd_client_ip)       declare -A commandLine=([4]="${userArg}" [3]="put" [2]="/decoderip/$(hostname)" [1]="--" [0]="${inputKeyValue}");
+	# Special function for writing ip addresses under /DECODERIP/
+	write_etcd_client_ip)       declare -A commandLine=([4]="${userArg}" [3]="put" [2]="/DECODERIP/$(hostname)" [1]="--" [0]="${inputKeyValue}");
 	;;
 	# returns value list of IP Addresses, special case to parse directly to command (used for read_etcd_clients and the sed variant)
-	read_etcd_clients*)         declare -A commandLine=([4]="${userArg}" [3]="get" [2]="--prefix" [1]="/decoderip/" [0]="--print-value-only"); fID="clearText";
+	read_etcd_clients*)         declare -A commandLine=([4]="${userArg}" [3]="get" [2]="--prefix" [1]="/DECODERIP/" [0]="--print-value-only"); fID="clearText";
 	;;
 	# Delete a key
 	delete_etcd_key)            declare -A commandLine=([4]="${userArg}" [1]="del" [0]="/$(hostname)/${inputKeyName}"); fID="clearText";
