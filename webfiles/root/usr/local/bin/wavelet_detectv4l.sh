@@ -57,11 +57,15 @@ generate_service(){
 }
 
 sense_devices_local() {
+	# we're just looking at what's in /dev/v4l here, effectively.
+	# Might be a good idea to try and compare this against UG's output and add selection logic in future though..
+	# forEach > ug -t v4l2:{i} | process output here, select appropriate pxl/res | test dev for validation via UG | done
 	shopt -s nullglob
 	declare -a v4lArray=(/dev/v4l/by-id/*)
 	for index in "${!v4lArray[@]}" ; do
 		[[ ${v4lArray[$index]} =~ -index1$ ]] && unset -v 'v4lArray[$index]';
 	done
+	
 	array=("${v4lArray[@]}")
 	for i in "${v4lArray[@]}"; do
 		device_string_long=$i
@@ -296,7 +300,7 @@ encoder_checkNetwork(){
 		touch /home/wavelet/NETWORK_ERROR_FLAG
 		exit 0
 	fi
-	ping -c 3 192.168.1.32
+	ping -c 3 $(cat /var/home/wavelet/config/etcd_ip)
 	if [[ $? -eq 0 ]]; then
 		echo -e "Online and connected to Wavelet Server, continuing..\n"
 		sense_devices_local
