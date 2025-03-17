@@ -1,6 +1,8 @@
 #!/bin/bash
-# Monitors etcd for output and restarts the encoder as necessary
-#
+# Monitors etcd for the ENCODER_QUERY master key
+# Checks the input label for the device hostname
+# If hostname is on this machine, we restart run_ug.service, calling the encoder process to validate and verify further
+# The encoder process should not be called by anything other than this module, or wavelet_init
 
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd_global(){
@@ -14,9 +16,8 @@ write_etcd_global(){
 
 main() {
 	# Checks to see if this host is referenced
-	KEYNAME="ENCODER_QUERY";	read_etcd_global;	hashValue=${printvalue}
-	KEYNAME="uv_input";			read_etcd_global;	controllerInputLabel=${printvalue}
-	targetHost="${controllerInputLabel%/*}"
+	KEYNAME="ENCODER_QUERY";				read_etcd_global;	hashValue=${printvalue}
+	KEYNAME="/UI/short_hash/${hashValue}"	read_etcd_global;   targetHost="${printvalue%/*}"
 	# Determine what kind of device we are dealing with
 	if [[ ${targetHost} == *"network_interface"* ]]; then
 		echo -e "Target Hostname is a network device."
