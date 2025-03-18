@@ -277,35 +277,45 @@ generate_etcd_host_role(){
 	echo "Generating role and user for ETCD client.." >> /var/home/wavelet-root/logs/etcdlog.log
 	KEYNAME="/PROV/REQUEST"; clientHostName=$(etcdctl --endpoints=${ETCDENDPOINT} --user PROV:wavelet_provision get "${KEYNAME}" --print-value-only)
 	echo "Client hostname retrieved for: ${clientHostName}" >> /var/home/wavelet-root/logs/etcdlog.log
-	clientIP=$(dig +short ${clientHostName}  | head -n1)
-	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role add "${clientHostName:0:7}"
-	createCmd="etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put ${KEY} -- ${VAL}"
-	roleCmd="etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite $KEY --prefix=true"
+	clientIP=$(dig +short "${clientHostName}"  | head -n1)
+	# bash-legal quotation marks show up as single quotes in the actual run command line, breaking things!
+	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role add ${clientHostName:0:7}
+	createCmd() {
+		etcdctl --endpoints=${ETCDENDPOINT} ${userArg} put ${1} -- ${2}
+	}
+	roleCmd() {
+		etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite ${1} --prefix=true
+	}
 
 	# The below represents an exhaustive list of any keys the client machine being provisioned may need to write to.
 	# These probably need to be rethought, or orchestrated via the security layer controller.
 
 	# UI commands
-	VAL=1; KEY="/UI/hosts/${clientHostName}"				; /usr/bin/bash -c "$(echo "${createCmd}")"; /usr/bin/bash -c "$(echo "${roleCmd}")";
-	KEY="/UI/hostlist/${clientHostName}"					; /usr/bin/bash -c "$(echo "${createCmd}")"; /usr/bin/bash -c "$(echo "${roleCmd}")";
-	KEY="/UI/hostHash/${clientHostName}"					; /usr/bin/bash -c "$(echo "${createCmd}")"; /usr/bin/bash -c "$(echo "${roleCmd}")";
-	KEY="/UI/hostLabel/${clientHostName}"					; /usr/bin/bash -c "$(echo "${createCmd}")"; /usr/bin/bash -c "$(echo "${roleCmd}")";
+	VAL=1; KEY="/UI/hosts/${clientHostName}"				; createCmd ${KEY} ${VAL}; roleCmd ${KEY} ;
+	KEY="/UI/hostlist/${clientHostName}"					; createCmd ${KEY} ${VAL}; roleCmd ${KEY} ;
+	KEY="/UI/hostHash/${clientHostName}"					; createCmd ${KEY} ${VAL}; roleCmd ${KEY} ;
+	KEY="/UI/hostLabel/${clientHostName}"					; createCmd ${KEY} ${VAL}; roleCmd ${KEY} ;
 
 	# SYSTEM commands
-	VAL="${clientIP}"; KEY="/DECODERIP/${clientHostName}"	; /usr/bin/bash -c "$(echo "${createCmd}")"; /usr/bin/bash -c "$(echo "${roleCmd}")";
-	KEY="/hostHash/${clientHostName}"						; /usr/bin/bash -c "$(echo "${createCmd}")"; /usr/bin/bash -c "$(echo "${roleCmd}")";
-	KEY="${clientHostName}"									; /usr/bin/bash -c "$(echo "${createCmd}")"; /usr/bin/bash -c "$(echo "${roleCmd}")";
-	KEY="/${clientHostName}/Hash"							; /usr/bin/bash -c "$(echo "${createCmd}")"; /usr/bin/bash -c "$(echo "${roleCmd}")";
+	KEY="/${clientHostName}/"								; createCmd ${KEY} ${VAL}; roleCmd ${KEY};
+	VAL="${clientIP}"; KEY="/DECODERIP/${clientHostName}"	; createCmd ${KEY} ${VAL}; roleCmd ${KEY};
+	KEY="/hostHash/${clientHostName}"						; createCmd ${KEY} ${VAL}; roleCmd ${KEY};
+	KEY="/${clientHostName}/Hash"							; createCmd ${KEY} ${VAL}; roleCmd ${KEY};
 	
-	# I think these would be better served orchestrated via the controller, as they are for the device "backend"
-	KEY="/UI/interface/"									; /usr/bin/bash -c "$(echo "${roleCmd}")";
-	KEY="/UI/short_hash/"									; /usr/bin/bash -c "$(echo "${roleCmd}")";
+	# I think these would be better served orchestrated via the controller or here, as they are for the device "backend", and not specific to a host
+	KEY="/UI/interface/"									; roleCmd ${KEY};
+	KEY="/UI/short_hash/"									; roleCmd ${KEY};
 
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} user add "${clientHostName:0:7}" --new-user-password "${PassWord}"
-	echo "Testing access.." >> /var/home/wavelet-root/logs/etcdlog.log
+	sleep 5
+	echo "Returned value should be 1" >> /var/home/wavelet-root/logs/etcdlog.log
+	echo "Testing access with generated password.." >> /var/home/wavelet-root/logs/etcdlog.log
 	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} --user ${clientHostName:0:7}:${PassWord} get "/${clientHostName}/")
-	echo "Returned value should be 1:  ${printvalue}" >> /var/home/wavelet-root/logs/etcdlog.log
+	if [[ ${printvalue} -eq 1 ]]; then
+		echo "Return value failed!  Terminating process"
+		exit 1
+	fi
 	# This makes a poor man's two factor auth to get etcd access.
 	local user="${clientHostName}"
 	local password2=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
