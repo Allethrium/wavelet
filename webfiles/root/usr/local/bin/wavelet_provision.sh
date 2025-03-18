@@ -25,7 +25,7 @@ step1() {
 
 step2() {
 	if [[ "$EUID" -ne 1337 ]]; then 
-		echo "This step should only run as the wavelet user on the client machine"
+		echo "This step should only run as the wavelet user on the client machine and responds to the key bring re-written with the provision data."
 		exit 1
 	fi
 	/usr/local/bin/wavelet_etcd_interaction.sh "client_provision_data"
@@ -38,7 +38,7 @@ step2() {
 #
 #####
 
-set -x
+#set -x
 user=$(whoami)
 mkdir -p /var/home/${user}/logs
 exec > /var/home/${user}/logs/provision_request.log 2>&1
