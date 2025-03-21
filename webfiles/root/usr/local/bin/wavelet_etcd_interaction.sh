@@ -108,7 +108,7 @@ watch ${inputKeyName} -w simple -- /usr/bin/bash -c \"/usr/local/bin/${waveletMo
 Restart=always
 
 [Install]
-WantedBy=default.target" >> /var/home/${user}/.config/systemd/user/${waveletModule}.service
+WantedBy=default.target" > /var/home/${user}/.config/systemd/user/${waveletModule}.service
 	fi
 	echo -e "User Systemd service unit for etcd Key: ${inputKeyName} generated\nName: ${waveletModule}.service\nRemember to run 'systemctl --user daemon-reload' from your calling function.\n"
 	exit 0
