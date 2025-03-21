@@ -358,9 +358,10 @@ client_provision_get_data() {
 	local password1=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/.ssh/secrets/$(hostname).crypt.bin -d | base64 -d);
 	userArg="--user ${hostname:0:7}:${password1}";
 	# Now test and proceed if values agree
-	KEYNAME="Client_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
-	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" "${KEYNAME}")
-	if [[ ${printvalue} == "${KEYVALUE}" ]]; then
+	KEYNAME="Client_test"; KEYVALUE="True"
+	declare -A commandLine=([4]="${userArg}" [3]="put" [2]="/$(hostname)/${KEYNAME}" [1]="--" [0]="${KEYVALUE}")
+	declare -A commandLine=([3]="${userArg}" [2]="get" [1]="/$(hostname)/${KEYNAME}" [0]="--print-value-only"); fID="clearText"; local output=$(main)
+	if [[ ${output} == "${KEYVALUE}" ]]; then
 		echo "Client test successful!" >> /var/home/wavelet/logs/etcdlog.log
 		# Delete keys now that we are done
 		declare -A commandLine=([4]="${userArg}" [1]="del" [0]="/PROV/CRYPT"); fID="clearText"; main
