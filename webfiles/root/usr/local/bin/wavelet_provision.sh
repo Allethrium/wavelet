@@ -28,6 +28,7 @@ step2() {
 		echo "This step should only run as the wavelet user on the client machine and responds to the key bring re-written with the provision data."
 		exit 1
 	fi
+	echo "Getting client provision data.."
 	/usr/local/bin/wavelet_etcd_interaction.sh "client_provision_data"
 }
 
