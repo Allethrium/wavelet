@@ -353,7 +353,11 @@ client_provision_get_data() {
 	declare -A commandLine=([3]="${userArg}" [2]="get" [1]="/PROV/FACTOR2" [0]="--print-value-only"); fID="clearText"; local output=$(main)
 	#echo "Got factor2: $output" >> /var/home/${user}/etcdlog.log
 	echo ${output} > /var/home/wavelet/config/pw2.txt 
-	# test Auth now we have the appropriate keys
+	# Get new userargs
+	local password2=$(cat /var/home/wavelet/config/pw2.txt); hostname=$(hostname);
+	local password1=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/.ssh/secrets/$(hostname).crypt.bin -d | base64 -d);
+	userArg="--user ${hostname:0:7}:${password1}";
+	# Now test and proceed if values agree
 	KEYNAME="Client_test"; KEYVALUE="True"; /usr/local/bin/wavelet_etcd_interaction.sh "write_etcd" "${KEYNAME}" "${KEYVALUE}"
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd" "${KEYNAME}")
 	if [[ ${printvalue} == "${KEYVALUE}" ]]; then
@@ -366,7 +370,7 @@ client_provision_get_data() {
 		touch /var/provisioned.rq.complete
 	else
 		echo "Client test unsuccessful!  Please see logs." >> /var/home/wavelet/logs/etcdlog.log
-		echo "We got ${printvalue} back" >> /var/home/wavelet/logs/etcdlog.log
+		echo "We got back: ${printvalue}" >> /var/home/wavelet/logs/etcdlog.log
 		exit 1
 	fi
 }
