@@ -399,23 +399,23 @@ event_system_reboot(){
 	# Everything should watch the system reboot flag for a hard reset
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service SYSTEM_REBOOT 0 0 "wavelet_reboot"
 	# and the same for the host reboot
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/\"%H\"/control/DECODER_REBOOT 0 0 "wavelet_decoder_reboot"
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/\"%H\"/control/REBOOT 0 0 "wavelet_decoder_reboot"
 }
 event_reset(){
 	# Everything should watch the system reboot flag for a task reset
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service SYSTEM_RESET 0 0 "wavelet_reset"
 	# and the same for the host reset
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/\"%H\"/control/DECODER_RESET 0 0 "wavelet_decoder_reset"
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/\"%H\"/control/RESET 0 0 "wavelet_decoder_reset"
 }
 event_reveal(){
 	# Tells specific host to display SMPTE bars on screen, useful for finding which is what and where
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/\"%H\"/control/DECODER_REVEAL 0 0 "wavelet_decoder_reveal"
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/\"%H\"/control/REVEAL 0 0 "wavelet_decoder_reveal"
 }
 event_blankhost(){
 	# Tells specific host to display a black testcard on the screen, use this for privacy modes as necessary.
 	# Host Blank is necessary for the UI to load properly, so we always set it here
 	KEYNAME="/UI/hosts/${hostNameSys}/control/BLANK"; KEYVALUE="0"; write_etcd_global
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/\"%H\"/control/DECODER_BLANK 0 0 "wavelet_decoder_blank"
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/\"%H\"/control/BLANK 0 0 "wavelet_decoder_blank"
 }
 event_promote(){
 	# This flag watches the hostname to instruct the machine to (pro/de)mote the (en/de)coder as appropriate.
