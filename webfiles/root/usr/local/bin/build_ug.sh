@@ -159,11 +159,11 @@ event_decoder(){
 	echo -e "Decoder routine started."
 	etcd_provision_watcher
 	# Provision request to etcd
-	if [[ -f /var/provisioned.complete ]]; then
+	if [[ -f /var/home/wavelet/config/provisioned.complete ]]; then
 		echo "Provisioning completed, skipping step!"
 	else
 		echo "First run, sending provision request to server.."
-		echo "If provisioning has failed, perform rm -rf /var/provisioned.complete will cause the device to generate a new provision request on next boot."
+		echo "If provisioning has failed, perform rm -rf /var/home/wavelet/config/provisioned.complete will cause the device to generate a new provision request on next boot."
 		etcd_provision_request
 	fi
 	sleep .5
