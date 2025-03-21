@@ -77,11 +77,15 @@ etcd_provision_request(){
 	sleep 1
 	/usr/local/bin/wavelet_etcd_interaction.sh "client_provision_response"
 	sleep 1
-	# Perform a test here to ensure everything is good and the client can write its own keys.
+	# Wait for etcd_interaction to perform its task and write the done flag
+	while [[ ! -f /var/provisioned.rq.complete ]]; do
+		sleep .5
+	done
 	KEYNAME="PROV_TEST"; KEYVALUE="True"; write_etcd
 	read_etcd
 	if [[ ${printvalue} = "True" ]]; then
 		echo "Client provision request completed, client username has been generated and access to appropriate keys granted."
+		touch /var/provisioned.complete
 	else 
 		echo "Client provisioning has failed.  Key value is not accessible, or does not match!"
 		exit 1
