@@ -359,7 +359,7 @@ client_provision_get_data() {
 	userArg="--user ${hostname:0:7}:${password1}";
 	# Now test and proceed if values agree
 	KEYNAME="Client_test"; KEYVALUE="True"
-	declare -A commandLine=([4]="${userArg}" [3]="put" [2]="/$(hostname)/${KEYNAME}" [1]="--" [0]="${KEYVALUE}")
+	declare -A commandLine=([4]="${userArg}" [3]="put" [2]="/$(hostname)/${KEYNAME}" [1]="--" [0]="${KEYVALUE}"); fID="clearText"; main
 	declare -A commandLine=([3]="${userArg}" [2]="get" [1]="/$(hostname)/${KEYNAME}" [0]="--print-value-only"); fID="clearText"; local output=$(main)
 	if [[ ${output} == "${KEYVALUE}" ]]; then
 		echo "Client test successful!" >> /var/home/wavelet/logs/etcdlog.log
