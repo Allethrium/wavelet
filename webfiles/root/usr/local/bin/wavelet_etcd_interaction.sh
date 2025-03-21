@@ -368,7 +368,8 @@ client_provision_get_data() {
 		declare -A commandLine=([4]="${userArg}" [1]="del" [0]="/PROV/FACTOR2"); fID="clearText"; main
 		declare -A commandLine=([4]="${userArg}" [1]="del" [0]="/PROV/RESPONSE"); fID="clearText"; main
 		echo "Provisioning process completed.  Client may resume normal operation!" >> /var/home/wavelet/logs/etcdlog.log
-		touch /var/provisioned.rq.complete
+		touch /var/home/wavelet/config/provisioned.rq.complete
+		exit 0
 	else
 		echo "Client test unsuccessful!  Please see logs." >> /var/home/wavelet/logs/etcdlog.log
 		echo "We got back: ${printvalue}" >> /var/home/wavelet/logs/etcdlog.log
@@ -392,7 +393,7 @@ set_userArg() {
 
 get_client_pw(){
 	# Checks if we are provisioned or not, if we aren't we use PROV, if we are, generates password from available factors.
-	if [[ ! -f /var/provisioned.complete ]]; then
+	if [[ ! -f /var/home/wavelet/config/provisioned.complete ]]; then
 		echo "ETCD provisioning is not complete, defaulting to PROV" >> /var/home/wavelet/logs/etcdlog.log
 		userArg="--user PROV:wavelet_provision"
 	else
