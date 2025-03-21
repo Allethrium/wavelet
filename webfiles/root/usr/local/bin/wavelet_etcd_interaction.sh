@@ -308,14 +308,6 @@ generate_etcd_host_role(){
 
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} user add "${clientHostName:0:7}" --new-user-password "${PassWord}"
-	sleep 5
-	echo "Returned value should be 1" >> /var/home/wavelet-root/logs/etcdlog.log
-	echo "Testing access with generated password.." >> /var/home/wavelet-root/logs/etcdlog.log
-	printvalue=$(etcdctl --endpoints=${ETCDENDPOINT} --user ${clientHostName:0:7}:${PassWord} get "/${clientHostName}/")
-	if [[ ${printvalue} -eq 1 ]]; then
-		echo "Return value failed!  Terminating process"
-		exit 1
-	fi
 	# This makes a poor man's two factor auth to get etcd access.
 	local user="${clientHostName}"
 	local password2=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
@@ -371,6 +363,7 @@ client_provision_get_data() {
 		declare -A commandLine=([4]="${userArg}" [1]="del" [0]="/PROV/FACTOR2"); fID="clearText"; main
 		declare -A commandLine=([4]="${userArg}" [1]="del" [0]="/PROV/RESPONSE"); fID="clearText"; main
 		echo "Provisioning process completed.  Client may resume normal operation!" >> /var/home/wavelet/logs/etcdlog.log
+		touch /var/provisioned.rq.complete
 	else
 		echo "Client test unsuccessful!  Please see logs." >> /var/home/wavelet/logs/etcdlog.log
 		echo "We got ${printvalue} back" >> /var/home/wavelet/logs/etcdlog.log
@@ -394,7 +387,7 @@ set_userArg() {
 
 get_client_pw(){
 	# Checks if we are provisioned or not, if we aren't we use PROV, if we are, generates password from available factors.
-	if [[ -f /var/provisioned.complete ]]; then
+	if [[ ! -f /var/provisioned.complete ]]; then
 		echo "ETCD provisioning is not complete, defaulting to PROV" >> /var/home/wavelet/logs/etcdlog.log
 		userArg="--user PROV:wavelet_provision"
 	else
@@ -437,7 +430,7 @@ revisionID=$7
 # This means that ALL key values are base64 now.
 
 # Logfile has to live in $HOME here, because wavelet-root cannot write to wavelet's homedir.
-set -x
+#set -x
 user=$(whoami)
 mkdir -p /var/home/${user}/logs
 echo -e "\n\n**New log**" >> /var/home/${user}/logs/etcdlog.log
