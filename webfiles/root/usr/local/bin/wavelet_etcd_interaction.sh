@@ -393,7 +393,7 @@ set_userArg() {
 
 get_client_pw(){
 	# Checks if we are provisioned or not, if we aren't we use PROV, if we are, generates password from available factors.
-	if [[ ! -f /var/home/wavelet/config/provisioned.complete ]]; then
+	if [[ ! -f /var/home/wavelet/config/provisioned.rq.complete ]]; then
 		echo "ETCD provisioning is not complete, defaulting to PROV" >> /var/home/wavelet/logs/etcdlog.log
 		userArg="--user PROV:wavelet_provision"
 	else
