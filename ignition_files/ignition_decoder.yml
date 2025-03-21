@@ -565,8 +565,8 @@ systemd:
         After=multi-user.target network-online.target
         [Service]
         Type=simple
-        ExecStartPre=/usr/local/bin/populate_etcd_cred.sh
-        LoadCredential=etcdPass:/etc/client_etcd_pw.txt
+        ExecStartPre=/usr/local/bin/get_creds.sh
+        LoadCredentialEncrypted=etcd_client_pass:/var/roothome/.ssh/secrets/ciphertext.cred
         ExecStart=/usr/local/bin/watch_wavelet_deprovision.sh
         [Install]
         WantedBy=multi-user.target

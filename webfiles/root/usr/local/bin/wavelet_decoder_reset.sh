@@ -6,7 +6,7 @@
 
 detect_self(){
 	# Detect_self in this case relies on the etcd type key
-	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/type"; read_etcd_global
 	echo -e "Host type is: ${printvalue}\n"
 	case "${printvalue}" in
 		enc*)                                   echo -e "I am an Encoder \n"            ;       exit 0
@@ -92,7 +92,7 @@ exec >/home/wavelet/logs/wavelet_reset_decoder.log 2>&1
 hostNameSys=$(hostname)
 hostNamePretty=$(hostnamectl --pretty)
 
-KEYNAME="/${hostNameSys}/DECODER_RESET"
+KEYNAME="/UI/hosts/${hostNameSys}/control/RESET"
 read_etcd_global
 if [[ "${printvalue}" == 1 ]]; then
 	echo -e "\nReset key is set to 1, continuing with task.. \n"

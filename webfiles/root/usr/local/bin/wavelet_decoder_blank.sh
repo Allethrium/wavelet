@@ -5,7 +5,7 @@
 
 detect_self(){
 	# Detect_self in this case relies on the etcd type key
-	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/type"; read_etcd_global
 	echo -e "Host type is: ${printvalue}\n"
 	case "${printvalue}" in
 		enc*)                                   echo -e "I am an Encoder \n"            ;       exit 0
@@ -113,20 +113,20 @@ exec >/var/home/wavelet/logs/wavelet_blank_decoder.log 2>&1
 hostNameSys=$(hostname)
 hostNamePretty=$(hostnamectl --pretty)
 
-KEYNAME="/${hostNameSys}/DECODER_BLANK_PREV"; read_etcd_global; oldKeyValue=${printvalue}
-KEYNAME="/${hostNameSys}/DECODER_BLANK"; read_etcd_global; newKeyValue=${printvalue}
+KEYNAME="/UI/hosts/${hostNameSys}/control/BLANK_PREV"; read_etcd_global; oldKeyValue=${printvalue}
+KEYNAME="/UI/hosts/${hostNameSys}/control/BLANK"; read_etcd_global; newKeyValue=${printvalue}
 	if [[ ${newKeyValue} == ${oldKeyValue} ]]; then
 		echo -e "\n Blank setting and previous blank setting match, the webpage has been refreshed, doing nothing..\n"
 		:
 	else
 		if [[ "${newKeyValue}" == 1 ]]; then
 				echo -e "\ninput_update key is set to 1, setting blank display for this host, and writing prevKey \n"
-				KEYNAME="/${hostNameSys}/DECODER_BLANK_PREV"; KEYVALUE="1";	write_etcd_global
+				KEYNAME="/UI/hosts/${hostNameSys}/control/BLANK_PREV"; KEYVALUE="1";	write_etcd_global
 				event_decoder_blank
 				# use a switcher, have the decoders all running a blank in the background?
 		else
 				echo -e "\ninput_update key is set to 0, reverting to previous display, and writing prevKey.. \n"
-				KEYNAME="/${hostNameSys}/DECODER_BLANK_PREV"; KEYVALUE="0"; write_etcd_global
+				KEYNAME="/UI/hosts/${hostNameSys}/control/BLANK_PREV"; KEYVALUE="0"; write_etcd_global
 				event_decoder_unblank
 		fi
 	fi
