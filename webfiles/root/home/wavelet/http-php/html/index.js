@@ -67,8 +67,8 @@ function hostsAjax(){
 				var hostHash		=	item['hostHash'];
 				var hostLabel 		=	item['hostLabel'];
 				var hostIP 			=	item['hostIP'];
-				var blankstatus  	=   item['hostBlankStatus'];
-				createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, blankstatus);
+				var hostBlankStatus	=   item['hostBlankStatus'];
+				createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, hostBlankStatus);
 				})
 		},
 	complete: function(){
@@ -335,7 +335,7 @@ function createHostButton(hostName, hostHash, item) {
 		class:  'btn renameButton',
 		id: 	`btn_Host-${hostHash}-${item}`,
 		}).click(function(){
-			console.log("Instructing host:" + hostName + "\nHash Value:" + hostHash + "\nTo: " + item);
+			console.log("Instructing host:" + hostName + "\nHash Value:" + hostHash + "\nTo Execute: " + item);
 			$.ajax({
 				type: "POST",
 				url: "/set_host_control.php",
@@ -348,19 +348,20 @@ function createHostButton(hostName, hostHash, item) {
 				success: function(response){
 					console.log(response);
 				}
-			})
+			});
 			sleep (750);
-			location.reload();
 		})
 	return $btn;
 }
 
-function createBlankButton(hostName, hostHash, initialHostBlankStatus) {
+function createBlankButton(hostName, hostHash, hostBlankStatus) {
 	// This function creates the host blank button, and changes the button text depending on status.
 	var blankHostName			=		hostName;
 	var blankHostHash			=		hostHash;
-	var blankHostText			=		"pending status";
-	console.log("Called to create Blank Host button for:" + hostName + ", hash " + hostHash );
+	var hostBlankStatus 		=		hostBlankStatus;
+	var blankHostText			=		( hostBlankStatus ==="0") ? "Blank Host":"Unblank Host";
+
+	console.log("Called to create Blank Host button for:" + hostName + ", hash " + hostHash + ", Blank status:" + hostBlankStatus );
 	var $btn 					= 		$('<button/>', {
 		type:					'button',
 		text:					blankHostText,
@@ -373,17 +374,17 @@ function createBlankButton(hostName, hostHash, initialHostBlankStatus) {
 		}).click(function(){
 			let matchedElement = $('body').find(`[data-blankHostName="${blankHostName}"]`);
 			if ($(matchedElement).text() == "Blank Host") {
-				console.log("Host instructed to blank screen:" + blankHostName);
+				console.log("Host instructed to blank screen with array:" + hostName);
 				$.ajax({
 					type: "POST",
 					url: "/set_host_control.php",
 					data: {
-					key:				hostName,
-					hash:				hostHash,
-					value:				"1",
-					hostFunction:		"BLANK"
+						key:			hostName,
+						hash:			hostHash,
+						value:			"1",
+						hostFunction:	"BLANK"
 						},
-						success: function(response){
+					success: function(response){
 							console.log(response);
 						}
 				});
@@ -391,7 +392,7 @@ function createBlankButton(hostName, hostHash, initialHostBlankStatus) {
 					$(matchedElement).text("Unblank Host");
 					$(matchedElement).addClass('active');
 			} else {
-				console.log("Host instructed to restore display:" + blankHostName);
+				console.log("Host instructed to restore display:" + hostName);
 				$.ajax({
 					type: "POST",
 					url: "/set_host_control.php",
@@ -435,10 +436,10 @@ function createCodecStateChangeButton(hostName, hostHash, type) {
 					type: "POST",
 					url: "/set_host_control.php",
 					data: {
-						key:				hostName,
-						hash:				hostHash,
-						value:				"1",
-						hostFunction:		"PROMOTE"
+						key:			hostName,
+						hash:			hostHash,
+						value:			"1",
+						hostFunction:	"PROMOTE"
 						},
 				success: function(response){
 					console.log(response);
@@ -634,11 +635,11 @@ function createInputButton(key, value, keyFull, inputHost, functionIndex, IP) {
 	counter++;
 }
 
-function createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, blankstatus, functionIndex) {
+function createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, hostBlankStatus, functionIndex) {
 	var divEntry						=		document.createElement("Div");
 	var type							=		type;
 	const id							=		document.createTextNode(counter + 1);
-	var initialHostBlankStatus			=		blankstatus;
+	var hostBlankStatus					=		hostBlankStatus;
 	divEntry.setAttribute("id", id);
 	divEntry.setAttribute("divHost", hostHash);
 	divEntry.setAttribute("data-fulltext", key);
@@ -648,7 +649,7 @@ function createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, blankst
 	$(divEntry).addClass('host_divider');
 
 	/* This needs to be done "backwards" insofar as the type needs to be determined before we can start creating a new DIV */
-	console.log("Generating label and buttons with\nHost Label: "+hostLabel+"\nHost Name: "+hostName+"\nAnd Host Hash: "+hostHash+"\nAnd type: "+type+"\nAnd IP: "+hostIP);
+	console.log("Generating label and buttons with\nHost Label: "+hostLabel+"\nHost Name: "+hostName+"\nAnd Host Hash: "+hostHash+"\nAnd type: "+type+"\nAnd IP: "+hostIP+"\nAnd blank status: "+hostBlankStatus);
 	function createClientButtonSet(hostLabel, hostName, hostHash, type){
 		var labelTextBox					=		document.createElement("input");
 		var labelTextBoxLabel				=		document.createElement("label");
@@ -685,7 +686,7 @@ function createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, blankst
 			});
 		}});
 		$(divEntry).append(labelTextBox);
-		$(divEntry).append(createBlankButton(hostName, hostHash, blankstatus));
+		$(divEntry).append(createBlankButton(hostName, hostHash, hostBlankStatus));
 		$(divEntry).append(createDetailMenu(hostName, hostHash, type, divEntry));
 		counter ++;
 	}
