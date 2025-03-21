@@ -555,6 +555,21 @@ systemd:
           [Service]
           Type=simple
           ExecStart=/usr/bin/systemctl --force reboot
+    # Deprovision watcher service (UID: 0)
+    - name: wavelet_deprovision.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Calls deprovision module
+        Wants=network-online.target
+        After=multi-user.target network-online.target
+        [Service]
+        Type=simple
+        ExecStartPre=/usr/local/bin/populate_etcd_cred.sh
+        LoadCredential=etcdPass:/etc/client_etcd_pw.txt
+        ExecStart=/usr/local/bin/watch_wavelet_deprovision.sh
+        [Install]
+        WantedBy=multi-user.target
     # Mask docker entirely
     - name: docker.service
       mask: true
