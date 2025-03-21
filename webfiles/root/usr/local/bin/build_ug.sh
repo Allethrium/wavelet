@@ -184,7 +184,6 @@ event_decoder(){
 		wavelet_decoder_reveal \
 		wavelet_reboot \
 		wavelet_reset \
-		wavelet_deprovision \
 		wavelet_device_relabel \
 		wavelet_promote --now
 	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
@@ -221,7 +220,6 @@ event_encoder(){
 		wavelet_decoder_reveal \
 		wavelet_reboot \
 		wavelet_reset \
-		wavelet_deprovision \
 		wavelet_device_relabel \
 		wavelet_promote \
 		wavelet_encoder_query --now
