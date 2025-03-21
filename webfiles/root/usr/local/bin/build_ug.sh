@@ -80,6 +80,7 @@ etcd_provision_request(){
 	# Wait for etcd_interaction to perform its task and write the done flag
 	while [[ ! -f /var/home/wavelet/config/provisioned.rq.complete ]]; do
 		sleep .5
+		echo "waiting for provision process to complete.."
 	done
 	KEYNAME="PROV_TEST"; KEYVALUE="True"; write_etcd
 	read_etcd
@@ -235,7 +236,6 @@ event_encoder(){
 }
 
 event_generate_wavelet_encoder_query(){
-	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
 	# We need to add this switch here to ensure if we're a server we don't populate ourselves to the encoders DOM in the webUI..
 	if [[ ${hostNamePretty} == *"enc"* ]]; then
 		event_generateHash enc
