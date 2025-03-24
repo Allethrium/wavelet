@@ -151,7 +151,15 @@
 			"browser.tabs.warnOnClose": {
 				"Value": false,
 				"Status": "locked"
-			}
+			},
+			"browser.sessionstore.resume_from_crash": {
+        		"Value": false,
+        		"Status": "locked"
+      		},
+      		"browser.sessionstore.resume_session_once": {
+        		"Value": false,
+        		"Status": "locked"
+      		}
 		},
 		"PrimaryPassword": false,
 		"PrintingEnabled": false,
