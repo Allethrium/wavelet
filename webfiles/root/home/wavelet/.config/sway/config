@@ -25,7 +25,7 @@ exec mako
 ### Output configuration
 #
 # Default wallpaper (more resolutions are available in /usr/share/backgrounds/sway/)
-output * bg /usr/share/backgrounds/sway/wavelet_test.png fill
+output * bg /usr/local/backgrounds/sway/wavelet_test.png fill
 #
 # Example configuration:
 #
