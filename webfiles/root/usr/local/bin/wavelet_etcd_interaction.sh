@@ -291,20 +291,19 @@ generate_etcd_host_role(){
 	# These probably need to be rethought, or orchestrated via the security layer controller.
 
 	# UI commands
-	VAL=1; KEY="/UI/hosts/${clientHostName}"				; createCmd ${KEY} ${VAL}; roleCmd ${KEY} ;
-	KEY="/UI/hostlist/${clientHostName}"					; createCmd ${KEY} ${VAL}; roleCmd ${KEY} ;
-	KEY="/UI/hostHash/${clientHostName}"					; createCmd ${KEY} ${VAL}; roleCmd ${KEY} ;
-	KEY="/UI/hostLabel/${clientHostName}"					; createCmd ${KEY} ${VAL}; roleCmd ${KEY} ;
+	VAL=1; KEY="/UI/hosts/${clientHostName}"						; createCmd ${KEY} ${VAL}; roleCmd ${KEY} ;
+	KEY="/UI/hostlist/${clientHostName}"							; createCmd ${KEY} ${VAL}; roleCmd ${KEY} ;
+	KEY="/UI/hostHash/${clientHostName}"							; createCmd ${KEY} ${VAL}; roleCmd ${KEY} ;
 
 	# SYSTEM commands
-	KEY="/${clientHostName}/"								; createCmd ${KEY} ${VAL}; roleCmd ${KEY};
-	VAL="${clientIP}"; KEY="/DECODERIP/${clientHostName}"	; createCmd ${KEY} ${VAL}; roleCmd ${KEY};
-	KEY="/hostHash/${clientHostName}"						; createCmd ${KEY} ${VAL}; roleCmd ${KEY};
-	KEY="/${clientHostName}/Hash"							; createCmd ${KEY} ${VAL}; roleCmd ${KEY};
+	KEY="/${clientHostName}/"										; createCmd ${KEY} ${VAL}; roleCmd ${KEY};
+	VAL="${clientIP}"; KEY="/DECODERIP/${clientHostName}"			; createCmd ${KEY} ${VAL}; roleCmd ${KEY};
+	KEY="/hostHash/${clientHostName}"								; createCmd ${KEY} ${VAL}; roleCmd ${KEY};
+	KEY="/${clientHostName}/Hash"									; createCmd ${KEY} ${VAL}; roleCmd ${KEY};
 	
 	# I think these would be better served orchestrated via the controller or here, as they are for the device "backend", and not specific to a host
-	KEY="/UI/interface/"									; roleCmd ${KEY};
-	KEY="/UI/short_hash/"									; roleCmd ${KEY};
+	KEY="/UI/interface/"											; roleCmd ${KEY};
+	KEY="/UI/short_hash/"											; roleCmd ${KEY};
 
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} user add "${clientHostName:0:7}" --new-user-password "${PassWord}"
