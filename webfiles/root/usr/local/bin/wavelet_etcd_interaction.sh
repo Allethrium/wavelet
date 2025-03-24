@@ -235,19 +235,19 @@ encrypt_webui_data() {
 test_auth() {
 	echo "testing $1"
 	if [[ $1 == "svr" ]]; then
-		echo "Testing svr auth.." >> /var/home/${user}/logs
+		echo "Testing svr auth.." >> /var/home/${user}/logs/etcdlog.log
 		KEYNAME="svr_auth"; KEYVALUE="True"
 		/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
 		returnVal=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}")
-		echo "Returned: ${returnVal}" >> /var/home/${user}/logs
+		echo "Returned: ${returnVal}" >> /var/home/${user}/logs/etcdlog.log
 		if [[ ${returnVal} == "True" ]]; then
-			echo "Test successful!" >> /var/home/${user}/logs
+			echo "Test successful!" >> /var/home/${user}/logs/etcdlog.log
 		else
-			echo "Test failed!" >> /var/home/${user}/logs
+			echo "Test failed!" >> /var/home/${user}/logs/etcdlog.log
 			exit 1
 		fi
 	else
-		echo "Testing webui auth.." >> /var/home/${user}/logs
+		echo "Testing webui auth.." >> /var/home/${user}/logs/etcdlog.log
 		KEYNAME="/UI/ui_auth"
 		local password2=$(cat /var/home/wavelet/http-php/secrets/pw2.txt)
 		local decrypt=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -nosalt -in /var/home/wavelet/http-php/secrets/crypt.bin -d)
@@ -255,11 +255,11 @@ test_auth() {
 		etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} put "/UI/ui_auth" -- "True"
 		echo "Attempting: etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} get ${KEYNAME}" >> /var/home/${user}/logs/etcdlog.log
 		returnVal=$(etcdctl --endpoints=${ETCDENDPOINT} --user webui:${webuipw} get "${KEYNAME}" --print-value-only)
-		echo "Returned: ${returnVal}" >> /var/home/${user}/logs
+		echo "Returned: ${returnVal}" >> /var/home/${user}/logs/etcdlog.log
 		if [[ ${returnVal} == *"True"* ]]; then
-			echo "Test successful!" >> /var/home/${user}/logs
+			echo "Test successful!" >> /var/home/${user}/logs/etcdlog.log
 		else
-			echo "Test failed!" >> /var/home/${user}/logs
+			echo "Test failed!" >> /var/home/${user}/logs/etcdlog.log
 			exit 1
 		fi
 	fi
