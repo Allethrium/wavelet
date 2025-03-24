@@ -571,10 +571,12 @@ function createInputButton(key, value, keyFull, inputHost, functionIndex, IP) {
 	var currentInputsHash			=		getActiveInputHash();
 	
 	divEntry.setAttribute("divDeviceHash", value);
-	divEntry.setAttribute("data-fulltext", inputHost + keyFull);
+	divEntry.setAttribute("data-fulltext", keyFull);
+	divEntry.setAttribute("data-label", inputHost + ": " + key);
+	divEntry.setAttribute("data-inputHost", inputHost);
 	divEntry.setAttribute("divDevID", dynamicButton.id);
 	$(divEntry).addClass('input_divider_device');
-	console.log("dynamic video source div created for device hash: " + value + " and label:  " + key + "on host: ");
+	console.log("dynamic video source div created for device hash: " + value + " and label:  " + key + "on host: " + inputHost);
 	// Create the device button
 	function createInputButton(text, value) {
 		var $btn = $('<button/>', {
@@ -728,7 +730,7 @@ function relabelInputElement() {
 	const oldGenText                                =               $(this).parent().attr('data-fulltext');
 	const newTextInput                              =               prompt("Enter new text label for this device:");
 	const inputButtonLabel                          =               $(this).next('button').attr('label');
-	var hostName									=               $(this).next('button').attr('label').split('/')[0];
+	var hostName									=               $(this).parent().attr('data-inputHost');
 	const functionID								=				$(this).parent().attr('data-functionID');
 	var deviceIpAddr								=				$(this).parent().attr('title');
 	console.log("Found Hash is: " + selectedDivHash + "\nFound button ID is: " + relabelTarget + "\nFound Label is: " + inputButtonLabel);
@@ -743,7 +745,7 @@ function relabelInputElement() {
 	if (newTextInput !== null && newTextInput !== "") {
 		document.getElementById(relabelTarget).innerText = `${hostName}: ${newTextInput}`;
 		document.getElementById(relabelTarget).oldGenText = oldGenText;
-		console.log("Button text successfully applied as: " + hostName + newTextInput);
+		console.log("Button text successfully applied as: " + hostName + ": " + newTextInput);
 		console.log("The originally generated device field from Wavelet was: " + oldGenText);
 		console.log("The button must be activated for any changes to reflect on the video banner!");
 		$.ajax({
