@@ -456,6 +456,12 @@ storage:
       overwrite: true
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/home/wavelet/.config/sway/config
+    # A simple desktop background
+    - path: /usr/share/backgrounds/sway/wavelet_test.png
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root//usr/share/backgrounds/sway/wavelet_test.png
     # For SWAY - Styles.css is for the controller surface elsewhere..
     - path: /home/wavelet/.config/waybar/style.css
       mode: 0755
