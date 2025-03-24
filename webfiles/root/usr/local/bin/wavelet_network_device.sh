@@ -325,8 +325,14 @@ populate_to_etcd(){
 probe_ip(){
 	# Probes a specific IP.  Can be called from CLI or more commonly from detectv4l.sh
 	echo -e "Detected IP Address: ${ipAddr}"
-	macAddr=$(cat /var/lib/dnsmasq/dnsmasq.leases | grep ${ipAddr} | awk '{print $2}')
-	parse_macaddr "${ipAddr}" "${macAddr}"
+	wavelet_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "/DECODERIP/")
+	if [[ $i == *"{wavelet_ip}"* ]]; then
+		echo "IP is registered in wavelet, it's probably a host! ignoring."
+		exit 0
+	else
+		macAddr=$(cat /var/lib/dnsmasq/dnsmasq.leases | grep ${ipAddr} | awk '{print $2}')
+		parse_macaddr "${ipAddr}" "${macAddr}"
+	fi
 }
 
 
