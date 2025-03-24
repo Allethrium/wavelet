@@ -567,7 +567,7 @@ event_generateHash(){
 			KEYNAME="/UI/hosts/${hostNameSys}/hash"; KEYVALUE="${hostHash}"; write_etcd_global
 			KEYNAME="/UI/hosts/${hostNameSys}/control/label"; KEYVALUE="${hostNamePretty}"; write_etcd_global
 			# Populate SYSTEM values
-			KEYNAME="/${hostNameSys}/Hash"; write_etcd_global
+			KEYNAME="/${hostNameSys}/Hash"; KEYVALUE="${hostHash}"; write_etcd_global
 			KEYNAME="/hostHash/${hostNameSys}"; KEYVALUE="${hostHash}"; write_etcd_global
 			KEYNAME="/hostHash/${hostNameSys}/label"; KEYVALUE="${hostNamePretty}"; write_etcd_global
 			KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
