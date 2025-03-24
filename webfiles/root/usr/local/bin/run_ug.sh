@@ -113,10 +113,10 @@ event_decoder(){
 	# Ensure all reset, reveal and reboot flags are set to 0 so they are
 	# 1) populated
 	# 2) not active so the new device goes into a reboot/reset/reveal loop
-	KEYNAME="/UI/hosts/${hostNameSys}/DECODER_RESET"; KEYVALUE="0"; write_etcd_global
-	KEYNAME="/UI/hosts/${hostNameSys}/DECODER_REVEAL"; write_etcd_global
-	KEYNAME="/UI/hosts/${hostNameSys}/DECODER_REBOOT"; write_etcd_global
-	KEYNAME="/UI/hosts/${hostNameSys}/DECODER_BLANK"; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/control/DECODER_RESET"; KEYVALUE="0"; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/control/DECODER_REVEAL"; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/control/DECODER_REBOOT"; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/control/DECODER_BLANK"; write_etcd_global
 	# Enable watcher services now all task activation keys are set to 0
 	systemctl --user enable \
 		wavelet_decoder_reset.service \
