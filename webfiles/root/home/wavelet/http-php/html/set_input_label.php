@@ -63,14 +63,14 @@ $token	=	get_etcd_auth_token();
 if (str_contains ($hash, '/network_interface/')) {
 		echo "This is a network device, calling appropriate function for network device..";
 		$value=$hash;
-		$modHash=(str_replace("/network_interface/", "", $value, $token));
-		set_etcd_inputLabel('/network_interface/short/' . $label, $modHash, $token);
-		set_etcd_inputLabel('/network_shorthash/' . $modHash, $label, $token);
+		$modHash=(str_replace("/UI/network_interface/", "", $value, $token));
+		set_etcd_inputLabel('/UI/network_interface/short/' . $label, $modHash, $token);
+		set_etcd_inputLabel('/UI/network_shorthash/' . $modHash, $label, $token);
 		del_etcd($oldText, $token);
 	} else {
 		echo "This is a local device, calling appropriate function for local device..";
-		set_etcd_inputLabel('/interface/' .$label, $hash, $token);
-		set_etcd_inputLabel('/short_hash/' .$hash, $label, $token);
+		set_etcd_inputLabel('/UI/interface/' .$label, $hash, $token);
+		set_etcd_inputLabel('/UI/short_hash/' .$hash, $label, $token);
 		del_etcd("$oldText", $token);
 	}
 ?>
