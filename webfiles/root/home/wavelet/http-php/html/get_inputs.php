@@ -58,7 +58,7 @@ function curl_etcd($key, $token) {
 	$hashDataArray = json_decode($result, true); 
 	foreach ($hashDataArray['kvs'] as $x => $item) {
 		$decodedKey		=	base64_decode($item['key']);
-		$decodedValue	=	strtok(base64_decode($item['value']). "\\");
+		$decodedValue	=	strtok(base64_decode($item['value']), "\\");
 		$Decoded		=	json_encode($decodedValue);
 		return $Decoded;
 	}
