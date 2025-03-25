@@ -31,7 +31,7 @@ function poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit, $token) {
 			'key'			=>	trim($decodedKeyShort),
 			'value'			=>	$decodedValue,
 			'keyFull'		=>	$decodedKey,
-			'host'			=>	str_replace("\"", "", (curl_etcd('/UI/short_hash/' . $decodedValue, $token)))
+			'host'			=>	strtok(curl_etcd('/UI/short_hash/' . $decodedValue, $token), "/")
 		];
 	}
 	$output = json_encode($newData);
@@ -58,9 +58,9 @@ function curl_etcd($key, $token) {
 	$hashDataArray = json_decode($result, true); 
 	foreach ($hashDataArray['kvs'] as $x => $item) {
 		$decodedKey		=	base64_decode($item['key']);
-		$decodedValue	=	base64_decode($item['value']);
-		$Decoded		=	json_encode($decodedHashValue);
-		return substr($Decoded, 0, (strpos($Decoded, '\\')));
+		$decodedValue	=	strtok(base64_decode($item['value']). "\\");
+		$Decoded		=	json_encode($decodedValue);
+		return $Decoded;
 	}
 }
 
