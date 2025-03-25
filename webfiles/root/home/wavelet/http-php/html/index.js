@@ -554,7 +554,8 @@ function createInputButton(key, value, keyFull, inputHost, inputHostL, functionI
 	const text							=		document.createTextNode(key);
 	const id							=		document.createTextNode(counter + 1);
 	dynamicButton.id					=		counter;
-	hostNameLabel						=		inputHostL;
+	hostName							=		inputHost;
+ 	hostNameLabel						=		inputHostL;
 	deviceLabel							=		key;
 	/* create a div container, where the button, relabel button and any other associated elements reside */
 	if (functionIndex === 1) {
@@ -562,9 +563,10 @@ function createInputButton(key, value, keyFull, inputHost, inputHostL, functionI
 		dynamicInputs.appendChild(divEntry);
 		divEntry.setAttribute("data-functionID", functionIndex);
 		const title						=		document.createTextNode(key);
+		hostNameAndDevice				=		(hostNameLabel + ":" + key);
 	} else if (functionIndex === 3) {
 		console.log("called from thirdAjax, so this is a network video source");
-		hostNameAndDevice				=		(IP + ": " + key);
+		hostNameAndDevice				=		(IP + ":" + key);
 		dynamicNetworkInputs.appendChild(divEntry);
 		divEntry.setAttribute("data-functionID", functionIndex);
 		divEntry.setAttribute("title", IP);
@@ -576,12 +578,12 @@ function createInputButton(key, value, keyFull, inputHost, inputHostL, functionI
 	
 	divEntry.setAttribute("divDeviceHash", value);
 	divEntry.setAttribute("data-fulltext", keyFull);
-	divEntry.setAttribute("data-label", inputHostL + ":" + key);
-	divEntry.setAttribute("data-inputHost", inputHost);
-	divEntry.setAttribute("data-inputHostLabel", inputHost);
+	divEntry.setAttribute("data-label", hostNameLabel + ":" + key);
+	divEntry.setAttribute("data-inputHost", hostName);
+	divEntry.setAttribute("data-inputHostLabel", hostNameLabel);
 	divEntry.setAttribute("divDevID", dynamicButton.id);
 	$(divEntry).addClass('input_divider_device');
-	console.log("dynamic video source div created for device hash: " + value + " and label:  " + key + "on host: " + inputHost);
+	console.log("dynamic video source div created for device hash: " + value + " and label:  " + key + "on host: " + hostName);
 	// Create the device button
 	function createInputButton(text, value) {
 		var $btn = $('<button/>', {
