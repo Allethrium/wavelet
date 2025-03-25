@@ -754,7 +754,7 @@ function relabelInputElement() {
 				hostLabel:			hostLabel,			
 				value:				hashValue,
 				label:				newTextInput,
-				oldInterfaceKey:	(`${hostName};${hostLabel};fullLabel
+				oldInterfaceKey:	fullLabel,
 			  },
 			success: function(response){
 				console.log(response);
