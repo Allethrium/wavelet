@@ -57,10 +57,10 @@ function curl_etcd($key, $token) {
 		curl_close($ch);
 	$hashDataArray = json_decode($result, true); 
 	foreach ($hashDataArray['kvs'] as $x => $item) {
-		$decodedHashKey		=	base64_decode($item['key']);
-		$decodedHashValue	=	base64_decode($item['value']);
-		$HashDecoded		=	json_encode($decodedHashValue);
-		return substr($HashDecoded, 0, (strpos($HashDecoded, '\\')));
+		$decodedKey		=	base64_decode($item['key']);
+		$decodedValue	=	base64_decode($item['value']);
+		$Decoded		=	json_encode($decodedHashValue);
+		return substr($Decoded, 0, (strpos($Decoded, '\\')));
 	}
 }
 
