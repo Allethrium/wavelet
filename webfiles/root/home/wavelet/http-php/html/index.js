@@ -39,7 +39,8 @@ function inputsAjax(){
 				var value		=	item['value'];
 				var keyFull		=	item['keyFull'];
 				var inputHost 	=	item['host'];
-				createInputButton(key, value, keyFull, inputHost, functionIndex);
+				var inputHostL	=	item['hostNamePretty'];
+				createInputButton(key, value, keyFull, inputHost, inputHostL, functionIndex);
 				})
 		},
 		complete: function(){
@@ -545,13 +546,16 @@ function createDetailMenu(hostName, hostHash, type, divEntry) {
 	}
 }
 
-function createInputButton(key, value, keyFull, inputHost, functionIndex, IP) {
-	var divEntry					=		document.createElement("Div");
-	var dynamicButton				=		document.createElement("Button");
-	const text						=		document.createTextNode(key);
-	const id						=		document.createTextNode(counter + 1);
-	dynamicButton.id				=		counter;
-	hostNameAndDevice				=		(inputHost + ":" + key);
+function createInputButton(key, value, keyFull, inputHost, inputHostL, functionIndex, IP) {
+	// Note that for the frontend, we always use the PRETTY hostname set for the client
+	// the "real" hostname is still saved as a data attr, but not really used here.
+	var divEntry						=		document.createElement("Div");
+	var dynamicButton					=		document.createElement("Button");
+	const text							=		document.createTextNode(key);
+	const id							=		document.createTextNode(counter + 1);
+	dynamicButton.id					=		counter;
+	hostNameLabel						=		inputHostL;
+	deviceLabel							=		key;
 	/* create a div container, where the button, relabel button and any other associated elements reside */
 	if (functionIndex === 1) {
 		console.log("called from firstAjax, so this is a local video source");
@@ -560,7 +564,7 @@ function createInputButton(key, value, keyFull, inputHost, functionIndex, IP) {
 		const title						=		document.createTextNode(key);
 	} else if (functionIndex === 3) {
 		console.log("called from thirdAjax, so this is a network video source");
-		hostNameAndDevice			=		(IP + ": " + key);
+		hostNameAndDevice				=		(IP + ": " + key);
 		dynamicNetworkInputs.appendChild(divEntry);
 		divEntry.setAttribute("data-functionID", functionIndex);
 		divEntry.setAttribute("title", IP);
@@ -568,12 +572,13 @@ function createInputButton(key, value, keyFull, inputHost, functionIndex, IP) {
 	} else {
 		console.error("createInputButton not called from a valid function");
 	}
-	var currentInputsHash			=		getActiveInputHash();
+	var currentInputsHash				=		getActiveInputHash();
 	
 	divEntry.setAttribute("divDeviceHash", value);
 	divEntry.setAttribute("data-fulltext", keyFull);
-	divEntry.setAttribute("data-label", inputHost + ": " + key);
+	divEntry.setAttribute("data-label", inputHostL + ":" + key);
 	divEntry.setAttribute("data-inputHost", inputHost);
+	divEntry.setAttribute("data-inputHostLabel", inputHost);
 	divEntry.setAttribute("divDevID", dynamicButton.id);
 	$(divEntry).addClass('input_divider_device');
 	console.log("dynamic video source div created for device hash: " + value + " and label:  " + key + "on host: " + inputHost);
@@ -620,20 +625,8 @@ function createInputButton(key, value, keyFull, inputHost, functionIndex, IP) {
 	$(divEntry).append(createInputDeleteButton());
 	$(divEntry).append(createRenameButton());
 	$(divEntry).append(createInputButton(text, value));
-	var createdButton = $(divEntry).find('.dynamicInputButton');
-	/* We might as well do this on pageload instead of creating the buttons..
-	 * 
-	 * if (createdButton.val() == currentInput) {
-		console.log("This button is the currently selected input hash, changing CSS to active!");
-		$(createdButton.css({
-			'background-color': 'red',
-			'color': 'white',
-			'font-size': '44px'
-		}));
-	} */
-
-	/* set counter +1 for button ID */
-	const selectedDivHash			=		$(this).parent().attr('divDeviceHash');
+	var createdButton 					= 		$(divEntry).find('.dynamicInputButton');
+	const selectedDivHash				=		$(this).parent().attr('divDeviceHash');
 	counter++;
 }
 
@@ -731,10 +724,11 @@ function relabelInputElement() {
 	const newTextInput                              =               prompt("Enter new text label for this device:");
 	const inputButtonLabel                          =               $(this).next('button').attr('label');
 	var hostName									=               $(this).parent().attr('data-inputHost');
+	var hostLabel									=               $(this).parent().attr('data-inputHostLabel');
 	const functionID								=				$(this).parent().attr('data-functionID');
 	var deviceIpAddr								=				$(this).parent().attr('title');
-	console.log("Found Hash is: " + selectedDivHash + "\nFound button ID is: " + relabelTarget + "\nFound Label is: " + inputButtonLabel);
-	console.log("Device full label is: " + oldGenText + "\nNew device label: " + newTextInput + "\nHostname: " + hostName);
+	console.log("Found Hash is: " + selectedDivHash + "\nFound button ID is: " + relabelTarget + "\nFound old label is: " + inputButtonLabel);
+	console.log("Device full label is: " + oldGenText + "\nNew device label: " + newTextInput + "\non Hostname: " + hostName);
 	if (functionID == 3) {
 		hashValue	= ("/network_interface/" + selectedDivHash);
 		hostName	= `${deviceIpAddr}`;
@@ -743,9 +737,9 @@ function relabelInputElement() {
 		hashValue = selectedDivHash;
 	}
 	if (newTextInput !== null && newTextInput !== "") {
-		document.getElementById(relabelTarget).innerText = `${hostName}: ${newTextInput}`;
+		document.getElementById(relabelTarget).innerText = `${hostLabel}:${newTextInput}`;
 		document.getElementById(relabelTarget).oldGenText = oldGenText;
-		console.log("Button text successfully applied as: " + hostName + ": " + newTextInput);
+		console.log("Button text successfully applied as: " + hostLabel + ":" + newTextInput + "for system host: " + hostName );
 		console.log("The originally generated device field from Wavelet was: " + oldGenText);
 		console.log("The button must be activated for any changes to reflect on the video banner!");
 		$.ajax({
@@ -753,7 +747,7 @@ function relabelInputElement() {
 			url: "/set_input_label.php",
 			data: {
 				value:          hashValue,
-				label:          (hostName + "/" + newTextInput),
+				label:          (hostLabel + ":" + newTextInput),
 				oldvl:          oldGenText,
 				hostName:       hostName
 			  },

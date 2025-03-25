@@ -10,9 +10,9 @@ function poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit, $token) {
 	curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 	curl_setopt($ch, CURLOPT_POST, 1);
 	curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\": \"$keyPrefix\", \"range_end\": \"$keyPrefixPlusOneBit\"}");
-	$headers	=	array();
-	$headers[]	=	'Authorization: ' .  $token;
-	$headers[]	=	'Content-Type: application/x-www-form-urlencoded';
+	$headers		=	array();
+	$headers[]		=	'Authorization: ' .  $token;
+	$headers[]		=	'Content-Type: application/x-www-form-urlencoded';
 	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 	$result = curl_exec($ch);
 	if (curl_errno($ch)) {
@@ -21,17 +21,16 @@ function poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit, $token) {
 	curl_close($ch);
 	$dataArray				=	json_decode($result, true); // this decodes the JSON string as an associative array
 	foreach ($dataArray['kvs'] as $x => $item) {
-	// This forms the "pretty" label, the value that gets changed when the relabel key is picked.
-	$decodedKeyShort 		=	(str_replace("-video-index0", "", (str_replace("/UI/interface/", "", (base64_decode($item['key']))))));
-	// This is the hash value of the device, and is used to track the device state if it is unplugged/plugged back in to the same port
-	$decodedKey				=	base64_decode($item['key']);
-	// This is the "long" device name which is used as a reverse lookup w/ the device hash
-	$decodedValue			=	base64_decode($item['value']);
+		// we get back a list of keys/vals from /UI/interface/$KEY
+		// $KEY is a packed format of:  HOSTNAME : HOSTNAMEPRETTY : DEVICE LABEL : DEVICE FULLPATH
+		list($hostName, $hostNamePretty, $inputLabel, $inputPath) 				=	explode(";", (base64_decode($item['key'])));
+		$decodedValue															=	base64_decode($item['value']);
 		$newData[]			=	[
-			'key'			=>	trim($decodedKeyShort),
+			'key'			=>	$inputLabel,
 			'value'			=>	$decodedValue,
-			'keyFull'		=>	$decodedKey,
-			'host'			=>	strtok(curl_etcd('/UI/short_hash/' . $decodedValue, $token), "/")
+			'keyFull'		=>	$inputPath,
+			'host'			=>	$hostName,
+			'hostNamePretty'=>	$hostNamePretty
 		];
 	}
 	$output = json_encode($newData);
