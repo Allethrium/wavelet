@@ -132,7 +132,7 @@ set_device_input() {
 	KEYNAME="/UI/short_hash/${deviceHash}"; KEYVALUE="${hostNamePretty}/${device_string_short}"; write_etcd_global
 	# The long_interface value is the device FULL path in the filesystem, local to each encoder.
 	# This is necessary for the owning encoder to know what to test against, along with the reverse value
-	KEYNAME="/${hostnameSys}/long_interface${device_string_long}"; KEYVALUE=${deviceHash}; write_etcd_global
+	KEYNAME="/${hostNameSys}/long_interface${device_string_long}"; KEYVALUE=${deviceHash}; write_etcd_global
 	KEYVALUE="/${hostNameSys}/inputs${device_string_long}"; KEYNAME="/UI/short_hash/${deviceHash}"; write_etcd_global
 	# Hash - short path lookup
 	KEYNAME="/${hostNameSys}/devpath_lookup/${deviceHash}"; KEYVALUE="${v4l_device_path}"; write_etcd_global
