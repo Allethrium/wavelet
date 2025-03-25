@@ -27,11 +27,11 @@ function poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit, $token) {
 		$newHostName 												=	str_replace("/UI/interface/", '', $hostName);
 		$decodedValue												=	base64_decode($item['value']);
 		$newData[]			=	[
-			'key'			=>	$inputLabel,
-			'value'			=>	$decodedValue,
-			'keyFull'		=>	$inputPath,
-			'host'			=>	strtok($hostName, '/'),
-			'hostNamePretty'=>	$hostNamePretty
+			'key'				=>	$inputLabel,
+			'value'				=>	$decodedValue,
+			'keyFull'			=>	$inputPath,
+			'host'				=>	$newHostName,
+			'hostNamePretty'	=>	$hostNamePretty
 		];
 	}
 	$output = json_encode($newData);
