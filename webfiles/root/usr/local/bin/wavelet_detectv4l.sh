@@ -321,7 +321,7 @@ redetect_network_devices(){
 			:
 		else
 			nohup /usr/local/bin/wavelet_network_device.sh "--p" "${i}" &
-			wait
+			wait 1
 		fi
 	done
 }
