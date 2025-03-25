@@ -37,10 +37,11 @@ function inputsAjax(){
 				const functionIndex =   1;
 				var key			=	item['key'];
 				var value		=	item['value'];
+				var keyLong		=	item['keyLong'];
 				var keyFull		=	item['keyFull'];
 				var inputHost 	=	item['host'];
 				var inputHostL	=	item['hostNamePretty'];
-				createInputButton(key, value, keyFull, inputHost, inputHostL, functionIndex);
+				createInputButton(key, value, keyLong, keyFull, inputHost, inputHostL, functionIndex);
 				})
 		},
 		complete: function(){
@@ -546,7 +547,7 @@ function createDetailMenu(hostName, hostHash, type, divEntry) {
 	}
 }
 
-function createInputButton(key, value, keyFull, inputHost, inputHostL, functionIndex, IP) {
+function createInputButton(key, value, keyLong, keyFull, inputHost, inputHostL, functionIndex, IP) {
 	// Note that for the frontend, we always use the PRETTY hostname set for the client
 	// the "real" hostname is still saved as a data attr, but not really used here.
 	var divEntry						=		document.createElement("Div");
@@ -557,6 +558,7 @@ function createInputButton(key, value, keyFull, inputHost, inputHostL, functionI
 	hostName							=		inputHost;
  	hostNameLabel						=		inputHostL;
 	deviceLabel							=		key;
+	fullKey 							=		keyFull;
 	/* create a div container, where the button, relabel button and any other associated elements reside */
 	if (functionIndex === 1) {
 		console.log("called from firstAjax, so this is a local video source");
@@ -577,7 +579,7 @@ function createInputButton(key, value, keyFull, inputHost, inputHostL, functionI
 	var currentInputsHash				=		getActiveInputHash();
 	
 	divEntry.setAttribute("divDeviceHash", value);
-	divEntry.setAttribute("data-fulltext", keyFull);
+	divEntry.setAttribute("data-fulltext", fullKey);
 	divEntry.setAttribute("data-label", hostNameLabel + ":" + key);
 	divEntry.setAttribute("data-inputHost", hostName);
 	divEntry.setAttribute("data-inputHostLabel", hostNameLabel);
@@ -748,11 +750,11 @@ function relabelInputElement() {
 			url: "/set_input_label.php",
 			data: {
 				// Remember we are regenerating the full packed data so we need everything
-				host:			hostName, 
-				hostLabel:		hostLabel,			
-				value:			hashValue,
-				label:			newTextInput,
-				fullPath:		fullLabel,
+				host:				hostName, 
+				hostLabel:			hostLabel,			
+				value:				hashValue,
+				label:				newTextInput,
+				oldInterfaceKey:	(`${hostName};${hostLabel};fullLabel
 			  },
 			success: function(response){
 				console.log(response);

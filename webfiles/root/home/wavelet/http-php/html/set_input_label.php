@@ -8,7 +8,7 @@ include('get_auth_token.php');
 		
 $hash = $_POST["value"];
 $label = $_POST["label"];
-$oldText = $_POST["fullPath"];
+$oldText = $_POST["oldInterfaceKey"];
 $hostName = $_POST["host"];
 $hostLabel = $_POST["hostLabel"];
 

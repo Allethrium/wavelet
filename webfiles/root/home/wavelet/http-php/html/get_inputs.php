@@ -29,7 +29,8 @@ function poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit, $token) {
 		$newData[]			=	[
 			'key'				=>	$inputLabel,
 			'value'				=>	$decodedValue,
-			'keyFull'			=>	$inputPath,
+			'keyFull'			=>	base64_decode($item['key']),
+			'keyLong'			=>	$inputPath
 			'host'				=>	$newHostName,
 			'hostNamePretty'	=>	$hostNamePretty
 		];
