@@ -5,12 +5,12 @@ include('get_auth_token.php');
 // Hash = device hash from webUI, 
 // label = device label from webUI, this is used to overwrite the device string in /interface/ and make the label persistent.
 // oldText = the old device label, which we need to delete from ETCD.
-
-
+		
 $hash = $_POST["value"];
 $label = $_POST["label"];
-$oldText = $_POST["oldvl"];
-$hostName = $_POST["hostName"];
+$oldText = $_POST["fullPath"];
+$hostName = $_POST["host"];
+$hostLabel = $_POST["hostLabel"];
 
 function set_etcd_inputLabel($keyTarget, $keyValue, $token) {
 	$b64KeyTarget = base64_encode($keyTarget);
@@ -70,8 +70,9 @@ if (str_contains ($hash, '/network_interface/')) {
 		del_etcd($oldText, $token);
 	} else {
 		echo "This is a local device, calling appropriate function for local device..";
-		set_etcd_inputLabel('/UI/interface/' . $hostName . $label, $hash, $token);
-		set_etcd_inputLabel('/UI/short_hash/' .$hash, $hostName . $label, $token);
+		// Ensure key format remains:  HOSTNAME;HOSTNAMEPRETTY;DEVICELABEL;DEVICE FULLPATH
+		set_etcd_inputLabel('/UI/interface/' . "$hostName;$hostLabel;$label;$oldText" , $hash, $token);
+		set_etcd_inputLabel('/UI/short_hash/' . $hash, "$hostName;$hostLabel;$label;$oldText", $token);
 		del_etcd("$oldText", $token);
 	}
 ?>

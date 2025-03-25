@@ -22,7 +22,7 @@ function poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit, $token) {
 	$dataArray				=	json_decode($result, true); // this decodes the JSON string as an associative array
 	foreach ($dataArray['kvs'] as $x => $item) {
 		// we get back a list of keys/vals from /UI/interface/$KEY
-		// $KEY is a packed format of:  HOSTNAME : HOSTNAMEPRETTY : DEVICE LABEL : DEVICE FULLPATH
+		// $KEY is a packed format of:  HOSTNAME;HOSTNAMEPRETTY;DEVICELABEL;DEVICE FULLPATH
 		list($hostName, $hostNamePretty, $inputLabel, $inputPath) 				=	explode(";", (base64_decode($item['key'])));
 		$decodedValue															=	base64_decode($item['value']);
 		$newData[]			=	[

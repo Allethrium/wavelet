@@ -720,17 +720,17 @@ function createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, hostBla
 }
 
 function relabelInputElement() {
-	const selectedDivHash                           =               $(this).parent().attr('divDeviceHash');
-	const relabelTarget                             =               $(this).parent().attr('divDevID');
-	const oldGenText                                =               $(this).parent().attr('data-fulltext');
-	const newTextInput                              =               prompt("Enter new text label for this device:");
-	const inputButtonLabel                          =               $(this).next('button').attr('label');
-	var hostName									=               $(this).parent().attr('data-inputHost');
-	var hostLabel									=               $(this).parent().attr('data-inputHostLabel');
+	const selectedDivHash							=				$(this).parent().attr('divDeviceHash');
+	const relabelTarget								=				$(this).parent().attr('divDevID');
+	const fullLabel									=				$(this).parent().attr('data-fulltext');
+	const newTextInput								=				prompt("Enter new text label for this device:");
+	const inputButtonLabel							=				$(this).next('button').attr('label');
+	var hostName									=				$(this).parent().attr('data-inputHost');
+	var hostLabel									=				$(this).parent().attr('data-inputHostLabel');
 	const functionID								=				$(this).parent().attr('data-functionID');
 	var deviceIpAddr								=				$(this).parent().attr('title');
 	console.log("Found Hash is: " + selectedDivHash + "\nFound button ID is: " + relabelTarget + "\nFound old label is: " + inputButtonLabel);
-	console.log("Device full label is: " + oldGenText + "\nNew device label: " + newTextInput + "\non Hostname: " + hostName);
+	console.log("Device full label is: " + fullLabel + "\nNew device label will be hostLabel +: " + newTextInput + "\non Hostname: " + hostName);
 	if (functionID == 3) {
 		hashValue	= ("/network_interface/" + selectedDivHash);
 		hostName	= `${deviceIpAddr}`;
@@ -740,18 +740,19 @@ function relabelInputElement() {
 	}
 	if (newTextInput !== null && newTextInput !== "") {
 		document.getElementById(relabelTarget).innerText = `${hostLabel}:${newTextInput}`;
-		document.getElementById(relabelTarget).oldGenText = oldGenText;
-		console.log("Button text successfully applied as: " + hostLabel + ":" + newTextInput + "for system host: " + hostName );
-		console.log("The originally generated device field from Wavelet was: " + oldGenText);
-		console.log("The button must be activated for any changes to reflect on the video banner!");
+		console.log("Button text successfully applied as: " + hostLabel + ":" + newTextInput + ", for system host: " + hostName );
+		console.log("The originally generated device field from Wavelet was: " + fullLabel);
+		console.log("The button must be activated for any changes to reflect on the video banner (if it is on)");
 		$.ajax({
 			type: "POST",
 			url: "/set_input_label.php",
 			data: {
-				value:          hashValue,
-				label:          (hostLabel + ":" + newTextInput),
-				oldvl:          oldGenText,
-				hostName:       hostName
+				// Remember we are regenerating the full packed data so we need everything
+				host:			hostName, 
+				hostLabel:		hostLabel,			
+				value:			hashValue,
+				label:			(hostLabel + ":" + newTextInput),
+				fullPath:		fullLabel,
 			  },
 			success: function(response){
 				console.log(response);
