@@ -10,6 +10,7 @@ include('get_auth_token.php');
 $hash = $_POST["value"];
 $label = $_POST["label"];
 $oldText = $_POST["oldvl"];
+$hostName = $_POST["hostName"];
 
 function set_etcd_inputLabel($keyTarget, $keyValue, $token) {
 	$b64KeyTarget = base64_encode($keyTarget);
@@ -69,8 +70,8 @@ if (str_contains ($hash, '/network_interface/')) {
 		del_etcd($oldText, $token);
 	} else {
 		echo "This is a local device, calling appropriate function for local device..";
-		set_etcd_inputLabel('/UI/interface/' .$label, $hash, $token);
-		set_etcd_inputLabel('/UI/short_hash/' .$hash, $label, $token);
+		set_etcd_inputLabel('/UI/interface/' . $hostName . $label, $hash, $token);
+		set_etcd_inputLabel('/UI/short_hash/' .$hash, $hostName . $label, $token);
 		del_etcd("$oldText", $token);
 	}
 ?>
