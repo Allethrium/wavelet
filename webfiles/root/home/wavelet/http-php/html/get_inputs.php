@@ -30,7 +30,7 @@ function poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit, $token) {
 			'key'			=>	$inputLabel,
 			'value'			=>	$decodedValue,
 			'keyFull'		=>	$inputPath,
-			'host'			=>	strtok($hostName, '/')
+			'host'			=>	strtok($hostName, '/'),
 			'hostNamePretty'=>	$hostNamePretty
 		];
 	}
