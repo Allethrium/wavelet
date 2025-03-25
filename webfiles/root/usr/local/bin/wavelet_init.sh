@@ -53,8 +53,8 @@ generate_service(){
 
 
 event_init_codec() {
-	KEYNAME=uv_encoder;	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:threads=0:bitrate=8M"; write_etcd_global
-	echo -e "Default LibX265 activated, bitrate 8M\n"
+	KEYNAME=uv_encoder;	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:threads=0:bitrate=10M"; write_etcd_global
+	echo -e "Default LibX265 activated, bitrate 10M\n"
 }
 
 event_init_av1() {
