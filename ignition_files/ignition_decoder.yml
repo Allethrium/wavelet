@@ -79,6 +79,12 @@ storage:
       overwrite: true
       contents:
         source: http://192.168.1.32:8080/ignition/connectwifi.sh
+    # A simple desktop background
+    - path: /usr/local/backgrounds/sway/wavelet_test.png
+      mode: 0755
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/wavelet_test.png
     # Sets hostname (set randomly after bootstrap process completes.
     # Any decoder can be promoted to another device by manually changing hostname
     - path: /etc/hostname
