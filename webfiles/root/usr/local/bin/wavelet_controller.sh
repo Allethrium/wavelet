@@ -459,7 +459,7 @@ wavelet_system_reboot() {
 
 wavelet_clear_inputs() {
 	# Removes all input devices from their appropriate prefixes.
-	# Until I fix the detection/removal stuff so that it works perfectly, this will effectively clean out any cruft from 'stuck'
+	# Until I fix the detection/removal stuff so that it works perfectly, this will effectively clean out any cruft
 	/usr/local/bin/wavelet_clean_inputs.sh
 }
 
@@ -467,6 +467,9 @@ wavelet_detect_inputs() {
 	# Tells detectv4l to run on everything, all encoders watch this flag when they are provisioned as such.
 	KEYNAME="DEVICE_REDETECT"; KEYVALUE=1; write_etcd_global
 	echo -e "All devices now redetecting available input video sources.."
+	sleep 3
+	# And reset the redetect flag to zero after three second sleep.
+	KEYVALUE=0; write_etcd_global
 }
 
 
