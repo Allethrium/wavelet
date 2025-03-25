@@ -751,7 +751,7 @@ function relabelInputElement() {
 				host:			hostName, 
 				hostLabel:		hostLabel,			
 				value:			hashValue,
-				label:			(hostLabel + ":" + newTextInput),
+				label:			newTextInput,
 				fullPath:		fullLabel,
 			  },
 			success: function(response){
