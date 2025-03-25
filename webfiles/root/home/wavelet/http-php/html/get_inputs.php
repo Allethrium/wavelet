@@ -23,13 +23,14 @@ function poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit, $token) {
 	foreach ($dataArray['kvs'] as $x => $item) {
 		// we get back a list of keys/vals from /UI/interface/$KEY
 		// $KEY is a packed format of:  HOSTNAME;HOSTNAMEPRETTY;DEVICELABEL;DEVICE FULLPATH
-		list($hostName, $hostNamePretty, $inputLabel, $inputPath) 				=	explode(";", (base64_decode($item['key'])));
-		$decodedValue															=	base64_decode($item['value']);
+		list($hostName, $hostNamePretty, $inputLabel, $inputPath) 	=	explode(";", (base64_decode($item['key'])));
+		$newHostName 												=	str_replace("/UI/interface/", '', $hostName);
+		$decodedValue												=	base64_decode($item['value']);
 		$newData[]			=	[
 			'key'			=>	$inputLabel,
 			'value'			=>	$decodedValue,
 			'keyFull'		=>	$inputPath,
-			'host'			=>	$hostName,
+			'host'			=>	strtok($hostName, '/')
 			'hostNamePretty'=>	$hostNamePretty
 		];
 	}
