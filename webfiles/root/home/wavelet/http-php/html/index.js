@@ -96,7 +96,7 @@ function networkInputsAjax(){
 				var value			=	item['value'];
 				var keyFull			=	item['keyFull'];
 				var IPAddr			=	item['IP'];
-				createInputButton(key, value, keyFull, functionIndex, IPAddr);
+				createInputButton(key, value, "network", keyFull, "network", "network", functionIndex, IPAddr);
 			})
 		},
 	});
@@ -547,6 +547,30 @@ function createDetailMenu(hostName, hostHash, type, divEntry) {
 	}
 }
 
+function ajaxMonitor(hash) {
+	// Takes the hash argument and tries to return a status every .5 seconds from the parent div hash
+	const selectedDivHash				=		$(this).parent().attr('divDeviceHash');
+	var interval = 500;  // 1000 = 1 second, 3000 = 3 seconds
+		function doAjax() {
+    		$.ajax({
+	            type: 'POST',
+            	url: '/get_device_status.php',
+            	data: {
+					hash:			selectedDivHash
+            	},
+            	dataType: 'json',
+            	success: function (data) {
+                    	$('#hidden').val(data);// first set the value     
+            	},
+            	complete: function (data) {
+                    	// Schedule the next
+                    	setTimeout(doAjax, interval);
+            	}
+    		});
+	}
+	setTimeout(doAjax, interval);
+}
+
 function createInputButton(key, value, keyLong, keyFull, inputHost, inputHostL, functionIndex, IP) {
 	// Note that for the frontend, we always use the PRETTY hostname set for the client
 	// the "real" hostname is still saved as a data attr, but not really used here.
@@ -725,21 +749,24 @@ function relabelInputElement() {
 	const selectedDivHash							=				$(this).parent().attr('divDeviceHash');
 	const relabelTarget								=				$(this).parent().attr('divDevID');
 	const fullLabel									=				$(this).parent().attr('data-fulltext');
-	const newTextInput								=				prompt("Enter new text label for this device:");
+	var newTextInput								=				prompt("Enter new text label for this device:", "New Label Value.");
 	const inputButtonLabel							=				$(this).next('button').attr('label');
 	var hostName									=				$(this).parent().attr('data-inputHost');
 	var hostLabel									=				$(this).parent().attr('data-inputHostLabel');
 	const functionID								=				$(this).parent().attr('data-functionID');
 	var deviceIpAddr								=				$(this).parent().attr('title');
 	console.log("Found Hash is: " + selectedDivHash + "\nFound button ID is: " + relabelTarget + "\nFound old label is: " + inputButtonLabel);
-	console.log("Device full label is: " + fullLabel + "\nNew device label will be hostLabel +: " + newTextInput + "\non Hostname: " + hostName);
+	console.log("Device full label is: " + fullLabel);
 	if (functionID == 3) {
-		hashValue	= ("/network_interface/" + selectedDivHash);
-		hostName	= `${deviceIpAddr}`;
-		console.log('This is a network device, substituting path strings for PHP handler\nSetting hostname to IP Address:' + deviceIpAddr);
+		hashValue	=	selectedDivHash;
+		hostName	=	`${deviceIpAddr}`;
+		hostLabel	=	`${deviceIpAddr}`;
+		console.log('This is a network device!\nSetting hostname to: ' + deviceIpAddr + ":" + newTextInput);
 	} else {
 		console.log('This is a local device, use div hash');
-		hashValue = selectedDivHash;
+		hashValue	=	selectedDivHash;
+		inputButtonLabel;
+		console.log("New device label will be hostLabel +: " + newTextInput + "\non Hostname: " + hostName);
 	}
 	if (newTextInput !== null && newTextInput !== "") {
 		document.getElementById(relabelTarget).innerText = `${hostLabel}:${newTextInput}`;
@@ -773,13 +800,7 @@ function removeInputElement() {
 	const inputButtonKeyFull                        =               $(this).parent().attr('data-fulltext');
 	const functionID								=				$(this).parent().attr('data-functionID');
 	console.log("Found Hash for removal is: " + selectedDivHash + "\nFound button ID is: " + relabelTarget + "\nFound Label is: " + inputButtonKeyFull);
-	if (functionID == 3) {
-		console.log("Network device, function ID 3");
-		hashValue = ("/UI/network_shorthash/" + selectedDivHash);
-	} else {
-		console.log("Local device or other, function ID not 3");
-		hashValue = selectedDivHash;
-	}
+	hashValue = selectedDivHash;
 	console.log("Deleting input entry and associated key: " + inputButtonKeyFull + " and value: " + hashValue);
 		$.ajax({
 			type: "POST",
@@ -794,7 +815,7 @@ function removeInputElement() {
 		});
 	sleep(1000);
 	$(this).parent().remove();
-	location.reload();
+	//location.reload();
 }
 
 function removeHostElement(hostName, hostHash) {

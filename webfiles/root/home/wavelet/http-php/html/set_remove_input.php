@@ -24,7 +24,7 @@ function del_etcd($input, $token) {
 	if (curl_errno($ch)) {
 		echo 'Error:' . curl_error($ch);
 	}
-	echo "\n$input range removed";
+	// echo "\n$input range removed";
 }
 
 function get_etcd($key, $token) {
@@ -44,21 +44,21 @@ function get_etcd($key, $token) {
 		echo 'Error:' . curl_error($ch);
 	}
 	curl_close($ch);
-	echo "\n Successfully got {$keyTarget} for {$keyValue} \n";
+	// echo "Successfully got {$keyTarget} for {$keyValue} \n";
 	return $keyValue;
 }
 
 $token						=	get_etcd_auth_token();
-echo "PHP set_remove_input Received removal request for Key:\n$key\nAnd value:\n$value\n";
+// echo "PHP set_remove_input Received removal request for Key:\n$key\nAnd value:\n$value\n";
 
-if (str_contains ($key, '/UI/network_shorthash/')) {
-	echo "\nThis is a network device, calling appropriate function for network device..\n";
+if (str_contains ($key, 'network_interface')) {
+	echo "This is a network device, calling appropriate function for network device..";
 	del_etcd("$key", $token);
 	del_etcd("/UI/short_hash/$value", $token);
 } else {
 	echo "\nThis is a local device, calling appropriate function for local device..\n";
 	// we no longer need to perform steps to provide keys because all the data we need for interface is stored in postdata.
-	del_etcd("/UI/short_hash/$value", $token);
 	del_etcd($key, $token);
+	del_etcd("/UI/short_hash/$value", $token);
 }
 ?>

@@ -57,16 +57,14 @@ function del_etcd($keyTarget, $token) {
 
 // curl etcd uv_hash_select for the value of the device hash we want to see streaming on the system
 // please note how we have to call the function twice to set the reverse lookup values as well as the fwd values!
-echo "posted data are: \n New Label: $label, \n Old Label: $oldText, \n Hash: $hash \n";
+echo "posted data are: \n New Label: $label, \n Old Full Key: $oldText, \n Hash: $hash \n";
 
 // Here we need to determine if we are dealing with a USB or PCIe capture device attached to the server, or whether we are dealing with a network device, as they are written in different keys on etcd
 $token	=	get_etcd_auth_token();
-if (str_contains ($hash, '/network_interface/')) {
+if (str_contains ($oldText, 'network_interface')) {
+		// Packed format IP;DEVICE_LABEL(attempts to set the device hostname!);IP -- $HASH
 		echo "This is a network device, calling appropriate function for network device..";
-		$value=$hash;
-		$modHash=(str_replace("/UI/network_interface/", "", $value, $token));
-		set_etcd_inputLabel('/UI/network_interface/short/' . $label, $modHash, $token);
-		set_etcd_inputLabel('/UI/network_shorthash/' . $modHash, $label, $token);
+		set_etcd_inputLabel('/UI/network_interface/' . "$hostName;$label;$hostName", $hash, $token);
 		del_etcd($oldText, $token);
 	} else {
 		echo "This is a local device, calling appropriate function for local device..";

@@ -315,13 +315,13 @@ redetect_network_devices(){
 	for i in $(cat /var/lib/dnsmasq/dnsmasq.leases | awk '{print $3}'); do
 		echo "Probing IP Address: ${i}"
 		# Check to see if we're a registered wavelet device
-		wavelet_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix" "/DECODERIP/")
+		wavelet_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix_global" "/DECODERIP/")
 		if [[ $i == *"{wavelet_ip}"* ]]; then
 			echo "IP is a wavelet host, ignoring."
-			:
+			exit 0
 		else
-			nohup /usr/local/bin/wavelet_network_device.sh "--p" "${i}" &
-			wait 4
+			echo "Calling network device sense for IP Address: ${i}"
+			/usr/local/bin/wavelet_network_device.sh "--p" "${i}"
 		fi
 	done
 }
