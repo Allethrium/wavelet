@@ -57,5 +57,7 @@ KEYNAME="/UI/interface"; delete_etcd_key_prefix
 KEYNAME="/UI/short_hash/"; delete_etcd_key_prefix
 KEYNAME="/long_hash/"; delete_etcd_key_prefix
 KEYNAME="/$(hostname)/inputs"; delete_etcd_key_prefix
+KEYNAME="/UI/network_interface/"; delete_etcd_key_prefix
+KEYNAME="/UI/network_shorthash/"; delete_etcd_key_prefix
 echo -e "\nInput Device data completely cleared.  Plug a device in to begin detection of input sources from scratch.\n"
 exit 0

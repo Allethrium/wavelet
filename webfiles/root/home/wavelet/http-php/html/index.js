@@ -458,7 +458,7 @@ function createDecoderMenuSet(hostName, hostHash, type) {
 	let activeMenuSelector			=	(`#hamburgerMenu_${hostHash}`);
 	let buttonList 					=	['DEPROVISION','RESET','REBOOT','REVEAL'];
 	for (let item of buttonList) {
-		console.log("Setting up" + item);
+		console.log("Setting up: " + item);
 		$(activeMenuSelector).append(createHostButton(hostName, hostHash, item));
 	}
 	$(activeMenuSelector).append(createCodecStateChangeButton(hostName, hostHash, type));
@@ -738,6 +738,7 @@ function relabelInputElement() {
 		hostName	= `${deviceIpAddr}`;
 		console.log('This is a network device, substituting path strings for PHP handler\nSetting hostname to IP Address:' + deviceIpAddr);
 	} else {
+		console.log('This is a local device, use div hash');
 		hashValue = selectedDivHash;
 	}
 	if (newTextInput !== null && newTextInput !== "") {
@@ -761,6 +762,7 @@ function relabelInputElement() {
 			}
 			});
 	} else {
+		console.log("text input was empty!");
 		return;
 	}
 }
@@ -773,7 +775,7 @@ function removeInputElement() {
 	console.log("Found Hash for removal is: " + selectedDivHash + "\nFound button ID is: " + relabelTarget + "\nFound Label is: " + inputButtonKeyFull);
 	if (functionID == 3) {
 		console.log("Network device, function ID 3");
-		hashValue = ("/network_ip/" + selectedDivHash);
+		hashValue = ("/UI/network_shorthash/" + selectedDivHash);
 	} else {
 		console.log("Local device or other, function ID not 3");
 		hashValue = selectedDivHash;
@@ -790,8 +792,8 @@ function removeInputElement() {
 				console.log(response);
 			}
 		});
+	sleep(1000);
 	$(this).parent().remove();
-	sleep(300);
 	location.reload();
 }
 
@@ -809,7 +811,7 @@ function removeHostElement(hostName, hostHash) {
 			}
 		});
 	$(this).parent().remove();
-	sleep(300);
+	sleep(1000);
 	location.reload();
 }
 
@@ -888,6 +890,7 @@ function getActiveInputHash(activeInputHash) {
 }
 
 function sleep(ms) {
+	console.log("Sleeping for:" + ms);
 	return new Promise(resolve => setTimeout(resolve, ms || DEF_DELAY));
 }
 

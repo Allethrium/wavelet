@@ -298,16 +298,16 @@ read_leasefile(){
 populate_to_etcd(){
 	# Now we populate the appropriate keys for webUI labeling and tracking:
 	echo -e "Populating ETCD with discovery data..\n"
-	KEYNAME="/UI/network_interface/short/${deviceHostName}"; KEYVALUE="${deviceHash}"; write_etcd_global
-	KEYNAME="/network_shorthash/${deviceHash}"; KEYVALUE="${deviceHostName}"; write_etcd_global
-	#KEYNAME="/network_long/${leasefile}"
-	#KEYVALUE="${devicehash}"
-	#write_etcd_global
-	KEYNAME="/network_longhash/${deviceHash}"; KEYVALUE="${leasefile}"; write_etcd_global
+	# Packed format IP;DEVICE_LABEL(HOSTNAME!);DEVICE_MAC -- $HASH
+	KEYNAME="/UI/network_interface/${ipAddr};${deviceHostName};${macAddr}"; KEYVALUE="${deviceHash}"; write_etcd_global
+	KEYNAME="/UI/short_hash/${deviceHash}"; KEYVALUE="${ipAddr};${deviceHostName};${macAddr}"; write_etcd_global
+	# Values used by the controller inaccessible to UI
 	KEYNAME="/network_ip/${deviceHash}"; KEYVALUE="${ipAddr}"; write_etcd_global
 	KEYNAME="/network_uv_stream_command/${ipAddr}"; KEYVALUE="${UGdeviceStreamCommand}"; write_etcd_global
 	echo -e "Device successfully configured, finishing up..\n"
 	# since we now have a network device active on the system, we need to setup an IP ping watcher to autoremove it or note it as bad
+		# This would give us a status field in UI by input hash, along with a statuscode (Good, Bad, Unhealthy) and a float tooltip for log entries perhaps?
+		# KEYNAME="/UI/status/${deviceHash}"; KEYVALUE="${STATUSCODE};${LOGbase64}"; write_etcd_global
 		# Read current IP subscription list
 		# find this device in the IP Subscription list
 		# if is not already there, append it
@@ -315,8 +315,6 @@ populate_to_etcd(){
 		# etcd  /network_health/${ipAddr} --  GOOD or BAD
 		# Finally, set and configure a watcher service for this device so that it will reconfigure the device hostname if the label is changed on the webUI
 		# /usr/local/bin/wavelet_network_device_relabel.sh
-	# This key often winds up with garbage, and must be deleted or it will cause issues parsing things back out.
-	KEYNAME="/UI/network_interface/short"; delete_etcd_key
 	# Finally we tell wavelet there is a new input device in town so the server encoder task will regenerate next click..
 	KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
 	exit 0
