@@ -582,7 +582,7 @@ event_device_redetect(){
 }
 event_host_relabel_watcher(){
 	# Watches for a device relabel flag, then runs wavelet_device_relabel.sh
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/%H/control/RELABEL 0 0 "wavelet_device_relabel" \"relabel\"
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/%H/control/label 0 0 "wavelet_device_relabel" \"relabel\"
 }
 event_clear_devicemap(){
 	# Clears the device map file so it will be regenerated.  Since the paths under v4l2 aren't stable, 
