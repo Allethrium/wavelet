@@ -693,15 +693,16 @@ function createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, hostBla
 			if ( oldLabelValue 				==		prettyName ) {
 				console.log("Error, values have not changed, doing nothing")
 			} else {
-			console.log("submitting to set_hostlabel.php with values---\nHash: " + phpHostHash + "\nNew Label: " + prettyName + "\nHostname: " + hostName + "\nType: " + type);
+			console.log("submitting to set_host_control.php with values---\nHash: " + phpHostHash + "\nNew Label: " + prettyName + "\nHostname: " + hostName + "\nType: " + type);
 			$.ajax({
-				url : '/set_host_label.php',
+				url : '/set_host_control.php',
 				type :'post',
 				data:{
 					hash:			phpHostHash,
-					prettyName:		prettyName,
-					hostName:		hostName,
-					type   :		type
+					value:			prettyName,
+					key:			hostName,
+					type   :		type,
+					hostFunction:	"label"
 					},
 				success:	function(response) {
 					console.log(response);

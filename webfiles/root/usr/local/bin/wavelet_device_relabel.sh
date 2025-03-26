@@ -52,6 +52,8 @@ generate_service(){
 	# Can be called with more args with "generate_servier" ${keyToWatch} 0 0 "${serviceName}"
 	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
 }
+
+
 detect_self(){
 	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
 	echo -e "Hostname is ${printvalue} \n"
@@ -67,22 +69,21 @@ detect_self(){
 		esac
 }
 
-
 check_label(){
 	# Finds our current hash and gets the new label from Etcd as set from UI
 	oldLabel=${hostNamePretty}
 	echo "${oldLabel}" > /home/wavelet/oldLabel.txt
-	KEYNAME="/hostHash/${hostNameSys}/relabel_active"; KEYVALUE="1"; write_etcd_global
 	KEYNAME="/${hostNameSys}/Hash"; read_etcd_global; myHostHash="${printvalue}"
 	echo -e "My hash is ${myHostHash}, attempting to find a my new device label..\n"
-	KEYNAME="/${hostNameSys}/hostNamePretty"; read_etcd_global; myNewHostLabel="${printvalue}"
+	KEYNAME="/UI/host/${hostNameSys}/control/label"; read_etcd_global; myNewHostLabel="${printvalue}"
 	echo -e "My *New* host label is ${myNewHostLabel}!\n"
 	if [[ "${hostNamePretty}" == "${myNewHostLabel}" ]]; then
 		echo -e "New label and current Pretty hostname are identical, setting flag to 0 and doing nothing..\n"
-		KEYNAME="/hostHash/${hostNamePretty}/relabel_active"; KEYVALUE="0"; write_etcd_global
+		KEYNAME="/${hostNameSys}/relabel_active"; KEYVALUE="0"; write_etcd_global
 		exit 0
 	else
 		echo -e "New label and current Pretty hostname are different, proceding to initiate change.."
+		KEYNAME="/${hostNameSys}/relabel_active"; KEYVALUE="1"; write_etcd_global
 		set_newLabel
 	fi
 }
@@ -109,7 +110,7 @@ set_newLabel(){
 	fi
 	echo "${appendedHostName}" > newHostName.txt
 	KEYNAME="/${hostNameSys}/RECENT_RELABEL"; KEYVALUE="1"; write_etcd_global
-	# Generate the necessary files, then reboot.
+	# Generate the necessary files, then reboot if needed.
 	set_newHostName ${appendedHostName}
 }
 
@@ -204,7 +205,7 @@ set_newHostName(){
 	myNewHostname=$@
 	if hostnamectl hostname --pretty ${myNewHostname}; then
 		echo -e "\nHost Name set as ${myNewHostName} successfully!, writing relabel_active to 0."
-		KEYNAME="/hostHash/${hostNameSys}/relabel_active"; KEYVALUE="0";	write_etcd_global
+		KEYNAME="/${hostNameSys}/relabel_active"; KEYVALUE="0";	write_etcd_global
 		KEYNAME="/${hostNameSys}/RECENT_RELABEL";	KEYVALUE="1"; 			write_etcd_global
 		echo "Done, no further actions needed."
 	else
@@ -213,17 +214,6 @@ set_newHostName(){
 	fi
 }
 
-event_hostNameChange() {
-	KEYNAME="/${hostNameSys}/RELABEL"; read_etcd_global
-	if [[ "${printvalue}" -eq "0" ]]; then
-		echo -e "Relabel task bit for this hostname is set to 0, doing nothing.."
-		exit 0
-	fi
-	echo -e "Relabel bits active, resetting them to 0 prior to starting task.."
-	KEYNAME="/hostHash/${hostNameSys}/relabel_active"; KEYVALUE="0"; write_etcd_global
-	KEYNAME="/${hostNameSys}/RELABEL"; KEYVALUE="0"; write_etcd_global
-	detect_self
-}
 
 ###
 #
@@ -254,11 +244,11 @@ for arg in "$@"; do
 		;;
 		enc*)			echo -e "\nCalled with encoder argument, promoting to Decoder\n"				;	event_prefix_set "${arg}"
 		;;
-		"relabel")		echo -e "\nCalled with relabel argument, not calling prefix function..\n"		;	event_hostNameChange
+		"relabel")		echo -e "\nCalled with relabel argument, not calling prefix function..\n"		;	detect_self
 		;;
 		"deprovision")	echo -e "\nCalled with deprov argument, removing inputs..\n"					;	remove_associated_inputs	;	remove_host_keys
 		;;
-		*)				echo -e "\nCalled with invalid argument, not calling prefix function..\n"		;	event_hostNameChange
+		*)				echo -e "\nCalled with invalid argument, not calling prefix function..\n"		;	detect_self
 		;;
 	esac
 done

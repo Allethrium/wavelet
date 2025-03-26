@@ -54,6 +54,7 @@ function validateValue($function, $value) {
 			$output		=	var_dump((bool) $value);	//	convert to bool
 		} else {
 			$output 	=	$value;					//	this can only be the label function
+			$function 	=	"label";
 		}
 	}
 }
