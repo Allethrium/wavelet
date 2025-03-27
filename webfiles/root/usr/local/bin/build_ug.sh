@@ -273,6 +273,7 @@ event_server(){
 	event_device_redetect
 	event_audio_toggle
 	event_audio_bluetooth_connect
+	event_force_deprovision
 	event_generateHash svr
 	systemctl --user daemon-reload
 	systemctl --user start \
@@ -408,7 +409,7 @@ event_reset(){
 event_reveal(){
 	# Tells specific host to display SMPTE bars on screen, useful for finding which is what and where
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/\"%H\"/control/REVEAL 0 0 "wavelet_decoder_reveal"
-}
+}${}
 event_blankhost(){
 	# Tells specific host to display a black testcard on the screen, use this for privacy modes as necessary.
 	# Host Blank is necessary for the UI to load properly, so we always set it here
@@ -418,6 +419,12 @@ event_blankhost(){
 event_promote(){
 	# This flag watches the hostname to instruct the machine to (pro/de)mote the (en/de)coder as appropriate.
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/\"%H\"/control/PROMOTE 0 0 "wavelet_promote"
+}
+event_force_deprovision(){
+	# This one is tricky.  This runs only on the server, and watches all of the host deprovision prefixes
+	# If any prefix is changed, we take that hosts' value and give the host a timeout to respond to the deprovision request
+	# If the timeout is exceeded, the host keys are removed from the system because the host is nonresponsive.
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/UI/hosts/ --prefix" 0 0 "wavelet_force_deprovision"
 }
 event_audio_toggle(){
 	if [[ -f ~/.config/systemd/user/wavelet_audio_toggle.service ]]; then

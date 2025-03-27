@@ -304,6 +304,12 @@ read_leasefile(){
 populate_to_etcd(){
 	# Now we populate the appropriate keys for webUI labeling and tracking:
 	deviceHash=$(echo "${ipAddr}:${macAddr}" | sha256sum | tr -d "[:space:]-")
+	echo -e "Checking for the device hash.."
+	KEYNAME="/UI/short_hash/${packaged}"; read_etcd_global
+	if [[ ${printvalue} = ${deviceHash} ]]; then
+		echo "Device hash already appears to be populated, doing nothing."
+		exit 0
+	fi
 	echo -e "Populating ETCD with discovery data..\n"
 	# Packed format IP;DEVICE_LABEL(attempts to set the device hostname!);IP -- $HASH
 	packaged="${ipAddr};${deviceHostName};${ipAddr}"
@@ -331,11 +337,17 @@ populate_to_etcd(){
 probe_ip(){
 	# Probes a specific IP.  Can be called from CLI or more commonly from detectv4l.sh
 	echo -e "Detected IP Address: ${1}"
+	# Checks to see if IP is decoder/encoder or other wavelet host
 	wavelet_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix_global" "/DECODERIP/")
 	if [[ "${1}" == *"{wavelet_ip}"* ]]; then
 		echo "IP is registered in wavelet, it's probably a host! ignoring."
 		exit 0
 	else
+		KEYNAME="/network_ip/${deviceHash}"; read_etcd_global
+		if [[ ${printvalue} = ${$1} ]]; then
+			echo "This device is already populated in network IP, doing nothing"
+			exit 0
+		fi
 		macAddr=$(cat /var/lib/dnsmasq/dnsmasq.leases | grep ${1} | awk '{print $2}')
 		parse_macaddr "${1}" "${macAddr}"
 	fi

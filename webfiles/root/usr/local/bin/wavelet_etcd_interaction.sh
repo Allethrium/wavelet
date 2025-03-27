@@ -362,7 +362,8 @@ client_provision_get_data() {
 	declare -A commandLine=([3]="${userArg}" [2]="get" [1]="/$(hostname)/${KEYNAME}" [0]="--print-value-only"); fID="clearText"; local output=$(main)
 	if [[ ${output} == "${KEYVALUE}" ]]; then
 		echo "Client test successful!" >> /var/home/wavelet/logs/etcdlog.log
-		# Delete keys now that we are done
+		# Delete keys now that we are done, leaving them around is a security concern.
+		userArg="--user PROV:wavelet_provision"
 		declare -A commandLine=([4]="${userArg}" [1]="del" [0]="/PROV/CRYPT"); fID="clearText"; main
 		declare -A commandLine=([4]="${userArg}" [1]="del" [0]="/PROV/FACTOR2"); fID="clearText"; main
 		declare -A commandLine=([4]="${userArg}" [1]="del" [0]="/PROV/RESPONSE"); fID="clearText"; main
