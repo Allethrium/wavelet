@@ -409,7 +409,7 @@ event_reset(){
 event_reveal(){
 	# Tells specific host to display SMPTE bars on screen, useful for finding which is what and where
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/\"%H\"/control/REVEAL 0 0 "wavelet_decoder_reveal"
-}${}
+}
 event_blankhost(){
 	# Tells specific host to display a black testcard on the screen, use this for privacy modes as necessary.
 	# Host Blank is necessary for the UI to load properly, so we always set it here
@@ -554,7 +554,7 @@ event_generateHash(){
 		echo -e "generated device hash: ${hostHash} \n"
 		# Check for pre-existing keys here
 		KEYNAME="/hostHash/${hostHash}"; read_etcd_global; hashExists=${printvalue}
-		if [[ -z "${hashExists}" || ${#hashExists} -le 1 ]] then
+		if [[ -z "${hashExists}" || ${#hashExists} -le 1 ]]; then
 			echo -e "\nHostname value was set to ${hashExists}, which is null or less than 1 char, therefore it is not valid. \n"
 			# Populate what will initially be used as the label variable from the webUI
 			case ${1} in
@@ -652,24 +652,4 @@ exec > "${logName}" 2>&1
 
 time=0
 event_connectwifi
-
-# This seems problematic and fragile..
-#if [[ $(hostname) == *"svr"* ]];then
-#	until [[ $(/usr/local/bin/wavelet_etcd_interaction.sh "check_status" | awk '{print $6}' | tail -1) = "true," ]]; do
-		#echo -e "Etcd still down.. waiting a second.."
-		#sleep 1
-		#time=$(( ${time} + 1 ))
-		#if [[ $time -eq "60" ]]; then
-			#echo "We have been waiting sixty seconds, there is likely a network issue."
-			#echo "Running the wifi connection script.."
-			#until /usr/local/bin/connectwifi.sh; do
-				#sleep .5
-			#done
-		#fi
-	#done
-#else
-#	echo "Not a server, skipping etcd check.."
-	#sleep 2
-#fi
-
 detect_self
