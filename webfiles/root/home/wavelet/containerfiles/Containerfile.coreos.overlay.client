@@ -20,7 +20,7 @@ fastestmirror=True" > /etc/dnf/dnf.conf && \
 	rm /etc/yum.repos.d/fedora-cisco-openh264.repo
 RUN rpm-ostree override remove nfs-utils-coreos --install nfs-utils
 RUN	rpm-ostree install -y -A \
-		wget fontawesome-fonts wl-clipboard nnn mako sway bemenu rofi-wayland lxsession waybar chrony \
+		wget fontawesome-fonts wl-clipboard nnn mako sway swayimg bemenu rofi-wayland lxsession waybar chrony \
 		foot vim powerline powerline-fonts vim-powerline greetd NetworkManager-wifi iw wireless-regdb wpa_supplicant \
 		avahi rdma freeipa-client iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch etcd sha \
 		libv4l v4l-utils pipewire-v4l2 ImageMagick \
