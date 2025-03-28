@@ -77,6 +77,8 @@ event_decoder_blank(){
         	-gravity Center -fill white label:'This screen is intentionally blank.' \
         	-colorspace RGB /var/home/wavelet/config/blank.bmp
         fi
+        # Add a volume > 0 option here so that we stop any audio output from the device when it's blanked.
+        # This will be necessary to blank off a team call or overflow if audio were being processed.
         swayimg /var/home/wavelet/config/blank.bmp -f --config=info.show=no &
 }
 event_decoder_unblank(){
