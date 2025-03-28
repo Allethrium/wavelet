@@ -67,39 +67,26 @@ generate_service(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
 }
 event_decoder_blank(){
-	echo -e "\nDecoder Blank flag change detected, switching host to blank input...\n\n\n"
-	systemctl --user stop UltraGrid.AppImage.service
-	mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.blank
-	# set ug_args to generate and display smpte testcard
-	ug_args="--tool uv -t testcard:pattern=blank -d vulkan_sdl2:fs:keep-aspect:nocursor:nodecorate"
-	echo -e "
-	[Unit]
-	Description=UltraGrid AppImage executable
-	After=network-online.target
-	Wants=network-online.target
-	[Service]
-	ExecStartPre=-swaymsg workspace 2
-	ExecStart=/usr/local/bin/UltraGrid.AppImage ${ug_args}
-	Restart=always
-	[Install]
-	WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
-	systemctl --user daemon-reload
-	systemctl --user start UltraGrid.AppImage.service
-	systemctl --user restart wavelet_decoder_blank.service
-	echo -e "\nTask Complete.\n"
-	exit 0
+        echo -e "\nDecoder Blank flag change detected, switching host to blank input...\n\n\n"
+        # this should be a blank image
+        if [[ ! -f /var/home/wavelet/config/blankscreen.png ]]; then
+        	echo "Blank display isn't available, generating.."
+			color="rgb(.2, .2, .2, 0)"
+			backgroundcolor="rgb(.2, .2, .2, 0)"
+        	magick -size 1920x1080 -pointsize 50 -background "${color}" -bordercolor "${backgroundcolor}" \
+        	-gravity Center -fill white label:'This screen is intentionally blank.' \
+        	-colorspace RGB /var/home/wavelet/config/blank.bmp
+        fi
+        swayimg /var/home/wavelet/config/blank.bmp -f --config=info.show=no &
+}
+event_decoder_unblank(){
+        pid=$(ps ax | grep swayimg | awk '{print $1}' | head -n 1)
+        kill -15 $pid
+        sleep 1
+        kill -6 $pid
+        exit 0
 }
 
-event_decoder_unblank(){
-	echo -e "\nDecoder Blank flag change detected, restoring host to previous input...\n\n\n"
-	systemctl --user stop UltraGrid.AppImage.service
-	mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.blank /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
-	systemctl --user daemon-reload
-	systemctl --user start UltraGrid.AppImage.service
-	systemctl --user restart wavelet_decoder_blank.service
-	echo -e "\nTask Complete.\n"
-	exit 0
-}
 
 ###
 #
