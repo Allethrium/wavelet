@@ -55,7 +55,7 @@ generate_service(){
 
 
 detect_self(){
-	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/type"; read_etcd_global
 	echo -e "Hostname is ${printvalue} \n"
 	case ${printvalue} in
 		enc*)                                   echo -e "I am an Encoder \n"            ;       check_label
@@ -127,7 +127,7 @@ event_prefix_set(){
 	KEYNAME="/${hostNameSys}/Hash"; read_etcd_global; myHostHash="${printvalue}"
 	KEYNAME="/hostHash/${myHostHash}"; read_etcd_global; myHostLabel="${printvalue}"
 	echo -e "My host label is ${myHostLabel}"
-	KEYNAME="/${hostNameSys}/type"; read_etcd_global; type=${printvalue}
+	KEYNAME="/UI/hosts/${hostNameSys}/type"; read_etcd_global; type=${printvalue}
 		if [[ "${type}" = "dec" ]]; then
 			echo "I am currently a decoder switching to an encoder"
 			typeSwitch="enc"
@@ -136,9 +136,8 @@ event_prefix_set(){
 				wavelet_encoder_query.service \
 				watch_encoderflag.service \
 				wavelet_promote.service --now
-			KEYNAME="/decoderip/${hostNameSys}"; delete_etcd_global
+			KEYNAME="/DECODERIP/${hostNameSys}"; delete_etcd_global
 			KEYNAME="DEVICE_REDETECT"; KEYVALUE="1"; write_etcd_global
-			KEYNAME="reload_reflector"; write_etcd_global
 		else
 			echo "I am not a decoder, switching to become a decoder.."
 			typeSwitch="dec"
@@ -149,19 +148,15 @@ event_prefix_set(){
 				watch_encoderflag.service --now
 			remove_associated_inputs
 		fi
-	KEYNAME="/hostLabel/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/type"; write_etcd_global
 	systemctl restart getty@tty1.service
 }
 
 remove_associated_inputs(){
 	echo "Removing input devices associated with my hostname.."
-	KEYNAME="/interface/${hostNamePretty}/"; read_etcd_prefix_global; read -a devHash <<< "${printvalue}"
+	KEYNAME="/UI/interface/${hostNameSys}"; read_etcd_prefix_global; read -a devHash <<< "${printvalue}"
 	for i in ${devHash[@]}; do
-		echo "Working on hash: ${i}"
-		KEYNAME="/short_hash/${i}"; delete_etcd_key_global
-		KEYNAME="/hash/${i}"; delete_etcd_key_global
-		KEYNAME="/${hostNamePretty}/devpath_lookup/${i}"; delete_etcd_global
 		KEYNAME="uv_hash_select"; read_etcd_global
 		if [[ ${printvalue} = "${i}" ]]; then
 			echo "current device is the selected device, resetting streaming to seal."
@@ -169,36 +164,15 @@ remove_associated_inputs(){
 			KEYNAME="ENCODER_QUERY"; KEYVALUE="2"; write_etcd_global
 			KEYNAME="input_update"; KEYVALUE="1"; write_etcd_global
 		fi
+		echo "Working on hash: ${i}"
+		KEYNAME="/UI/short_hash/${i}"; read_etcd_global; deviceLabel=${printvalue}
+		KEYNAME="/UI/short_hash/${i}"; delete_etcd_key_global
+		KEYNAME="/UI/interface/${deviceLabel}"; delete_etcd_key_global
+		KEYNAME="/${hostNameSys}/devpath_lookup/${i}"; delete_etcd_global
 	done
-	# Now we have processed ALL of the interface items on this host, we can remove the interface labels:
-	KEYNAME="/interface/${hostNamePretty}/"; delete_etcd_key_prefix
+	# Now we have processed ALL of the UI items on this host, we can remove the interface items from the host system side:
 	KEYNAME="/${hostNameSys}/inputs"; delete_etcd_key_prefix
-	KEYNAME="/${hostNamePretty}/inputs"; delete_etcd_key_prefix
 	KEYNAME="/${hostNameSys}/INPUT_DEVICE_PRESENT"; delete_etcd_key_global	
-}
-
-remove_host_keys(){
-	echo "Disabling watcher services and removing any remaining host keys.."
-	systemctl --user disable \
-		wavelet_device_redetect.service \
-		wavelet_encoder_reboot.service \
-		wavelet_monitor_decoder_blank.service \
-		wavelet_monitor_decoder_reboot.service \
-		wavelet_monitor_decoder_reveal.service \
-		wavelet_monitor_decoder_reset.service \
-		watch_encoderflag.service \
-		wavelet_deprovision.service \
-		wavelet_detectv4l.service \
-		wavelet_device_relabel.service \
-		wavelet_encoder.service \
-		wavelet_encoder_query.service \
-		wavelet_promote.service \
-		wavelet_reboot.service \
-		wavelet_reset.service --now
-	KEYNAME="/${hostNameSys}"; delete_etcd_prefix
-	KEYNAME="/hostHash/${hostNameSys}"; delete_etcd_prefix
-	echo "Host keys deleted, shutting down!"
-	systemctl poweroff -i
 }
 
 set_newHostName(){
@@ -245,8 +219,6 @@ for arg in "$@"; do
 		enc*)			echo -e "\nCalled with encoder argument, promoting to Decoder\n"				;	event_prefix_set "${arg}"
 		;;
 		"relabel")		echo -e "\nCalled with relabel argument, not calling prefix function..\n"		;	detect_self
-		;;
-		"deprovision")	echo -e "\nCalled with deprov argument, removing inputs..\n"					;	remove_associated_inputs	;	remove_host_keys
 		;;
 		*)				echo -e "\nCalled with invalid argument, not calling prefix function..\n"		;	detect_self
 		;;
