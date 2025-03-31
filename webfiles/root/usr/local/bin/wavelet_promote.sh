@@ -4,7 +4,7 @@
 detect_self(){
 	systemctl --user daemon-reload
 	# Detect_self in this case relies on the etcd type key
-	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/type"; read_etcd_global
 	echo -e "Host type is: ${printvalue}\n"
 	case "${printvalue}" in
 		enc*)                                   echo -e "I am an Encoder \n"           				;		event_encoder
@@ -95,7 +95,7 @@ exec >/var/home/wavelet/logs/promote.log 2>&1
 hostNameSys=$(hostname)
 hostNamePretty=$(hostnamectl --pretty)
 
-KEYNAME="/$(hostname)/PROMOTE"; read_etcd_global
+KEYNAME="/UI/hosts/${hostNameSys}/control/PROMOTE"; read_etcd_global
 if [[ "${printvalue}" == 1 ]]; then
 	echo -e "\nPROMOTE key is set to 1, continuing with task.. \n"
 	detect_self
