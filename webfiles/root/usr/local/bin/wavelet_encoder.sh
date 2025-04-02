@@ -332,7 +332,7 @@ TimeoutStopSec=0.33
 [Install]
 WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 	# Tell Wavelet I am the active encoder
-	KEYNAME="ACTIVE_ENCODER"; KEYVALUE="${hostNameSys}"; write_etcd_global
+	KEYNAME="ENCODER_ACTIVE"; KEYVALUE="${hostNameSys}"; write_etcd_global
 	# Tell wavelet my encoder IP address
 	activeConnection=$(nmcli -t -f NAME,DEVICE c s -a | head -n 1)
 	activeConnectionIP=$(nmcli dev show ${activeConnection#*:} | grep ADDRESS | awk '{print $2}' | head -n 1)
