@@ -75,7 +75,7 @@ check_label(){
 	echo "${oldLabel}" > /home/wavelet/oldLabel.txt
 	KEYNAME="/${hostNameSys}/Hash"; read_etcd_global; myHostHash="${printvalue}"
 	echo -e "My hash is ${myHostHash}, attempting to find a my new device label..\n"
-	KEYNAME="/UI/host/${hostNameSys}/control/label"; read_etcd_global; myNewHostLabel="${printvalue}"
+	KEYNAME="/UI/hosts/${hostNameSys}/control/label"; read_etcd_global; myNewHostLabel="${printvalue}"
 	echo -e "My *New* host label is ${myNewHostLabel}!\n"
 	if [[ "${hostNamePretty}" == "${myNewHostLabel}" ]]; then
 		echo -e "New label and current Pretty hostname are identical, setting flag to 0 and doing nothing..\n"
@@ -125,7 +125,7 @@ event_prefix_set(){
 		wavelet_monitor_decoder_reveal.service \
 		wavelet_monitor_decoder_reset.service --now
 	KEYNAME="/${hostNameSys}/Hash"; read_etcd_global; myHostHash="${printvalue}"
-	KEYNAME="/hostHash/${myHostHash}"; read_etcd_global; myHostLabel="${printvalue}"
+	KEYNAME="/UI/hosts/${hostNameSys}/control/label"; read_etcd_global; myHostLabel="${printvalue}"
 	echo -e "My host label is ${myHostLabel}"
 	KEYNAME="/UI/hosts/${hostNameSys}/type"; read_etcd_global; type=${printvalue}
 		if [[ "${type}" = "dec" ]]; then
@@ -136,8 +136,8 @@ event_prefix_set(){
 				wavelet_encoder_query.service \
 				watch_encoderflag.service \
 				wavelet_promote.service --now
-			KEYNAME="/DECODERIP/${hostNameSys}"; delete_etcd_global
-			KEYNAME="DEVICE_REDETECT"; KEYVALUE="1"; write_etcd_global
+			KEYNAME="/DECODERIP/${hostNameSys}"; delete_etcd_key_global
+			KEYNAME="NEW_DEVICE_ATTACHED"; KEYVALUE="1"; write_etcd_global
 		else
 			echo "I am not a decoder, switching to become a decoder.."
 			typeSwitch="dec"
@@ -149,7 +149,6 @@ event_prefix_set(){
 			remove_associated_inputs
 		fi
 	KEYNAME="/UI/hosts/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
-	KEYNAME="/${hostNameSys}/type"; write_etcd_global
 	systemctl restart getty@tty1.service
 }
 
@@ -157,12 +156,13 @@ remove_associated_inputs(){
 	echo "Removing input devices associated with my hostname.."
 	KEYNAME="/UI/interface/${hostNameSys}"; read_etcd_prefix_global; read -a devHash <<< "${printvalue}"
 	for i in ${devHash[@]}; do
-		KEYNAME="uv_hash_select"; read_etcd_global
+		KEYNAME="/UI/UV_HASH_SELECT"; read_etcd_global
 		if [[ ${printvalue} = "${i}" ]]; then
 			echo "current device is the selected device, resetting streaming to seal."
-			KEYNAME="uv_hash_select"; KEYVALUE="seal"; write_etcd_global
+			KEYNAME="/UI/UV_HASH_SELECT"; KEYVALUE="seal"; write_etcd_global
 			KEYNAME="ENCODER_QUERY"; KEYVALUE="2"; write_etcd_global
-			KEYNAME="input_update"; KEYVALUE="1"; write_etcd_global
+			# this is deprecated
+			#KEYNAME="input_update"; KEYVALUE="1"; write_etcd_global
 		fi
 		echo "Working on hash: ${i}"
 		KEYNAME="/UI/short_hash/${i}"; read_etcd_global; deviceLabel=${printvalue}
@@ -172,7 +172,7 @@ remove_associated_inputs(){
 	done
 	# Now we have processed ALL of the UI items on this host, we can remove the interface items from the host system side:
 	KEYNAME="/${hostNameSys}/inputs"; delete_etcd_key_prefix
-	KEYNAME="/${hostNameSys}/INPUT_DEVICE_PRESENT"; delete_etcd_key_global	
+	KEYNAME="/${hostNameSys}/INPUT_DEVICE_PRESENT"; delete_etcd_key_global
 }
 
 set_newHostName(){
@@ -180,7 +180,7 @@ set_newHostName(){
 	if hostnamectl hostname --pretty ${myNewHostname}; then
 		echo -e "\nHost Name set as ${myNewHostName} successfully!, writing relabel_active to 0."
 		KEYNAME="/${hostNameSys}/relabel_active"; KEYVALUE="0";	write_etcd_global
-		KEYNAME="/${hostNameSys}/RECENT_RELABEL";	KEYVALUE="1"; 			write_etcd_global
+		KEYNAME="/${hostNameSys}/RECENT_RELABEL"; KEYVALUE="1"; write_etcd_global
 		echo "Done, no further actions needed."
 	else
 		echo -e "\n Hostname change command failed, please check logs\n"
