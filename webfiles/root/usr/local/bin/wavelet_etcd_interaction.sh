@@ -304,6 +304,8 @@ generate_etcd_host_role(){
 	# I think these would be better served orchestrated via the controller or here, as they are for the device "backend", and not specific to a host
 	KEY="/UI/interface/"											; roleCmd ${KEY};
 	KEY="/UI/short_hash/"											; roleCmd ${KEY};
+	KEY="DEVICE_REDETECT"											; roleCmd ${KEY};
+	KEY="ENCODER_ACTIVE"											; roleCmd ${KEY};
 
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} user add "${clientHostName:0:7}" --new-user-password "${PassWord}"
