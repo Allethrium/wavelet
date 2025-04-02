@@ -176,6 +176,8 @@ event_decoder(){
 	event_system_reboot
 	event_host_relabel_watcher
 	event_promote
+	# Generate device_redetect, but do not enable it!
+	event_device_redetect
 	systemctl --user daemon-reload
 	systemctl --user enable \
 		wavelet_decoder_reboot \
