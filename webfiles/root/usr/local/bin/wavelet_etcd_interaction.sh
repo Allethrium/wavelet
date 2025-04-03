@@ -286,27 +286,39 @@ generate_etcd_host_role(){
 	roleCmd() {
 		etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} readwrite ${1} --prefix=true
 	}
+	roleCmdReadOnly() {
+		etcdctl --endpoints=${ETCDENDPOINT} ${userArg} role grant-permission ${clientHostName:0:7} read ${1} --prefix=true
+	}
 
 	# The below represents an exhaustive list of any keys the client machine being provisioned may need to write to.
 	# These probably need to be rethought, or orchestrated via the security layer controller.
 
 	# UI commands
-	VAL=1; KEY="/UI/hosts/${clientHostName}"						; createCmd ${KEY} ${VAL}; roleCmd ${KEY} ;
-	KEY="/UI/hostlist/${clientHostName}"							; createCmd ${KEY} ${VAL}; roleCmd ${KEY} ;
-	KEY="/UI/hostHash/${clientHostName}"							; createCmd ${KEY} ${VAL}; roleCmd ${KEY} ;
+	VAL=1; KEY="/UI/hosts/${clientHostName}"						; createCmd ${KEY} ${VAL}; roleCmd ${KEY}
+	KEY="/UI/hostlist/${clientHostName}"							; createCmd ${KEY} ${VAL}; roleCmd ${KEY}
+	KEY="/UI/hostHash/${clientHostName}"							; createCmd ${KEY} ${VAL}; roleCmd ${KEY}
 
 	# SYSTEM commands
-	KEY="/${clientHostName}/"										; roleCmd ${KEY};
-	VAL="${clientIP}"; KEY="/DECODERIP/${clientHostName}"			; roleCmd ${KEY};
-	KEY="/hostHash/"												; roleCmd ${KEY};
+	KEY="/${clientHostName}/"										; roleCmd ${KEY}
+	VAL="${clientIP}"; KEY="/DECODERIP/${clientHostName}"			; roleCmd ${KEY}
+	KEY="/hostHash/"												; roleCmd ${KEY}
 	#KEY="/${clientHostName}/Hash"									; createCmd ${KEY} ${VAL}; roleCmd ${KEY};
 	
 	# I think these would be better served orchestrated via the controller or here, as they are for the device "backend", and not specific to a host
-	KEY="/UI/interface/"											; roleCmd ${KEY};
-	KEY="/UI/short_hash/"											; roleCmd ${KEY};
-	KEY="DEVICE_REDETECT"											; roleCmd ${KEY};
-	KEY="ENCODER_ACTIVE"											; roleCmd ${KEY};
-	KEY="NEW_DEVICE_ATTACHED"										; roleCmd ${KEY};
+	KEY="/UI/interface/"											; roleCmd ${KEY}
+	KEY="/UI/short_hash/"											; roleCmd ${KEY}
+	KEY="DEVICE_REDETECT"											; roleCmd ${KEY}
+	KEY="ENCODER_ACTIVE"											; roleCmd ${KEY}
+	KEY="NEW_DEVICE_ATTACHED"										; roleCmd ${KEY}
+	KEY="ENCODER_IP_ADDRESS"										; roleCmd ${KEY}
+	KEY="GLOBAL_INPUT_DEVICE_NEW"									; roleCmd ${KEY}
+	KEY="ENCODER_QUERY"												; roleCmdReadOnly ${KEY}
+	KEY="uv_videoport"												; roleCmdReadOnly ${KEY}
+	KEY="uv_audioport"												; roleCmdReadOnly ${KEY}
+	KEY="/UI/banner"												; roleCmdReadOnly ${KEY}
+	KEY="uv_encoder"												; roleCmdReadOnly ${KEY}
+	KEY="uv_input"													; roleCmdReadOnly ${KEY}
+	KEY="REFLECTOR_IP"												; roleCmdReadOnly ${KEY}
 
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} user add "${clientHostName:0:7}" --new-user-password "${PassWord}"
