@@ -56,7 +56,7 @@ generate_service(){
 
 detect_self(){
 	KEYNAME="/UI/hosts/${hostNameSys}/type"; read_etcd_global
-	echo -e "Hostname is ${printvalue} \n"
+	echo -e "Host type key is ${printvalue} \n"
 	case ${printvalue} in
 		enc*)                                   echo -e "I am an Encoder \n"            ;       check_label
 		;;
@@ -131,13 +131,15 @@ event_prefix_set(){
 		if [[ "${type}" = "dec" ]]; then
 			echo "I am currently a decoder switching to an encoder"
 			typeSwitch="enc"
+			event_generate_wavelet_encoder_query
 			systemctl --user enable \
 				wavelet_device_redetect \
 				wavelet_encoder_query.service \
-				watch_encoderflag.service \
 				wavelet_promote.service --now
 			KEYNAME="/DECODERIP/${hostNameSys}"; delete_etcd_key_global
 			KEYNAME="NEW_DEVICE_ATTACHED"; KEYVALUE="1"; write_etcd_global
+			myHostLabel=$(echo ${myHostLabel} | cut -c 4-)
+			hostNamePretty="${typeSwitch}${myHostLabel}"
 		else
 			echo "I am not a decoder, switching to become a decoder.."
 			typeSwitch="dec"
@@ -146,10 +148,18 @@ event_prefix_set(){
 				wavelet_encoder.service \
 				wavelet_encoder_query.service \
 				watch_encoderflag.service --now
+			myHostLabel=$(echo ${myHostLabel} | cut -c 4-)
+			hostNamePretty="${typeSwitch}${myHostLabel}"
 			remove_associated_inputs
 		fi
 	KEYNAME="/UI/hosts/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/control/label"; KEYVALUE="${hostNamePretty}"; write_etcd_global
 	systemctl restart getty@tty1.service
+}
+
+event_generate_wavelet_encoder_query(){
+	# Taken from build_ug.sh, easier to replicate this here.
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "ENCODER_QUERY" 0 0 "wavelet_encoder_query"
 }
 
 remove_associated_inputs(){
