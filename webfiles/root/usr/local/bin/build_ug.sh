@@ -555,9 +555,12 @@ event_generateHash(){
 		hostHash=$(cat /etc/machine-id | sha256sum | tr -d "[:space:]-")
 		echo -e "generated device hash: ${hostHash} \n"
 		# Check for pre-existing keys here
+		# /hostHash/ contains the reverse lookup for the system hostname, with the hash value as the key.
+		# This is deleted upon deprovision, and we use it here to tell if we are an already provisioned host.
 		KEYNAME="/hostHash/${hostHash}"; read_etcd_global; hashExists=${printvalue}
 		if [[ -z "${hashExists}" || ${#hashExists} -le 1 ]]; then
-			echo -e "\nHostname value was set to ${hashExists}, which is null or less than 1 char, therefore it is not valid. \n"
+			echo "Generated hash value lookup provides: ${hashExists}, which is null or less than 1 char, therefore it is not valid."
+			echo "Populating initial device type template from hostname.."
 			# Populate what will initially be used as the label variable from the webUI
 			case ${1} in
 				enc*)			KEYVALUE="enc";
@@ -571,17 +574,18 @@ event_generateHash(){
 				*)				echo -e "host type is invalid, exiting."	;	exit 0
 				;;
 			esac
+			echo "Populating device keys.."
 			# Populate UI data
-			KEYNAME="/UI/hosts/${hostNameSys}/type"; write_etcd_global
-			KEYNAME="/UI/hosts/${hostNameSys}/hash"; KEYVALUE="${hostHash}"; write_etcd_global
-			KEYNAME="/UI/hosts/${hostNameSys}/control/label"; KEYVALUE="${hostNamePretty}"; write_etcd_global
+			KEYNAME="/UI/hosts/${hostNameSys}/type"											; write_etcd_global
+			KEYNAME="/UI/hosts/${hostNameSys}/hash"			; KEYVALUE="${hostHash}"		; write_etcd_global
+			KEYNAME="/UI/hosts/${hostNameSys}/control/label"; KEYVALUE="${hostNamePretty}"	; write_etcd_global
 			# Populate SYSTEM values
-			KEYNAME="/${hostNameSys}/Hash"; KEYVALUE="${hostHash}"; write_etcd_global
-			KEYNAME="/hostHash/${hostNameSys}"; KEYVALUE="${hostHash}"; write_etcd_global
-			KEYNAME="/hostHash/${hostNameSys}/label"; KEYVALUE="${hostNamePretty}"; write_etcd_global
-			KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
+			KEYNAME="/${hostNameSys}/Hash"					; KEYVALUE="${hostHash}"		; write_etcd_global
+			KEYNAME="/hostHash/${hostHash}"					; KEYVALUE="${hostNameSys}"		; write_etcd_global
+			KEYNAME="/hostHash/${hostNameSys}/label"		; KEYVALUE="${hostNamePretty}"	; write_etcd_global
+			KEYNAME="/${hostNameSys}/hostNamePretty"		; KEYVALUE=${hostNamePretty}	; write_etcd_global
 		else
-			echo -e "Hash value exists as /hostHash/${hashExists}"
+			echo -e "Hash value exists: ${hashExists}"
 			echo -e "Device already populated, taking no further action."
 		fi
 }
