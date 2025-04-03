@@ -120,7 +120,7 @@ detect_ug_version(){
 detect_self(){
 	systemctl --user daemon-reload
 	systemctl --user enable foot-server.socket --now
-	if [[ -f /var/provisioned.complete ]]; then
+	if [[ -f /var/home/wavelet/config/provisioned.complete ]]; then
 		echo "Provisioning completed, detecting self via etcd.."
 		# Detect_self in this case relies on the etcd type key
 		KEYNAME="/${hostNameSys}/type"; read_etcd_global
