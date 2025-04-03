@@ -232,6 +232,9 @@ event_encoder(){
 	KEYNAME="/UI/hosts/$hostNameSys/type"; write_etcd_global
 	KEYNAME="/UI/hostlist/${hostNameSys}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
+	# This simple module should be all that's required.  
+	# Resetting to a decoder would restart getty session and clear the seat regardless
+	/usr/local/bin/wavelet_encoder_blank.sh
 }
 
 event_generate_wavelet_encoder_query(){
