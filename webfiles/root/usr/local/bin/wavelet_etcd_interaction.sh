@@ -296,10 +296,10 @@ generate_etcd_host_role(){
 	KEY="/UI/hostHash/${clientHostName}"							; createCmd ${KEY} ${VAL}; roleCmd ${KEY} ;
 
 	# SYSTEM commands
-	KEY="/${clientHostName}/"										; createCmd ${KEY} ${VAL}; roleCmd ${KEY};
-	VAL="${clientIP}"; KEY="/DECODERIP/${clientHostName}"			; createCmd ${KEY} ${VAL}; roleCmd ${KEY};
-	KEY="/hostHash/${clientHostName}"								; createCmd ${KEY} ${VAL}; roleCmd ${KEY};
-	KEY="/${clientHostName}/Hash"									; createCmd ${KEY} ${VAL}; roleCmd ${KEY};
+	KEY="/${clientHostName}/"										; roleCmd ${KEY};
+	VAL="${clientIP}"; KEY="/DECODERIP/${clientHostName}"			; roleCmd ${KEY};
+	KEY="/hostHash/"												; roleCmd ${KEY};
+	#KEY="/${clientHostName}/Hash"									; createCmd ${KEY} ${VAL}; roleCmd ${KEY};
 	
 	# I think these would be better served orchestrated via the controller or here, as they are for the device "backend", and not specific to a host
 	KEY="/UI/interface/"											; roleCmd ${KEY};
