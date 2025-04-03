@@ -205,25 +205,25 @@ event_encoder(){
 	else
 		event_connectwifi
 	fi
-    event_encoder_reboot
     event_system_reboot
     event_reset
     event_device_redetect
     event_host_relabel_watcher
     event_generate_wavelet_encoder_query
     event_promote
+    event_encoder_blank
 	systemctl --user daemon-reload
 	# Generate Systemd notifier services for encoders
 	systemctl --user enable \
 		wavelet_decoder_reboot \
 		wavelet_decoder_reset \
-		wavelet_decoder_blank \
 		wavelet_decoder_reveal \
 		wavelet_reboot \
 		wavelet_reset \
 		wavelet_device_relabel \
 		wavelet_promote \
-		wavelet_encoder_query --now
+		wavelet_encoder_query \
+		wavelet_encoder_blank.service --now
 	# We do not perform run_ug for the encoder as that is enabled if it receives an encoderflag change.  It will be idle until then.
 	# Run detectv4l here
 	/usr/local/bin/wavelet_detectv4l.sh
@@ -233,8 +233,6 @@ event_encoder(){
 	KEYNAME="/UI/hostlist/${hostNameSys}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
 	# This simple module should be all that's required.  
-	# Resetting to a decoder would restart getty session and clear the seat regardless
-	/usr/local/bin/wavelet_encoder_blank.sh
 }
 
 event_generate_wavelet_encoder_query(){
@@ -512,6 +510,18 @@ ExecStart=/bin/bash -c "/usr/local/bin/wavelet_start_UI.sh"
 [Install]
 WantedBy=default.target' > /var/home/wavelet/.config/systemd/user/wavelet_ui.service
 	fi
+}
+event_encoder_blank() {
+	echo -e '[Unit]
+Description=Wavelet encoder blank screen service
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+ExecStartPre=/bin/sleep 8
+ExecStart=swaymsg exec /usr/local/bin/wavelet_encoder_blank.sh
+[Install]
+WantedBy=default.target' > /var/home/wavelet/.config/systemd/user/wavelet_encoder_blank.service
 }
 event_generate_encoder_service(){
 	if [[ -f ~/.config/systemd/user/wavelet_encoder.service ]]; then
