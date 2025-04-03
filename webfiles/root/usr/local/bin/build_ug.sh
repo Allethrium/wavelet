@@ -123,7 +123,7 @@ detect_self(){
 	if [[ -f /var/provisioned.complete ]]; then
 		echo "Provisioning completed, detecting self via etcd.."
 		# Detect_self in this case relies on the etcd type key
-		KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+		KEYNAME="/${hostNameSys}/type"; read_etcd_global
 		echo -e "Host type is: ${printvalue}\n"
 		# test if i'm the server
 		if [[ $(hostname) = *"svr"* ]]; then
@@ -189,9 +189,8 @@ event_decoder(){
 		wavelet_device_relabel \
 		wavelet_promote --now
 	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
-	# Set Type keys to "dec" for system, /hostLabel/ and also for UI
+	# Set Type keys to "dec" for system, and also for UI
 	KEYVALUE="dec";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
-	KEYVALUE="dec";	KEYNAME="/hostLabel/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/UI/hosts/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/UI/hostlist/${hostNameSys}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
