@@ -91,16 +91,9 @@ check_and_wait(){
 
 
 logName=/var/home/wavelet/logs/force_deprovision.log
-if [[ -e $logName || -L $logName ]] ; then
-	i=0
-	while [[ -e $logName-$i || -L $logName-$i ]] ; do
-		let i++
-	done
-	logName=$logName-$i
-fi
 
 set -x
-exec > "${logName}" 2>&1
+exec >> "${logName}" 2>&1
 callingKey=$ETCD_WATCH_KEY
 echo "Called with ${ETCD_WATCH_KEY}"
 hostNameSys="${ETCD_WATCH_KEY#*/UI/hosts/}"
