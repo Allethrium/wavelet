@@ -306,6 +306,7 @@ generate_etcd_host_role(){
 	KEY="/UI/short_hash/"											; roleCmd ${KEY};
 	KEY="DEVICE_REDETECT"											; roleCmd ${KEY};
 	KEY="ENCODER_ACTIVE"											; roleCmd ${KEY};
+	KEY="NEW_DEVICE_ATTACHED"										; roleCmd ${KEY};
 
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} user add "${clientHostName:0:7}" --new-user-password "${PassWord}"
