@@ -153,6 +153,7 @@ event_prefix_set(){
 			remove_associated_inputs
 		fi
 	KEYNAME="/UI/hosts/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
+	KEYNAME="/${hostNameSys}/type"; write_etcd_global
 	KEYNAME="/UI/hosts/${hostNameSys}/control/label"; KEYVALUE="${hostNamePretty}"; write_etcd_global
 	systemctl restart getty@tty1.service
 }
