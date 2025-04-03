@@ -138,8 +138,8 @@ event_prefix_set(){
 				wavelet_promote.service --now
 			KEYNAME="/DECODERIP/${hostNameSys}"; delete_etcd_key_global
 			KEYNAME="NEW_DEVICE_ATTACHED"; KEYVALUE="1"; write_etcd_global
-			myHostLabel=$(echo ${myHostLabel} | cut -c 4-)
-			hostNamePretty="${typeSwitch}${myHostLabel}"
+			#myHostLabel=$(echo ${myHostLabel} | cut -c 4-)
+			#hostNamePretty="${typeSwitch}${myHostLabel}"
 		else
 			echo "I am not a decoder, switching to become a decoder.."
 			typeSwitch="dec"
@@ -158,12 +158,12 @@ event_prefix_set(){
 				# needs client rw on the target key
 				KEYNAME="ENCODER_QUERY"; KEYVALUE=${previousInputHash}; write_etcd_global
 			fi
-		myHostLabel=$(echo ${myHostLabel} | cut -c 4-)
-		hostNamePretty="${typeSwitch}${myHostLabel}"
+		#myHostLabel=$(echo ${myHostLabel} | cut -c 4-)
+		#hostNamePretty="${typeSwitch}${myHostLabel}"
 		fi
 	KEYNAME="/UI/hosts/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/type"; write_etcd_global
-	KEYNAME="/UI/hosts/${hostNameSys}/control/label"; KEYVALUE="${hostNamePretty}"; write_etcd_global
+	#KEYNAME="/UI/hosts/${hostNameSys}/control/label"; KEYVALUE="${hostNamePretty}"; write_etcd_global
 	systemctl restart getty@tty1.service
 }
 
