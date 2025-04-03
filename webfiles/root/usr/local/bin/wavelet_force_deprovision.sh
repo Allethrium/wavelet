@@ -72,6 +72,14 @@ check_and_wait(){
 			KEYNAME="/DECODERIP/${hostNameSys}"
 			# Remove host user and roles - needs to call service from wavelet-root for etcd root permissions!
 			KEYNAME="/PROV/FORCE_REMOVE"; KEYVALUE="${hostNameSys}"; write_etcd_global
+			if [[ ${hostNameSys} == *"enc" ]]; then
+				# Check if I am the active encoder, and reset feed to seal
+				KEYNAME="ENCODER_QUERY"; read_etcd_global; currentHash=${printvalue}
+				KEYNAME="/UI/short_hash/${currentHash}"; read_etcd_global; targetHost="${printvalue%/*}"
+				if [[ "${targetHost}" == *"${hostNamePretty}"* ]]; then
+					echo -e "The active input is hosted from me!  Setting the current stream back to the static image."
+					KEYNAME="ENCODER_QUERY"; KEYVALUE=SEAL; write_etcd_global
+				fi
 		else
 			echo "Key is gone, or null - deprovisioning completed, doing nothing."
 			exit 0

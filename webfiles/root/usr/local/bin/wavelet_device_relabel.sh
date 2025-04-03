@@ -148,9 +148,18 @@ event_prefix_set(){
 				wavelet_encoder.service \
 				wavelet_encoder_query.service \
 				watch_encoderflag.service --now
-			myHostLabel=$(echo ${myHostLabel} | cut -c 4-)
-			hostNamePretty="${typeSwitch}${myHostLabel}"
 			remove_associated_inputs
+			KEYNAME=/UI/UV_HASH_SELECT; read_etcd_global; currentInputHash=${printvalue}
+			KEYNAME=/UI/UV_HASH_SELECT_OLD; read_etcd_global; previousInputHash=${printvalue}
+			if [[ ${currentInputHash} == ${previousInputHash} ]]; then
+				echo "This is the current and previously active device, wavelet will switch back to the SEAL option."
+				KEYNAME="ENCODER_QUERY"; KEYVALUE="SEAL"
+			else
+				# needs client rw on the target key
+				KEYNAME="ENCODER_QUERY"; KEYVALUE=${previousInputHash}; write_etcd_global
+			fi
+		myHostLabel=$(echo ${myHostLabel} | cut -c 4-)
+		hostNamePretty="${typeSwitch}${myHostLabel}"
 		fi
 	KEYNAME="/UI/hosts/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/type"; write_etcd_global

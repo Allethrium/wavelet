@@ -312,7 +312,7 @@ generate_etcd_host_role(){
 	KEY="NEW_DEVICE_ATTACHED"										; roleCmd ${KEY}
 	KEY="ENCODER_IP_ADDRESS"										; roleCmd ${KEY}
 	KEY="GLOBAL_INPUT_DEVICE_NEW"									; roleCmd ${KEY}
-	KEY="ENCODER_QUERY"												; roleCmdReadOnly ${KEY}
+	KEY="ENCODER_QUERY"												; roleCmd ${KEY}
 	KEY="uv_videoport"												; roleCmdReadOnly ${KEY}
 	KEY="uv_audioport"												; roleCmdReadOnly ${KEY}
 	KEY="/UI/banner"												; roleCmdReadOnly ${KEY}
