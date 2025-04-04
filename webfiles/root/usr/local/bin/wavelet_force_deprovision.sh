@@ -80,6 +80,7 @@ check_and_wait(){
 					echo -e "The active input is hosted from me!  Setting the current stream back to the static image."
 					KEYNAME="ENCODER_QUERY"; KEYVALUE=SEAL; write_etcd_global
 				fi
+			fi
 		else
 			echo "Key is gone, or null - deprovisioning completed, doing nothing."
 			exit 0
