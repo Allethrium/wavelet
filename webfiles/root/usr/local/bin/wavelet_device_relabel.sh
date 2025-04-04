@@ -94,11 +94,7 @@ set_newLabel(){
 	echo -e "My new host label is ${myNewHostLabel}"
 	echo -e "My system hostname is ${hostNameSys}"
 	# Check for current FQDN in the case someone wrote gibberish in the text box.
-	FQDN=$(nslookup ${hostNamePretty} -i | grep ${hostNamePretty} | head -n 1)
-	NAME=$(echo "${FQDN##*:}" | xargs)
-	echo -e "HostName FQDN is ${NAME}"
-	# Compare current FQDN with input FQDN and append if necessary
-	currentfqdnString=$(echo "${NAME}%.*")
+	currentfqdnString=${hostNameSys}
 	inputfqdnString=$(echo "${myNewHostLabel}%.*")
 	if [[ "${currentfqdnString} == ${inputfqdnString}" ]]; then
 		echo -e "FQDN strings are correct, proceeding.."
