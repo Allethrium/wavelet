@@ -633,7 +633,7 @@ function createInputButton(key, value, keyLong, keyFull, inputHost, inputHostL, 
 	deviceLabel							=		key;
 	fullKey 							=		keyFull;
 	// Look for duplicates
-	if (document.querySelectorAll(`[divDeviceHash="${value}"]`)) {
+	if (document.querySelectorAll(`[divDeviceHash="${value}"]`).length > 0) {
 		console.log("this entry is already present! doing nothing.");
 		return;
 	}
