@@ -308,6 +308,7 @@ generate_etcd_host_role(){
 	KEY="/UI/interface/"											; roleCmd ${KEY}
 	KEY="/UI/short_hash/"											; roleCmd ${KEY}
 	KEY="/UI/UV_HASH_SELECT"										; roleCmd ${KEY}
+	KEY="/UI/POLL_UPDATE"											; roleCmd ${KEY}
 	KEY="DEVICE_REDETECT"											; roleCmd ${KEY}
 	KEY="ENCODER_ACTIVE"											; roleCmd ${KEY}
 	KEY="NEW_DEVICE_ATTACHED"										; roleCmd ${KEY}

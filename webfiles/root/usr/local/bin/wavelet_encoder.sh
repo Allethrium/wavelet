@@ -131,11 +131,11 @@ generate_server_args(){
 			systemctl --user start UltraGrid.AppImage.service
 			generate_systemd_unit
 		fi
+	else
+		# Consume the global device flag by resetting it to 0 always!
+		KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="0"; write_etcd_global
 	fi
-	# Consume the global device flag by resetting it
-	KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="0"; write_etcd_global
 	echo "" > /var/home/wavelet/device_map_entries_verity
-
 	# Declare the master server inputs array
 	declare -A serverInputDevices=()
 	# Declare our static inputs

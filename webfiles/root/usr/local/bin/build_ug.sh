@@ -87,6 +87,7 @@ etcd_provision_request(){
 	if [[ ${printvalue} = "True" ]]; then
 		echo "Client provision request completed, client username has been generated and access to appropriate keys granted."
 		touch /var/home/wavelet/config/provisioned.complete
+		KEYNAME="HOST_STATE_CHANGE"; KEYVALUE="1"; write_etcd_global
 	else 
 		echo "Client provisioning has failed.  Key value is not accessible, or does not match!"
 		exit 1
@@ -491,6 +492,16 @@ event_generate_reflectorreload(){
 		echo -e "Unit file does not exist, generating..\n"
 		# Generate userspace reflector_reload service
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/DECODERIP/ --prefix" 0 0 "wavelet_reflector_reload"
+	fi
+}
+event_generate_poll_watcher(){
+	# This generates THREE watcher services, one for /UI/inputs, one for /UI/network_interface, and one for /UI/hosts
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/UI/inputs --prefix" 0 0 "wavelet_poll_watcher" "inputs"
+	cp /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher.service /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_net.service
+	sed -i 'inputs|network_interface/g' /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_net.service
+	cp /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher.service /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_hosts.service
+	sed -i 'inputs|hosts/g' /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_hosts.service
+	mv /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher.service /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_inputs.service
 	fi
 }
 event_generate_wavelet_ui_service(){

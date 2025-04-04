@@ -297,10 +297,59 @@ function handlePageLoad() {
 	toggleInputElements.forEach(el => {
 		togglebox_setup(el.id);
 	});
-	// Execute initial AJAX Call
+	// Execute initial AJAX Call, these will run in a chain.
 	inputsAjax();
 }
 
+function pollAjax() {
+	// This function runs an AJAX call from inputs, network inputs or hosts div.  That is 3x calls every 500ms.
+	// If the values returned differ from the previous variable, we call a full reconstruction of the target div.
+	// we get back a packed value of timestamp|targetFunction
+	// targetFunction is inputs, network inputs or hosts
+	// normal console logging off here because otherwise it'll make using the console to debug impossible
+	setTimeout(pollAjax, 2000);
+	let oldPollValue	=	getCookie("oldPollValue");
+	if (oldPollValue == "INIT") {
+		console.log("Called with INIT value, page has just done loading");
+	}
+	//console.log("Attempting Poll!");
+	$.ajax({
+		type: "POST",
+		url: "poll_etcd_key.php",
+		dataType: "json",
+		success: function(returned_data) {
+			returned_data.forEach(item => {
+				var pollKey			=	item['key'];
+				var pollValue		=	item['value'];
+				// console.log("Read key:" + pollKey + "For value: " + pollValue);
+				if (pollValue == oldPollValue ) {
+					//console.log ("The old and new poll values are identical, doing nothing.");
+				} else {
+					// trim the timestamp off to get the divider target
+					dividerTarget		=	pollValue.substring(pollValue.indexOf("|") + 1);
+					console.log ('Poll values have changed!  A system update has occurred, calling appropriate function ID:' + dividerTarget);
+					setCookie("oldPollValue", pollValue);
+					// can be:  net, inputs, hosts
+					// put a case switcher;
+					switch(dividerTarget) {
+						case 'inputs':
+							console.log("Will refresh inputs div");
+							location.replace('#dynamic_inputs', inputsAjax());
+						break;
+						case 'net':
+							console.log("Will refresh network inputs div");
+							location.replace('#dynamicNetworkInputs', networkInputsAjax());
+						break;
+						case 'svr':
+							console.log("Will refresh Hosts div");
+							location.replace('#HostControlDiv', hostsAjax());
+						break;
+					}
+				}
+			})
+		}
+		})	
+}
 function getBluetoothMAC(bluetoothMACValue) {
 	// this function gets the audio status from etcd and sets the audio toggle button on/off upon page load
 	console.log ("Checking Bluetooth MAC..");
@@ -583,6 +632,11 @@ function createInputButton(key, value, keyLong, keyFull, inputHost, inputHostL, 
  	hostNameLabel						=		inputHostL;
 	deviceLabel							=		key;
 	fullKey 							=		keyFull;
+	// Look for duplicates
+	if (document.querySelectorAll(`[divDeviceHash="${value}"]`)) {
+		console.log("this entry is already present! doing nothing.");
+		return;
+	}
 	/* create a div container, where the button, relabel button and any other associated elements reside */
 	if (functionIndex === 1) {
 		console.log("called from firstAjax, so this is a local video source");
@@ -916,11 +970,36 @@ function sleep(ms) {
 	return new Promise(resolve => setTimeout(resolve, ms || DEF_DELAY));
 }
 
+function setCookie(cname, cvalue, exdays) {
+  const d = new Date();
+  d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
+  let expires = "expires="+d.toUTCString();
+  document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+}
+
+function getCookie(cname) {
+  let name = cname + "=";
+  let ca = document.cookie.split(';');
+  for(let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) == ' ') {
+      c = c.substring(1);
+    }
+    if (c.indexOf(name) == 0) {
+      return c.substring(name.length, c.length);
+    }
+  }
+  return "";
+}
+
 const callingFunction = (callback) => {
 	const callerId = 'calling_function';
 	callback(this);
-};
+}
 
 $(document).ready(function() {
 	getActiveInputHash("your_input_hash");
+	console.log("Setting up AJAX polling for events..");
+	setCookie("oldPollValue", "INIT", 365);
+	setTimeout(pollAjax, 2000);
 });
