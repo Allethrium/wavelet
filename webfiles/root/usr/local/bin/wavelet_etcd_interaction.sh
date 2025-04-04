@@ -307,6 +307,7 @@ generate_etcd_host_role(){
 	# I think these would be better served orchestrated via the controller or here, as they are for the device "backend", and not specific to a host
 	KEY="/UI/interface/"											; roleCmd ${KEY}
 	KEY="/UI/short_hash/"											; roleCmd ${KEY}
+	KEY="/UI/UV_HASH_SELECT"										; roleCmd ${KEY}
 	KEY="DEVICE_REDETECT"											; roleCmd ${KEY}
 	KEY="ENCODER_ACTIVE"											; roleCmd ${KEY}
 	KEY="NEW_DEVICE_ATTACHED"										; roleCmd ${KEY}
@@ -316,6 +317,7 @@ generate_etcd_host_role(){
 	KEY="uv_videoport"												; roleCmdReadOnly ${KEY}
 	KEY="uv_audioport"												; roleCmdReadOnly ${KEY}
 	KEY="/UI/banner"												; roleCmdReadOnly ${KEY}
+	KEY="/UI/UV_HASH_SELECT_OLD"									; roleCmdReadOnly ${KEY}
 	KEY="uv_encoder"												; roleCmdReadOnly ${KEY}
 	KEY="uv_input"													; roleCmdReadOnly ${KEY}
 	KEY="REFLECTOR_IP"												; roleCmdReadOnly ${KEY}

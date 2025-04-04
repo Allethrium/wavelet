@@ -184,7 +184,7 @@ remove_associated_inputs(){
 		KEYNAME="/UI/short_hash/${i}"; read_etcd_global; deviceLabel=${printvalue}
 		KEYNAME="/UI/short_hash/${i}"; delete_etcd_key_global
 		KEYNAME="/UI/interface/${deviceLabel}"; delete_etcd_key_global
-		KEYNAME="/${hostNameSys}/devpath_lookup/${i}"; delete_etcd_global
+		KEYNAME="/${hostNameSys}/devpath_lookup/${i}"; delete_etcd_key_global
 	done
 	# Now we have processed ALL of the UI items on this host, we can remove the interface items from the host system side:
 	KEYNAME="/${hostNameSys}/inputs"; delete_etcd_key_prefix
