@@ -319,6 +319,8 @@ generate_etcd_host_role(){
 	KEY="uv_encoder"												; roleCmdReadOnly ${KEY}
 	KEY="uv_input"													; roleCmdReadOnly ${KEY}
 	KEY="REFLECTOR_IP"												; roleCmdReadOnly ${KEY}
+	KEY="SYSTEM_REBOOT"												; roleCmdReadOnly ${KEY}
+	KEY="SYSTEM_RESET"												; roleCmdReadOnly ${KEY}
 
 	local PassWord=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	etcdctl --endpoints=${ETCDENDPOINT} ${userArg} user add "${clientHostName:0:7}" --new-user-password "${PassWord}"
