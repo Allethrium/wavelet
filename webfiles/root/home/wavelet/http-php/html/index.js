@@ -312,7 +312,7 @@ function pollAjax() {
 	// we get back a packed value of timestamp|targetFunction
 	// targetFunction is inputs, network inputs or hosts
 	// normal console logging off here because otherwise it'll make using the console to debug impossible
-	setTimeout(pollAjax, 2000);
+	setTimeout(pollAjax, 5000);
 	let oldPollValue	=	getCookie("oldPollValue");
 	if (oldPollValue == "INIT") {
 		console.log("Called with INIT value, page has just done loading");
@@ -1029,5 +1029,5 @@ $(document).ready(function() {
 	getActiveInputHash("your_input_hash");
 	console.log("Setting up AJAX polling for events..");
 	setCookie("oldPollValue", "INIT", 365);
-	setTimeout(pollAjax, 5000);
+	setTimeout(pollAjax, 3000);
 });
