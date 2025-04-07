@@ -496,13 +496,11 @@ event_generate_reflectorreload(){
 }
 event_generate_poll_watcher(){
 	# This generates THREE watcher services, one for /UI/inputs, one for /UI/network_interface, and one for /UI/hosts
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/UI/inputs --prefix" 0 0 "wavelet_poll_watcher" "inputs"
-	cp /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher.service /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_net.service
-	sed -i 'inputs|network_interface/g' /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_net.service
-	cp /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher.service /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_hosts.service
-	sed -i 'inputs|hosts/g' /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_hosts.service
-	mv /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher.service /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_inputs.service
-	fi
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/UI/interface --prefix" 0 0 "wavelet_poll_watcher_interface" "interface"
+	cp /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_interface.service /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_net.service
+	cp /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_interface.service /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_hosts.service
+	sed -i 's|interface|network_interface|g' /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_net.service
+	sed -i 's|interface|hosts|g' /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_hosts.service
 }
 event_generate_wavelet_ui_service(){
 	# Final step of the server spinup, and starts the web interface on the server console.
