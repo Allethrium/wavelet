@@ -20,21 +20,25 @@ function poll_etcd_inputs($keyPrefix, $keyPrefixPlusOneBit, $token) {
 	}
 	curl_close($ch);
 	$dataArray				=	json_decode($result, true); // this decodes the JSON string as an associative array
-	foreach ($dataArray['kvs'] as $x => $item) {
-		// we get back a list of keys/vals from /UI/interface/$KEY
-		// $KEY is a packed format of:  HOSTNAME;HOSTNAMEPRETTY;DEVICELABEL;DEVICE FULLPATH
-		$keyFull													=	base64_decode($item['key']);
-		$decodedValue												=	base64_decode($item['value']);
-		list($hostName, $hostNamePretty, $inputLabel, $inputPath) 	=	explode(";", $keyFull);
-		$newHostName 												=	str_replace("/UI/interface/", '', $hostName);
-		$newData[]			=	[
-			'key'				=>	$inputLabel,
-			'value'				=>	$decodedValue,
-			'keyFull'			=>	$keyFull,
-			'keyLong'			=>	$inputPath,
-			'host'				=>	$newHostName,
-			'hostNamePretty'	=>	$hostNamePretty
-		];
+	if (is_array($dataArray['kvs']) && count($dataArray['kvs']) > 0) {
+		foreach ($dataArray['kvs'] as $x => $item) {
+			// we get back a list of keys/vals from /UI/interface/$KEY
+			// $KEY is a packed format of:  HOSTNAME;HOSTNAMEPRETTY;DEVICELABEL;DEVICE FULLPATH
+			$keyFull													=	base64_decode($item['key']);
+			$decodedValue												=	base64_decode($item['value']);
+			list($hostName, $hostNamePretty, $inputLabel, $inputPath) 	=	explode(";", $keyFull);
+			$newHostName 												=	str_replace("/UI/interface/", '', $hostName);
+			$newData[]			=	[
+				'key'				=>	isset($inputLabel) ? $inputLabel: "0",
+				'value'				=>	isset($decodedValue) ? $decodedValue : "0",
+				'keyFull'			=>	isset($keyFull) ? $keyFull : "0",
+				'keyLong'			=>	isset($inputPath) ? $inputPath : "0",
+				'host'				=>	isset($newHostName) ? $newHostName : "0",
+				'hostNamePretty'	=>	isset($hostNamePretty) ? $hostNamePretty : "0"
+			];
+		}
+	} else {
+		$newData 				=	[];
 	}
 	$output = json_encode($newData);
 	echo $output;
