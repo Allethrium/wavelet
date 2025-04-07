@@ -627,7 +627,7 @@ function ajaxMonitor(hash) {
 
 function checkForDuplicate(divLoc, divAttr, value) {
 	// Look for duplicates
-	console.log("Checking for duplicate entries for hash: " + value);
+	console.log("Checking for duplicate entries for hash: " + value + "\nIn Div: " + divLoc);
 	const divID							=		document.getElementById(divLoc);
 	const childNodes					=		Array.from(divID.childNodes);
 	const liveChildElements				=		childNodes.filter((node) => node.nodeType === Node.ELEMENT_NODE);
