@@ -25,81 +25,80 @@ function inputsAjax(){
 // value = generated hash value of the device from detectv4l, this is how we track it, and how wavelet can find it
 // keyfull = the pathname of the device in /UI/friendlyname
 // key = the key of the device (also a UI-modifiable label attribute)
-	$.ajax({
+	var deferred = $.ajax({
 		type: "POST",
 		url: "get_inputs.php",
 		dataType: "json",
-		success: function(returned_data) {
-			counter = 3;
-			console.log("JSON Inputs data received:");
-			console.log(returned_data);
-			returned_data.forEach(item => {
-				const functionIndex =   1;
-				var key			=	item['key'];
-				var value		=	item['value'];
-				var keyLong		=	item['keyLong'];
-				var keyFull		=	item['keyFull'];
-				var inputHost 	=	item['host'];
-				var inputHostL	=	item['hostNamePretty'];
-				createInputButton(key, value, keyLong, keyFull, inputHost, inputHostL, functionIndex);
-				})
-		},
-		complete: function(){
-			hostsAjax();
-		}
 	});
+
+	deferred.done(function(returned_data) {
+		counter = 3;
+		console.log("JSON Inputs data received:");
+		console.log(returned_data);
+		returned_data.forEach(item => {
+			const functionIndex =   1;
+			var key			=	item['key'];
+			var value		=	item['value'];
+			var keyLong		=	item['keyLong'];
+			var keyFull		=	item['keyFull'];
+			var inputHost 	=	item['host'];
+			var inputHostL	=	item['hostNamePretty'];
+			createInputButton(key, value, keyLong, keyFull, inputHost, inputHostL, functionIndex);
+			});
+	});
+	return deferred;
 }
+
 
 function hostsAjax(){
 // get dynamic hosts from etcd, and call createNewHost to generate entries and buttons for them.
 // returns:  Key (keyname), type (host type), hostName (hostname), hostHash (host's machine ID as SHA256sum), hostLabel (pretty hostname)
-	$.ajax({
+	var deferred = $.ajax({
 		type: "POST",
 		url: "get_hosts.php",
 		dataType: "json",
-		success: function(returned_data) {
-			counter = 500;
-			console.log("JSON Hosts data received:");
-			console.log(returned_data);
-			returned_data.forEach(item => {
-				const functionIndex	=	2;
-				var key				=	item['key'];
-				var type			=	item['type'];
-				var hostName		=	item['hostName'];
-				var hostHash		=	item['hostHash'];
-				var hostLabel 		=	item['hostLabel'];
-				var hostIP 			=	item['hostIP'];
-				var hostBlankStatus	=   item['hostBlankStatus'];
-				createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, hostBlankStatus);
-				})
-		},
-	complete: function(){
-		networkInputsAjax();
-	}
 	});
+	deferred.done(function(returned_data) {
+		counter = 500;
+		console.log("JSON Hosts data received:");
+		console.log(returned_data);
+		returned_data.forEach(item => {
+			const functionIndex	=	2;
+			var key				=	item['key'];
+			var type			=	item['type'];
+			var hostName		=	item['hostName'];
+			var hostHash		=	item['hostHash'];
+			var hostLabel 		=	item['hostLabel'];
+			var hostIP 			=	item['hostIP'];
+			var hostBlankStatus	=   item['hostBlankStatus'];
+			createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, hostBlankStatus);
+		});
+	});
+	return deferred;
 }
 
 function networkInputsAjax(){
 // get dynamic network inputs from etcd, and call and generate entries and buttons for them.
-// why aren't we moving to Angular/REACT already? oh that's right.. i haven't had time to learn it yet..
-	$.ajax({
+	var deferred = $.ajax({
 		type: "POST",
 		url: "get_network_inputs.php",
 		dataType: "json",
-		success: function(returned_data) {
-			counter	=	3000;
-			console.log("JSON Network Inputs data received:");
-			console.log(returned_data);
-			returned_data.forEach(item => {
-				const functionIndex	=	3;
-				var key				=	item['key'];
-				var value			=	item['value'];
-				var keyFull			=	item['keyFull'];
-				var IPAddr			=	item['IP'];
-				createInputButton(key, value, "network", keyFull, "network", "network", functionIndex, IPAddr);
-			})
-		},
 	});
+
+	deferred.done(function(returned_data) {
+		counter	=	3000;
+		console.log("JSON Network Inputs data received:");
+		console.log(returned_data);
+		returned_data.forEach(item => {
+			const functionIndex	=	3;
+			var key				=	item['key'];
+			var value			=	item['value'];
+			var keyFull			=	item['keyFull'];
+			var IPAddr			=	item['IP'];
+			createInputButton(key, value, "network", keyFull, "network", "network", functionIndex, IPAddr);
+		});
+	});
+	return deferred;
 }
 
 function sendPHPID(buttonElement) {
@@ -297,13 +296,19 @@ function handlePageLoad() {
 	toggleInputElements.forEach(el => {
 		togglebox_setup(el.id);
 	});
-	// Execute initial AJAX Call, these will run in a chain.
-	inputsAjax();
+	// Call AJAX to populate dynamic page areas
+	inputsAjax().then(function() {
+		hostsAjax();
+	}).then(function() {
+		networkInputsAjax();
+	});
 }
 
 function pollAjax() {
-	// This function runs an AJAX call from inputs, network inputs or hosts div.  That is 3x calls every 500ms.
+	// This function runs an AJAX call from inputs, network inputs or hosts div.  That is 3x calls every 2s.
 	// If the values returned differ from the previous variable, we call a full reconstruction of the target div.
+	// because this approach is destructive, we do not need to worry about removing the device
+	// as long as the poll value is changed as per the controller, the approach will work as desired.
 	// we get back a packed value of timestamp|targetFunction
 	// targetFunction is inputs, network inputs or hosts
 	// normal console logging off here because otherwise it'll make using the console to debug impossible
@@ -317,39 +322,39 @@ function pollAjax() {
 		type: "POST",
 		url: "poll_etcd_key.php",
 		dataType: "json",
-		success: function(returned_data) {
-			returned_data.forEach(item => {
-				var pollKey			=	item['key'];
-				var pollValue		=	item['value'];
-				// console.log("Read key:" + pollKey + "For value: " + pollValue);
-				if (pollValue == oldPollValue ) {
-					//console.log ("The old and new poll values are identical, doing nothing.");
-				} else {
-					// trim the timestamp off to get the divider target
-					dividerTarget		=	pollValue.substring(pollValue.indexOf("|") + 1);
-					console.log ('Poll values have changed!  A system update has occurred, calling appropriate function ID:' + dividerTarget);
-					setCookie("oldPollValue", pollValue);
-					// can be:  net, inputs, hosts
-					// put a case switcher;
-					switch(dividerTarget) {
-						case 'inputs':
-							console.log("Will refresh inputs div");
-							location.replace('#dynamic_inputs', inputsAjax());
-						break;
-						case 'net':
-							console.log("Will refresh network inputs div");
-							location.replace('#dynamicNetworkInputs', networkInputsAjax());
-						break;
-						case 'svr':
-							console.log("Will refresh Hosts div");
-							location.replace('#HostControlDiv', hostsAjax());
-						break;
-					}
+	}).then(function(returned_data) {
+		returned_data.forEach(item => {
+			var pollKey			=	item['key'];
+			var pollValue		=	item['value'];
+			// console.log("Read key:" + pollKey + "For value: " + pollValue);
+			if (pollValue == oldPollValue ) {
+				//console.log ("The old and new poll values are identical, doing nothing.");
+			} else {
+				// trim the timestamp off to get the divider target
+				dividerTarget		=	pollValue.substring(pollValue.indexOf("|") + 1);
+				console.log ('Poll values have changed!  A system update has occurred somewhere, calling appropriate function ID:' + dividerTarget);
+				setCookie("oldPollValue", pollValue);
+				// can be:  net, inputs, hosts
+				// put a case switcher;
+				switch(dividerTarget) {
+					case 'interface':
+						console.log("Refresh inputs div");
+						location.replace('#dynamic_inputs', inputsAjax());
+					break;
+					case 'network_interface':
+						console.log("Refresh network inputs div");
+						location.replace('#dynamicNetworkInputs', networkInputsAjax());
+					break;
+					case 'hosts':
+						console.log("Refresh Hosts div");
+						location.replace('#HostControlDiv', hostsAjax());
+					break;
 				}
-			})
-		}
-		})	
+			}
+		});
+	});
 }
+
 function getBluetoothMAC(bluetoothMACValue) {
 	// this function gets the audio status from etcd and sets the audio toggle button on/off upon page load
 	console.log ("Checking Bluetooth MAC..");
@@ -620,6 +625,25 @@ function ajaxMonitor(hash) {
 	setTimeout(doAjax, interval);
 }
 
+function checkForDuplicate(divLoc, divAttr, value) {
+	// Look for duplicates
+	console.log("Checking for duplicate entries for hash: " + value);
+	const divID							=		document.getElementById(divLoc);
+	const childNodes					=		Array.from(divID.childNodes);
+	const liveChildElements				=		childNodes.filter((node) => node.nodeType === Node.ELEMENT_NODE);
+	let duplicateEntryFound				=		false;
+	liveChildElements.forEach((element) => {
+		const foundDivHash = element.getAttribute(divAttr);
+		if ( foundDivHash == value ) {
+			console.log("Entry is already present! doing nothing.");
+			duplicateEntryFound 		= 		true;
+		} else {
+			console.log("No entry discovered for value: " + value);
+		}
+	});
+	return duplicateEntryFound;
+}
+
 function createInputButton(key, value, keyLong, keyFull, inputHost, inputHostL, functionIndex, IP) {
 	// Note that for the frontend, we always use the PRETTY hostname set for the client
 	// the "real" hostname is still saved as a data attr, but not really used here.
@@ -632,30 +656,31 @@ function createInputButton(key, value, keyLong, keyFull, inputHost, inputHostL, 
  	hostNameLabel						=		inputHostL;
 	deviceLabel							=		key;
 	fullKey 							=		keyFull;
-	// Look for duplicates
-	if (document.querySelectorAll(`[divDeviceHash="${value}"]`).length > 0) {
-		console.log("this entry is already present! doing nothing.");
-		return;
-	}
+
 	/* create a div container, where the button, relabel button and any other associated elements reside */
 	if (functionIndex === 1) {
 		console.log("called from firstAjax, so this is a local video source");
+		if (checkForDuplicate("dynamicInputs", "divDeviceHash", value)) {
+			return;
+		}
 		dynamicInputs.appendChild(divEntry);
 		divEntry.setAttribute("data-functionID", functionIndex);
 		const title						=		document.createTextNode(key);
 		hostNameAndDevice				=		(hostNameLabel + ":" + key);
 	} else if (functionIndex === 3) {
 		console.log("called from thirdAjax, so this is a network video source");
+		if (checkForDuplicate("dynamicNetworkInputs", "divDeviceHash", value)) {
+			return;
+		}
 		hostNameAndDevice				=		(IP + ":" + key);
 		dynamicNetworkInputs.appendChild(divEntry);
-		divEntry.setAttribute("data-functionID", functionIndex);
+		divEntry.setAttribute("divDeviceHash", functionIndex);
 		divEntry.setAttribute("title", IP);
 		$('#dynamicNetworkInputs').addClass('dynamicNetworkInputs');
 	} else {
 		console.error("createInputButton not called from a valid function");
 	}
 	var currentInputsHash				=		getActiveInputHash();
-	
 	divEntry.setAttribute("divDeviceHash", value);
 	divEntry.setAttribute("data-fulltext", fullKey);
 	divEntry.setAttribute("data-label", hostNameLabel + ":" + key);
@@ -712,6 +737,7 @@ function createInputButton(key, value, keyLong, keyFull, inputHost, inputHostL, 
 	counter++;
 }
 
+
 function createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, hostBlankStatus, functionIndex) {
 	var divEntry						=		document.createElement("Div");
 	var type							=		type;
@@ -724,7 +750,9 @@ function createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, hostBla
 	divEntry.setAttribute("data-hostType", type);
 	divEntry.setAttribute("title", "IP: " + hostIP);
 	$(divEntry).addClass('host_divider');
-
+	if (checkForDuplicate("HostControlDiv", "divhost", hostHash)) {
+		return;
+	}
 	/* This needs to be done "backwards" insofar as the type needs to be determined before we can start creating a new DIV */
 	console.log("Generating label and buttons with\nHost Label: "+hostLabel+"\nHost Name: "+hostName+"\nAnd Host Hash: "+hostHash+"\nAnd type: "+type+"\nAnd IP: "+hostIP+"\nAnd blank status: "+hostBlankStatus);
 	function createClientButtonSet(hostLabel, hostName, hostHash, type){
@@ -1001,5 +1029,5 @@ $(document).ready(function() {
 	getActiveInputHash("your_input_hash");
 	console.log("Setting up AJAX polling for events..");
 	setCookie("oldPollValue", "INIT", 365);
-	setTimeout(pollAjax, 2000);
+	setTimeout(pollAjax, 5000);
 });
