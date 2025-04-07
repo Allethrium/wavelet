@@ -499,6 +499,7 @@ event_generate_poll_watcher(){
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/UI/interface --prefix" 0 0 "wavelet_poll_watcher_interface" "interface"
 	cp /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_interface.service /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_net.service
 	cp /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_interface.service /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_hosts.service
+	sed -i 's|wavelet_poll_watcher_interface.sh|wavelet_poll_watcher.sh|g' {/var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_interface.service,/var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_net.service,/var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_hosts.service}
 	sed -i 's|interface|network_interface|g' /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_net.service
 	sed -i 's|interface|hosts|g' /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_hosts.service
 }
