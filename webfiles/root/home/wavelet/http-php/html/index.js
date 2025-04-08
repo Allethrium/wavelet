@@ -627,10 +627,11 @@ function ajaxMonitor(hash) {
 
 function checkForDuplicate(divLoc, divAttr, value) {
 	// Look for duplicates
-	console.log("Checking for duplicate entries for hash: " + value + "\nIn Div: " + divLoc);
+	console.log("Looking for duplicate entries for hash: " + value + "\nIn parent Div: " + divLoc + "\nFor Attribute: " + divAttr);
 	const divID							=		document.getElementById(divLoc);
-	const childNodes					=		Array.from(divID.childNodes);
-	const liveChildElements				=		childNodes.filter((node) => node.nodeType === Node.ELEMENT_NODE);
+	// we need to access something else here like getElementsByXXX, this isn't getting the 'grandchildren' for the host elements
+	const childNodes					=		Array.from(divID.getElementsByTagName("*"));
+	let liveChildElements				=		childNodes.filter((node) => node.nodeType === Node.ELEMENT_NODE);
 	let duplicateEntryFound				=		false;
 	liveChildElements.forEach((element) => {
 		const foundDivHash = element.getAttribute(divAttr);
@@ -896,9 +897,7 @@ function removeInputElement() {
 				console.log(response);
 			}
 		});
-	sleep(1000);
 	$(this).parent().remove();
-	//location.reload();
 }
 
 function removeHostElement(hostName, hostHash) {
