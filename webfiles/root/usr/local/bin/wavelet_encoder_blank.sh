@@ -5,6 +5,11 @@ read_etcd_global(){
 	printvalue=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_global" "${KEYNAME}") 
 	echo -e "Key Name: {$KEYNAME} read from etcd for Global Value: $printvalue\n"
 }
+write_etcd_global(){
+	/usr/local/bin/wavelet_etcd_interaction.sh "write_etcd_global" "${KEYNAME}" "${KEYVALUE}"
+	echo -e "Key Name: ${KEYNAME} set to: ${KEYVALUE} for Global value\n"
+}
+
 
 detect_self(){
 	# Detect_self in this case relies on the etcd type key
@@ -36,6 +41,8 @@ event_encoder_blank(){
         # Add a volume > 0 option here so that we stop any audio output from the device when it's blanked.
         # This will be necessary to blank off a team call or overflow if audio were being processed.
         swayimg /var/home/wavelet/config/enc_blank.bmp -f --config=info.show=no &
+        # Generate activity on hosts update so that UI will function as intended.
+        KEYNAME="/UI/hosts/${hostNameSys}/UPDATEUI"; KEYVALUE="1"; write_etcd_global
 }
 
 
