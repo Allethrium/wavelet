@@ -14,13 +14,11 @@ write_etcd_global(){
 	echo -e "Key Name: ${KEYNAME} set to: ${KEYVALUE} for Global value\n"
 }
 
-
 set_poll_key(){
 	# generates a timestamp, concats with with the type
 	KEYNAME="/UI/POLL_UPDATE"; KEYVALUE="$(date +%s)|${1}"; write_etcd_global
 	echo "/UI/POLL_UPDATE key updated with ${KEYVALUE}, UI should pick up changes on next polling cycle!"
 }
-
 
 ###
 #
