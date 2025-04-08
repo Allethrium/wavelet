@@ -627,19 +627,18 @@ function ajaxMonitor(hash) {
 
 function checkForDuplicate(divLoc, divAttr, value) {
 	// Look for duplicates
-	console.log("Looking for duplicate entries for hash: " + value + "\nIn parent Div: " + divLoc + "\nFor Attribute: " + divAttr);
+	// console.log("Looking for duplicate entries for hash: " + value + "\nIn parent Div: " + divLoc + "\nFor Attribute: " + divAttr);
 	const divID							=		document.getElementById(divLoc);
-	// we need to access something else here like getElementsByXXX, this isn't getting the 'grandchildren' for the host elements
 	const childNodes					=		Array.from(divID.getElementsByTagName("*"));
 	let liveChildElements				=		childNodes.filter((node) => node.nodeType === Node.ELEMENT_NODE);
 	let duplicateEntryFound				=		false;
 	liveChildElements.forEach((element) => {
 		const foundDivHash = element.getAttribute(divAttr);
 		if ( foundDivHash == value ) {
-			console.log("Entry is already present! doing nothing.");
+			// here we need to check if anything about this duplicate changed
 			duplicateEntryFound 		= 		true;
 		} else {
-			console.log("No entry discovered for value: " + value);
+			// console.log("No entry discovered for value: " + value);
 		}
 	});
 	return duplicateEntryFound;
@@ -738,8 +737,33 @@ function createInputButton(key, value, keyLong, keyFull, inputHost, inputHostL, 
 	counter++;
 }
 
+function checkHostDuplicate(type, hostHash) {
+	// called AFTER we check for duplicates initially, and only if the hash IS a duplicate
+	console.log("Looking for hostHash: " +hostHash+ "\nwith type: " +type);
+	let update 							=		false;
+	const divLoc						=		"HostControlDiv";
+	const divID							=		document.getElementById(divLoc);
+	const childNodes					=		Array.from(divID.getElementsByTagName("*"));
+	let liveChildElements				=		childNodes.filter((node) => node.nodeType === Node.ELEMENT_NODE);
+	liveChildElements.forEach((element) => {
+		let elementHash  				=		element.getAttribute("divhost");
+		let elementClass				=		element.getAttribute("class");
+		if ( hostHash == elementHash && elementClass == "host_divider") {
+			let elementType 			= 		element.getAttribute("data-hosttype");
+			console.log("Host Type is: " + elementType)
+			if ( type == elementType) {
+				console.log("Type unchanged.")
+			} else {
+				let update				=	true;
+				element.remove();
+			}
+		}
+	});
+	return update;
+}
 
 function createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, hostBlankStatus, functionIndex) {
+	let update							=		false;
 	var divEntry						=		document.createElement("Div");
 	var type							=		type;
 	const id							=		document.createTextNode(counter + 1);
@@ -751,8 +775,16 @@ function createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, hostBla
 	divEntry.setAttribute("data-hostType", type);
 	divEntry.setAttribute("title", "IP: " + hostIP);
 	$(divEntry).addClass('host_divider');
+	// am I a duplicate?
 	if (checkForDuplicate("HostControlDiv", "divhost", hostHash)) {
-		return;
+		console.log("Working on a duplicate, applying type test..");
+		if(checkHostDuplicate(type, hostHash)) {
+			console.log("element should now be deleted.");
+		} else {
+			return;
+		}
+	} else {
+			console.log("unique ID, continuing");
 	}
 	/* This needs to be done "backwards" insofar as the type needs to be determined before we can start creating a new DIV */
 	console.log("Generating label and buttons with\nHost Label: "+hostLabel+"\nHost Name: "+hostName+"\nAnd Host Hash: "+hostHash+"\nAnd type: "+type+"\nAnd IP: "+hostIP+"\nAnd blank status: "+hostBlankStatus);
