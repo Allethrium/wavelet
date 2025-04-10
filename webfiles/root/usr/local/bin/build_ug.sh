@@ -233,6 +233,7 @@ event_encoder(){
 	KEYNAME="/UI/hosts/$hostNameSys/type"; write_etcd_global
 	KEYNAME="/UI/hostlist/${hostNameSys}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/UPDATE"; KEYVALUE="1"; write_etcd_global
 	# This simple module should be all that's required.  
 }
 
