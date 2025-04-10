@@ -277,6 +277,7 @@ event_server(){
 	event_audio_toggle
 	event_audio_bluetooth_connect
 	event_force_deprovision
+	event_generate_poll_watcher
 	event_generateHash svr
 	systemctl --user daemon-reload
 	systemctl --user start \
@@ -377,7 +378,6 @@ WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestre
 	echo -e "Enabling server notification services"
 	event_generate_controller
 	event_generate_reflectorreload
-	event_generate_watch_provision
 	event_generate_run_ug
 	systemctl --user enable wavelet_controller.service --now
 	systemctl --user enable wavelet_reflector.service --now
