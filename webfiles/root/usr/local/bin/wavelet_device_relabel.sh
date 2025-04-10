@@ -125,7 +125,7 @@ event_prefix_set(){
 	echo -e "My host label is ${myHostLabel}"
 	KEYNAME="/UI/hosts/${hostNameSys}/type"; read_etcd_global; type=${printvalue}
 		if [[ "${type}" = "dec" ]]; then
-			echo "I am currently a decoder switching to an encoder"
+			echo "I am currently a decoder, switching to an encoder"
 			typeSwitch="enc"
 			event_generate_wavelet_encoder_query
 			systemctl --user enable \
@@ -160,6 +160,7 @@ event_prefix_set(){
 	KEYNAME="/UI/hosts/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/type"; write_etcd_global
 	#KEYNAME="/UI/hosts/${hostNameSys}/control/label"; KEYVALUE="${hostNamePretty}"; write_etcd_global
+	# It is possible we will need to add an additional delayed step to "poke" the UI into updating.
 	systemctl restart getty@tty1.service
 }
 
