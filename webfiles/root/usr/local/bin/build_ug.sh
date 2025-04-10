@@ -280,7 +280,7 @@ event_server(){
 	event_generate_poll_watcher
 	event_generateHash svr
 	systemctl --user daemon-reload
-	systemctl --user start \
+	systemctl --user enable \
 		wavelet_reflector \
 		wavelet_audio_toggle \
 		wavelet_controller \
@@ -292,6 +292,10 @@ event_server(){
 		wavelet_reflector_reload \
 		wavelet_reset \
 		wavelet_set_bluetooth_connect \
+		wavelet_force_deprovision \
+		wavelet_poll_watcher_interface \
+		wavelet_poll_watcher_net \
+		wavelet_poll_watcher_hosts \
 		wavelet_ui --now
 	echo "System services generated, starting services now.."
 }
