@@ -79,7 +79,8 @@ event_decoder_blank(){
         fi
         # Add a volume > 0 option here so that we stop any audio output from the device when it's blanked.
         # This will be necessary to blank off a team call or overflow if audio were being processed.
-        swayimg /var/home/wavelet/config/blank.bmp -f --config=info.show=no &
+
+        SWAYSOCK=/dev/null swayimg /var/home/wavelet/config/blank.bmp -f --config=info.show=no &; sleep 1; &
 }
 event_decoder_unblank(){
         pid=$(ps ax | grep swayimg | awk '{print $1}' | head -n 1)
