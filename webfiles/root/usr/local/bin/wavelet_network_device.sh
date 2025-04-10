@@ -344,7 +344,7 @@ probe_ip(){
 		exit 0
 	else
 		KEYNAME="/network_ip/${deviceHash}"; read_etcd_global
-		if [[ ${printvalue} = ${$1} ]]; then
+		if [[ ${printvalue} = ${1} ]]; then
 			echo "This device is already populated in network IP, doing nothing"
 			exit 0
 		fi
