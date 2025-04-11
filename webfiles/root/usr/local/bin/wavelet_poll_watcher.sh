@@ -15,7 +15,8 @@ write_etcd_global(){
 }
 
 set_poll_key(){
-	# generates a timestamp, concats with with the type
+	# generates a timestamp, concats with with the type after a three second delay to allow the system to settle
+	sleep 3
 	KEYNAME="/UI/POLL_UPDATE"; KEYVALUE="$(date +%s)|${1}"; write_etcd_global
 	echo "/UI/POLL_UPDATE key updated with ${KEYVALUE}, UI should pick up changes on next polling cycle!"
 }
