@@ -55,5 +55,5 @@ detect_self(){
 hostNameSys=$(hostname)
 hostNamePretty=$(hostnamectl --pretty)
 #set -x
-exec >/var/home/wavelet/logs/watch_encoderflag.log 2>&1
+exec >/var/home/wavelet/logs/encoderquery.log 2>&1
 main

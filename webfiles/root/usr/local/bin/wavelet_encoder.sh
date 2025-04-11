@@ -72,6 +72,7 @@ detect_input_present(){
 	systemctl --user daemon-reload
 	systemctl --user enable wavelet_encoder_query.service --now
 	echo -e "Now monitoring for encoder changes.."
+	read_uv_hash_select
 }
 
 read_uv_hash_select() {
@@ -354,8 +355,8 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage
 set_channelIndex(){
 	# This previously resided in the controller, but makes more sense here.
 	# Called after server or client encoder blocks have concatenated and generated their respective device maps and cmdlines
-	KEYNAME=uv_input;		read_etcd_global; controllerInputLabel=${printvalue}
-	KEYNAME=ENCODER_QUERY;	read_etcd_global; hashValue=${printvalue}
+	KEYNAME="/UI/UV_INPUT";		read_etcd_global; controllerInputLabel=${printvalue}
+	KEYNAME="ENCODER_QUERY";	read_etcd_global; hashValue=${printvalue}
 	# Ensure the encoder is even running...
 	if ! systemctl --user is-active --quiet UltraGrid.AppImage.service; then
 		echo "Something went wrong, we can't do anything until the SystemD unit is operating!"
@@ -364,18 +365,19 @@ set_channelIndex(){
 	fi
 	# Final step is to look for the uv_input label in device_map_entries_verity
 	# Module should ONLY be called on a system which possesses the device in question
-	# If we are the server, we should test for network device:
+	# If we are the server, testing should have occurred in encoder_query
 	if [[ $(hostname) == *"svr"* ]]; then
 		echo "Test for network device"
-		if [[ ${controllerInputLabel} == *"/network_interface/"* ]]; then
-			KEYNAME="/network_ip/${hashValue}"; read_etcd_global
-			KEYNAME="/network_uv_stream_command/${printvalue}"; read_etcd_global
-			searchArg=${printvalue}
+		KEYNAME="/network_ip/${hashValue}"; read_etcd_global
+		if [[ -n ${printvalue} ]]; then
+			echo "return value not null, proceding"
+			KEYNAME="/network_uv_stream_command/${printvalue}"; read_etcd_global; searchArg="${printvalue}"
 		else
-			# We want the UI label to reflect the pretty hostnames as set on the UI here.  I think..
-			KEYNAME="/${hostNamePretty}/devpath_lookup/${hashValue}"; read_etcd_global; searchArg="${printvalue}"
+			echo "return value for network_ip/${hashValue} is null!  not a network device! Looking in local devices.."
+			KEYNAME="/${hostNameSys}/devpath_lookup/${hashValue}"; read_etcd_global; searchArg="${printvalue}"
 		fi
 	fi
+	# Now we have searchArg as the commandline string for the device that's been selected
 	# check for device_map presence
 	echo "Looking for device path ${searchArg} in local device map file.."
 	if grep -q ${searchArg} /var/home/wavelet/device_map_entries_verity; then
@@ -387,7 +389,7 @@ set_channelIndex(){
 		rm -rf /var/home/wavelet/device_map_entries_verity; sleep 2
 		KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
 		KEYNAME="/${hostNameSys}/INPUT_DEVICE_NEW"; write_etcd_global
-		KEYNAME=ENCODER_QUERY; KEYVALUE="hashValue"; write_etcd_global
+		KEYNAME=ENCODER_QUERY; KEYVALUE="${hashValue}"; write_etcd_global
 		exit 0
 	fi
 	# check for UG arg
@@ -458,4 +460,4 @@ hostNamePretty=$(hostnamectl --pretty)
 #set -x
 exec >/var/home/wavelet/logs/encoder.log 2>&1
 
-read_uv_hash_select
+detect_input_present
