@@ -405,6 +405,10 @@ function createHostButton(hostName, hostHash, item) {
 					console.log(response);
 				}
 			});
+			// remove the UI element if this is a deprovision task
+			if ( item == "DEPROVISION") {
+				$(this).parent.parent.remove();
+			}
 			sleep (750);
 		})
 	return $btn;
@@ -519,7 +523,7 @@ function createDecoderMenuSet(hostName, hostHash, type) {
 }
 
 function createEncoderMenuSet(hostName, hostHash, type) {
-	console.log("Generating Decoder buttons in Hamburger Menu..");
+	console.log("Generating Encoder buttons in Hamburger Menu..");
 	let activeMenuSelector			=	(`#hamburgerMenu_${hostHash}`);
 	let buttonList 					=	['DEPROVISION','RESET','REBOOT','REVEAL'];
 	for (let item of buttonList) {
