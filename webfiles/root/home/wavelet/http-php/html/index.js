@@ -250,7 +250,7 @@ function togglebox_setup(toggleBox) {
 
 function getToggleStatus(toggleKey, toggleValue) {
 	// this function gets a toggle status and returns it.  Replaces audio, banner, livestream & persist toggle modules.
-	console.log("Getting toggle value for /ui/" + toggleKey);
+	console.log("Getting toggle value for /UI/" + toggleKey);
 	$.ajax({
 			type: "POST",
 			url: "/get_toggle_status.php",
@@ -407,7 +407,7 @@ function createHostButton(hostName, hostHash, item) {
 			});
 			// remove the UI element if this is a deprovision task
 			if ( item == "DEPROVISION") {
-				$(this).parent.parent.remove();
+				document.getElementById(this).parentElement.parentElement.remove();
 			}
 			sleep (750);
 		})
