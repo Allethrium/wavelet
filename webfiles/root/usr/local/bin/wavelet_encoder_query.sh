@@ -17,19 +17,29 @@ write_etcd_global(){
 main() {
 	# Checks to see if this host is referenced
 	KEYNAME="ENCODER_QUERY";				read_etcd_global;	hashValue=${printvalue}
-	KEYNAME="/UI/short_hash/${hashValue}"	read_etcd_global;   targetHost="${printvalue%/*}"
-	# Determine what kind of device we are dealing with
-	if [[ ${targetHost} == *"network_interface"* ]]; then
-		echo -e "Target Hostname is a network device."
-		detect_self
-	elif [[ "${targetHost}" == *"${hostNamePretty}"* ]]; then
-		echo -e "Target hostname references this host!"
-		systemctl --user restart run_ug.service
-	else 
-		echo -e "Device is hosted on another host, checking to see if I'm the server.."
-		detect_self
-		exit 0
-	fi
+	KEYNAME="/UI/short_hash/${hashValue}"	read_etcd_global;   target="${printvalue}"
+	# Target will be the packed value in HostName:hostnamepretty:devLabel:devPath for local
+	# IP:name:ip for network device
+	# Get our IP Subnet for checking on network devices
+	case ${hashValue} in
+		"1")					echo "Static Input, checking for server status..";		detect_self
+		;;
+		"2")					echo "Static Input, checking for server status..";		detect_self
+		;;
+		"T")					echo "Static Input, checking for server status..";		detect_self
+	esac
+	# Not a static input? next steps:
+	ipAddrSvr=$(cat /var/home/wavelet/config/etcd_ip)
+	A=(${ipAddrSvr//./ })
+	ipAddrSubnet=$(echo "${A[0]}.${A[1]}.${A[2]}")
+	case ${target} in
+		*${hostNameSys}*)		echo "Target hostname references this host!";			systemctl --user restart run_ug.service
+		;;
+		${ipaddrSubNet}*)  		echo "Network device, checking for server status..";	detect_self
+		;;
+		*)						echo "This host is not referenced/invalid selection";	exit 0
+	esac
+
 }
 
 detect_self(){
