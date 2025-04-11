@@ -69,7 +69,7 @@ generate_service(){
 event_decoder_blank(){
 	echo -e "\nDecoder Blank flag change detected, switching host to blank input...\n\n\n"
 	# this should be a blank image
-	if [[ ! -f /var/home/wavelet/config/blankscreen.png ]]; then
+	if [[ ! -f /var/home/wavelet/config/blank.bmp ]]; then
 		echo "Blank display isn't available, generating.."
 			color="rgb(.2, .2, .2, 0)"
 			backgroundcolor="rgb(.2, .2, .2, 0)"
@@ -82,7 +82,7 @@ event_decoder_blank(){
 	export XDG_RUNTIME_DIR=/run/user/$(id -u)
 	WAYLAND_DISPLAY=wayland-1
 	SWAYSOCK=/run/user/${UID=$(id -u)}/sway-ipc.$UID.$(pgrep -x sway).sock
-	if $( swaymsg exec -- "swayimg /var/home/wavelet/config/blank.bmp -f --config=info.show=no" | grep -q "Failed to open display"); then
+	if $( swaymsg -s $SWAYSOCK exec -- "swayimg /var/home/wavelet/config/blank.bmp -f --config=info.show=no" | grep -q "Failed to open display"); then
 		echo "Swayimg issue, restarting the system unit!"
 		systemctl --user restart wavelet_decoder_blank.service
 	else
