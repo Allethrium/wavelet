@@ -423,6 +423,7 @@ event_blankhost(){
 	# Host Blank is necessary for the UI to load properly, so we always set it here
 	KEYNAME="/UI/hosts/${hostNameSys}/control/BLANK"; KEYVALUE="0"; write_etcd_global
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/\"%H\"/control/BLANK 0 0 "wavelet_decoder_blank"
+	sed -i '/Service/aExecStartPre=-swaymsg workspace 2' /var/home/wavelet/.config/systemd/user/wavelet_decoder_blank.service
 }
 event_promote(){
 	# This flag watches the hostname to instruct the machine to (pro/de)mote the (en/de)coder as appropriate.
