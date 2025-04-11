@@ -38,6 +38,6 @@ function poll_etcd_inputs($token, $keyPrefix) {
 
 $prefixstring		= 	"/ui/$toggleKey";
 $keyPrefix			=	base64_encode($prefixstring);
-$token 				=	get_etcd_authtoken($password, $username);
+$token				=	get_etcd_auth_token();
 poll_etcd_inputs($token, $keyPrefix);
 ?>
