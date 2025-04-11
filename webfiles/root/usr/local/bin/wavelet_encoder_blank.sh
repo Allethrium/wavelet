@@ -42,7 +42,7 @@ event_encoder_blank(){
 	export XDG_RUNTIME_DIR=/run/user/$(id -u)
 	WAYLAND_DISPLAY=wayland-1
 	SWAYSOCK=/run/user/${UID=$(id -u)}/sway-ipc.$UID.$(pgrep -x sway).sock
-	swaymsg -s $SWAYSOCK exec "swayimg /var/home/wavelet/config/enc_blank.bmp -f --config=info.show=no" & sleep 1
+	swaymsg -s $SWAYSOCK exec "swayimg /var/home/wavelet/config/enc_blank.bmp -f --config=info.show=no" & sleep 5
 	# Generate activity on hosts update so that UI will function as intended.
 	KEYNAME="/UI/hosts/${hostNameSys}/UPDATEUI"; KEYVALUE="1"; write_etcd_global
 }
