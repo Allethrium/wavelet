@@ -18,8 +18,8 @@ main() {
 	# Checks to see if this host is referenced
 	KEYNAME="ENCODER_QUERY";				read_etcd_global;	hashValue=${printvalue}
 	KEYNAME="/UI/short_hash/${hashValue}"	read_etcd_global;   target="${printvalue}"
-	# Target will be the packed value in HostName:hostnamepretty:devLabel:devPath for local
-	# IP:name:ip for network device
+	# Target will be the packed value in HostName;hostnamepretty;devLabel;devPath for local
+	# IP;name;ip for network device
 	# Get our IP Subnet for checking on network devices
 	case ${hashValue} in
 		"1")					echo "Static Input, checking for server status..";		detect_self
@@ -32,10 +32,14 @@ main() {
 	ipAddrSvr=$(cat /var/home/wavelet/config/etcd_ip)
 	A=(${ipAddrSvr//./ })
 	ipAddrSubnet=$(echo "${A[0]}.${A[1]}.${A[2]}")
+	# trim target of anything after first ; delimiter
+	target=${target%%;*}
 	case ${target} in
 		*${hostNameSys}*)		echo "Target hostname references this host!";			systemctl --user restart run_ug.service
 		;;
-		${ipaddrSubNet}*)  		echo "Network device, checking for server status..";	detect_self
+		*${hostNameSys#*.})		echo "Same domain but not this hostname, exiting.";		exit 0
+		;;
+		*${ipaddrSubNet}*)  	echo "Network device, checking for server status..";	detect_self
 		;;
 		*)						echo "This host is not referenced/invalid selection";	exit 0
 	esac
