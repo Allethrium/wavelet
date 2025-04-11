@@ -28,21 +28,23 @@ detect_self(){
 }
 
 event_encoder_blank(){
-        echo -e "\nDecoder Blank flag change detected, switching host to blank input...\n\n\n"
-        # this should be a blank image
-        if [[ ! -f /var/home/wavelet/config/enc_blank.bmp ]]; then
-        	echo "Blank display isn't available, generating.."
+	echo -e "\nDecoder Blank flag change detected, switching host to blank input...\n\n\n"
+	# this should be a blank image
+	if [[ ! -f /var/home/wavelet/config/enc_blank.bmp ]]; then
+		echo "Blank display isn't available, generating.."
 			color="rgb(.2, .2, .2, 0)"
 			backgroundcolor="rgb(.2, .2, .2, 0)"
-        	magick -size 1920x1080 -pointsize 50 -background "${color}" -bordercolor "${backgroundcolor}" \
-        	-gravity Center -fill white label:'TRANSMITTING AS ENCODER.\nThis screen is intentionally blank.' \
-        	-colorspace RGB /var/home/wavelet/config/enc_blank.bmp
-        fi
-        # Add a volume > 0 option here so that we stop any audio output from the device when it's blanked.
-        # This will be necessary to blank off a team call or overflow if audio were being processed.
-        swayimg /var/home/wavelet/config/enc_blank.bmp -f --config=info.show=no &
-        # Generate activity on hosts update so that UI will function as intended.
-        KEYNAME="/UI/hosts/${hostNameSys}/UPDATEUI"; KEYVALUE="1"; write_etcd_global
+		magick -size 1920x1080 -pointsize 50 -background "${color}" -bordercolor "${backgroundcolor}" \
+		-gravity Center -fill white label:'TRANSMITTING AS ENCODER.\nThis screen is intentionally blank.' \
+		-colorspace RGB /var/home/wavelet/config/enc_blank.bmp
+	fi
+	pactl set-sink-mute $(pactl get-default-sink) 1
+	export XDG_RUNTIME_DIR=/run/user/$(id -u)
+	WAYLAND_DISPLAY=wayland-1
+	SWAYSOCK=/run/user/${UID=$(id -u)}/sway-ipc.$UID.$(pgrep -x sway).sock
+	swaymsg -s $SWAYSOCK exec "swayimg /var/home/wavelet/config/enc_blank.bmp -f --config=info.show=no" & sleep 1
+	# Generate activity on hosts update so that UI will function as intended.
+	KEYNAME="/UI/hosts/${hostNameSys}/UPDATEUI"; KEYVALUE="1"; write_etcd_global
 }
 
 
