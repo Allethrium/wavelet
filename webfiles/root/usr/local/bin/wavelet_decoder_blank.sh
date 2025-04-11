@@ -67,27 +67,36 @@ generate_service(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
 }
 event_decoder_blank(){
-        echo -e "\nDecoder Blank flag change detected, switching host to blank input...\n\n\n"
-        # this should be a blank image
-        if [[ ! -f /var/home/wavelet/config/blankscreen.png ]]; then
-        	echo "Blank display isn't available, generating.."
+	echo -e "\nDecoder Blank flag change detected, switching host to blank input...\n\n\n"
+	# this should be a blank image
+	if [[ ! -f /var/home/wavelet/config/blankscreen.png ]]; then
+		echo "Blank display isn't available, generating.."
 			color="rgb(.2, .2, .2, 0)"
 			backgroundcolor="rgb(.2, .2, .2, 0)"
-        	magick -size 1920x1080 -pointsize 50 -background "${color}" -bordercolor "${backgroundcolor}" \
-        	-gravity Center -fill white label:'This screen is intentionally blank.' \
-        	-colorspace RGB /var/home/wavelet/config/blank.bmp
-        fi
-        # Add a volume > 0 option here so that we stop any audio output from the device when it's blanked.
-        # This will be necessary to blank off a team call or overflow if audio were being processed.
-
-        SWAYSOCK=/dev/null swayimg /var/home/wavelet/config/blank.bmp -f --config=info.show=no && sleep 1 &
+		magick -size 1920x1080 -pointsize 50 -background "${color}" -bordercolor "${backgroundcolor}" \
+		-gravity Center -fill white label:'This screen is intentionally blank.' \
+		-colorspace RGB /var/home/wavelet/config/blank.bmp
+	fi
+	# mute audio
+	pactl set-sink-mute $(pactl get-default-sink) 1
+	export XDG_RUNTIME_DIR=/run/user/$(id -u)
+	WAYLAND_DISPLAY=wayland-1
+	SWAYSOCK=/run/user/${UID=$(id -u)}/sway-ipc.$UID.$(pgrep -x sway).sock
+	if $( swaymsg exec -- "swayimg /var/home/wavelet/config/blank.bmp -f --config=info.show=no" | grep -q "Failed to open display"); then
+		echo "Swayimg issue, restarting the system unit!"
+		systemctl --user restart wavelet_decoder_blank.service
+	else
+		sleep 1 &
+	fi
 }
 event_decoder_unblank(){
-        pid=$(ps ax | grep swayimg | awk '{print $1}' | head -n 1)
-        kill -15 $pid
-        sleep 1
-        kill -6 $pid
-        exit 0
+	# un-mute audio
+	pactl set-sink-mute $(pactl get-default-sink) 0
+	pid=$(ps ax | grep swayimg | awk '{print $1}' | head -n 1)
+	kill -15 $pid
+	sleep 1
+	kill -6 $pid
+	exit 0
 }
 
 
