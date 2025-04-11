@@ -29,12 +29,12 @@ function set_etcd($token, $keyPrefix, $keyValue) {
 }
 
 // error_reporting(E_ALL);
-$prefixstring	=	"/ui/$toggleKey";
+$prefixstring	=	"/UI/$toggleKey";
 $keyPrefix		=	base64_encode($prefixstring);
 $keyValue		=	base64_encode($toggleValue);
 $token			=	get_etcd_auth_token();
 
 // curl etcd uv_hash_select for the value of the device hash we want to see streaming on the system
 set_etcd($token, $keyPrefix, $keyValue);
-set_etcd("input_update", "1");
+set_etcd($token, "input_update", "1");
 ?>
