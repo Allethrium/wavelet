@@ -384,10 +384,10 @@ set_channelIndex(){
 	else
 		# If not, we run the process again after having the encoder restart
 		echo "Entry missing from device map file! Forcing re-enumeration of devices.."
-		sleep 1
+		rm -rf /var/home/wavelet/device_map_entries_verity; sleep 2
 		KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
 		KEYNAME="/${hostNameSys}/INPUT_DEVICE_NEW"; write_etcd_global
-		rm -rf /var/home/wavelet/device_map_entries_verity
+		KEYNAME=ENCODER_QUERY; KEYVALUE="hashValue"; write_etcd_global
 		exit 0
 	fi
 	# check for UG arg
