@@ -5,7 +5,7 @@
 
 detect_self(){
 	# Detect_self in this case relies on the etcd type key
-	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/type"; read_etcd_global
 	echo -e "Host type is: ${printvalue}\n"
 	case "${printvalue}" in
 		enc*)                                   echo -e "I am an Encoder \n"            ;       exit 0
@@ -68,38 +68,37 @@ generate_service(){
 }
 event_decoder_blank(){
 	echo -e "\nDecoder Blank flag change detected, switching host to blank input...\n\n\n"
-	systemctl --user stop UltraGrid.AppImage.service
-	mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.blank
-	# set ug_args to generate and display smpte testcard
-	ug_args="--tool uv -t testcard:pattern=blank -d vulkan_sdl2:fs:keep-aspect:nocursor:nodecorate"
-	echo -e "
-	[Unit]
-	Description=UltraGrid AppImage executable
-	After=network-online.target
-	Wants=network-online.target
-	[Service]
-	ExecStartPre=-swaymsg workspace 2
-	ExecStart=/usr/local/bin/UltraGrid.AppImage ${ug_args}
-	Restart=always
-	[Install]
-	WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
-	systemctl --user daemon-reload
-	systemctl --user start UltraGrid.AppImage.service
-	systemctl --user restart wavelet_decoder_blank.service
-	echo -e "\nTask Complete.\n"
+	# this should be a blank image
+	if [[ ! -f /var/home/wavelet/config/blank.bmp ]]; then
+		echo "Blank display isn't available, generating.."
+			color="rgb(.2, .2, .2, 0)"
+			backgroundcolor="rgb(.2, .2, .2, 0)"
+		magick -size 1920x1080 -pointsize 50 -background "${color}" -bordercolor "${backgroundcolor}" \
+		-gravity Center -fill white label:'This screen is intentionally blank.' \
+		-colorspace RGB /var/home/wavelet/config/blank.bmp
+	fi
+	# mute audio
+	pactl set-sink-mute $(pactl get-default-sink) 1
+	export XDG_RUNTIME_DIR=/run/user/$(id -u)
+	WAYLAND_DISPLAY=wayland-1
+	SWAYSOCK=/run/user/${UID=$(id -u)}/sway-ipc.$UID.$(pgrep -x sway).sock
+	if $( swaymsg -s $SWAYSOCK exec -- "swayimg /var/home/wavelet/config/blank.bmp -f --config=info.show=no" | grep -q "Failed to open display"); then
+		echo "Swayimg issue, restarting the system unit!"
+		systemctl --user restart wavelet_decoder_blank.service
+	else
+		sleep 1 &
+	fi
+}
+event_decoder_unblank(){
+	# un-mute audio
+	pactl set-sink-mute $(pactl get-default-sink) 0
+	pid=$(ps ax | grep swayimg | awk '{print $1}' | head -n 1)
+	kill -15 $pid
+	sleep 1
+	kill -6 $pid
 	exit 0
 }
 
-event_decoder_unblank(){
-	echo -e "\nDecoder Blank flag change detected, restoring host to previous input...\n\n\n"
-	systemctl --user stop UltraGrid.AppImage.service
-	mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.blank /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
-	systemctl --user daemon-reload
-	systemctl --user start UltraGrid.AppImage.service
-	systemctl --user restart wavelet_decoder_blank.service
-	echo -e "\nTask Complete.\n"
-	exit 0
-}
 
 ###
 #
@@ -113,20 +112,20 @@ exec >/var/home/wavelet/logs/wavelet_blank_decoder.log 2>&1
 hostNameSys=$(hostname)
 hostNamePretty=$(hostnamectl --pretty)
 
-KEYNAME="/${hostNameSys}/DECODER_BLANK_PREV"; read_etcd_global; oldKeyValue=${printvalue}
-KEYNAME="/${hostNameSys}/DECODER_BLANK"; read_etcd_global; newKeyValue=${printvalue}
+KEYNAME="/UI/hosts/${hostNameSys}/control/BLANK_PREV"; read_etcd_global; oldKeyValue=${printvalue}
+KEYNAME="/UI/hosts/${hostNameSys}/control/BLANK"; read_etcd_global; newKeyValue=${printvalue}
 	if [[ ${newKeyValue} == ${oldKeyValue} ]]; then
 		echo -e "\n Blank setting and previous blank setting match, the webpage has been refreshed, doing nothing..\n"
 		:
 	else
 		if [[ "${newKeyValue}" == 1 ]]; then
 				echo -e "\ninput_update key is set to 1, setting blank display for this host, and writing prevKey \n"
-				KEYNAME="/${hostNameSys}/DECODER_BLANK_PREV"; KEYVALUE="1";	write_etcd_global
+				KEYNAME="/UI/hosts/${hostNameSys}/control/BLANK_PREV"; KEYVALUE="1";	write_etcd_global
 				event_decoder_blank
 				# use a switcher, have the decoders all running a blank in the background?
 		else
 				echo -e "\ninput_update key is set to 0, reverting to previous display, and writing prevKey.. \n"
-				KEYNAME="/${hostNameSys}/DECODER_BLANK_PREV"; KEYVALUE="0"; write_etcd_global
+				KEYNAME="/UI/hosts/${hostNameSys}/control/BLANK_PREV"; KEYVALUE="0"; write_etcd_global
 				event_decoder_unblank
 		fi
 	fi

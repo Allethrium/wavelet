@@ -29,7 +29,6 @@ Tmpfs=/tmp
 Exec=httpd-foreground
 
 [Service]
-TimeOutStartSec=300
 Restart=always
 RestartSec=5
 
@@ -44,6 +43,7 @@ WantedBy=default.target" > /home/wavelet/.config/containers/systemd/httpd.contai
 	cp /var/home/wavelet/setup/wavelet-files.tar.xz /home/wavelet/http/ignition/
 	cp /home/wavelet/.bashrc /home/wavelet/http/ignition/skel_bashrc.txt
 	cp /home/wavelet/.bash_profile /home/wavelet/http/ignition/skel_profile.txt
+	cp /usr/local/backgrounds/sway/wavelet_test.png /var/home/wavelet/http/ignition/
 	chown -R wavelet:wavelet /home/wavelet/http
 	chmod +x /home/wavelet/http
 	exit 0

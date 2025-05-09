@@ -67,3 +67,4 @@ if [[ $(hostname) = *"svr"* ]]; then
 else
 	event_deprovision
 fi
+chown wavelet:wavelet /var/home/wavelet/logs/deprovision.log

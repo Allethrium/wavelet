@@ -3,7 +3,7 @@
 
 detect_self(){
 	# Detect_self in this case relies on the etcd type key
-	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/type"; read_etcd_global
 	echo -e "Host type is: ${printvalue}\n"
 	case "${printvalue}" in
 		enc*) 					echo -e "I am an Encoder"; event_encoder
@@ -18,7 +18,6 @@ detect_self(){
 		;;
 	esac
 }
-
 
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd(){
@@ -68,7 +67,7 @@ generate_service(){
 
 event_server(){
 	# The server is a special case because it serves blanks screen, static image and test bars.
-	# As a result, instead of run_ug it calls wavelet_init.service
+	# As a result, instead of using the normal runner, it calls wavelet_init.service
 	# Ensure web interface is up
 	systemctl --user start http-php-pod.service
 	# Check for input devices
@@ -109,15 +108,15 @@ event_encoder(){
 event_decoder(){
 	# Registers self as a decoder in etcd for the reflector to query & include in its client args
 	echo -e "Populated IP Address is: ${IPVALUE}"
-	KEYVALUE=${IPVALUE}
+	KEYVALUE="${IPVALUE}"
 	write_etcd_client_ip
 	# Ensure all reset, reveal and reboot flags are set to 0 so they are
 	# 1) populated
 	# 2) not active so the new device goes into a reboot/reset/reveal loop
-	KEYNAME="/${hostNameSys}/DECODER_RESET"; KEYVALUE="0"; write_etcd_global
-	KEYNAME="/${hostNameSys}/DECODER_REVEAL"; write_etcd_global
-	KEYNAME="/${hostNameSys}/DECODER_REBOOT"; write_etcd_global
-	KEYNAME="/${hostNameSys}/DECODER_BLANK"; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/control/DECODER_RESET"; KEYVALUE="0"; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/control/DECODER_REVEAL"; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/control/DECODER_REBOOT"; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/control/DECODER_BLANK"; write_etcd_global
 	# Enable watcher services now all task activation keys are set to 0
 	systemctl --user enable \
 		wavelet_decoder_reset.service \
@@ -194,6 +193,7 @@ get_ipValue(){
 				if [[ $ip =~ $regex ]]; then
 					echo -e "\nIP Address is valid as ${ip}, continuing.."
 					KEYNAME="/hostHash/${hostNameSys}/ipaddr"; KEYVALUE="${ip}"; write_etcd_global
+					KEYNAME="/UI/hosts/${hostNameSys}/IP"; write_etcd_global
 				else
 					echo -e "IP Address is not valid, sleeping and calling function again\n"
 					get_ipValue

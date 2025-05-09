@@ -84,7 +84,7 @@
 	position: absolute;
 	inset: -100px;
 	display: block;
-	background: #093740 url("./noise_2.png");
+	background: #093740 url("noise2.png");
 	background-blend-mode: overlay;
 	animation: noise-background 0.5s steps(1) infinite;
 }
@@ -237,7 +237,7 @@
 	position: absolute;
 	inset: -100px;
 	display: block;
-	background: #093740 url("./noise_2.png");
+	background: #093740 url("noise2.png");
 	background-blend-mode: overlay;
 	animation: noise-background 0.5s steps(1) infinite;
 }
@@ -380,7 +380,7 @@
 	position: absolute;
 	inset: -100px;
 	display: block;
-	background: #093740 url("./noise_2.png");
+	background: #093740 url("noise2.png");
 	background-blend-mode: overlay;
 	animation: noise-background 0.5s steps(1) infinite;
 }
@@ -461,7 +461,7 @@ body:before {
 	inset: -100px;
 	z-index: -1;
 	display: block;
-	background: #093740 url("./noise_2.png");
+	background: #093740 url("noise2.png");
 	background-blend-mode: overlay;
 	animation: noise-background 0.5s steps(1) infinite;
 	content: "";

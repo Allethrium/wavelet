@@ -16,7 +16,7 @@ event_decoder(){
 	echo "Setting decoder hostname as well as 'Pretty' label to the same value."
 	echo "The Pretty label will be utilized on the webUI and may change."
 	echo "The stable hostname is for domain enrollment, and should remain stable after initial configuration."
-	newhostname=$(LC_ALL=C tr -dc A-Z-0-9 </dev/urandom | head -c 4)
+	newhostname=$(head -c 4 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
 	hostnamectl hostname dec$newhostname.wavelet.local
 	hostnamectl --pretty hostname dec$newhostname.wavelet.local
 	# remember to reset permissions or we get root logfiles

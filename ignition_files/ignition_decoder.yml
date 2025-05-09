@@ -79,6 +79,12 @@ storage:
       overwrite: true
       contents:
         source: http://192.168.1.32:8080/ignition/connectwifi.sh
+    # A simple desktop background
+    - path: /usr/local/backgrounds/sway/wavelet_test.png
+      mode: 0755
+      overwrite: true
+      contents:
+        source: http://192.168.1.32:8080/ignition/wavelet_test.png
     # Sets hostname (set randomly after bootstrap process completes.
     # Any decoder can be promoted to another device by manually changing hostname
     - path: /etc/hostname
@@ -459,12 +465,30 @@ storage:
         name: wavelet
       group:
         name: wavelet
+    - path: /home/wavelet/.ssh/secrets
+      mode: 0755
+      user:
+        name: wavelet
+      group:
+        name: wavelet
     - path: /home/wavelet/config
       mode: 0755
       user:
         name: wavelet
       group:
         name: wavelet
+    - path: /home/wavelet-root/.ssh/secrets
+      mode: 0755
+      user:
+        name: wavelet-root
+      group:
+        name: wavelet-root
+    - path: /home/wavelet-root/config
+      mode: 0755
+      user:
+        name: wavelet-root
+      group:
+        name: wavelet-root
     - path: /home/wavelet/http
       mode: 0755
       user:
@@ -537,6 +561,21 @@ systemd:
           [Service]
           Type=simple
           ExecStart=/usr/bin/systemctl --force reboot
+    # Deprovision watcher service (UID: 0)
+    - name: wavelet_deprovision.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Calls deprovision module
+        Wants=network-online.target
+        After=multi-user.target network-online.target
+        [Service]
+        Type=simple
+        ExecStartPre=/usr/local/bin/get_creds.sh
+        LoadCredentialEncrypted=etcd_client_pass:/var/roothome/.ssh/secrets/ciphertext.cred
+        ExecStart=/usr/local/bin/watch_wavelet_deprovision.sh
+        [Install]
+        WantedBy=multi-user.target
     # Mask docker entirely
     - name: docker.service
       mask: true

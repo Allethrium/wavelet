@@ -49,15 +49,15 @@ generate_service(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
 }
 
-set -x
+#set -x
 exec >/var/home/wavelet/logs/clear_inputs.log 2>&1
 
 # We add --prefix to perform a "directory + contents" deletion.  DANGEROUS.
-KEYNAME="interface"; delete_etcd_key_prefix
-KEYNAME="/interface"; delete_etcd_key_prefix
-KEYNAME="/hash"; delete_etcd_key_prefix
-KEYNAME="hash"; delete_etcd_key_prefix
-KEYNAME="/short"; delete_etcd_key_prefix
-KEYNAME="/long"; delete_etcd_key_prefix
+KEYNAME="/UI/interface"; delete_etcd_key_prefix
+KEYNAME="/UI/short_hash/"; delete_etcd_key_prefix
+KEYNAME="/long_hash/"; delete_etcd_key_prefix
+KEYNAME="/$(hostname)/inputs"; delete_etcd_key_prefix
+KEYNAME="/UI/network_interface/"; delete_etcd_key_prefix
+KEYNAME="/UI/network_shorthash/"; delete_etcd_key_prefix
 echo -e "\nInput Device data completely cleared.  Plug a device in to begin detection of input sources from scratch.\n"
 exit 0

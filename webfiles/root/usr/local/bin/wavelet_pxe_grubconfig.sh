@@ -14,10 +14,12 @@
 
 generate_tftpboot() {
 	# The Containerfile will generate an output direct to /var/lib/tftpboot with a populated set of UEFI secure boot files.
+	# Note that the shim may only load if the client host's BIOS/EFI is set to OS:Other - the shim may not work with the microsoft defaults on most machines.
+	# If none of that works, secure boot can be disabled, but that feels like defeat.
 	sudo podman build --tag shim -f /home/wavelet/containerfiles/Containerfile.tftpboot
 	podman run --privileged --security-opt label=disable -v /var/lib:/tmp/ shim
 	# Grub aarch64 boot option (just here as placeholder)
-	curl http://ports.ubuntu.com/ubuntu-ports/dists/focal/main/uefi/grub2-arm64/current/grubnetaa64.efi.signed -o /var/lib/tftpboot/grubnetaa64.efi.signed
+	# curl http://ports.ubuntu.com/ubuntu-ports/dists/focal/main/uefi/grub2-arm64/current/grubnetaa64.efi.signed -o /var/lib/tftpboot/grubnetaa64.efi.signed
 }
 
 generate_coreos_image() {
@@ -189,19 +191,23 @@ cp -R /var/lib/tftpboot/boot /home/wavelet/http/pxe
 cp -R /var/lib/tftpboot/efi /home/wavelet/http/pxe
 cp /var/home/wavelet/config/etcd_ip /home/wavelet/http/ignition
 # Ensure the wavelet user owns the http folder, and set +x and read perms on http folder and subfolders
-chmod -R 0755 /home/wavelet/http
-chown -R wavelet /home/wavelet/
+chmod -R 0755 /var/home/wavelet/http
+chown -R wavelet /var/home/wavelet/
+chown -R wavelet-root /var/home/wavelet-root
 # Remove executable bit from all FILES in http (folders need +x for apache to traverse them) - apparently this breaks PXE though?
 find /var/home/wavelet/http/ -type f -print0 | xargs -0 chmod 644
 find /var/home/wavelet/http-php/ -type f -print0 | xargs -0 chmod 644
 echo -e "\nPXE bootable images completed and populated in http serverdir, client provisioning should now be available..\n"
 touch /var/pxe.complete
+# Clean up
+rm -rf /var/home/wavelet/pxe
 
 # Check to see if the security layer is enabled, if not, we are done and should reboot..
 if [[ -f /var/prod.security/enabled ]]; then
 	systemctl start wavelet_install_hardening.service
 	exit 0
 else
+	machinectl shell wavelet-root@ $(which bash) -c "systemctl --user daemon-reload && systemctl --user enable wavelet_provision.service --now"
 	# restart getty@tty1 to reload UI and start userland build process
 	systemctl restart getty@tty1
 fi

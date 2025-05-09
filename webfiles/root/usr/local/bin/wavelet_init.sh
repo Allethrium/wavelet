@@ -53,8 +53,8 @@ generate_service(){
 
 
 event_init_codec() {
-	KEYNAME=uv_encoder;	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:threads=0:bitrate=8M"; write_etcd_global
-	echo -e "Default LibX265 activated, bitrate 8M\n"
+	KEYNAME=uv_encoder;	KEYVALUE="libavcodec:encoder=libx265:preset=ultrafast:threads=0:bitrate=10M"; write_etcd_global
+	echo -e "Default LibX265 activated, bitrate 10M\n"
 }
 
 event_init_av1() {
@@ -71,11 +71,11 @@ event_init_seal(){
 	rm -rf seal.mkv
 	# Generate an image
 	ffmpeg -fflags +genpts -loop 1 -i ny-stateseal.jpg -t 10 -c:v mjpeg -vf scale=1080x1080 -t 10 seal.mkv
-	KEYNAME=uv_input; KEYVALUE="SEAL"; write_etcd_global
+	KEYNAME=UV_INPUT; KEYVALUE="SEAL"; write_etcd_global
 	cd /home/wavelet/
 
 	# call uv_hash_select to process the provided device hash and select the input from these data
-	KEYNAME=uv_hash_select; read_etcd_global; 
+	KEYNAME=UV_HASH_SELECT; read_etcd_global; 
 	# Reads Filter settings, should be banner.pam most of the time
 	KEYNAME=uv_filter_cmd; read_etcd_global; filtervar=${printvalue}
 	# Reads Encoder codec settings, should be populated from the Controller
@@ -138,7 +138,7 @@ hostNamePretty=$(hostnamectl --pretty)
 # Populate standard values into etcd
 #set -x
 # Wait until etcd cluster is up ( we are checking for "IS LEADER" = true here )
-until [[ $(/usr/local/bin/wavelet_etcd_interaction.sh "check_status" | awk '{print $6}') = "true," ]]; do
+until [[ $(/usr/local/bin/wavelet_etcd_interaction.sh "check_status" | awk '{print $6}' | tail -1) = "true," ]]; do
 	echo -e "Etcd still down.. waiting one second.."
 	sleep 1
 done
@@ -148,10 +148,12 @@ exec >/var/home/wavelet/logs/initialize.log 2>&1
 echo -e "Populating standard values into etcd, the last step will trigger the Controller and Reflector functions, bringing the system up.\n"
 KEYNAME="uv_videoport"; KEYVALUE="5004"; write_etcd_global
 KEYNAME="uv_audioport"; KEYVALUE="5006"; write_etcd_global
-KEYNAME="/livestream/enabled"; KEYVALUE="0"; write_etcd_global
-KEYNAME="uv_hash_select"; KEYVALUE="2"; write_etcd_global
-KEYNAME="/banner/enabled"; KEYVALUE="0"; write_etcd_global
+KEYNAME="/UI/livestream"; KEYVALUE="0"; write_etcd_global
+KEYNAME="/UI/UV_HASH_SELECT"; KEYVALUE="2"; write_etcd_global
+KEYNAME="/UI/banner"; KEYVALUE="0"; write_etcd_global
 KEYNAME="uv_filter_cmd"; delete_etcd_key_global
+# Ensure host blank key populated and OFF for server every load, or hosts will fail to launch.
+KEYNAME="/UI/hosts/${hostNameSys}/control/BLANK"; KEYVALUE="0" write_etcd_global
 
 event_init_av1
 
@@ -169,4 +171,11 @@ systemctl --user enable \
 # Ping detectv4l so that we populate devices
 /usr/local/bin/wavelet_detectv4l.sh
 touch /var/home/wavelet/encoder.firstrun
-event_init_seal
+
+KEYNAME="/UI/interface/persist"; read_etcd_global
+if [[ ${printvalue} -eq "1" ]]; then
+	echo "Input persistance is enabled.  Attempting to start encoder with the previously selected input.."
+else
+	ehco "Input persistence is not enable, starting with the static image input.."
+	event_init_seal
+fi

@@ -6,7 +6,7 @@
 
 detect_self(){
 	# Detect_self in this case relies on the etcd type key
-	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/type"; read_etcd_global
 	echo -e "Host type is: ${printvalue}\n"
 	case "${printvalue}" in
 		enc*)                                   echo -e "I am an Encoder \n"            ;       exit 0
@@ -70,7 +70,7 @@ event_decoder(){
 	# Kill the systemd monitor task for a few moments
 	systemctl --user stop wavelet-decoder-reveal.service
 	echo -e "\nDecoder Reveal flag change detected, resetting flag and displaying reveal card for 10 seconds..\n"
-	KEYNAME="/${hostNameSys}/DECODER_REVEAL"; KEYVALUE="0"; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/control/REVEAL"; KEYVALUE="0"; write_etcd_global
 	systemctl --user stop UltraGrid.AppImage.service
 	mv /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service.old.reveal
 	# set ug_args to generate and display smpte testcard
@@ -108,7 +108,7 @@ hostNamePretty=$(hostnamectl --pretty)
 #set -x
 exec >/var/home/wavelet/logs/wavelet_reveal_decoder.log 2>&1
 
-KEYNAME="/${hostNameSys}/DECODER_REVEAL"; read_etcd_global
+KEYNAME="/UI/hosts/${hostNameSys}/control/REVEAL"; read_etcd_global
 		if [[ "${printvalue}" == 1 ]]; then
 				echo -e "\ninput_update key is set to 1, continuing with task.. \n"
 				detect_self

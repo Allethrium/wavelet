@@ -7,7 +7,7 @@
 
 detect_self(){
 	# Detect_self in this case relies on the etcd type key
-	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/type"; read_etcd_global
 	echo -e "Host type is: ${printvalue}\n"
 	case "${printvalue}" in
 	enc*) 					echo -e "I am an Encoder \n"		;	event_encoder
@@ -69,7 +69,7 @@ generate_service(){
 
 
 event_decoder(){
-	KEYNAME="/${hostNameSys}/DECODER_REBOOT"; read_etcd_global; rebootflag=${printvalue}
+	KEYNAME="/UI/hosts/${hostNameSys}/control/REBOOT"; read_etcd_global; rebootflag=${printvalue}
 	if [[ "${rebootflag}" -eq 1 ]]; then
 		echo -e "\nSystem Reboot flag reset to 0\n\n\n\n***SYSTEM IS GOING DOWN FOR REBOOT IMMEDIATELY***\n\n\n"
 		# we wait 12 seconds so that the server has time to get out ahead and come back up before the decoders start doing anything.
@@ -81,7 +81,7 @@ event_decoder(){
 	fi
 }
 event_encoder(){
-	KEYNAME="/${hostNameSys}/ENCODER_RESTART"; KEYVALUE=0; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/control/ENCODER_REBOOT"; KEYVALUE=0; write_etcd_global
 	echo -e "\nEncoder Reboot flag reset to 0\n\n\n\n***SYSTEM IS GOING DOWN FOR REBOOT IMMEDIATELY***\n\n\n"
 	# we wait 12 seconds so that the server has time to get out ahead and come back up before the decoders start doing anything.
 	wait 12
@@ -91,12 +91,12 @@ event_server(){
 	echo -e "\nSystem Reboot flag is set, waiting 5 Seconds for other machines to reboot or set appropriate flags..\n"
 	# Remember, the server houses the keypair store, so it must be available for the system to operate when everything has rebooted!
 	wait 5
-	KEYNAME="SYSTEM_RESTART"; KEYVALUE=0; write_etcd_global
+	KEYNAME="SYSTEM_REBOOT"; KEYVALUE=0; write_etcd_global
 	echo -e "\nSystem Reboot flag reset to 0\n\n\n\n***SYSTEM IS GOING DOWN FOR REBOOT IMMEDIATELY***\n\n\n"
 	systemctl reboot -i
 }
 event_other(){
-	KEYNAME="/${hostNameSys}/DECODER_RESTART"; KEYVALUE=0; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/control/REBOOT"; KEYVALUE=0; write_etcd_global
 	systemctl reboot -i
 }
 

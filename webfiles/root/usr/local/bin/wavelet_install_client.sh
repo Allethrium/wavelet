@@ -71,11 +71,20 @@ install_security_layer(){
 
 setup_deprovision_service(){
 	# Service calls a module which destroys the host and will remove from domain if the security layer is enabled
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/%H/DEPROVISION" 0 0 "wavelet_deprovision"
-	# Move to system folder
-	mv /home/wavelet/.config/systemd/user/${waveletModule}.service /etc/systemd/system
+	# Note this service won't work right away, it will require the device username/password after enrollment has been completed!
+	echo "[Unit]
+Description=Wavelet Deprovision Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=etcdctl --endpoints=${ETCDENDPOINT} watch /%H/DEPROVISION -w simple -- /usr/bin/bash -c \"/usr/local/bin/wavelet_deprovision.sh\"
+Restart=always
+
+[Install]
+WantedBy=default.target/etc/systemd/system" > /etc/systemd/system/wavelet_deprovision.service
 	systemctl daemon-reload
-	systemctl start wavelet_deprovision.service --now
+	systemctl enable wavelet_deprovision.service
 }
 
 ####

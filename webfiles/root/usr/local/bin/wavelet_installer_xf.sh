@@ -3,6 +3,11 @@
 # Should be one of the first things to run on initial boot in place of a more commonly used direct systemd unit.
 # All wavelet modules, including the web server code, are deployed on all devices.
 
+
+RED="\033[0;31m"
+GREEN="\033[0;32m"
+NC="\033[0m"
+
 detect_self(){
 	# This might be of use if we need some custom kernels or decide to start building addition ostree overlays
 	# platform=$(dmidecode | grep "Manufacturer" | cut -d ':' -f 2 | head -n 1)
@@ -167,8 +172,9 @@ WantedBy=multi-user.target" > /etc/systemd/system/wavelet_install_hardening.serv
 
 get_ipValue(){
 	# Gets the current IP address for this host
-	IPVALUE=$(ip a | grep 192.168.1 | awk '/inet / {gsub(/\/.*/,"",$2); print $2}')
-	if [[ "${IPVALUE}" == "" ]] then
+	nmcli_get=$(nmcli -t -f AUTOCONNECT,UUID con | grep 'yes')
+	IPVALUE=$(nmcli -f 'IP4.ADDRESS' con show --active uuid "${nmcli_get##*yes:}" | awk '{ print $2 }')
+	if [[ "${IPVALUE%/*}" == "" ]] then
 			# sleep for five seconds, then call yourself again
 			echo -e "\nIP Address is null, sleeping and calling function again\n"
 			sleep 5
@@ -185,7 +191,7 @@ get_ipValue(){
 					get_ipValue
 				fi
 			}
-			valid_ipv4 "${IPVALUE}"
+			valid_ipv4 "${IPVALUE%/*}"
 	fi
 }
 
@@ -225,28 +231,56 @@ rpm_overlay_install(){
 	# The second stage adds everything necessary for the server.
 	# We do this two-stage process to keep the overlay size down as much as we can
 	echo "Building client image and pushing to registry.."
-	podman build -t localhost/coreos_overlay_client \
-	--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
-	-v=/var/home/wavelet/containerfiles:/mount:z \
-	-f "/var/home/wavelet/containerfiles/${containerFile}"
-	podman tag localhost/coreos_overlay_client localhost:5000/coreos_overlay_client:latest
-	touch /var/rpm-ostree-overlay.complete
-	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
-	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-	# Push client image to container registry - N.B can only use --compress with dir: transport method. 
-	podman push localhost:5000/coreos_overlay_client:latest 192.168.1.32:5000/coreos_overlay_client --tls-verify=false	
+	count=0
+	build_client_container_image() {
+		podman build -t localhost/coreos_overlay_client --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} -v=/var/home/wavelet/containerfiles:/mount:z -f "/var/home/wavelet/containerfiles/${containerFile}"
+		count=$((count + 1 ))
+		export_client_container_image
+	}
+	export_client_container_image() {
+		if podman tag localhost/coreos_overlay_client localhost:5000/coreos_overlay_client:latest; then
+			fail=0
+			podman push localhost:5000/coreos_overlay_client:latest 192.168.1.32:5000/coreos_overlay_client --tls-verify=false	
+			touch /var/rpm-ostree-overlay.complete
+			touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
+			touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+		else
+			fail=1
+			echo "${RED}Unable to tag or push container image, possible package issue inside the container.  Retrying as long as it takes (Retry attempts: $count)${NC}"
+			build_client_container_image
+		fi
+	}
+	build_client_container_image
 
 	# Build the server overlay
 	echo "Building server image and rebasing.."
-	podman build -t localhost/coreos_overlay_server \
-	--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
-	-v=/home/wavelet/containerfiles:/mount:z \
-	-f /home/wavelet/containerfiles/Containerfile.coreos.overlay.server
-	podman tag localhost/coreos_overlay_server localhost:5000/coreos_overlay_server:latest
+	count=0
+	build_svr_container_image() {
+		count=$((count + 1 ))
+		podman build -t localhost/coreos_overlay_server \
+		--build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION} \
+		-v=/home/wavelet/containerfiles:/mount:z \
+		-f /home/wavelet/containerfiles/Containerfile.coreos.overlay.server
+		export_svr_container_image
+	}
+	export_svr_container_image() {
+		if podman tag localhost/coreos_overlay_server localhost:5000/coreos_overlay_server:latest; then
+			fail=0
+			echo "${GREEN}Server overlay build success!${NC}"
+			podman push localhost:5000/coreos_overlay_client:latest 192.168.1.32:5000/coreos_overlay_client --tls-verify=false	
+			rpm-ostree rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay_server
+		else
+			fail=1
+			echo "${RED}Server overlay build failed! retrying with attempt: ${count}..${NC}"
+			build_svr_container_image
+		fi
+	}
+	build_svr_container_image
+
 	# We don't need to push the server overlay to the registry, because this it the only host which will use it.
 	# Rebase server on server overlay image
 	rpm-ostree rebase ostree-unverified-image:containers-storage:localhost:5000/coreos_overlay_server
-	echo -e "\nRPM package updates completed, finishing installer task and checking for extended support..\n"
+	echo -e "\n${GREEN}RPM package updates completed, finishing installer task and checking for extended support..\n${NC}"
 }
 
 rpm_ostree_ARM(){

@@ -52,9 +52,11 @@ generate_service(){
 	# Can be called with more args with "generate_servier" ${keyToWatch} 0 0 "${serviceName}"
 	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
 }
+
+
 detect_self(){
-	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
-	echo -e "Hostname is ${printvalue} \n"
+	KEYNAME="/UI/hosts/${hostNameSys}/type"; read_etcd_global
+	echo -e "Host type key is ${printvalue} \n"
 	case ${printvalue} in
 		enc*)                                   echo -e "I am an Encoder \n"            ;       check_label
 		;;
@@ -67,22 +69,21 @@ detect_self(){
 		esac
 }
 
-
 check_label(){
 	# Finds our current hash and gets the new label from Etcd as set from UI
 	oldLabel=${hostNamePretty}
 	echo "${oldLabel}" > /home/wavelet/oldLabel.txt
-	KEYNAME="/hostHash/${hostNameSys}/relabel_active"; KEYVALUE="1"; write_etcd_global
 	KEYNAME="/${hostNameSys}/Hash"; read_etcd_global; myHostHash="${printvalue}"
 	echo -e "My hash is ${myHostHash}, attempting to find a my new device label..\n"
-	KEYNAME="/${hostNameSys}/hostNamePretty"; read_etcd_global; myNewHostLabel="${printvalue}"
+	KEYNAME="/UI/hosts/${hostNameSys}/control/label"; read_etcd_global; myNewHostLabel="${printvalue}"
 	echo -e "My *New* host label is ${myNewHostLabel}!\n"
 	if [[ "${hostNamePretty}" == "${myNewHostLabel}" ]]; then
 		echo -e "New label and current Pretty hostname are identical, setting flag to 0 and doing nothing..\n"
-		KEYNAME="/hostHash/${hostNamePretty}/relabel_active"; KEYVALUE="0"; write_etcd_global
+		KEYNAME="/${hostNameSys}/relabel_active"; KEYVALUE="0"; write_etcd_global
 		exit 0
 	else
 		echo -e "New label and current Pretty hostname are different, proceding to initiate change.."
+		KEYNAME="/${hostNameSys}/relabel_active"; KEYVALUE="1"; write_etcd_global
 		set_newLabel
 	fi
 }
@@ -93,11 +94,7 @@ set_newLabel(){
 	echo -e "My new host label is ${myNewHostLabel}"
 	echo -e "My system hostname is ${hostNameSys}"
 	# Check for current FQDN in the case someone wrote gibberish in the text box.
-	FQDN=$(nslookup ${hostNamePretty} -i | grep ${hostNamePretty} | head -n 1)
-	NAME=$(echo "${FQDN##*:}" | xargs)
-	echo -e "HostName FQDN is ${NAME}"
-	# Compare current FQDN with input FQDN and append if necessary
-	currentfqdnString=$(echo "${NAME}%.*")
+	currentfqdnString=${hostNameSys}
 	inputfqdnString=$(echo "${myNewHostLabel}%.*")
 	if [[ "${currentfqdnString} == ${inputfqdnString}" ]]; then
 		echo -e "FQDN strings are correct, proceeding.."
@@ -109,7 +106,7 @@ set_newLabel(){
 	fi
 	echo "${appendedHostName}" > newHostName.txt
 	KEYNAME="/${hostNameSys}/RECENT_RELABEL"; KEYVALUE="1"; write_etcd_global
-	# Generate the necessary files, then reboot.
+	# Generate the necessary files, then reboot if needed.
 	set_newHostName ${appendedHostName}
 }
 
@@ -124,20 +121,21 @@ event_prefix_set(){
 		wavelet_monitor_decoder_reveal.service \
 		wavelet_monitor_decoder_reset.service --now
 	KEYNAME="/${hostNameSys}/Hash"; read_etcd_global; myHostHash="${printvalue}"
-	KEYNAME="/hostHash/${myHostHash}"; read_etcd_global; myHostLabel="${printvalue}"
+	KEYNAME="/UI/hosts/${hostNameSys}/control/label"; read_etcd_global; myHostLabel="${printvalue}"
 	echo -e "My host label is ${myHostLabel}"
-	KEYNAME="/${hostNameSys}/type"; read_etcd_global; type=${printvalue}
+	KEYNAME="/UI/hosts/${hostNameSys}/type"; read_etcd_global; type=${printvalue}
 		if [[ "${type}" = "dec" ]]; then
-			echo "I am currently a decoder switching to an encoder"
+			echo "I am currently a decoder, switching to an encoder"
 			typeSwitch="enc"
+			event_generate_wavelet_encoder_query
 			systemctl --user enable \
 				wavelet_device_redetect \
 				wavelet_encoder_query.service \
-				watch_encoderflag.service \
 				wavelet_promote.service --now
-			KEYNAME="/decoderip/${hostNameSys}"; delete_etcd_global
-			KEYNAME="DEVICE_REDETECT"; KEYVALUE="1"; write_etcd_global
-			KEYNAME="reload_reflector"; write_etcd_global
+			KEYNAME="/DECODERIP/${hostNameSys}"; delete_etcd_key_global
+			KEYNAME="NEW_DEVICE_ATTACHED"; KEYVALUE="1"; write_etcd_global
+			#myHostLabel=$(echo ${myHostLabel} | cut -c 4-)
+			#hostNamePretty="${typeSwitch}${myHostLabel}"
 		else
 			echo "I am not a decoder, switching to become a decoder.."
 			typeSwitch="dec"
@@ -147,65 +145,59 @@ event_prefix_set(){
 				wavelet_encoder_query.service \
 				watch_encoderflag.service --now
 			remove_associated_inputs
+			KEYNAME=/UI/UV_HASH_SELECT; read_etcd_global; currentInputHash=${printvalue}
+			KEYNAME=/UI/UV_HASH_SELECT_OLD; read_etcd_global; previousInputHash=${printvalue}
+			if [[ ${currentInputHash} == ${previousInputHash} ]]; then
+				echo "This is the current and previously active device, wavelet will switch back to the SEAL option."
+				KEYNAME="ENCODER_QUERY"; KEYVALUE="SEAL"
+			else
+				# needs client rw on the target key
+				KEYNAME="ENCODER_QUERY"; KEYVALUE=${previousInputHash}; write_etcd_global
+			fi
+		#myHostLabel=$(echo ${myHostLabel} | cut -c 4-)
+		#hostNamePretty="${typeSwitch}${myHostLabel}"
 		fi
-	KEYNAME="/hostLabel/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/type"; KEYVALUE="${typeSwitch}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/type"; write_etcd_global
+	#KEYNAME="/UI/hosts/${hostNameSys}/control/label"; KEYVALUE="${hostNamePretty}"; write_etcd_global
+	# It is possible we will need to add an additional delayed step to "poke" the UI into updating.
 	systemctl restart getty@tty1.service
+}
+
+event_generate_wavelet_encoder_query(){
+	# Taken from build_ug.sh, easier to replicate this here.
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "ENCODER_QUERY" 0 0 "wavelet_encoder_query"
 }
 
 remove_associated_inputs(){
 	echo "Removing input devices associated with my hostname.."
-	KEYNAME="/interface/${hostNamePretty}/"; read_etcd_prefix_global; read -a devHash <<< "${printvalue}"
+	KEYNAME="/UI/interface/${hostNameSys}"; read_etcd_prefix_global; read -a devHash <<< "${printvalue}"
 	for i in ${devHash[@]}; do
-		echo "Working on hash: ${i}"
-		KEYNAME="/short_hash/${i}"; delete_etcd_key_global
-		KEYNAME="/hash/${i}"; delete_etcd_key_global
-		KEYNAME="/${hostNamePretty}/devpath_lookup/${i}"; delete_etcd_global
-		KEYNAME="uv_hash_select"; read_etcd_global
+		KEYNAME="/UI/UV_HASH_SELECT"; read_etcd_global
 		if [[ ${printvalue} = "${i}" ]]; then
 			echo "current device is the selected device, resetting streaming to seal."
-			KEYNAME="uv_hash_select"; KEYVALUE="seal"; write_etcd_global
+			KEYNAME="/UI/UV_HASH_SELECT"; KEYVALUE="seal"; write_etcd_global
 			KEYNAME="ENCODER_QUERY"; KEYVALUE="2"; write_etcd_global
-			KEYNAME="input_update"; KEYVALUE="1"; write_etcd_global
+			# this is deprecated
+			#KEYNAME="input_update"; KEYVALUE="1"; write_etcd_global
 		fi
+		echo "Working on hash: ${i}"
+		KEYNAME="/UI/short_hash/${i}"; read_etcd_global; deviceLabel=${printvalue}
+		KEYNAME="/UI/short_hash/${i}"; delete_etcd_key_global
+		KEYNAME="/UI/interface/${deviceLabel}"; delete_etcd_key_global
+		KEYNAME="/${hostNameSys}/devpath_lookup/${i}"; delete_etcd_key_global
 	done
-	# Now we have processed ALL of the interface items on this host, we can remove the interface labels:
-	KEYNAME="/interface/${hostNamePretty}/"; delete_etcd_key_prefix
+	# Now we have processed ALL of the UI items on this host, we can remove the interface items from the host system side:
 	KEYNAME="/${hostNameSys}/inputs"; delete_etcd_key_prefix
-	KEYNAME="/${hostNamePretty}/inputs"; delete_etcd_key_prefix
-	KEYNAME="/${hostNameSys}/INPUT_DEVICE_PRESENT"; delete_etcd_key_global	
-}
-
-remove_host_keys(){
-	echo "Disabling watcher services and removing any remaining host keys.."
-	systemctl --user disable \
-		wavelet_device_redetect.service \
-		wavelet_encoder_reboot.service \
-		wavelet_monitor_decoder_blank.service \
-		wavelet_monitor_decoder_reboot.service \
-		wavelet_monitor_decoder_reveal.service \
-		wavelet_monitor_decoder_reset.service \
-		watch_encoderflag.service \
-		wavelet_deprovision.service \
-		wavelet_detectv4l.service \
-		wavelet_device_relabel.service \
-		wavelet_encoder.service \
-		wavelet_encoder_query.service \
-		wavelet_promote.service \
-		wavelet_reboot.service \
-		wavelet_reset.service --now
-	KEYNAME="/${hostNameSys}"; delete_etcd_prefix
-	KEYNAME="/hostHash/${hostNameSys}"; delete_etcd_prefix
-	echo "Host keys deleted, shutting down!"
-	systemctl poweroff -i
+	KEYNAME="/${hostNameSys}/INPUT_DEVICE_PRESENT"; delete_etcd_key_global
 }
 
 set_newHostName(){
 	myNewHostname=$@
 	if hostnamectl hostname --pretty ${myNewHostname}; then
 		echo -e "\nHost Name set as ${myNewHostName} successfully!, writing relabel_active to 0."
-		KEYNAME="/hostHash/${hostNameSys}/relabel_active"; KEYVALUE="0";	write_etcd_global
-		KEYNAME="/${hostNameSys}/RECENT_RELABEL";	KEYVALUE="1"; 			write_etcd_global
+		KEYNAME="/${hostNameSys}/relabel_active"; KEYVALUE="0";	write_etcd_global
+		KEYNAME="/${hostNameSys}/RECENT_RELABEL"; KEYVALUE="1"; write_etcd_global
 		echo "Done, no further actions needed."
 	else
 		echo -e "\n Hostname change command failed, please check logs\n"
@@ -213,17 +205,6 @@ set_newHostName(){
 	fi
 }
 
-event_hostNameChange() {
-	KEYNAME="/${hostNameSys}/RELABEL"; read_etcd_global
-	if [[ "${printvalue}" -eq "0" ]]; then
-		echo -e "Relabel task bit for this hostname is set to 0, doing nothing.."
-		exit 0
-	fi
-	echo -e "Relabel bits active, resetting them to 0 prior to starting task.."
-	KEYNAME="/hostHash/${hostNameSys}/relabel_active"; KEYVALUE="0"; write_etcd_global
-	KEYNAME="/${hostNameSys}/RELABEL"; KEYVALUE="0"; write_etcd_global
-	detect_self
-}
 
 ###
 #
@@ -254,11 +235,9 @@ for arg in "$@"; do
 		;;
 		enc*)			echo -e "\nCalled with encoder argument, promoting to Decoder\n"				;	event_prefix_set "${arg}"
 		;;
-		"relabel")		echo -e "\nCalled with relabel argument, not calling prefix function..\n"		;	event_hostNameChange
+		"relabel")		echo -e "\nCalled with relabel argument, not calling prefix function..\n"		;	detect_self
 		;;
-		"deprovision")	echo -e "\nCalled with deprov argument, removing inputs..\n"					;	remove_associated_inputs	;	remove_host_keys
-		;;
-		*)				echo -e "\nCalled with invalid argument, not calling prefix function..\n"		;	event_hostNameChange
+		*)				echo -e "\nCalled with invalid argument, not calling prefix function..\n"		;	detect_self
 		;;
 	esac
 done

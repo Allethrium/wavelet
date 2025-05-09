@@ -21,21 +21,23 @@ detect_self(){
 }
 
 podman_quadlet(){
+	local webuiPass=$(cat /var/home/wavelet/.ssh/secrets/etcd_webui_pw.secure)
 	# New Method - quadlets
 	# We also now know we don't have any other services running on port 80 so we can put nginx on standard HTTP(S) ports.
 	# The .kube file at the end basically allows us to link these two services into a podman pod.   
 	# The install wantedBy= section is how we do systemctl enable --now, basically.
 	mkdir -p /var/home/wavelet/.config/containers/systemd/
-	echo -e "
-[Unit]
+	mkdir -p /var/home/wavelet/http-php/certs
+	mkdir -p /var/home/wavelet/http-php/secrets
+	echo -e "[Unit]
 Description=PHP + FPM
 [Container]
 Image=docker.io/library/php:fpm
 AutoUpdate=registry
+Volume=/var/home/wavelet/http-php/secrets:/var/secrets:Z
 Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/php-fpm.container
 # For Nginx, ports are mapped to 9080 and 9443 respectively..
-	echo -e "
-[Unit]
+	echo -e "[Unit]
 Description=NGINX
 [Container]
 Image=docker.io/library/nginx:alpine
@@ -45,20 +47,23 @@ Pod=http-php.pod" > /var/home/wavelet/.config/containers/systemd/nginx.container
 	echo -e "Security layer enabled, adding mounts for certificates..\n"
 		# Check for prod certs
 		if [[ ! -f /etc/pki/tls/certs/http.crt ]]; then
-			# we generate a crappy certificate so things work, at the very least..
+			# Since prod certs aren't there, we generate a crappy certificate so things work, at the very least..
+			# wait, this won't work because we cannot write to the directory.
 			echo -e "Certificate has not been generated on server, generating a snake oil certificate for testing..\n"
-			openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/pki/tls/certs/httpd.key -out /etc/pki/tls/certs/httpd.crt -subj "/C=US/ST=NewYork/L=NewYork/O=ALLETHRIUM/OU=DevOps/CN=WaveletInterface"
-			openssl dhparam -out /etc/pki/certs/dhparam.pem 4096
+			openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /var/home/wavelet/http-php/certs/httpd.key -out /var/home/wavelet/http-php/certs/httpd.crt -subj "/C=US/ST=NewYork/L=NewYork/O=ALLETHRIUM/OU=DevOps/CN=192.168.1.32"
+			openssl dhparam -out /var/home/wavelet/http-php/certs/dhparam.pem 4096
 		fi
 		# Cert directory mounted regardless, the conf file will determine if we bother looking for them.
 		cp /var/home/wavelet/config/nginx.secure.conf /var/home/wavelet/http-php/nginx/nginx.conf
+		sed -i "s|#fastcgi_param PASSWORD "";|fastcgi_param PASSWORD "${webuiPass}";|g" /var/home/wavelet/http-php/nginx/nginx.conf
 	fi
 	mkdir -p /var/home/wavelet/http-php/log
-	echo -e "
-[Pod]
+	# Problems accessing /etc/pki/tls/certs from userland though?
+	webuiPass=$(cat /var/home/wavelet/.ssh/secrets/etcd_webui_pw.secure)
+	echo -e "[Pod]
 PublishPort=9080:80
 PublishPort=9443:443
-Volume=/etc/pki/tls/certs/:/etc/pki/tls/certs/
+Volume=/var/home/wavelet/http-php/certs/:/etc/pki/tls/certs/:z
 Volume=/var/home/wavelet/http-php/log:/var/log/nginx:Z
 Volume=/var/home/wavelet/http-php/html:/var/www/html:Z
 Volume=/var/home/wavelet/http-php/nginx:/etc/nginx/conf.d/:z

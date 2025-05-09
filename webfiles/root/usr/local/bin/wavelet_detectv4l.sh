@@ -57,11 +57,15 @@ generate_service(){
 }
 
 sense_devices_local() {
+	# we're just looking at what's in /dev/v4l here, effectively.
+	# Might be a good idea to try and compare this against UG's output and add selection logic in future though..
+	# forEach > ug -t v4l2:{i} | process output here, select appropriate pxl/res | test dev for validation via UG | done
 	shopt -s nullglob
 	declare -a v4lArray=(/dev/v4l/by-id/*)
 	for index in "${!v4lArray[@]}" ; do
 		[[ ${v4lArray[$index]} =~ -index1$ ]] && unset -v 'v4lArray[$index]';
 	done
+	
 	array=("${v4lArray[@]}")
 	for i in "${v4lArray[@]}"; do
 		device_string_long=$i
@@ -92,7 +96,7 @@ generate_device_info() {
 	echo -e "generated device hash: $deviceHash \n"
 	device_string_short=$(echo "${device_string_long}" | sed 's/.*usb-//')
 	# Let's look for the device hash in the /interface prefix to make sure it doesn't already exist!
-	KEYNAME="/hash/${deviceHash}"; read_etcd_global; output_return=${printvalue}
+	KEYNAME="/UI/short_hash/${deviceHash}"; read_etcd_global; output_return=${printvalue}
 	if [[ $output_return == "" ]] then
 		echo -e "${deviceHash} not located within etcd, assuming we have a new device and continuing with process to set parameters.."
 		isDevice_input_or_output
@@ -116,25 +120,26 @@ isDevice_input_or_output() {
 }
 
 set_device_input() {
-	# called from generate_device_info from the nested if loop checking for pre-existing deviceHash in etcd /hash/
-	# populated device_string_short with hash value, this is used by the interface webUI component
+	# called from generate_device_info from the nested if loop checking for pre-existing deviceHash in etcd /UI/short_hash
 	# device_string_short is effectively the webui Label / banner text.
-	# Because we cannot query etcd by keyvalue, we must create a reverse lookup prefix for everything we want to be able to clean up!!
-	KEYNAME="/interface/${hostNamePretty}/${device_string_short}"; KEYVALUE="${deviceHash}"; write_etcd_global	
-	# And the reverse lookup prefix - N.B this is updated from set_label.php when the webUI changes a device label/banner string! 
-	KEYNAME="/short_hash/${deviceHash}"; KEYVALUE="${hostNamePretty}/${device_string_short}"; write_etcd_global
-	# We need this to perform cleanup "gracefully"
-	KEYNAME="/long_interface${device_string_long}"; KEYVALUE=${deviceHash}; write_etcd_global
-	# This will enable us to find the device from its hash value, along with the registered host encoder, like a reverse DNS lookup..
-	# GLOBAL value
-	echo -e "Attempting to set keyname ${deviceHash} for ${hostNamePretty}${device_string_long}"
-	KEYNAME="/hash/${deviceHash}"
-	# Stores the device data under hostname/inputs/device_string_long
-	KEYVALUE="/${hostNamePretty}/inputs${device_string_long}"; write_etcd_global
+	# Because we cannot query etcd by keyvalue, we must create a reverse record in order to clean up
+	# This forms a character delimited packed format that we utilize in the PHP module to extract data.
+	# This can be modified from the UI, hence we need to track the device by a more immutable hash value elsewhere
+	#
+	# Packed format:
+	#	HOSTNAME;HOSTNAMEPRETTY;DEVICE LABEL;DEVICE_FULLPATH -- $HASH
+	#
+	#
+	interfaceEntry="${hostNameSys};${hostNamePretty};${device_string_short};${device_string_long}"
+	KEYNAME="/UI/interface/${interfaceEntry}"; KEYVALUE="${deviceHash}"; write_etcd_global	
+	# And the reverse lookup prefix. This is updated from set_label.php when the webUI changes a device label
+	KEYNAME="/UI/short_hash/${deviceHash}"; KEYVALUE="${interfaceEntry}"; write_etcd_global
+	# This is necessary for the owning encoder to know what to test against, along with the reverse value
+	KEYVALUE="/${hostNameSys}/inputs${device_string_long}"; KEYNAME="${deviceHash}"; write_etcd_global
 	# Hash - short path lookup
-	KEYNAME="/${hostNamePretty}/devpath_lookup/${deviceHash}"; KEYVALUE="${v4l_device_path}"; write_etcd_global
+	KEYNAME="/${hostNameSys}/devpath_lookup/${deviceHash}"; KEYVALUE="${v4l_device_path}"; write_etcd_global
 	# notify watcher that input device configuration has changed
-	KEYNAME=new_device_attached; KEYVALUE=1; write_etcd_global
+	KEYNAME=NEW_DEVICE_ATTACHED; KEYVALUE=1; write_etcd_global
 	echo -e "resetting variables to null."
 	deviceHash=""
 	device_string_short=""
@@ -148,14 +153,13 @@ set_device_input() {
 
 
 device_cleanup() {
-	# always the last thing we do here, compares /dev/v4l/by-id to /hash/ and /interface/, removes "dead" devices.  
+	# always the last thing we do here, compares /dev/v4l/by-id to /UI/short_hash and /UI/interface/, removes "dead" devices.  
 	# These dead devices could also be other inputs supported by existing USB devices, but with a different interface (IE /dev/video0 and /dev/video1 might be the same device, one UVC video, one audio)
 	# Get a clean list of devices in populated etcd
-	KEYNAME="/long_interface/"
-	activeInterfaceDevices=$(read_etcd_keysonly | sed 's|/long_interface||g')
+	KEYNAME="/${hostNameSys}/inputs/"
+	activeInterfaceDevices=$(read_etcd_keysonly | sed 's|/${hostnameSys}/inputs||g')
 	IFS=' ' read -a interfaceLongArray <<< ${activeInterfaceDevices}
 	unset IFS
-	#$(etcdctl --endpoints=${ETCDENDPOINT} get /long_interface/ --prefix --keys-only | sed 's|/long_interface||g')
 	# Iterate through array and try to find it in v4lArray, if found we REMOVE it from interfaceLongArray, so we end up with only devices which don't physically exist on this system
 	for i in ${interfaceLongArray[@]}; do
 		if [[ "${v4lArray[*]}" =~ "${i}" ]]; then
@@ -177,25 +181,19 @@ device_cleanup() {
 			else
 				cleanupStringLong="${i}"
 				echo -e "\nCleanup device is ${cleanupStringLong}"
-				# delete the input caps key for the missing device
-				echo -e "Deleting ${hostNameSys}/inputs${cleanupStringLong}  entry"
-				KEYNAME="/${hostNamePretty}/inputs${cleanupStringLong}"; delete_etcd_key_global
 				# find the device hash 
-				KEYNAME="/long_interface${cleanupStringLong}"; cleanupHash=$(read_etcd)
+				KEYNAME="/${hostNameSys}/inputs${cleanupStringLong}"; cleanupHash=$(read_etcd)
 				echo -e "Device hash located as ${cleanupHash}"
-				# delete from long_interface prefix
-				echo -e "Deleting /long_interface${cleanupStringLong} entry"
-				delete_etcd_key
-				# delete from hash prefix
-				echo -e "Deleting /hash/${cleanupHash} entry"
-				KEYNAME="/hash/${cleanupHash}"; delete_etcd_key_global
+				# delete the input caps key for the missing device
+				echo -e "Deleting /${hostNameSys}/inputs${cleanupStringLong}  entry"
+				KEYNAME="/${hostNameSys}/inputs${cleanupStringLong}"; delete_etcd_key_global
 				# finally, find and delete from interface prefix - Guess we need ANOTHER lookup table to manage to keep all of this straight..
-				KEYNAME="/short_hash/${cleanupHash}"; read_etcd_global; cleanupInterface=${printvalue}
-				echo -e "Device UI Interface label located in /short_hash/${cleanupHash} for the value ${cleanupInterface}"
-				echo -e "Deleting /short_hash/${cleanupHash}  entry"
+				KEYNAME="/UI/interface/short_hash/${cleanupHash}"; read_etcd_global; cleanupInterface=${printvalue}
+				echo -e "Device UI Interface label located in /UI/short_hash/${cleanupHash} for the value ${cleanupInterface}"
+				echo -e "Deleting /UI/interface/short_hash/${cleanupHash} entry"
 				delete_etcd_key
-				echo -e "Deleting /interface/${cleanupInterface} entry"
-				KEYNAME="/interface/$${cleanupInterface}"; delete_etcd_key_global
+				echo -e "Deleting /UI/interface/${cleanupInterface} entry"
+				KEYNAME="/UI/interface/${cleanupInterface}"; delete_etcd_key_global
 				echo -e "Device entry ${cleanupStringLong} should be removed along with all references to ${cleanupHash}\n\n"
 			fi
 		done
@@ -279,7 +277,7 @@ event_biamp() {
 detect_self(){
 	systemctl --user daemon-reload
 	# Detect_self in this case relies on the etcd type key
-	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
+	KEYNAME="/${hostNameSys}/type"; read_etcd_global
 	echo -e "Host type is: ${printvalue}\n"
 	case "${printvalue}" in
 		enc*)                                   echo -e "I am an Encoder\n"										;		encoder_checkNetwork 1
@@ -300,7 +298,7 @@ encoder_checkNetwork(){
 		touch /home/wavelet/NETWORK_ERROR_FLAG
 		exit 0
 	fi
-	ping -c 3 192.168.1.32
+	ping -c 3 $(cat /var/home/wavelet/config/etcd_ip)
 	if [[ $? -eq 0 ]]; then
 		echo -e "Online and connected to Wavelet Server, continuing..\n"
 		sense_devices_local
@@ -314,14 +312,17 @@ encoder_checkNetwork(){
 
 redetect_network_devices(){
 	# Redetects network devices
-	echo -e "Redetecting network devices.  Ensuring DEVICE_REDETECT watcher service is temporarily disabled.."
-	systemctl --user disable wavelet_device_redetect.service --now
-	KEYNAME="DEVICE_REDETECT"; KEYVALUE="0"; write_etcd_global
-	systemctl --user enable wavelet_device_redetect.service --now
 	for i in $(cat /var/lib/dnsmasq/dnsmasq.leases | awk '{print $3}'); do
 		echo "Probing IP Address: ${i}"
-		nohup /usr/local/bin/wavelet_network_device.sh "--p" "${i}" &
-		wait
+		# Check to see if we're a registered wavelet device
+		wavelet_ip=$(/usr/local/bin/wavelet_etcd_interaction.sh "read_etcd_prefix_global" "/DECODERIP/")
+		if [[ $i == *"{wavelet_ip}"* ]]; then
+			echo "IP is a wavelet host, ignoring."
+			exit 0
+		else
+			echo "Calling network device sense for IP Address: ${i}"
+			/usr/local/bin/wavelet_network_device.sh "--p" "${i}"
+		fi
 	done
 }
 

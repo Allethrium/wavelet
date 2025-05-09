@@ -55,7 +55,7 @@ main(){
 	KEYNAME="/audio/bluetooth_connect_notify"; KEYVALUE="0"; write_etcd_global
 
 	# check to see if audio is even enabled, if not, we exit 0
-	KEYNAME="/audio_interface/bluetooth_connect_active"; read_etcd_global
+	KEYNAME="/ui/audio"; read_etcd_global
 	if [[ "${printvalue}" -eq "0" ]]; then
 	echo -e "\nAudio bit is not enabled, disabling bluetooth and exiting\n"
 	echo -e 'power off\n' | bluetoothctl
@@ -63,7 +63,7 @@ main(){
 	fi
 
 	# Get bluetooth MAC for ExUBT (set in Audio control portion on webUI)
-	KEYNAME="/audio_interface_bluetooth_mac"; read_etcd_global; bluetoothMAC=${printvalue}
+	KEYNAME="/interface/audio/bluetooth_mac"; read_etcd_global; bluetoothMAC=${printvalue}
 	# if bluetoothMAC=""; then
 	# echo -e "Bluetooth MAC ID is not populated! Exiting and resetting connect bit"
 	# KEYNAME="/interface/bluetooth_connect_active"
@@ -84,7 +84,7 @@ main(){
 	echo -e 'pairable off\n' | bluetoothctl
 
 	# Set bluetooth connection successful for webUI tracking
-	KEYNAME="/audio_interface/bluetooth_connect_active"; KEYVALUE="1"; write_etcd_global
+	KEYNAME="/interface/audio/bluetooth_connect_active"; KEYVALUE="1"; write_etcd_global
 	echo -e "Bluetooth connection set for ${bluetoothMAC}"
 	# do we need to do anything with Pipewire here to set the exUBT/BT device as the audio sink?  
 }

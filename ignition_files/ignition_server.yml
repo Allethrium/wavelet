@@ -58,7 +58,7 @@ storage:
       mode: 0755
       overwrite: true
       contents:
-        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.8/UltraGrid-1.9.8-x86_64.AppImage
+        source: https://github.com/CESNET/UltraGrid/releases/download/v1.9.9/UltraGrid-1.9.9-x86_64.AppImage
     # Inhibit systemd suspend
     - path: /etc/systemd/logind.conf.d/inhibit-suspend.conf
       mode: 0644
@@ -72,24 +72,24 @@ storage:
       contents:
         inline: DomainAdminPasswordGoesHere
     # WiFi Name
-    - path: /var/home/wavelet/wifi_ssid
+    - path: /var/home/wavelet/config/wifi_ssid
       overwrite: true
       contents:
         inline: SEDwaveletssid
     # WiFi BSSID
-    - path: /var/home/wavelet/wifi_bssid
+    - path: /var/home/wavelet/config/wifi_bssid
       mode: 0600
       overwrite: true
       contents:
         inline: SEDwaveletbssid
     # WiFi WPA Passphrase
-    - path: /var/home/wavelet/wifi_pw
+    - path: /var/home/wavelet/config/wifi_pw
       mode: 0600
       overwrite: true
       contents:
         inline: SEDwaveletwifipassword
     # The password Wavelet will use when attempting to configure network devices
-    - path: /var/home/wavelet/networkdevice_userpass
+    - path: /var/home/wavelet/config/networkdevice_userpass
       mode: 0600
       overwrite: true
       contents:
@@ -242,6 +242,29 @@ storage:
           polkit.addRule(function(action, subject) {
             if ((action.id == "org.freedesktop.systemd1.manage-units" &&
                  subject.user == "wavelet")) {
+                  polkit.log("action=" + action)
+                  polkit.log("subject=" + subject)
+                  polkit.log("unit="+action.lookup("unit"))
+                  polkit.log("verb="+action.lookup("verb"))
+            if (action.lookup("unit") == "dnsmasq.service" ||
+                action.lookup("unit") == "etcd-quadlet.service") {
+                 var verb = action.lookup("verb");
+                 if (verb == "start" || verb == "stop" || verb == "restart" || verb == "enable" || verb == "disable") {
+                  polkit.log("returning YES")
+                  return polkit.Result.YES;
+                  }
+                }
+              }
+          });
+    # SystemD unit control
+    - path: /etc/polkit-1/rules.d/9337-wavelet.rules
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          polkit.addRule(function(action, subject) {
+            if ((action.id == "org.freedesktop.systemd1.manage-units" &&
+                 subject.user == "wavelet-root")) {
                   polkit.log("action=" + action)
                   polkit.log("subject=" + subject)
                   polkit.log("unit="+action.lookup("unit"))
@@ -433,6 +456,12 @@ storage:
       overwrite: true
       contents:
         source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/home/wavelet/.config/sway/config
+    # A simple desktop background
+    - path: /usr/local/backgrounds/sway/wavelet_test.png
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://raw.githubusercontent.com/Allethrium/wavelet/master/webfiles/root/usr/local/backgrounds/sway/wavelet_test.png
     # For SWAY - Styles.css is for the controller surface elsewhere..
     - path: /home/wavelet/.config/waybar/style.css
       mode: 0755
@@ -565,8 +594,31 @@ storage:
         name: wavelet
       group:
         name: wavelet
+    # wavelet-root owns provision_request
+    - path: /home/wavelet-root/.config/systemd/user/wavelet_provision.service
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          [Unit]
+          Description=Wavelet Provision key watcher (UID 9337)
+          After=network-online.target etcd-quadlet.service sway-session.target
+          Wants=network-online.target sway-session.target
+          [Service]
+          Type=simple
+          RestartSec=2s
+          Restart=always
+          ExecStart=etcdctl --endpoints=192.168.1.32:2379 --user PROV:wavelet_provision watch /PROV/REQUEST -w simple -- /usr/bin/bash -c "/usr/local/bin/wavelet_provision.sh"
+          [Install]
+          WantedBy=default.target
+      user:
+        name: wavelet-root
+      group:
+        name: wavelet-root
     # Linger services for containers/systemd units which the wavelet user is required to access
     - path: /var/lib/systemd/linger/wavelet
+      mode: 0644
+    - path: /var/lib/systemd/linger/wavelet-root
       mode: 0644
   directories:
     - path: /home/wavelet/.config/systemd/user/default.target.wants
@@ -607,12 +659,30 @@ storage:
         name: wavelet
       group:
         name: wavelet
+    - path: /home/wavelet/.ssh/secrets
+      mode: 0755
+      user:
+        name: wavelet
+      group:
+        name: wavelet
     - path: /home/wavelet/config
       mode: 0755
       user:
         name: wavelet
       group:
         name: wavelet
+    - path: /home/wavelet-root/.ssh/secrets
+      mode: 0755
+      user:
+        name: wavelet-root
+      group:
+        name: wavelet-root
+    - path: /home/wavelet-root/config
+      mode: 0755
+      user:
+        name: wavelet-root
+      group:
+        name: wavelet-root
     - path: /home/wavelet/http
       mode: 0755
       user:
@@ -650,7 +720,7 @@ storage:
         name: root
       group:
         name: root
-# user accounts, passwords and pubkeys
+# user accounts, passwords and pubkeys (populated from installer)
 passwd:
   users:
       #ADD_USER_YAML_HERE

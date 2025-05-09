@@ -22,7 +22,7 @@ detect_self(){
 	case $UG_HOSTNAME in
 	svr*)                   echo -e "I am a Server. Proceeding..."	;	event_server
 	;;
-	*)                      echo -e "This device Hostname is not set approprately, exiting \n" && exit 0
+	*)                      echo -e "This device Hostname is not set appropriately, exiting \n" && exit 0
 	;;
 	esac
 }
@@ -436,7 +436,7 @@ subjectAltName=email:wavelet_domain@$(dnsdomainname)" > /var/home/wavelet/config
 	role="etcd_webui"
 	etcdctl role add "${role}"
 	# We wish to grant the WebUI only permissions to readwrite keys which it ought to be interacting with.  You'll need to walk through this.
-	# This is also why we've put everything webUI related under /interface/ or similar prefixes..
+	# This is also why we've put everything webUI related under /interface/ or maybe some other, similar prefixes..
 	etcdctl role grant-permission "${role}" readwrite --prefix ""
 
 	# We may wish to add a different etcd client user for each client which joins
@@ -444,7 +444,7 @@ subjectAltName=email:wavelet_domain@$(dnsdomainname)" > /var/home/wavelet/config
 	# This would be done on the client spinup and.. probably leave a mess when clients leave the network and need to be cleaned up on the regular?
 	# Let us test with the server and go from there..
 	local userName="etcd_host_$(hostname)"
-	ipa user-add ${userName} --random --first=etcd --last=webui > /var/secrets/etcd_host_$(hostname).password
+	ipa user-add ${userName} --random --first=etcd --last=$(hostname) > /var/secrets/etcd_host_$(hostname).password
 	local etcdHostPW=$(cat /var/secrets/${userName}); echo "${etcdHostPW}" | etcdctl user add ${userName}
 	etcdctl user grant-role "${userName}" "server"
 }

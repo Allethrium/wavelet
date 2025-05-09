@@ -1,6 +1,8 @@
 #!/bin/bash
-# Monitors etcd for output and restarts the encoder as necessary
-#
+# Monitors etcd for the ENCODER_QUERY master key
+# Checks the input label for the device hostname
+# If hostname is on this machine, we restart run_ug.service, calling the encoder process to validate and verify further
+# The encoder process should not be called by anything other than this module, or wavelet_init
 
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
 read_etcd_global(){
@@ -14,21 +16,34 @@ write_etcd_global(){
 
 main() {
 	# Checks to see if this host is referenced
-	KEYNAME="ENCODER_QUERY";	read_etcd_global;	hashValue=${printvalue}
-	KEYNAME="uv_input";			read_etcd_global;	controllerInputLabel=${printvalue}
-	targetHost="${controllerInputLabel%/*}"
-	# Determine what kind of device we are dealing with
-	if [[ ${targetHost} == *"network_interface"* ]]; then
-		echo -e "Target Hostname is a network device."
-		detect_self
-	elif [[ "${targetHost}" == *"${hostNamePretty}"* ]]; then
-		echo -e "Target hostname references this host!"
-		systemctl --user restart run_ug.service
-	else 
-		echo -e "Device is hosted on another host, checking to see if I'm the server.."
-		detect_self
-		exit 0
-	fi
+	KEYNAME="ENCODER_QUERY";				read_etcd_global;	hashValue=${printvalue}
+	KEYNAME="/UI/short_hash/${hashValue}"	read_etcd_global;   target="${printvalue}"
+	# Target will be the packed value in HostName;hostnamepretty;devLabel;devPath for local
+	# IP;name;ip for network device
+	# Get our IP Subnet for checking on network devices
+	case ${hashValue} in
+		"1")					echo "Static Input, checking for server status..";		detect_self
+		;;
+		"2")					echo "Static Input, checking for server status..";		detect_self
+		;;
+		"T")					echo "Static Input, checking for server status..";		detect_self
+	esac
+	# Not a static input? next steps:
+	ipAddrSvr=$(cat /var/home/wavelet/config/etcd_ip)
+	A=(${ipAddrSvr//./ })
+	ipAddrSubnet=$(echo "${A[0]}.${A[1]}.${A[2]}")
+	# trim target of anything after first ; delimiter
+	target=${target%%;*}
+	case ${target} in
+		*${hostNameSys}*)		echo "Target hostname references this host!";			systemctl --user restart run_ug.service
+		;;
+		*${hostNameSys#*.})		echo "Same domain but not this hostname, exiting.";		exit 0
+		;;
+		*${ipaddrSubNet}*)  	echo "Network device, checking for server status..";	detect_self
+		;;
+		*)						echo "This host is not referenced/invalid selection";	exit 0
+	esac
+
 }
 
 detect_self(){
@@ -44,5 +59,5 @@ detect_self(){
 hostNameSys=$(hostname)
 hostNamePretty=$(hostnamectl --pretty)
 #set -x
-exec >/var/home/wavelet/logs/watch_encoderflag.log 2>&1
+exec >/var/home/wavelet/logs/encoderquery.log 2>&1
 main

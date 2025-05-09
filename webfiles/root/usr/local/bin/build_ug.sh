@@ -47,8 +47,51 @@ delete_etcd_key_prefix(){
 	/usr/local/bin/wavelet_etcd_interaction.sh "delete_etcd_key_prefix" "${KEYNAME}"
 }
 generate_service(){
-	# Can be called with more args with "generate_servier" ${keyToWatch} 0 0 "${serviceName}"
+	# Can be called with more args with "generate_service" ${keyToWatch} 0 0 "${serviceName}"
 	/usr/local/bin/wavelet_etcd_interaction.sh "generate_service" "${serviceName}"
+}
+
+etcd_provision_watcher(){
+	# wavelet user systemd service to get provision data back after processing from svr
+	etcdIP=$(cat /var/home/wavelet/config/etcd_ip)
+	echo -e "[Unit]
+Description=Wavelet provision retrieval (UID 1337)
+After=network-online.target etcd-member.service
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/etcdctl --endpoints=${etcdIP}:2379 --user PROV:wavelet_provision watch /PROV/RESPONSE -w simple -- /usr/bin/bash -c \"/usr/local/bin/wavelet_provision.sh 2\"
+StartLimitBurst=30
+
+[Install]
+WantedBy=default.target" > /var/home/wavelet/.config/systemd/user/wavelet_provision_watcher.service
+	systemctl --user daemon-reload && systemctl --user enable wavelet_provision_watcher.service	--now
+	sleep .5
+}
+
+etcd_provision_request(){
+	# RunOnce for client provisioning, server handles request from there.
+	# The client side runs as wavelet / 1337
+	echo "Calling client provision.."
+	/usr/local/bin/wavelet_etcd_interaction.sh "client_provision_request"
+	sleep 1
+	/usr/local/bin/wavelet_etcd_interaction.sh "client_provision_response"
+	sleep 1
+	# Wait for etcd_interaction to perform its task and write the done flag
+	while [[ ! -f /var/home/wavelet/config/provisioned.rq.complete ]]; do
+		sleep .5
+		echo "waiting for provision process to complete.."
+	done
+	KEYNAME="PROV_TEST"; KEYVALUE="True"; write_etcd
+	read_etcd
+	if [[ ${printvalue} = "True" ]]; then
+		echo "Client provision request completed, client username has been generated and access to appropriate keys granted."
+		touch /var/home/wavelet/config/provisioned.complete
+		KEYNAME="HOST_STATE_CHANGE"; KEYVALUE="1"; write_etcd_global
+	else 
+		echo "Client provisioning has failed.  Key value is not accessible, or does not match!"
+		exit 1
+	fi
 }
 
 
@@ -78,20 +121,34 @@ detect_ug_version(){
 detect_self(){
 	systemctl --user daemon-reload
 	systemctl --user enable foot-server.socket --now
-	# Detect_self in this case relies on the etcd type key
-	KEYNAME="/hostLabel/${hostNameSys}/type"; read_etcd_global
-	echo -e "Host type is: ${printvalue}\n"
-	# test if i'm the server
-	if [[ $(hostname) = *"svr"* ]]; then
-		echo -e "I am a Server. Proceeding..."; event_server
-	else
-		# Handle encoder or decoder paths
-		if [[ ${printvalue} = *"enc"* ]]; then
-			echo "I am an encoder"; event_encoder
+	if [[ -f /var/home/wavelet/config/provisioned.complete ]]; then
+		echo "Provisioning completed, detecting self via etcd.."
+		# Detect_self in this case relies on the etcd type key
+		KEYNAME="/${hostNameSys}/type"; read_etcd_global
+		echo -e "Host type is: ${printvalue}\n"
+		# test if i'm the server
+		if [[ $(hostname) = *"svr"* ]]; then
+			# This is fine because a server always has etcd rights
+			echo -e "I am a Server. Proceeding..."; event_server
 		else
-			# This is for anything NOT a svr or enc, including an unpopulated new device.
-			echo "I am a decoder"; event_decoder
+			# Handle encoder or decoder paths
+			# This is fine because an encoder will have previously been a decoder, and have etcd rights.
+			if [[ ${printvalue} = *"enc"* ]]; then
+				echo "I am an encoder"; event_encoder
+			else
+				# This is for anything NOT a svr or enc, including an unpopulated new device.
+				# This COULD have etcd rights, or not and just "fail".  This is why it's not specific.
+				echo "I am a decoder"; event_decoder
+			fi
 		fi
+	else
+		echo "Provisioning is NOT complete, detecting via system hostname.."
+		case $(hostname) in
+			svr*)		echo "Server detected"; event_server
+			;;
+			dec*)		echo "Decoder detected"; event_decoder
+			;;
+		esac
 	fi
 }
 
@@ -102,22 +159,43 @@ detect_self(){
 
 event_decoder(){
 	echo -e "Decoder routine started."
+	etcd_provision_watcher
+	# Provision request to etcd
+	if [[ -f /var/home/wavelet/config/provisioned.complete ]]; then
+		echo "Provisioning completed, skipping step!"
+	else
+		echo "First run, sending provision request to server.."
+		echo "If provisioning has failed, perform rm -rf /var/home/wavelet/config/provisioned.complete will cause the device to generate a new provision request on next boot."
+		etcd_provision_request
+	fi
+	sleep .5
 	event_connectwifi
-	echo -e "Setting up systemd services to be a decoder, moving to run_ug"
-	event_reveal
-	event_system_reboot
-	event_reset
+	event_generateHash dec
 	event_blankhost
+	event_reveal
+	event_reset
+	event_system_reboot
 	event_host_relabel_watcher
 	event_promote
-	event_generateHash dec
+	# Generate device_redetect, but do not enable it!
+	event_device_redetect
+	systemctl --user daemon-reload
+	systemctl --user enable \
+		wavelet_decoder_reboot \
+		wavelet_decoder_reset \
+		wavelet_decoder_blank \
+		wavelet_decoder_reveal \
+		wavelet_reboot \
+		wavelet_reset \
+		wavelet_device_relabel \
+		wavelet_promote --now
 	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
-	# Set Type keys to "dec"
+	# Set Type keys to "dec" for system, and also for UI
 	KEYVALUE="dec";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
-	KEYNAME="/hostLabel/${hostNameSys}/type"; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/type"; write_etcd_global
+	KEYNAME="/UI/hostlist/${hostNameSys}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
-	sleep .33
-	# Executes run_ug in order to start the video streaming window
+	# Executes run_ug in order to start the UltraGrid application
 	systemctl --user start run_ug.service
 }
 event_encoder(){
@@ -128,25 +206,38 @@ event_encoder(){
 	else
 		event_connectwifi
 	fi
+    event_system_reboot
+    event_reset
+    event_device_redetect
+    event_host_relabel_watcher
+    event_generate_wavelet_encoder_query
+    event_promote
+    event_encoder_blank
 	systemctl --user daemon-reload
 	# Generate Systemd notifier services for encoders
-	event_encoder_reboot
-	event_system_reboot
-	event_reset
-	event_device_redetect
-	event_host_relabel_watcher
-	event_generate_wavelet_encoder_query
-	event_promote
+	systemctl --user enable \
+		wavelet_decoder_reboot \
+		wavelet_decoder_reset \
+		wavelet_decoder_reveal \
+		wavelet_reboot \
+		wavelet_reset \
+		wavelet_device_relabel \
+		wavelet_promote \
+		wavelet_encoder_query \
+		wavelet_encoder_blank.service --now
 	# We do not perform run_ug for the encoder as that is enabled if it receives an encoderflag change.  It will be idle until then.
 	# Run detectv4l here
 	/usr/local/bin/wavelet_detectv4l.sh
 	# Set Type keys to "enc"
 	KEYVALUE="enc";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
-	KEYNAME="/hostLabel/${hostNameSys}/type"; write_etcd_global
+	KEYNAME="/UI/hosts/$hostNameSys/type"; write_etcd_global
+	KEYNAME="/UI/hostlist/${hostNameSys}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
+	KEYNAME="/UI/hosts/${hostNameSys}/UPDATE"; KEYVALUE="1"; write_etcd_global
+	# This simple module should be all that's required.  
 }
+
 event_generate_wavelet_encoder_query(){
-	KEYNAME="wavelet_build_completed"; KEYVALUE="1"; write_etcd
 	# We need to add this switch here to ensure if we're a server we don't populate ourselves to the encoders DOM in the webUI..
 	if [[ ${hostNamePretty} == *"enc"* ]]; then
 		event_generateHash enc
@@ -156,8 +247,6 @@ event_generate_wavelet_encoder_query(){
 	fi
 	# Can be called directly, remember to escape quotes if we want to preserve them as per bash standards.
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "ENCODER_QUERY" 0 0 "wavelet_encoder_query"
-	systemctl --user daemon-reload
-	systemctl --user enable wavelet_encoder_query.service --now
 }
 event_server(){
 	if [[ -f /var/pxe.complete ]]; then
@@ -176,17 +265,40 @@ event_server(){
 		server_bootstrap
 	fi
 	# The server runs a superset of most of the client machines units, however it shouldn't support renaming.
+	svr_pw=$(cat /var/home/wavelet/.ssh/secrets/etcd_svr_pw.secure)
+	event_generate_wavelet_encoder_query
+	event_generate_wavelet_ui_service
 	event_clear_devicemap
-	event_generateHash svr
 	event_generate_reflector
 	event_generate_controller
 	event_generate_reflectorreload
-	event_encoder_reboot
-	event_system_reboot
+	event_system_reboot 
 	event_reset
 	event_device_redetect
-	event_generate_wavelet_encoder_query
-	event_generate_wavelet_ui_service
+	event_audio_toggle
+	event_audio_bluetooth_connect
+	event_force_deprovision
+	event_generate_poll_watcher
+	event_generateHash svr
+	systemctl --user daemon-reload
+	systemctl --user enable \
+		wavelet_reflector \
+		wavelet_audio_toggle \
+		wavelet_controller \
+		wavelet_decoder_reboot \
+		wavelet_decoder_reset \
+		wavelet_device_redetect \
+		wavelet_encoder_query \
+		wavelet_reboot \
+		wavelet_reflector_reload \
+		wavelet_reset \
+		wavelet_set_bluetooth_connect \
+		wavelet_force_deprovision \
+		wavelet_poll_watcher_interface \
+		wavelet_poll_watcher_net \
+		wavelet_poll_watcher_hosts \
+		wavelet_ui --now
+	echo "System services generated, starting services now.."
 }
 
 server_bootstrap(){
@@ -260,81 +372,68 @@ TimeoutStartSec=600
 [Install]
 WantedBy=default.target" > /var/home/wavelet/.config/containers/systemd/livestream.container
 	}
+	# Generate basic ETCD roles and key permissions
+	mkdir -p ~/.ssh/secrets
 	bootstrap_http
 	bootstrap_nginx_php
 	#bootstrap_nodejs		#	WAY in the future for UI stuff.
 	#bootstrap_livestream 	#	Probably not necessary to spin up a whole container for this..
 	bootstrap_dnsmasq_watcher_service
 	touch /var/home/wavelet/server_bootstrap_completed
-	echo -e "Reloading systemctl user daemon, and enabling the controller service immediately"
-	systemctl --user daemon-reload
 	echo -e "Enabling server notification services"
 	event_generate_controller
 	event_generate_reflectorreload
-	event_generate_watch_encoderflag
 	event_generate_run_ug
 	systemctl --user enable wavelet_controller.service --now
-	systemctl --user enable watch_reflectorreload.service --now
 	systemctl --user enable wavelet_reflector.service --now
 	# uncomment a firefox exec command into sway config, this will bring up the management console on the server in a new sway window, as a backup control surface.
-	# - note we need to work on a firefox policy/autoconfig.
+	# - note we need to work on a firefox policy/autoconfig which FF will actually respect
 	sed -i 's|#exec /usr/local/bin/wavelet_start_UI.sh|exec /usr/local/bin/wavelet_start_UI.sh|g' /var/home/wavelet/.config/sway/config
-	# Next, we build the reflector prune function.  This is necessary for removing streams for old decoders and maintaining the long term health of the system
-		# Get decoderIP list
-		# Ping each decoder on list
-		# If dead, ping more intensively for 30s
-		# If still dead, remove from reflector subscription
-	# Add server type ID into etcd
+	# Add server type ID into etcd (note the webUI could change the server's type from the UI side but would be prevented from changing the server SYSTEM type)
 	KEYVALUE="svr";	KEYNAME="/${hostNameSys}/type"; write_etcd_global
-	KEYNAME="/hostLabel/${hostNameSys}/type"; write_etcd_global
+	KEYNAME="/UI/hosts/$hostNameSys/type"; write_etcd_global
+	KEYNAME="/UI/hostlist/${hostNameSys}"; write_etcd_global
 	KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
-	# Finally, add a service to prune dead FUSE mountpoints.  Every time the UltraGrid AppImage is restarted, it leaves stale mountpoints.  This timed task will help keep everything clean.
+	# Add a service to prune dead FUSE mountpoints.  Every time the UltraGrid AppImage is restarted, it leaves stale mountpoints.  This timed task will help keep everything clean.
 		# Get "alive mountpoints"
 		# Prune anything !=alive
 	echo -e "Server configuration is now complete, bringing services up.."
 	event_server
 }
+
+### "/UI/hosts/$hostNameSys/control/$function"
 event_system_reboot(){
 	# Everything should watch the system reboot flag for a hard reset
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service SYSTEM_REBOOT 0 0 "wavelet_reboot"
 	# and the same for the host reboot
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/DECODER_REBOOT 0 0 "wavelet_decoder_reboot"
-	systemctl --user daemon-reload
-	systemctl --user enable wavelet_reboot.service --now
-	systemctl --user enable wavelet_decoder_reboot.service --now
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/\"%H\"/control/REBOOT 0 0 "wavelet_decoder_reboot"
 }
 event_reset(){
 	# Everything should watch the system reboot flag for a task reset
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service SYSTEM_RESET 0 0 "wavelet_reset"
 	# and the same for the host reset
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/DECODER_RESET 0 0 "wavelet_decoder_reset"
-	systemctl --user daemon-reload
-	systemctl --user enable wavelet_reset.service --now
-	systemctl --user enable wavelet_decoder_reset.service --now
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/\"%H\"/control/RESET 0 0 "wavelet_decoder_reset"
 }
 event_reveal(){
 	# Tells specific host to display SMPTE bars on screen, useful for finding which is what and where
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/DECODER_REVEAL 0 0 "wavelet_decoder_reveal"
-	systemctl --user enable wavelet_decoder_reveal.service --now
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/\"%H\"/control/REVEAL 0 0 "wavelet_decoder_reveal"
 }
 event_blankhost(){
 	# Tells specific host to display a black testcard on the screen, use this for privacy modes as necessary.
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/DECODER_BLANK 0 0 "wavelet_decoder_blank"
-	systemctl --user daemon-reload
-	systemctl --user enable wavelet_decoder_blank.service --now
+	# Host Blank is necessary for the UI to load properly, so we always set it here
+	KEYNAME="/UI/hosts/${hostNameSys}/control/BLANK"; KEYVALUE="0"; write_etcd_global
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/\"%H\"/control/BLANK 0 0 "wavelet_decoder_blank"
+	sed -i '/Service/aExecStartPre=-swaymsg workspace 2' /var/home/wavelet/.config/systemd/user/wavelet_decoder_blank.service
 }
 event_promote(){
 	# This flag watches the hostname to instruct the machine to (pro/de)mote the (en/de)coder as appropriate.
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/PROMOTE 0 0 "wavelet_promote"
-	systemctl --user enable wavelet_promote.service --now
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/\"%H\"/control/PROMOTE 0 0 "wavelet_promote"
 }
-event_encoder_reboot(){
-	# We want to regenerate this every time because the hostname may change
-		# Generate userspace run_ug service
-		# Encoders have their own reboot flag should watch the system reboot flag for a hard reset
-		/usr/local/bin/wavelet_etcd_interaction.sh generate_service /\"%H\"/SYSTEM_REBOOT 0 0 "wavelet_reboot"
-		systemctl --user daemon-reload
-		systemctl --user enable wavelet_reboot.service --now
+event_force_deprovision(){
+	# This one is tricky.  This runs only on the server, and watches all of the host deprovision prefixes
+	# If any prefix is changed, we take that hosts' value and give the host a timeout to respond to the deprovision request
+	# If the timeout is exceeded, the host keys are removed from the system because the host is nonresponsive.
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/UI/hosts/ --prefix" 0 0 "wavelet_force_deprovision"
 }
 event_audio_toggle(){
 	if [[ -f ~/.config/systemd/user/wavelet_audio_toggle.service ]]; then
@@ -344,9 +443,7 @@ event_audio_toggle(){
 		echo -e "Unit file does not exist, generating..\n"
 		# Generate userspace run_ug service
 		# Toggles audio functionality on and off
-		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/interface/audio/enabled" 0 0 "wavelet_audio_toggle"
-		systemctl --user daemon-reload
-		systemctl --user enable wavelet_audio_toggle.service --now
+		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/UI/audio" 0 0 "wavelet_audio_toggle"
 	fi
 }
 event_audio_bluetooth_connect(){
@@ -357,10 +454,8 @@ event_audio_bluetooth_connect(){
 		echo -e "Unit file does not exist, generating..\n"
 		# Generate userspace run_ug service
 		# Monitors the bluetooth MAC value and updates the system if there's a change
-		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/audio_interface_bluetooth_mac" 0 0 "wavelet_set_bluetooth_connect"
+		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/UI/audio/audio_interface_bluetooth_mac" 0 0 "wavelet_set_bluetooth_connect"
 		echo -e "Generating Reboot SystemdD unit in /.config/systemd/user.."
-		systemctl --user daemon-reload
-		systemctl --user enable wavelet_bluetooth_audio.service --now
 	fi
 }
 event_livestreamservice(){
@@ -373,8 +468,6 @@ event_livestreamservice(){
 		# creates wavelet_livestream systemd unit.
 		# I think this can run on the server without causing performance issues.
 		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "uv_islivestreaming" 0 0 "wavelet_livestream"
-		systemctl --user daemon-reload
-		systemctl --user enable wavelet_livestream.service --now
 	fi
 }
 event_generate_reflector(){
@@ -385,9 +478,6 @@ event_generate_reflector(){
 		echo -e "Unit file does not exist, generating..\n"
 		# Generate userspace reflector service
 		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "REFLECTOR_ARGS" 0 0 "wavelet.reflector"
-		# ExecStart=/usr/local/bin/UltraGrid.AppImage $(etcdctl --endpoints=${ETCDENDPOINT} get REFLECTOR_ARGS --print-value-only)
-		systemctl --user daemon-reload
-		systemctl --user enable wavelet.reflector.service --now
 	fi
 }
 event_generate_controller(){
@@ -397,9 +487,7 @@ event_generate_controller(){
 	else
 		echo -e "Unit file does not exist, generating..\n"
 		# Generate userspace controller service
-		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "input_update" 0 0 "wavelet_controller"
-		systemctl --user daemon-reload
-		systemctl --user enable wavelet_controller.service --now
+		/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/UI/INPUT_UPDATE" 0 0 "wavelet_controller"
 	fi
 }
 event_generate_reflectorreload(){
@@ -409,11 +497,17 @@ event_generate_reflectorreload(){
 	else
 		echo -e "Unit file does not exist, generating..\n"
 		# Generate userspace reflector_reload service
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/decoderip/ --prefix" 0 0 "wavelet_reflector_reload"
-	systemctl --user daemon-reload
-	systemctl --user enable wavelet_reflector_reload.service
-	systemctl --user start wavelet_reflector_reload.service
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/DECODERIP/ --prefix" 0 0 "wavelet_reflector_reload"
 	fi
+}
+event_generate_poll_watcher(){
+	# This generates THREE watcher services, one for /UI/inputs, one for /UI/network_interface, and one for /UI/hosts
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "/UI/interface --prefix" 0 0 "wavelet_poll_watcher_interface" "interface"
+	cp /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_interface.service /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_net.service
+	cp /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_interface.service /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_hosts.service
+	sed -i 's|wavelet_poll_watcher_interface.sh|wavelet_poll_watcher.sh|g' {/var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_interface.service,/var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_net.service,/var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_hosts.service}
+	sed -i 's|interface|network_interface|g' /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_net.service
+	sed -i 's|interface|hosts|g' /var/home/wavelet/.config/systemd/user/wavelet_poll_watcher_hosts.service
 }
 event_generate_wavelet_ui_service(){
 	# Final step of the server spinup, and starts the web interface on the server console.
@@ -431,9 +525,19 @@ ExecStartPre=/bin/sleep 8
 ExecStart=/bin/bash -c "/usr/local/bin/wavelet_start_UI.sh"
 [Install]
 WantedBy=default.target' > /var/home/wavelet/.config/systemd/user/wavelet_ui.service
-		systemctl --user daemon-reload
-		systemctl --user enable wavelet_ui.service --now
 	fi
+}
+event_encoder_blank() {
+	echo -e '[Unit]
+Description=Wavelet encoder blank screen service
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+ExecStartPre=/bin/sleep 8
+ExecStart=swaymsg exec /usr/local/bin/wavelet_encoder_blank.sh
+[Install]
+WantedBy=default.target' > /var/home/wavelet/.config/systemd/user/wavelet_encoder_blank.service
 }
 event_generate_encoder_service(){
 	if [[ -f ~/.config/systemd/user/wavelet_encoder.service ]]; then
@@ -465,7 +569,6 @@ Wants=network-online.target
 
 [Service]
 ExecStart=/bin/bash -c "/usr/local/bin/run_ug.sh"
-StartLimitIntervalSec=3
 StartLimitBurst=30
 
 [Install]
@@ -473,7 +576,6 @@ WantedBy=default.target" > /var/home/wavelet/.config/systemd/user/run_ug.service
 	systemctl --user daemon-reload
 }
 event_generateHash(){
-		# Can be modified from webUI, populates with hostname==prettyhostname by default
 		# arg is the device type I.E enc, dec, svr etc.
 		hashType=${1}
 		echo -e "device label/pretty hostname is: ${hostNamePretty}"
@@ -481,9 +583,12 @@ event_generateHash(){
 		hostHash=$(cat /etc/machine-id | sha256sum | tr -d "[:space:]-")
 		echo -e "generated device hash: ${hostHash} \n"
 		# Check for pre-existing keys here
+		# /hostHash/ contains the reverse lookup for the system hostname, with the hash value as the key.
+		# This is deleted upon deprovision, and we use it here to tell if we are an already provisioned host.
 		KEYNAME="/hostHash/${hostHash}"; read_etcd_global; hashExists=${printvalue}
-		if [[ -z "${hashExists}" || ${#hashExists} -le 1 ]] then
-			echo -e "\nHostname value was set to ${hashExists}, which is null or less than 1 char, therefore it is not valid. \n"
+		if [[ -z "${hashExists}" || ${#hashExists} -le 1 ]]; then
+			echo "Generated hash value lookup provides: ${hashExists}, which is null or less than 1 char, therefore it is not valid."
+			echo "Populating initial device type template from hostname.."
 			# Populate what will initially be used as the label variable from the webUI
 			case ${1} in
 				enc*)			KEYVALUE="enc";
@@ -497,29 +602,28 @@ event_generateHash(){
 				*)				echo -e "host type is invalid, exiting."	;	exit 0
 				;;
 			esac
-			KEYNAME="/hostLabel/${hostNameSys}/type"; write_etcd_global
-			# And the reverse lookups for the device
-			KEYNAME="/hostHash/${hostNameSys}/Hash"; KEYVALUE="${hostHash}"; write_etcd_global
-			KEYNAME="/${hostNameSys}/Hash"; write_etcd_global
-			KEYNAME="/hostHash/${hostHash}"; KEYVALUE="${hostNameSys}"; write_etcd_global
-			KEYNAME="/hostHash/${hostNameSys}/label"; KEYVALUE="${hostNamePretty}"; write_etcd_global
-			# Link the "pretty" hostname to the stable system hostname
-			KEYNAME="/${hostNameSys}/hostNamePretty"; KEYVALUE=${hostNamePretty}; write_etcd_global
+			echo "Populating device keys.."
+			# Populate UI data
+			KEYNAME="/UI/hosts/${hostNameSys}/type"											; write_etcd_global
+			KEYNAME="/UI/hosts/${hostNameSys}/hash"			; KEYVALUE="${hostHash}"		; write_etcd_global
+			KEYNAME="/UI/hosts/${hostNameSys}/control/label"; KEYVALUE="${hostNamePretty}"	; write_etcd_global
+			# Populate SYSTEM values
+			KEYNAME="/${hostNameSys}/Hash"					; KEYVALUE="${hostHash}"		; write_etcd_global
+			KEYNAME="/hostHash/${hostHash}"					; KEYVALUE="${hostNameSys}"		; write_etcd_global
+			KEYNAME="/hostHash/${hostNameSys}/label"		; KEYVALUE="${hostNamePretty}"	; write_etcd_global
+			KEYNAME="/${hostNameSys}/hostNamePretty"		; KEYVALUE=${hostNamePretty}	; write_etcd_global
 		else
-			echo -e "Hash value exists as /hostHash/${hashExists}"
+			echo -e "Hash value exists: ${hashExists}"
 			echo -e "Device already populated, taking no further action."
 		fi
 }
 event_device_redetect(){
 	# Watches for a device redetection flag, then runs detectv4l.sh
 	/usr/local/bin/wavelet_etcd_interaction.sh generate_service "DEVICE_REDETECT" 0 0 "wavelet_device_redetect"
-	systemctl --user daemon-reload
-	systemctl --user enable wavelet_device_redetect.service --now
 }
 event_host_relabel_watcher(){
 	# Watches for a device relabel flag, then runs wavelet_device_relabel.sh
-	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /%H/RELABEL 0 0 "wavelet_device_relabel" \"relabel\"
-	systemctl --user enable wavelet_device_relabel.service --now
+	/usr/local/bin/wavelet_etcd_interaction.sh generate_service /UI/hosts/%H/control/label 0 0 "wavelet_device_relabel" \"relabel\"
 }
 event_clear_devicemap(){
 	# Clears the device map file so it will be regenerated.  Since the paths under v4l2 aren't stable, 
@@ -544,16 +648,15 @@ event_connectwifi(){
 	if [[ ${#files[@]} -gt 0 ]]; then
 		echo "Network configuration file found, continuing and getting UUID for connection.."
 	else
-		echo "No file found for network configuration, connectwifi has failed, there is no available wireless connection.  Attempting to re-run connectwifi.."
-		/usr/local/bin/connectwifi.sh
+		echo "No file found for network configuration, connectwifi has failed, there is no available wireless connection.  setting troubleshooting flag and rebooting.."
+		touch /var/home/wavelet/config/wifi_issue.flag
+		systemctl reboot -i
 	fi
 	networkUUID=$(cat /var/home/wavelet/config/wifi.*.key)
 	# Set autoconnection again and ensure wifi is up
 	# Attempt to connect to the configured wifi before proceeding
 	if nmcli con up $(cat /var/home/wavelet/config/wifi_ssid); then
 		echo "Configured connection established, continuing."
-		# We'll use this flag for future UI improvements to help determine if a host is wired or wireless
-		KEYNAME="/${hostNameSys}/WIFI"; KEYVALUE="1"; write_etcd_global
 	fi
 }
 
@@ -583,18 +686,4 @@ exec > "${logName}" 2>&1
 
 time=0
 event_connectwifi
-until [[ $(/usr/local/bin/wavelet_etcd_interaction.sh "check_status" | awk '{print $6}') = "true," ]]; do
-	echo -e "Etcd still down.. waiting two seconds.."
-	sleep 2
-	time=$(( ${time} + 2 ))
-	if [[ $time -eq "60" ]]; then
-		echo "We have been waiting sixty seconds, there is likely a network issue."
-		echo "Running the wifi connection script.."
-		until /usr/local/bin/connectwifi.sh; do
-			sleep .5
-		done
-	fi
-done
-
-
 detect_self

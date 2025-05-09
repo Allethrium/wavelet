@@ -145,7 +145,10 @@ extract_usrlocalbin(){
 	echo -e "Wavelet application modules setup successfully..\n"
 	rm -rf /usr/local/bin/usrlocalbin.tar.xz
 }
-
+etcd_create_roles(){
+	# RunOnce for server provisioning, creates etcd roles.
+	/usr/local/bin/wavelet_etcd_interaction.sh "generate_etcd_core_roles"
+}
 
 ####
 #
@@ -185,6 +188,9 @@ setfacl -dm g:wavelet:rwx /var/home/wavelet
 setfacl -dm o::rx /var/home/wavelet
 install_ug_depends
 install_wavelet_modules
+
+# We setup etcd core roles from root, since the etcd root pw should be accessible only from that user.
+etcd_create_roles
 #generate_decoder_iso
 echo -e "Dependencies Installation completed..\n"
 systemctl set-default graphical.target

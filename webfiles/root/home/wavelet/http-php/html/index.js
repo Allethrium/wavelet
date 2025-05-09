@@ -22,102 +22,89 @@ function escapeHTML(val) {
 
 function inputsAjax(){
 // get dynamic devices from etcd, and call createInputButton function to generate entries for them.
-// value = generated hash value of the device, this is how we track it, and how wavelet can find it
-// keyfull = the pathname of the device in /interface/friendlyname
-// key = the key of the device (also friendlyname)
-	$.ajax({
+// value = generated hash value of the device from detectv4l, this is how we track it, and how wavelet can find it
+// keyfull = the pathname of the device in /UI/friendlyname
+// key = the key of the device (also a UI-modifiable label attribute)
+	var deferred = $.ajax({
 		type: "POST",
 		url: "get_inputs.php",
 		dataType: "json",
-		success: function(returned_data) {
-			counter = 3;
-			console.log("JSON Inputs data received:");
-			console.log(returned_data);
-			returned_data.forEach(item => {
-				const functionIndex =   1;
-				var key			=	item['key'];
-				var value		=	item['value'];
-				var keyFull		=	item['keyFull'];
-				createInputButton(key, value, keyFull, functionIndex);
-				})
-		},
-		complete: function(){
-			hostsAjax();
-		}
 	});
+
+	deferred.done(function(returned_data) {
+		counter = 3;
+		console.log("JSON Inputs data received:");
+		console.log(returned_data);
+		returned_data.forEach(item => {
+			const functionIndex =   1;
+			var key			=	item['key'];
+			var value		=	item['value'];
+			var keyLong		=	item['keyLong'];
+			var keyFull		=	item['keyFull'];
+			var inputHost 	=	item['host'];
+			var inputHostL	=	item['hostNamePretty'];
+			createInputButton(key, value, keyLong, keyFull, inputHost, inputHostL, functionIndex);
+			});
+	});
+	return deferred;
 }
+
 
 function hostsAjax(){
 // get dynamic hosts from etcd, and call createNewHost to generate entries and buttons for them.
 // returns:  Key (keyname), type (host type), hostName (hostname), hostHash (host's machine ID as SHA256sum), hostLabel (pretty hostname)
-	$.ajax({
+	var deferred = $.ajax({
 		type: "POST",
 		url: "get_hosts.php",
 		dataType: "json",
-		success: function(returned_data) {
-			counter = 500;
-			console.log("JSON Hosts data received:");
-			console.log(returned_data);
-			returned_data.forEach(item => {
-				const functionIndex	=	2;
-				var key				=	item['key'];
-				var type			=	item['type'];
-				var hostName		=	item['hostName'];
-				var hostHash		=	item['hostHash'];
-				var hostLabel 		=	item['hostLabel'];
-				createNewHost(key, type, hostName, hostHash, hostLabel);
-				})
-		},
-	complete: function(){
-		networkInputsAjax();
-	}
 	});
+	deferred.done(function(returned_data) {
+		counter = 500;
+		console.log("JSON Hosts data received:");
+		console.log(returned_data);
+		returned_data.forEach(item => {
+			const functionIndex	=	2;
+			var key				=	item['key'];
+			var type			=	item['type'];
+			var hostName		=	item['hostName'];
+			var hostHash		=	item['hostHash'];
+			var hostLabel 		=	item['hostLabel'];
+			var hostIP 			=	item['hostIP'];
+			var hostBlankStatus	=   item['hostBlankStatus'];
+			createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, hostBlankStatus);
+		});
+	});
+	return deferred;
 }
 
 function networkInputsAjax(){
 // get dynamic network inputs from etcd, and call and generate entries and buttons for them.
-// why aren't we moving to Angular/REACT already? oh that's right.. i haven't had time to learn it yet..
-	$.ajax({
+	var deferred = $.ajax({
 		type: "POST",
 		url: "get_network_inputs.php",
 		dataType: "json",
-		success: function(returned_data) {
-			counter	=	3000;
-			console.log("JSON Network Inputs data received:");
-			console.log(returned_data);
-			returned_data.forEach(item => {
-				const functionIndex	=	3;
-				var key				=	item['key'];
-				var value			=	item['value'];
-				var keyFull			=	item['keyFull'];
-				var IPAddr			=	item['IP'];
-				createInputButton(key, value, keyFull, functionIndex, IPAddr);
-			})
-		},
-	});
-}
-
-function fetchHostLabelAndUpdateUI(getLabelHostName){
-// This function gets hostname | label from etcd and is responsible for telling the server which text labels to produce for each host.
-	$.ajax({
-		type: "POST",
-		url: "get_host_label.php",
-		dataType: "json",
-		success: function(returned_data) {
-			counter = 500;
-			console.log("JSON Hosts data received:");
-			console.log(returned_data);
-			returned_data.forEach(item, index => {
-				var key	=	item['key'];
-			})
-		}
 	});
 
+	deferred.done(function(returned_data) {
+		counter	=	3000;
+		console.log("JSON Network Inputs data received:");
+		console.log(returned_data);
+		returned_data.forEach(item => {
+			const functionIndex	=	3;
+			var key				=	item['key'];
+			var value			=	item['value'];
+			var keyFull			=	item['keyFull'];
+			var IPAddr			=	item['IP'];
+			createInputButton(key, value, "network", keyFull, "network", "network", functionIndex, IPAddr);
+		});
+	});
+	return deferred;
 }
 
 function sendPHPID(buttonElement) {
 	// we use id here in place of value (both are same for static items in the html)
 	// Because javascript inexplicably can access everythign EXCEPT the value??
+	// Can probably retire this in favor of the dynamicPHPID function below.
 	const postValue				=		(buttonElement.id);
 	var postLabel				=		($(this).innerText);
 	if (postLabel in window) {
@@ -170,6 +157,8 @@ function sendPHPID(buttonElement) {
 
 
 function sendDynamicPHPID(buttonElement) {
+	/* Sends via AJAX the button Value (Hash) and Label (shortname), then sets self as Active for CSS on page reload */
+	/* Has to run a full DOM tree search to find itself though.. */
 	const selectedDivHash                           =               $(this).parent().attr('divDeviceHash');
 	const targetID									=               $(this).parent().attr('divDevID');
 	const inputButtonKeyFull                        =               $(this).parent().attr('data-fulltext');
@@ -231,14 +220,65 @@ function handleDynamicButtonClick() {
 	sendDynamicPHPID(this);
 }
 
+function togglebox_setup(toggleBox) {
+	// adds appropriate event listener to the toggleBox, uses a common module to set the value
+	let toggleID		=	toggleBox.split('_toggle_checkbox').join('');
+	let toggleElementID =	$('#' + toggleBox);
+	console.log("Adding event listener to ID: #" + toggleBox + "\nAnd key: " + toggleID);
+	// 	$("#banner_toggle_checkbox").change 
+	$(toggleElementID).on('change', function() {
+		var checkbox = $(this)[0];
+		if (checkbox.checked) {
+			var toggleValue = 1;
+		} else {
+			var toggleValue = 0;
+		}
+		console.log("Submitting ID:" + toggleID + "\nValue: " + toggleValue);
+		$.ajax({
+			type: "POST",
+			url: "/set_toggle_status.php",
+			data: {
+				toggleID:		toggleID,
+				toggleValue:	toggleValue
+				},
+			success: function(response){
+			console.log(response);
+			}
+		});
+	});
+}
+
+function getToggleStatus(toggleKey, toggleValue) {
+	// this function gets a toggle status and returns it.  Replaces audio, banner, livestream & persist toggle modules.
+	console.log("Getting toggle value for /UI/" + toggleKey);
+	$.ajax({
+			type: "POST",
+			url: "/get_toggle_status.php",
+			data: {
+				key: toggleKey
+			},
+		success: function(returned_data) {
+		const toggleValue = JSON.parse(returned_data);
+			if (toggleValue == "1" ) {
+				console.log ( toggleKey + "value is 1, enabling toggle.");
+				$("#" + toggleKey +"_toggle_checkbox")[0].checked=true;
+				} else {
+				console.log ("Banner value is 0, disabling toggle.");
+				$("#" + toggleKey +"_toggle_checkbox")[0].checked=false;
+				}
+		}
+	})
+}
+
 function handlePageLoad() {
-	var livestreamValue				=		getLivestreamStatus(livestreamValue);
-	var bannerValue					=		getBannerStatus(bannerValue);
-	var audioValue					=		getAudioStatus(audioValue);
+	var livestreamValue				=		getToggleStatus("livestream", livestreamValue);
+	var bannerValue					=		getToggleStatus("banner", bannerValue);
+	var audioValue					=		getToggleStatus("audio", audioValue);
+	var persistValue 				=		getToggleStatus("persist", persistValue);
 	var bluetoothMACValue			=		getBluetoothMAC(bluetoothMACValue);
-	var audioStatus					=		getAudioStatus(audioValue);
 	// Adding classes and attributes to the prepopulated 'static' buttons on the webUI
 	const staticInputElements		=		document.querySelectorAll(".btn");
+	let toggleInputElements 		= 		Array.from(document.getElementsByClassName('toggle-checkbox'));
 	var confirmElements 			= 		document.getElementsByClassName('serious');
 	var confirmIt					= 		function (e) {
 			var answer=confirm('Are you sure?');
@@ -253,167 +293,65 @@ function handlePageLoad() {
 	}
 	staticInputElements.forEach(el => 
 		el.addEventListener("click", handleButtonClick));
-	// Apply event listener to Livestream toggle
-	$("#lstoggleinput").change
-		(function() {
-			if ($(this).is(':checked')) {
-				$.ajax({
-					type: "POST",
-					url: "/set_enable_livestream.php",
-					data: {
-						lsonoff: "1"
-						},
-					success: function(response){
-					console.log(response);
-					}
-				});
-				} else {
-					$.ajax({
-						type: "POST",
-						url: "/set_enable_livestream.php",
-						data: {
-								lsonoff: "0"
-								},
-								success: function(response){
-								console.log(response);
-								}
-							});
-
-				}
+	toggleInputElements.forEach(el => {
+		togglebox_setup(el.id);
 	});
-	// Apply event listener to banner toggle
-	$("#banner_toggle_checkbox").change
-		(function() {
-			if ($(this).is(':checked')) {
-				$.ajax({
-					type: "POST",
-					url: "/set_enable_banner.php",
-					data: {
-						banneronoff: "1"
-					},
-					success: function(response){
-						console.log(response);
-					}
-				});
+	// Call AJAX to populate dynamic page areas
+	inputsAjax().then(function() {
+		hostsAjax();
+	}).then(function() {
+		networkInputsAjax();
+	});
+}
+
+function pollAjax() {
+	// This function runs an AJAX call from inputs, network inputs or hosts div.  That is 3x calls every 2s.
+	// If the values returned differ from the previous variable, we call a full reconstruction of the target div.
+	// because this approach is destructive, we do not need to worry about removing the device
+	// as long as the poll value is changed as per the controller, the approach will work as desired.
+	// we get back a packed value of timestamp|targetFunction
+	// targetFunction is inputs, network inputs or hosts
+	// normal console logging off here because otherwise it'll make using the console to debug impossible
+	setTimeout(pollAjax, 5000);
+	let oldPollValue	=	getCookie("oldPollValue");
+	if (oldPollValue == "INIT") {
+		console.log("Called with INIT value, page has just done loading");
+	}
+	//console.log("Attempting Poll!");
+	$.ajax({
+		type: "POST",
+		url: "poll_etcd_key.php",
+		dataType: "json",
+	}).then(function(returned_data) {
+		returned_data.forEach(item => {
+			var pollKey			=	item['key'];
+			var pollValue		=	item['value'];
+			// console.log("Read key:" + pollKey + "For value: " + pollValue);
+			if (pollValue == oldPollValue ) {
+				//console.log ("The old and new poll values are identical, doing nothing.");
 			} else {
-				$.ajax({
-					type: "POST",
-					url: "/set_enable_banner.php",
-					data: {
-						banneronoff: "0"
-							},
-					success: function(response){
-						console.log(response);
-						}
-				});
+				// trim the timestamp off to get the divider target
+				dividerTarget		=	pollValue.substring(pollValue.indexOf("|") + 1);
+				console.log ('Poll values have changed!  A system update has occurred somewhere, calling appropriate function ID:' + dividerTarget);
+				setCookie("oldPollValue", pollValue);
+				// can be:  net, inputs, hosts
+				// put a case switcher;
+				switch(dividerTarget) {
+					case 'interface':
+						console.log("Refresh inputs div");
+						location.replace('#dynamic_inputs', inputsAjax());
+					break;
+					case 'network_interface':
+						console.log("Refresh network inputs div");
+						location.replace('#dynamicNetworkInputs', networkInputsAjax());
+					break;
+					case 'hosts':
+						console.log("Refresh Hosts div");
+						location.replace('#HostControlDiv', hostsAjax());
+					break;
+				}
 			}
 		});
-	// Apply event listener to audio toggle
-	$("#audio_toggle").change
-		(function() {
-			if ($(this).is(':checked')) {
-				$.ajax({
-					type: "POST",
-					url: "/set_enable_audio.php",
-					data: {
-						audioonoff: "1"
-						},
-					success: function(response){
-						console.log(response);
-					}
-				});
-			} else {
-				$.ajax({
-					type: "POST",
-					url: "/set_enable_audio.php",
-					data: {
-						audioonoff: "0"
-							},
-					success: function(response){
-						console.log(response);
-					}
-				});
-			}
-	});
-	// Execute initial AJAX Call
-	inputsAjax();
-}
-
-function getLivestreamStatus(livestreamValue) {
-	// this function gets the livestream status from etcd and sets the livestream toggle button on/off upon page load
-	$.ajax({
-		type: "POST",
-		url: "get_livestream_status.php",
-		dataType: "json",
-		success: function(returned_data) {
-		const livestreamValue = JSON.parse(returned_data);
-			if (livestreamValue == "1" ) {
-				console.log ("Livestream value is 1, enabling toggle automatically.");
-				$("#lstoggleinput")[0].checked=true; // set HTML checkbox to checked
-				} else {
-				console.log ("Livestream value is NOT 1, disabling checkbox toggle.");
-				$("#lstoggleinput")[0].checked=false; // set HTML checkbox to unchecked
-				}
-		}
-	})
-}
-
-function getBannerStatus(bannerValue) {
-	// this function gets the banner status from etcd and sets the banner toggle button on/off upon page load
-	$.ajax({
-		type: "POST",
-		url: "get_banner_status.php",
-		dataType: "json",
-		success: function(returned_data) {
-		const bannerValue = JSON.parse(returned_data);
-			if (bannerValue == "1" ) {
-				console.log ("Banner value is 1, enabling toggle automatically.");
-				$("#banner_toggle_checkbox")[0].checked=true; // set HTML checkbox to checked
-				} else {
-				console.log ("Banner value is NOT 1, disabling checkbox toggle.");
-				$("#banner_toggle_checkbox")[0].checked=false; // set HTML checkbox to unchecked
-				}
-		}
-	})
-}
-
-function getAudioStatus(audioValue) {
-	// this function gets the audio status from etcd and sets the audio toggle button on/off upon page load
-	$.ajax({
-		type: "POST",
-		url: "get_audio_status.php",
-		dataType: "json",
-		success: function(returned_data) {
-		const audioValue = JSON.parse(returned_data);
-			if (audioValue == "1" ) {
-				console.log ("Audio value is 1, enabling toggle automatically.");
-				$("#audio_toggle_checkbox")[0].checked=true; // set HTML checkbox to checked
-				} else {
-				console.log ("Audio value is NOT 1, disabling checkbox toggle.");
-				$("#audio_toggle_checkbox")[0].checked=false; // set HTML checkbox to unchecked
-				}
-		}
-	})
-}
-
-async function getHostIPAJAX(hostName, divEntry) {
-	/* Takes the hostname on hover and gets the IP address of the device */
-	var queryHostName			=		hostName;
-	console.log("Attempting AJAX PHP query for the IP Address of " + queryHostName);
-	$.ajax({
-			type: "POST",
-			url: "/get_host_ip.php",
-			data: {
-				key: queryHostName,
-			},
-			success: function(returned_data){
-				console.log(returned_data);
-				$(divEntry).attr("title", "IP: " + returned_data);
-			},
-			error: function (xhr, ajaxOption, thrownError) {
-			console.log("Failed to get IP Address for hostname", queryHostName);
-			throw new Error(thrownerror);
-			}
 	});
 }
 
@@ -443,167 +381,47 @@ function getBluetoothMAC(bluetoothMACValue) {
 	})
 }
 
-function getBlankHostStatus(hostName, hostHash) {
-	// this function gets the host blank bit status from etcd, and sets the banner toggle button on/off upon page load
-	console.log('Attempting to get host blank bit for: ' + hostName + ", hash:" +hostHash);
-	let retValue = null;
-	var blankHostName = hostName;
-	$.ajax({
-		type: "POST",
-		url: "get_blank_host_status.php",
-		dataType: "json",
-		data: {
-			key: hostName
-		},
-		success: function(returned_data) {
-			console.log("Returned blank bit value for " + hostName +" is: " + returned_data);
-			if (returned_data == "1") {
-				console.log("Value is " + returned_data + ", changing CSS and text appropriately");
-				let matchedElement = 
-					// $('#dynamicDecHosts > div > button[data-blankHostName="${blankHostName}"]');
-					// $('#btn_blank').find(`[data-hostname="${blankHostName}"]`)
-										$('body').find(`[data-blankHostName="${blankHostName}"]`);
-
-				if(matchedElement){
-					console.log("Found element: " + matchedElement);
-					$(matchedElement).text("Unblank Host");
-					$(matchedElement).addClass('active');
-						return true;
-				} else {
-					console.log("Could not find the element with this selector!");
-				}
-			} else if (returned_data == "0") {
-								let matchedElement =
-								$('body').find(`[data-blankHostName="${blankHostName}"]`);
-								$(matchedElement).text("Blank Host");
-								$(matchedElement).removeClass('active');
-			} else {
-				console.log("invalid bit returned!")
-			};
-		}
-	});
-}
-
-const callingFunction = (callback) => {
-	const callerId = 'calling_function';
-	callback(this);
-};
-
-function createHostDeleteButton(hostName, hostHash) {
-/* add host delete button */
+function createHostButton(hostName, hostHash, item) {
+/* add generic host button for controls */
 	var $btn				=		$('<button/>', {
 		type:   'button',
-		text:   'Remove Host',
-		title:  'Delete this host',
-		value:  'Remove'+hostHash,      
+		text:   `${item} Host`,
+		title:  `${item} Host`,
+		value:  `${item}-${hostHash}`,      
 		class:  'btn renameButton',
-		id: 'btn_HostDelete',
+		id: 	`btn_Host-${hostHash}-${item}`,
 		}).click(function(){
-			console.log("Deleting host entry and associated keys for: " + hostName + "\nAnd Hash Value:" + hostHash);
+			console.log("Instructing host:" + hostName + "\nHash Value:" + hostHash + "\nTo Execute: " + item);
 			$.ajax({
 				type: "POST",
-				url: "/set_remove_host.php",
+				url: "/set_host_control.php",
 				data: {
-					key: hostName,
-					value: hostHash
-				},
-				success: function(response){
-					console.log(response);
-				}
-			})
-			sleep (750);
-			location.reload();
-		})
-	return $btn;
-}
-
-function createIdentifyButton(hostName, hostHash) {
-/* add decoder Identify button */
-	var $btn				=		$('<button/>', {
-		type:   'button',
-		text:   'Identify Host (15s)',
-		title:  'Display SMPTE Bars on this host for 15 seconds',
-		value:  'Identify'+hostHash,
-		class:  'btn identifyButton',
-		id: 'btn_identify'
-		}).click(function(){
-			console.log("Host instructed to reveal itself:" + hostName);
-			$(this).addClass('btn_active');
-			$.ajax({
-				type: "POST",
-				url: "/set_reveal_host.php",
-				data: {
-					key: hostName,
-					value: "1"
+					key:				hostName,
+					hash:				hostHash,
+					value:				"1",
+					hostFunction:		item
 					},
-			success: function(response){
-				console.log(response);
-			}
-		});
-	})
-return $btn;
-}
-
-function createRestartButton(hostName, hostHash) {
-/* add task restart button */
-	var $btn					=		$('<button/>', {
-		type:   'button',
-		text:   'Restart Codec Task',
-		value:  'Restart'+hostName,
-		class:  'btn restartButton',
-		title:  'restart codec task',
-		id: 'btn_restart'
-	}).click(function(){
-		console.log("Host instructed to restart UltraGrid task:" + hostName);
-		$.ajax({
-			type: "POST",
-			url: "/set_reset_host.php",
-			data: {
-				key: hostName,
-				value: "1"
-			},
-		success: function(response){
-			console.log(response);
-		}
-		});
-	})
-	return $btn;
-}
-
-function createRebootButton(hostName, hostHash) {
-/* add reboot button */
-	var $btn					=		$('<button/>', {
-		type:   'button',
-		text:   'Reboot Host',
-		class:  'btn rebootButton',
-		id: 'btn_reboot',
-		title:  'Reboot Host'
-		}).click(function(){
-			console.log("Host instructed to reboot!" + hostName);
-			$.ajax({
-				type: "POST",
-				url: "/set_reboot_host.php",
-				data: {
-					key: hostName,
-					value: "1"
-				},
 				success: function(response){
 					console.log(response);
 				}
 			});
+			// remove the UI element if this is a deprovision task
+			if ( item == "DEPROVISION") {
+				document.getElementById(this).parentElement.parentElement.remove();
+			}
+			sleep (750);
 		})
 	return $btn;
 }
 
-function sleep(ms) {
-	return new Promise(resolve => setTimeout(resolve, ms || DEF_DELAY));
-}
-
-function createBlankButton(hostName, hostHash, initialHostBlankStatus) {
+function createBlankButton(hostName, hostHash, hostBlankStatus) {
+	// This function creates the host blank button, and changes the button text depending on status.
 	var blankHostName			=		hostName;
 	var blankHostHash			=		hostHash;
-	var blankHostText			=		"pending status";
-	console.log("Called to create Blank Host button for:" + hostName + ", hash " + hostHash );
+	var hostBlankStatus 		=		hostBlankStatus;
+	var blankHostText			=		( hostBlankStatus ==="0") ? "Blank Host":"Unblank Host";
+
+	console.log("Called to create Blank Host button for:" + hostName + ", hash " + hostHash + ", Blank status:" + hostBlankStatus );
 	var $btn 					= 		$('<button/>', {
 		type:					'button',
 		text:					blankHostText,
@@ -616,15 +434,17 @@ function createBlankButton(hostName, hostHash, initialHostBlankStatus) {
 		}).click(function(){
 			let matchedElement = $('body').find(`[data-blankHostName="${blankHostName}"]`);
 			if ($(matchedElement).text() == "Blank Host") {
-				console.log("Host instructed to blank screen:" + blankHostName);
+				console.log("Host instructed to blank screen with array:" + hostName);
 				$.ajax({
 					type: "POST",
-					url: "/set_blank_host.php",
+					url: "/set_host_control.php",
 					data: {
-						key: blankHostName,
-						value: "1"
+						key:			hostName,
+						hash:			hostHash,
+						value:			"1",
+						hostFunction:	"BLANK"
 						},
-						success: function(response){
+					success: function(response){
 							console.log(response);
 						}
 				});
@@ -632,13 +452,15 @@ function createBlankButton(hostName, hostHash, initialHostBlankStatus) {
 					$(matchedElement).text("Unblank Host");
 					$(matchedElement).addClass('active');
 			} else {
-				console.log("Host instructed to restore display:" + blankHostName);
+				console.log("Host instructed to restore display:" + hostName);
 				$.ajax({
 					type: "POST",
-					url: "/set_blank_host.php",
+					url: "/set_host_control.php",
 					data: {
-						key: hostName,
-						value: "0"
+						key:				hostName,
+						hash:				hostHash,
+						value:				"0",
+						hostFunction:		"BLANK"
 						},
 					success: function(response){
 						console.log(response);
@@ -653,8 +475,7 @@ function createBlankButton(hostName, hostHash, initialHostBlankStatus) {
 }
 
 function createCodecStateChangeButton(hostName, hostHash, type) {
-/* Add a button to set the codec state change for a host*/
-/* this is processed through PHP and then handled by the hostname change module, hence it submits hostname and hash data too */
+	/* Add a button to set the codec state change for a host*/
 	console.log("Called codec state change button with:" + hostName + "," +hostHash + "," + type);
 	var buttonText					=		type;
 		if (type == "dec"){
@@ -665,20 +486,21 @@ function createCodecStateChangeButton(hostName, hostHash, type) {
 	var $btn = $('<button/>', {
 		type:   'button',
 		class:  'btn encoderButton',
-		id: 'btn_codec_swap',
+		id: 	'btn_codec_swap',
 		title:  'Change function',
 		text:   buttonText
 	});
 		$btn.click(function(){
 			console.log("Host instructed to switch codec functionality:" + hostName);
-			$.ajax({
-				type: "POST",
-				url: "/set_codec_state_change.php",
-				data: {
-					key: hostName,
-					hash: hostHash,
-					value: "1"
-				},
+				$.ajax({
+					type: "POST",
+					url: "/set_host_control.php",
+					data: {
+						key:			hostName,
+						hash:			hostHash,
+						value:			"1",
+						hostFunction:	"PROMOTE"
+						},
 				success: function(response){
 					console.log(response);
 					sleep (3000);
@@ -692,32 +514,38 @@ function createCodecStateChangeButton(hostName, hostHash, type) {
 function createDecoderMenuSet(hostName, hostHash, type) {
 	console.log("Generating Decoder buttons in Hamburger Menu..");
 	let activeMenuSelector			=	(`#hamburgerMenu_${hostHash}`);
-	$(activeMenuSelector).append(createRestartButton(hostName, hostHash));
-	$(activeMenuSelector).append(createRebootButton(hostName, hostHash));
-	$(activeMenuSelector).append(createIdentifyButton(hostName, hostHash));
+	let buttonList 					=	['DEPROVISION','RESET','REBOOT','REVEAL'];
+	for (let item of buttonList) {
+		console.log("Setting up: " + item);
+		$(activeMenuSelector).append(createHostButton(hostName, hostHash, item));
+	}
 	$(activeMenuSelector).append(createCodecStateChangeButton(hostName, hostHash, type));
-	$(activeMenuSelector).append(createHostDeleteButton(hostName, hostHash));
 }
 
 function createEncoderMenuSet(hostName, hostHash, type) {
-	console.log("Generating Decoder buttons in Hamburger Menu..");
+	console.log("Generating Encoder buttons in Hamburger Menu..");
 	let activeMenuSelector			=	(`#hamburgerMenu_${hostHash}`);
-	$(activeMenuSelector).append(createRestartButton(hostName, hostHash));
-	$(activeMenuSelector).append(createRebootButton(hostName, hostHash));
+	let buttonList 					=	['DEPROVISION','RESET','REBOOT','REVEAL'];
+	for (let item of buttonList) {
+				console.log("Setting up " + item);
+		$(activeMenuSelector).append(createHostButton(hostName, hostHash, item));
+	}
 	$(activeMenuSelector).append(createCodecStateChangeButton(hostName, hostHash, type));
-	$(activeMenuSelector).append(createHostDeleteButton(hostName, hostHash));
 }
 
 function createServerMenuSet(hostName, hostHash, type) {
-	console.log("Generating Decoder buttons in Hamburger Menu..");
+	console.log("Generating Server buttons in Hamburger Menu..");
 	let activeMenuSelector			=	(`#hamburgerMenu_${hostHash}`);
-	$(activeMenuSelector).append(createRestartButton(hostName, hostHash));
-	$(activeMenuSelector).append(createRebootButton(hostName, hostHash));
+	let buttonList 					=	['RESET','REBOOT'];
+	for (let item of buttonList) {
+		console.log("Setting up " + item);
+		$(activeMenuSelector).append(createHostButton(hostName, hostHash, item));
+	}
 }
 
 function createDetailMenu(hostName, hostHash, type, divEntry) {
 	/* Generates an HTML span for the hamburger menu */
-	console.log("creating a detail menu element and populating with appropriate menu options.\n")
+	console.log("creating a detail menu element and populating with appropriate menu options for a:" + type)
 	var hostMenuElement		=	$("<div>",	{
 		class:	'hostMenuElement',
 		id:	`hostMenuElement_${hostHash}`,
@@ -777,36 +605,94 @@ function createDetailMenu(hostName, hostHash, type, divEntry) {
 	}
 }
 
-function createInputButton(key, value, keyFull, functionIndex, IP) {
-	var divEntry					=		document.createElement("Div");
-	var dynamicButton				=		document.createElement("Button");
-	const text						=		document.createTextNode(key);
-	const id						=		document.createTextNode(counter + 1);
-	dynamicButton.id				=		counter;
-	hostNameAndDevice				=		key.replace(/\//, ':\n');
+function ajaxMonitor(hash) {
+	// Takes the hash argument and tries to return a status every .5 seconds from the parent div hash
+	const selectedDivHash				=		$(this).parent().attr('divDeviceHash');
+	var interval = 500;  // 1000 = 1 second, 3000 = 3 seconds
+		function doAjax() {
+    		$.ajax({
+	            type: 'POST',
+            	url: '/get_device_status.php',
+            	data: {
+					hash:			selectedDivHash
+            	},
+            	dataType: 'json',
+            	success: function (data) {
+                    	$('#hidden').val(data);// first set the value     
+            	},
+            	complete: function (data) {
+                    	// Schedule the next
+                    	setTimeout(doAjax, interval);
+            	}
+    		});
+	}
+	setTimeout(doAjax, interval);
+}
+
+function checkForDuplicate(divLoc, divAttr, value) {
+	// Look for duplicates
+	// console.log("Looking for duplicate entries for hash: " + value + "\nIn parent Div: " + divLoc + "\nFor Attribute: " + divAttr);
+	const divID							=		document.getElementById(divLoc);
+	const childNodes					=		Array.from(divID.getElementsByTagName("*"));
+	let liveChildElements				=		childNodes.filter((node) => node.nodeType === Node.ELEMENT_NODE);
+	let duplicateEntryFound				=		false;
+	liveChildElements.forEach((element) => {
+		const foundDivHash = element.getAttribute(divAttr);
+		if ( foundDivHash == value ) {
+			// here we need to check if anything about this duplicate changed
+			duplicateEntryFound 		= 		true;
+		} else {
+			// console.log("No entry discovered for value: " + value);
+		}
+	});
+	return duplicateEntryFound;
+}
+
+function createInputButton(key, value, keyLong, keyFull, inputHost, inputHostL, functionIndex, IP) {
+	// Note that for the frontend, we always use the PRETTY hostname set for the client
+	// the "real" hostname is still saved as a data attr, but not really used here.
+	var divEntry						=		document.createElement("Div");
+	var dynamicButton					=		document.createElement("Button");
+	const text							=		document.createTextNode(key);
+	const id							=		document.createTextNode(counter + 1);
+	dynamicButton.id					=		counter;
+	hostName							=		inputHost;
+ 	hostNameLabel						=		inputHostL;
+	deviceLabel							=		key;
+	fullKey 							=		keyFull;
+
 	/* create a div container, where the button, relabel button and any other associated elements reside */
 	if (functionIndex === 1) {
 		console.log("called from firstAjax, so this is a local video source");
+		if (checkForDuplicate("dynamicInputs", "divDeviceHash", value)) {
+			return;
+		}
 		dynamicInputs.appendChild(divEntry);
 		divEntry.setAttribute("data-functionID", functionIndex);
 		const title						=		document.createTextNode(key);
+		hostNameAndDevice				=		(hostNameLabel + ":" + key);
 	} else if (functionIndex === 3) {
 		console.log("called from thirdAjax, so this is a network video source");
-		hostNameAndDevice			=		(IP + ": " + key);
+		if (checkForDuplicate("dynamicNetworkInputs", "divDeviceHash", value)) {
+			return;
+		}
+		hostNameAndDevice				=		(IP + ":" + key);
 		dynamicNetworkInputs.appendChild(divEntry);
-		divEntry.setAttribute("data-functionID", functionIndex);
+		divEntry.setAttribute("divDeviceHash", functionIndex);
 		divEntry.setAttribute("title", IP);
 		$('#dynamicNetworkInputs').addClass('dynamicNetworkInputs');
 	} else {
 		console.error("createInputButton not called from a valid function");
 	}
-	var currentInputsHash			=		getActiveInputHash();
-	
+	var currentInputsHash				=		getActiveInputHash();
 	divEntry.setAttribute("divDeviceHash", value);
-	divEntry.setAttribute("data-fulltext", keyFull);
+	divEntry.setAttribute("data-fulltext", fullKey);
+	divEntry.setAttribute("data-label", hostNameLabel + ":" + key);
+	divEntry.setAttribute("data-inputHost", hostName);
+	divEntry.setAttribute("data-inputHostLabel", hostNameLabel);
 	divEntry.setAttribute("divDevID", dynamicButton.id);
 	$(divEntry).addClass('input_divider_device');
-	console.log("dynamic video source div created for device hash: " + value + " and label:  " + key);
+	console.log("dynamic video source div created for device hash: " + value + " and label:  " + key + "on host: " + hostName);
 	// Create the device button
 	function createInputButton(text, value) {
 		var $btn = $('<button/>', {
@@ -850,36 +736,62 @@ function createInputButton(key, value, keyFull, functionIndex, IP) {
 	$(divEntry).append(createInputDeleteButton());
 	$(divEntry).append(createRenameButton());
 	$(divEntry).append(createInputButton(text, value));
-	var createdButton = $(divEntry).find('.dynamicInputButton');
-	/* We might as well do this on pageload instead of creating the buttons..
-	 * 
-	 * if (createdButton.val() == currentInput) {
-		console.log("This button is the currently selected input hash, changing CSS to active!");
-		$(createdButton.css({
-			'background-color': 'red',
-			'color': 'white',
-			'font-size': '44px'
-		}));
-	} */
-
-	/* set counter +1 for button ID */
-	const selectedDivHash			=		$(this).parent().attr('divDeviceHash');
+	var createdButton 					= 		$(divEntry).find('.dynamicInputButton');
+	const selectedDivHash				=		$(this).parent().attr('divDeviceHash');
 	counter++;
 }
 
-function createNewHost(key, type, hostName, hostHash, hostLabel, functionIndex) {
+function checkHostDuplicate(type, hostHash) {
+	// called AFTER we check for duplicates initially, and only if the hash IS a duplicate
+	console.log("Looking for hostHash: " +hostHash+ "\nwith type: " +type);
+	let update 							=		false;
+	const divLoc						=		"HostControlDiv";
+	const divID							=		document.getElementById(divLoc);
+	const childNodes					=		Array.from(divID.getElementsByTagName("*"));
+	let liveChildElements				=		childNodes.filter((node) => node.nodeType === Node.ELEMENT_NODE);
+	liveChildElements.forEach((element) => {
+		let elementHash  				=		element.getAttribute("divhost");
+		let elementClass				=		element.getAttribute("class");
+		if ( hostHash == elementHash && elementClass == "host_divider") {
+			let elementType 			= 		element.getAttribute("data-hosttype");
+			console.log("Host Type is: " + elementType)
+			if ( type == elementType) {
+				console.log("Type unchanged.")
+			} else {
+				let update				=	true;
+				element.remove();
+			}
+		}
+	});
+	return update;
+}
+
+function createNewHost(key, type, hostName, hostHash, hostLabel, hostIP, hostBlankStatus, functionIndex) {
+	let update							=		false;
 	var divEntry						=		document.createElement("Div");
 	var type							=		type;
 	const id							=		document.createTextNode(counter + 1);
-	var initialHostBlankStatus			=		getBlankHostStatus(hostName, hostHash);
+	var hostBlankStatus					=		hostBlankStatus;
 	divEntry.setAttribute("id", id);
 	divEntry.setAttribute("divHost", hostHash);
 	divEntry.setAttribute("data-fulltext", key);
 	divEntry.setAttribute("data-hostName", hostName);
 	divEntry.setAttribute("data-hostType", type);
+	divEntry.setAttribute("title", "IP: " + hostIP);
 	$(divEntry).addClass('host_divider');
+	// am I a duplicate?
+	if (checkForDuplicate("HostControlDiv", "divhost", hostHash)) {
+		console.log("Working on a duplicate, applying type test..");
+		if(checkHostDuplicate(type, hostHash)) {
+			console.log("element should now be deleted.");
+		} else {
+			return;
+		}
+	} else {
+			console.log("unique ID, continuing");
+	}
 	/* This needs to be done "backwards" insofar as the type needs to be determined before we can start creating a new DIV */
-	console.log("Generating label and buttons with\nHost Label: "+hostLabel+"\nHost Name: "+hostName+"\nAnd Host Hash: "+hostHash+"\nAnd type: "+type);
+	console.log("Generating label and buttons with\nHost Label: "+hostLabel+"\nHost Name: "+hostName+"\nAnd Host Hash: "+hostHash+"\nAnd type: "+type+"\nAnd IP: "+hostIP+"\nAnd blank status: "+hostBlankStatus);
 	function createClientButtonSet(hostLabel, hostName, hostHash, type){
 		var labelTextBox					=		document.createElement("input");
 		var labelTextBoxLabel				=		document.createElement("label");
@@ -900,31 +812,30 @@ function createNewHost(key, type, hostName, hostHash, hostLabel, functionIndex) 
 			if ( oldLabelValue 				==		prettyName ) {
 				console.log("Error, values have not changed, doing nothing")
 			} else {
-			console.log("submitting to set_hostlabel.php with values---\nHash: " + phpHostHash + "\nNew Label: " + prettyName + "\nHostname: " + hostName + "\nType: " + type);
+			console.log("submitting to set_host_control.php with values---\nHash: " + phpHostHash + "\nNew Label: " + prettyName + "\nHostname: " + hostName + "\nType: " + type);
 			$.ajax({
-				url : '/set_host_label.php',
+				url : '/set_host_control.php',
 				type :'post',
 				data:{
 					hash:			phpHostHash,
-					prettyName:		prettyName,
-					hostName:		hostName,
-					type   :		type
+					value:			prettyName,
+					key:			hostName,
+					type   :		type,
+					hostFunction:	"label"
 					},
 				success:	function(response) {
 					console.log(response);
 				}
 			});
 		}});
-		getHostIPAJAX(hostName, divEntry);
 		$(divEntry).append(labelTextBox);
-		$(divEntry).append(createBlankButton(hostName, hostHash, initialHostBlankStatus));
+		$(divEntry).append(createBlankButton(hostName, hostHash, hostBlankStatus));
 		$(divEntry).append(createDetailMenu(hostName, hostHash, type, divEntry));
 		counter ++;
 	}
 	function createServerButtonSet(hostName, hostHash){
 		(divEntry).append("Host:" + hostName);
 		console.log("Generating Server label and buttons.");
-		getHostIPAJAX(hostName, divEntry);
 		$(divEntry).append(createDetailMenu(hostName, hostHash, type, divEntry));
 	}
 	function createGatewayButtonSet(hostName, hostHash){
@@ -955,43 +866,50 @@ function createNewHost(key, type, hostName, hostHash, hostLabel, functionIndex) 
 }
 
 function relabelInputElement() {
-	const selectedDivHash                           =               $(this).parent().attr('divDeviceHash');
-	const relabelTarget                             =               $(this).parent().attr('divDevID');
-	const oldGenText                                =               $(this).parent().attr('data-fulltext');
-	const newTextInput                              =               prompt("Enter new text label for this device:");
-	const inputButtonLabel                          =               $(this).next('button').attr('label');
-	var hostName									=               $(this).next('button').attr('label').split('/')[0];
+	const selectedDivHash							=				$(this).parent().attr('divDeviceHash');
+	const relabelTarget								=				$(this).parent().attr('divDevID');
+	const fullLabel									=				$(this).parent().attr('data-fulltext');
+	var newTextInput								=				prompt("Enter new text label for this device:", "New Label Value.");
+	const inputButtonLabel							=				$(this).next('button').attr('label');
+	var hostName									=				$(this).parent().attr('data-inputHost');
+	var hostLabel									=				$(this).parent().attr('data-inputHostLabel');
 	const functionID								=				$(this).parent().attr('data-functionID');
 	var deviceIpAddr								=				$(this).parent().attr('title');
-	console.log("Found Hash is: " + selectedDivHash + "\nFound button ID is: " + relabelTarget + "\nFound Label is: " + inputButtonLabel);
-	console.log("Device full label is: " + oldGenText + "\nNew device label: " + newTextInput + "\nHostname: " + hostName);
+	console.log("Found Hash is: " + selectedDivHash + "\nFound button ID is: " + relabelTarget + "\nFound old label is: " + inputButtonLabel);
+	console.log("Device full label is: " + fullLabel);
 	if (functionID == 3) {
-		hashValue	= ("/network_interface/" + selectedDivHash);
-		hostName	= `${deviceIpAddr}`;
-		console.log('This is a network device, substituting path strings for PHP handler\nSetting hostname to IP Address:' + deviceIpAddr);
+		hashValue	=	selectedDivHash;
+		hostName	=	`${deviceIpAddr}`;
+		hostLabel	=	`${deviceIpAddr}`;
+		console.log('This is a network device!\nSetting hostname to: ' + deviceIpAddr + ":" + newTextInput);
 	} else {
-		hashValue = selectedDivHash;
+		console.log('This is a local device, use div hash');
+		hashValue	=	selectedDivHash;
+		inputButtonLabel;
+		console.log("New device label will be hostLabel +: " + newTextInput + "\non Hostname: " + hostName);
 	}
 	if (newTextInput !== null && newTextInput !== "") {
-		document.getElementById(relabelTarget).innerText = `${hostName}: ${newTextInput}`;
-		document.getElementById(relabelTarget).oldGenText = oldGenText;
-		console.log("Button text successfully applied as: " + hostName + newTextInput);
-		console.log("The originally generated device field from Wavelet was: " + oldGenText);
-		console.log("The button must be activated for any changes to reflect on the video banner!");
+		document.getElementById(relabelTarget).innerText = `${hostLabel}:${newTextInput}`;
+		console.log("Button text successfully applied as: " + hostLabel + ":" + newTextInput + ", for system host: " + hostName );
+		console.log("The originally generated device field from Wavelet was: " + fullLabel);
+		console.log("The button must be activated for any changes to reflect on the video banner (if it is on)");
 		$.ajax({
 			type: "POST",
 			url: "/set_input_label.php",
 			data: {
-				value:          hashValue,
-				label:          (hostName + "/" + newTextInput),
-				oldvl:          oldGenText,
-				hostName:       hostName
+				// Remember we are regenerating the full packed data so we need everything
+				host:				hostName, 
+				hostLabel:			hostLabel,			
+				value:				hashValue,
+				label:				newTextInput,
+				oldInterfaceKey:	fullLabel,
 			  },
 			success: function(response){
 				console.log(response);
 			}
 			});
 	} else {
+		console.log("text input was empty!");
 		return;
 	}
 }
@@ -1002,13 +920,7 @@ function removeInputElement() {
 	const inputButtonKeyFull                        =               $(this).parent().attr('data-fulltext');
 	const functionID								=				$(this).parent().attr('data-functionID');
 	console.log("Found Hash for removal is: " + selectedDivHash + "\nFound button ID is: " + relabelTarget + "\nFound Label is: " + inputButtonKeyFull);
-	if (functionID == 3) {
-		console.log("Network device, function ID 3");
-		hashValue = ("/network_ip/" + selectedDivHash);
-	} else {
-		console.log("Local device or other, function ID not 3");
-		hashValue = selectedDivHash;
-	}
+	hashValue = selectedDivHash;
 	console.log("Deleting input entry and associated key: " + inputButtonKeyFull + " and value: " + hashValue);
 		$.ajax({
 			type: "POST",
@@ -1022,8 +934,6 @@ function removeInputElement() {
 			}
 		});
 	$(this).parent().remove();
-	sleep(300);
-	location.reload();
 }
 
 function removeHostElement(hostName, hostHash) {
@@ -1040,7 +950,7 @@ function removeHostElement(hostName, hostHash) {
 			}
 		});
 	$(this).parent().remove();
-	sleep(300);
+	sleep(1000);
 	location.reload();
 }
 
@@ -1118,6 +1028,41 @@ function getActiveInputHash(activeInputHash) {
 		}).then();
 }
 
+function sleep(ms) {
+	console.log("Sleeping for:" + ms);
+	return new Promise(resolve => setTimeout(resolve, ms || DEF_DELAY));
+}
+
+function setCookie(cname, cvalue, exdays) {
+  const d = new Date();
+  d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
+  let expires = "expires="+d.toUTCString();
+  document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+}
+
+function getCookie(cname) {
+  let name = cname + "=";
+  let ca = document.cookie.split(';');
+  for(let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) == ' ') {
+      c = c.substring(1);
+    }
+    if (c.indexOf(name) == 0) {
+      return c.substring(name.length, c.length);
+    }
+  }
+  return "";
+}
+
+const callingFunction = (callback) => {
+	const callerId = 'calling_function';
+	callback(this);
+}
+
 $(document).ready(function() {
 	getActiveInputHash("your_input_hash");
+	console.log("Setting up AJAX polling for events..");
+	setCookie("oldPollValue", "INIT", 365);
+	setTimeout(pollAjax, 3000);
 });

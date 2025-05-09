@@ -72,6 +72,7 @@ detect_input_present(){
 	systemctl --user daemon-reload
 	systemctl --user enable wavelet_encoder_query.service --now
 	echo -e "Now monitoring for encoder changes.."
+	read_uv_hash_select
 }
 
 read_uv_hash_select() {
@@ -131,11 +132,11 @@ generate_server_args(){
 			systemctl --user start UltraGrid.AppImage.service
 			generate_systemd_unit
 		fi
+	else
+		# Consume the global device flag by resetting it to 0 always!
+		KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="0"; write_etcd_global
 	fi
-	# Consume the global device flag by resetting it
-	KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="0"; write_etcd_global
 	echo "" > /var/home/wavelet/device_map_entries_verity
-
 	# Declare the master server inputs array
 	declare -A serverInputDevices=()
 	# Declare our static inputs
@@ -332,11 +333,11 @@ TimeoutStopSec=0.33
 [Install]
 WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage.service
 	# Tell Wavelet I am the active encoder
-	KEYNAME="ACTIVE_ENCODER"; KEYVALUE="${hostNameSys}"; write_etcd_global
+	KEYNAME="ENCODER_ACTIVE"; KEYVALUE="${hostNameSys}"; write_etcd_global
 	# Tell wavelet my encoder IP address
 	activeConnection=$(nmcli -t -f NAME,DEVICE c s -a | head -n 1)
 	activeConnectionIP=$(nmcli dev show ${activeConnection#*:} | grep ADDRESS | awk '{print $2}' | head -n 1)
-	KEYNAME=encoder_ip_address; KEYVALUE=${activeConnectionIP%/*}; write_etcd_global
+	KEYNAME=ENCODER_IP_ADDRESS; KEYVALUE=${activeConnectionIP%/*}; write_etcd_global
 	systemctl --user daemon-reload
 	systemctl --user restart UltraGrid.AppImage.service
 	echo -e "Encoder systemd unit instructed to start.."
@@ -354,8 +355,8 @@ WantedBy=default.target" > /home/wavelet/.config/systemd/user/UltraGrid.AppImage
 set_channelIndex(){
 	# This previously resided in the controller, but makes more sense here.
 	# Called after server or client encoder blocks have concatenated and generated their respective device maps and cmdlines
-	KEYNAME=uv_input;		read_etcd_global; controllerInputLabel=${printvalue}
-	KEYNAME=ENCODER_QUERY;	read_etcd_global; hashValue=${printvalue}
+	KEYNAME="/UI/UV_INPUT";		read_etcd_global; controllerInputLabel=${printvalue}
+	KEYNAME="ENCODER_QUERY";	read_etcd_global; hashValue=${printvalue}
 	# Ensure the encoder is even running...
 	if ! systemctl --user is-active --quiet UltraGrid.AppImage.service; then
 		echo "Something went wrong, we can't do anything until the SystemD unit is operating!"
@@ -364,16 +365,19 @@ set_channelIndex(){
 	fi
 	# Final step is to look for the uv_input label in device_map_entries_verity
 	# Module should ONLY be called on a system which possesses the device in question
-	# If we are the server, we should test for network device:
-	echo "Test for network device"
-	if [[ ${controllerInputLabel} == *"/network_interface/"* ]]; then
+	# If we are the server, testing should have occurred in encoder_query
+	if [[ $(hostname) == *"svr"* ]]; then
+		echo "Test for network device"
 		KEYNAME="/network_ip/${hashValue}"; read_etcd_global
-		KEYNAME="/network_uv_stream_command/${printvalue}"; read_etcd_global
-		searchArg=${printvalue}
-	else
-		KEYNAME="/${hostNamePretty}/devpath_lookup/${hashValue}"; read_etcd_global; searchArg="${printvalue}"
+		if [[ -n ${printvalue} ]]; then
+			echo "return value not null, proceding"
+			KEYNAME="/network_uv_stream_command/${printvalue}"; read_etcd_global; searchArg="${printvalue}"
+		else
+			echo "return value for network_ip/${hashValue} is null!  not a network device! Looking in local devices.."
+			KEYNAME="/${hostNameSys}/devpath_lookup/${hashValue}"; read_etcd_global; searchArg="${printvalue}"
+		fi
 	fi
-
+	# Now we have searchArg as the commandline string for the device that's been selected
 	# check for device_map presence
 	echo "Looking for device path ${searchArg} in local device map file.."
 	if grep -q ${searchArg} /var/home/wavelet/device_map_entries_verity; then
@@ -382,10 +386,10 @@ set_channelIndex(){
 	else
 		# If not, we run the process again after having the encoder restart
 		echo "Entry missing from device map file! Forcing re-enumeration of devices.."
-		sleep 1
+		rm -rf /var/home/wavelet/device_map_entries_verity; sleep 2
 		KEYNAME="GLOBAL_INPUT_DEVICE_NEW"; KEYVALUE="1"; write_etcd_global
 		KEYNAME="/${hostNameSys}/INPUT_DEVICE_NEW"; write_etcd_global
-		rm -rf /var/home/wavelet/device_map_entries_verity
+		KEYNAME=ENCODER_QUERY; KEYVALUE="${hashValue}"; write_etcd_global
 		exit 0
 	fi
 	# check for UG arg
@@ -415,7 +419,7 @@ set_channelIndex(){
 read_banner_status(){
 	# Reads Filter settings, should be banner.pam most of the time
 	# If banner isn't enabled filterVar will be null, as the logo.c file can result in crashes with RTSP streams and some other pixel formats.
-	KEYNAME="/banner/enabled"; read_etcd_global; bannerStatus=${printvalue}
+	KEYNAME="/UI/banner"; read_etcd_global; bannerStatus=${printvalue}
 	echo -e "Banner status is: ${bannerStatus}"
 	if [[ "${bannerStatus}" -eq 1 ]]; then
 		echo -e "Banner is enabled, so filterVar will be set appropriately.  Note currently the logo.c file in UltraGrid can generate errors on particular kinds of streams!..\n"
@@ -456,4 +460,4 @@ hostNamePretty=$(hostnamectl --pretty)
 #set -x
 exec >/var/home/wavelet/logs/encoder.log 2>&1
 
-read_uv_hash_select
+detect_input_present

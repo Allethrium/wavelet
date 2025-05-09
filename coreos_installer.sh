@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#set -x
 for i in "$@"
 	do
 		case $i in
@@ -41,12 +41,14 @@ IMAGEFILE=$(ls -t *.iso | head -n1)
 	echo -e "Generating Ignition files with Butane..\n"
 	# Generate decoder.ign regardless of server provisioning argument
 	echo -e "Generating decoder.ign..\n"
-	butane --pretty --strict --files-dir ./ ./decoder_custom.yml --output ./ignition_files/decoder.ign
+	butane --pretty --strict --files-dir ./ decoder_custom.yml --output ./ignition_files/decoder.ign
+	mv decoder_custom.yml ./ignition_files
 	if [[ "${serverMode}" = "1" ]]; then
 		# Generate butane setting files-dir to current path
 		# This is so that we can utilize the local files argument in server_custom.yml to inject the necessary files from /ignition subdir
 		echo -e "Generating server.ign..\n"
-		butane --pretty --strict --files-dir ./ignition_files ./server_custom.yml --output ./ignition_files/server.ign
+		butane --pretty --strict --files-dir ./ignition_files server_custom.yml --output ./ignition_files/server.ign
+		mv server_custom.yml ./ignition_files
 	fi
 
 echo "Customizing ISO files with Ignition\n"
@@ -77,4 +79,7 @@ echo "Customizing ISO files with Ignition\n"
 		-o /var/home/wavelet/http/ignition/wavelet_decoder.iso ${IMAGEFILE}
 	fi
 
+echo "Done, please note customized yml and transpiled files will remain in the /ignition_files/ folder for inspection and debugging purposes."
+# removes generated user YAML blocks to keep everything clean
+rm -rf *.yml
 echo -e "Image(s) generated,\n If this is initial setup please burn wavelet_server.iso to a USB stick and boot to continue setup..\n"
