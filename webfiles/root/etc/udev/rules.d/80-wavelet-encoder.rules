@@ -1,0 +1,6 @@
+ACTION=="add", SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}==":0e*:*", \
+    TAG+="systemd", ENV{UDEV_DB_RAN_ALREADY}!="1", \
+    ENV{SYSTEMD_USER_WANTS}+="wavelet_detectv4l@%E{DEVNAME}.service", ENV{UDEV_DB_RAN_ALREADY}="1"
+
+ACTION=="remove", SUBSYSTEM=="video4linux", ENV{DEVNAME}=="/dev/video*", \
+    RUN+="/usr/local/bin/wavelet_detectv4l.sh remove %E{DEVNAME}"

@@ -1,0 +1,8 @@
+[Plymouth-Theme]
+Name=Wavelet
+Description=Wavelet boot animation
+ModuleName=script
+
+[script]
+ScriptFile=/usr/share/plymouth/themes/wavelet/wavelet.script
+ImageDir=/usr/share/plymouth/themes/wavelet/

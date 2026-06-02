@@ -1,0 +1,17 @@
+# ISC-Kea DHCP server + TFTP
+# Containerized because of ISC's unfortunate choice of default paths
+# This prevents rpm-ostree from installing script hooks.
+FROM fedora:latest
+RUN rm -rf /etc/yum.repos.d/fedora-cisco-openh264.repo && \
+    dnf install -y kea kea-hooks etcd && \
+    dnf clean all
+# Change user ID because 998:998 is already etc/polkit on host...
+RUN usermod -u 964 kea
+RUN chown -R kea:kea /var/run/kea
+USER kea:kea
+EXPOSE 67/udp
+EXPOSE 67/tcp
+EXPOSE 68/udp
+EXPOSE 68/tcp
+COPY --chmod=0755 scripts/kea-cmd.sh /kea-cmd.sh
+CMD ["/kea-cmd.sh"]

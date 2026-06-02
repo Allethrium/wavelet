@@ -1,0 +1,121 @@
+# Because wavelet is tightly specced, we can use a cut down radius config
+server default {
+
+	listen {
+		type = auth
+		ipaddr = *
+		port = 1812
+		limit {
+			max_connections = 16
+			lifetime = 0
+			idle_timeout = 900
+			}
+		}
+
+		listen {
+			type = auth
+			ipv6addr = ::	# any.  ::1 == localhost
+			port = 0
+			limit {
+						max_connections = 16
+						lifetime = 0
+						idle_timeout = 30
+			}
+		}
+
+		authorize {
+			# authorize section is also named pre-authenticate.
+			# This is where we put our pre-flight checks before authentication can begin
+
+			# If no username was provided at all, we reject.
+			if (!(&User-Name)) {
+				update request {
+					&Module-Failure-Message += 'Rejected: User-Name not provided.'
+				}
+				reject
+			}
+
+			# FreeIPA requires anonymous-od-type-a to do the cert auth, so we check for that before bothering it.
+			if (&User-Name != "anonymous-od-type-a") {
+				update request {
+				  &Module-Failure-Message += 'Rejected: by identity'
+				}
+			reject
+			}
+			# This server processes only Wi-Fi authentication, so we check if request
+			# has NAS-Port-Type attribute and it's value is Wireless-802.11.
+			if (!(&NAS-Port-Type && &NAS-Port-Type == Wireless-802.11)) {
+				update request {
+					&Module-Failure-Message += 'Rejected: NAS-Port-Type is not Wireless-802.11.'
+				}
+				reject
+			}
+
+			# If we still here, call eap processing
+			# If EAP started, this module will return "handled".
+			# If EAP still is in progress, this module will return "ok" or "updated".
+			# This means EAP is not ready yet and we can not authenticate client yet.
+			# This module is placed at very beginning of this section, because it stops
+			# processing (`return`s) section until all EAP exchange completes.
+			# If you put some logic before EAP module, this logic will be executed every
+			# EAP message.
+			eap_wifi {
+				ok = return
+				updated = return
+				handled = return
+			}
+
+			# We should reach this code only when EAP fails
+			update request {
+				&Module-Failure-Message += 'Rejected: EAP failed'
+			}
+			reject
+
+			# End of Authorization section
+		}
+
+		authenticate {
+			#  Authentication.
+			#  Allow only EAP authentication.
+			eap_wifi
+			# End of authenticate section
+		}
+
+		post-auth {
+			#  Post-Authentication
+			if (session-state:User-Name && reply:User-Name && request:User-Name && (reply:User-Name == request:User-Name)) {
+				update reply {
+					&User-Name !* ANY
+				}
+			}
+
+    		update {
+		        &reply: += &session-state:
+	    	}
+
+			remove_reply_message_if_eap
+
+			Post-Auth-Type REJECT {
+				attr_filter.access_reject
+				# Insert EAP-Failure message if the request was
+				# rejected by policy instead of because of an
+				# authentication failure
+				eap_wifi
+				#  Remove reply message if the response contains an EAP-Message
+				remove_reply_message_if_eap
+			}
+
+			if (EAP-Key-Name && &reply:EAP-Session-Id) {
+				update reply {
+					&EAP-Key-Name := &reply:EAP-Session-Id
+				}
+			}
+		}
+
+
+	pre-proxy {
+	}
+
+	post-proxy {
+	}
+}

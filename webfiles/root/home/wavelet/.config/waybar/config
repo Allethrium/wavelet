@@ -1,0 +1,57 @@
+{
+    "reload_style_on_change": true,
+    "layer": "bottom",
+    "position": "top",
+    "height": 32,
+    "modules-left": ["sway/workspaces", "sway/mode"],
+    "modules-center": ["mpd"],
+    "modules-right": ["memory", "cpu", "network", "battery", "clock"],
+    "sway/mode": {
+        "format": " {}"
+    },
+    "sway/workspaces": {
+        "format": "{name}",
+        "disable-scroll-wraparound": true,
+        "enable-bar-scroll": true,
+        "smooth-scrolling-threshold": 30
+    },
+    "sway/window": {
+        "max-length": 200,
+        "tooltip": false
+    },
+    "clock": {
+        //"format": "{:%d.%m.%y %a / W: %V}",
+        "format": "{:%d.%m.%y %a}",
+        "tooltip": false
+    },
+    "battery": {
+        "format": "{icon} {capacity}%",
+        "format-icons": ["", "", "", "", ""],
+        "format-charging": " {capacity}%",
+        "interval": 30,
+        "states": {
+            "warning": 25,
+            "critical": 10
+        },
+        "tooltip": false
+    },
+    "tray": {
+        "icon-size": 20
+    },
+    "cpu": {
+        "tooltip": true,
+        "format": "CPU  {}%"
+    },
+    "memory": {
+        "tooltip": true,
+        "format": "MEM  {}%"
+        // "format": "{used} / {total}  "
+    },
+    "network": {
+        "format-wifi": " {essid} ({signalStrength}%)",
+        "format-ethernet": " {ifname}: {ipaddr}/{cidr}",
+        "format-linked": " {ifname} (No IP)",
+        "format-disconnected": "Disconnected ⚠",
+        "format-alt": "{ifname}: {ipaddr}/{cidr}"
+    }
+}

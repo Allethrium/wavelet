@@ -1,0 +1,54 @@
+# This file supplies an automated installer which will boot
+# then install CoreOS to the client machine hard drive with decoder.ign
+# NOTE - it will overwrite any existing hard drives, and won't ask permission!
+# ignition:
+# version: 3.0.0
+---
+variant: fcos
+version: 1.6.0
+ignition:
+  security:
+    tls:
+      certificate_authorities:
+        - source: http://svr.wavelet.allethrium:8080/ignition/ca.crt
+          verification:
+            hash:
+storage:
+  # Files injected locally during wavelet_pxe_grubconfig.sh
+  files:
+    # A basic ignition file that will enable autologin on tty1
+    #- path: /home/core/automated_installer.ign
+    #  contents:
+    #    local: automated_installer.ign
+    # This script finds the local hard drive
+    # Note we use http to :8080 here, the CA is not available at this step of installation
+    - path: /usr/local/bin/automated_coreos_deployment.sh
+      mode: 0755
+      contents:
+        source: https://svr.wavelet.allethrium:8443/ignition/automated_coreos_deployment.sh
+    - path: /home/decoder.ign
+      mode: 0640
+      contents:
+        source: https://svr.wavelet.allethrium:8443/ignition/decoder.ign
+# Configure SYSTEM systemd units
+systemd:
+  units:
+    - name: automated_coreos_deployment.service
+      enabled: true
+      contents: |
+        [Unit]
+        After=network-online.target
+        Wants=network-online.target
+        Before=systemd-user-sessions.service
+        OnFailure=emergency.target
+        OnFailureJobMode=replace-irreversibly
+        
+        [Service]
+        RemainAfterExit=yes
+        Type=oneshot
+        ExecStart=/usr/local/bin/automated_coreos_deployment.sh
+        StandardOutput=kmsg+console
+        StandardError=kmsg+console
+        
+        [Install]
+        WantedBy=multi-user.target

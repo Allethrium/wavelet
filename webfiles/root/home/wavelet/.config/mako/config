@@ -1,0 +1,25 @@
+sort=-time
+anchor=top-center
+layer=overlay
+font=Chivo Mono 18
+width=1000
+height=320
+icons=1
+border-size=2
+border-radius=10
+default-timeout=5000
+max-visible=1
+
+[urgency=low]
+border-color=#81a1c1
+
+[urgency=normal]
+border-color=#88c0d0
+
+[urgency=high]
+border-color=#0774CD8F
+default-timeout=0
+
+[grouped]
+format=<b>%s</b>\n%b
+

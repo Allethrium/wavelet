@@ -1,0 +1,19 @@
+#!/bin/bash
+# Update IPA DNS records when network interface changes
+domainName="$(dnsdomainname)"
+if [[ "$1" =~ ^(wlo|eno|enp) ]] && [[ "$2" == "up" || "$2" == "dhcp4-change" ]]; then
+	# Get current IP on this interface
+	current_ip=$(ip -4 addr show dev "$1" | awk '/inet / {print $2}' | cut -d/ -f1)
+	# Get host credentials if not already available
+	if ! klist >/dev/null 2>&1; then
+		kinit -kt /etc/krb5.keytab "host/$(hostname -f)@${domainName^^}" 2>/dev/null || \
+		kinit -kt /etc/krb5.keytab "$(hostname -f)@${domainName^^}" 2>/dev/null || true
+	fi
+	# Update DNS with current IP
+	nsupdate -g << NSUPDATE_EOF
+server dc1.$domainName
+update delete $(hostname -f). A
+update add $(hostname -f). 3600 A ${current_ip}
+send
+NSUPDATE_EOF
+fi

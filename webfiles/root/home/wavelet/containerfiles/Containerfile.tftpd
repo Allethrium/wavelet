@@ -1,0 +1,11 @@
+# ISC-Kea DHCP server + TFTP
+# Containerized because of ISC's unfortunate choice of default paths
+# This prevents rpm-ostree from installing script hooks.
+FROM alpine:latest
+RUN apk add --no-cache --virtual sl_plus_deps syslinux && \
+    cp -r /usr/share/syslinux /tftpboot && \
+    find /tftpboot -type f -exec chmod 0444 {} + && \
+    apk del sl_plus_deps
+RUN apk add --no-cache tftp-hpa
+EXPOSE 69/udp
+CMD ["in.tftpd","-L", "-vvv","--secure", "/data"]

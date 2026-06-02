@@ -1,0 +1,32 @@
+function draw() {
+    local screen_width = get_screen_width();
+    local screen_height = get_screen_height();
+
+    -- Center coordinates
+    local center_x = screen_width / 2;
+    local center_y = screen_height / 2;
+
+    -- Draw the background box (static)
+    local rect_width = 100;
+    local rect_height = 100;
+    draw_rounded_rectangle(center_x - rect_width/2, center_y - rect_height/2,
+                           rect_width, rect_height, 20, "rgba(30, 30, 30, 0.9)");
+
+    -- ANIMATION LOGIC:
+    -- We use a sine wave to oscillate the font size smoothly
+    local base_size = 64;
+
+    -- fraction goes from 0.0 (start) to 1.0 (end).
+    -- Multiplying by '20' makes it pulse faster.
+    local pulse_amount = math.sin(fraction * 20) * 8;
+
+    local current_size = base_size + pulse_amount;
+
+    -- Draw the Delta symbol centered in the box
+    draw_text("Δ", center_x, center_y + 15, "Sans", current_size, "rgba(255, 255, 255, 1.0)");
+}
+
+function update(fraction) {
+    -- fraction is automatically updated by Plymouth each frame
+    draw();
+}

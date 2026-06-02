@@ -1,0 +1,181 @@
+# This file aims to provide a usable base CoreOS image
+# It will run as a subordinate device, without the server dependencies
+# Always boots as PXE client from wavelet server
+# Default mode is a decoder
+# ignition:
+# version: 3.5.0
+---
+variant: fcos
+version: 1.6.0
+kernel_arguments:
+  should_exist:
+    - preempt=full
+    - nosmt
+    - threadirqs
+    - mitigations=off
+    - cpufreq.default_governor=performance
+    - nvme_probe_timeout=3
+    - nvme_core.default_ps_max_latency_us=200000
+    - rhgb
+    - quiet
+    - splash
+    - rd.neednet=1
+    - rd.timeout=10
+ignition:
+  security:
+    tls:
+      certificate_authorities:
+        - local: ca.crt
+          verification:
+            hash:
+storage:
+  disks:
+    - device: /dev/disk/by-id/coreos-boot-disk
+      partitions:
+        - number: 3
+          label: boot
+          size_mib: 2048
+          resize: true
+          wipe_partition_entry: true
+        - number: 4
+          label: root
+          size_mib: 0
+          start_mib: 0
+          resize: false
+          wipe_partition_entry: true
+  filesystems:
+    - device: /dev/disk/by-partlabel/boot
+      format: xfs
+      label: boot
+      wipe_filesystem: true
+    - device: /dev/disk/by-partlabel/root
+      format: xfs
+      label: root
+      wipe_filesystem: true
+  files:
+    # FreeIPA CA Certificate
+    - path: /var/home/wavelet/config/ca.crt
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://svr.wavelet.allethrium:8443/ignition/ca.crt
+    # UltraGrid AppImage
+    - path: /usr/local/bin/UltraGrid.AppImage
+      mode: 0755
+      contents:
+        source: https://svr.wavelet.allethrium:8443/ignition/UltraGrid.AppImage
+    # The key file, which replaces most of the ignition entries
+    - path: /var/wavelet_decoder_keys.csv
+      mode: 0600
+      overwrite: true
+      contents:
+        local: wavelet_decoder_keys.csv
+    # Satisfy bootc/rpm-ostree JSON parser requirement to pull from registry
+    - path: /etc/ostree/auth.json
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          {
+            "auths": {}
+          }
+    # Hostname file, without which install_packages will fail
+    - path: /etc/hostname
+      mode: 0644
+      contents:
+        inline: decX.#hostname#
+    # Wavelet installer module
+    - path: /usr/local/bin/wavelet_install_packages.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        source: https://svr.wavelet.allethrium:8443/ignition/wavelet_install_packages.sh
+    # Wavelet modules
+    - path: /var/wavelet_files.tar.gz
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://svr.wavelet.allethrium:8443/ignition/wavelet_files.tar.gz
+    # ETCD Enrollment user PW
+    - path: /var/root/secrets/enrollpw
+      mode: 0600
+      contents:
+        inline: #ENROLLPWHERE
+    # ETCD Provision user PW
+    - path: /var/root/secrets/provisionpw
+      mode: 0600
+      contents:
+        inline: #PROVISIONPWHERE
+# user accounts, passwords and pubkeys
+passwd:
+  users:
+      #ADD_USER_YAML_HERE
+# Configure SYSTEM systemd units
+systemd:
+  units:
+    # Decompress Wavelet files and install necessary pkgs.
+    # Note, this creates all the /var/.complete files in script.
+    - name: wavelet_installer.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Install packages, generate second-boot systemd rootful units
+        Before=getty@tty1.service generate_files.service
+        ConditionFirstBoot=yes
+        Wants=network-online.target
+        After=network-online.target
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_packages.sh "wavelet_files.tar.gz" "/var/wavelet_decoder_keys.csv"'
+        ExecStartPost=-systemctl reboot
+        [Install]
+        WantedBy=multi-user.target
+    # Reboot service
+    - name: decoder-reboot.timer
+      enabled: true
+      contents: |
+          [Unit]
+          Description=Daily Reboot
+          [Timer]
+          OnCalendar=*-*-* 6:07:00
+          [Install]
+          WantedBy=timers.target
+    # Reboot service timer
+    - name: decoder-reboot.service
+      contents: |
+          [Unit]
+          Description=Daily Reboot
+          [Service]
+          Type=simple
+          ExecStart=/usr/bin/systemctl --force reboot
+    # Mask docker entirely
+    - name: docker.service
+      mask: true
+    - name: docker.socket
+      mask: true
+    # Mask irqbalance
+    - name: irqbalance.service
+      mask: true
+    # Mask zincati entirely
+    - name: zincati.service
+      mask: true
+    # Mask NetworkManager-wait-online.service
+    - name: NetworkManager-wait-online.service
+      mask: true
+    # Autologin dropin service
+    # Causes a login loop until appropriate packages are installed
+    # Service will start a sequence that will launch the Sway DM
+    # Calls a number of user systemd units which provision Wavelet services.
+    # Autologin dropin service
+    - name: getty@tty1.service
+      dropins:
+        - name: autologin-core.conf
+          contents: |
+            [Unit]
+            Description=Wait for wavelet packages to install before starting autologin
+            After=wavelet_installer.service
+            ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+            [Service]
+            # Override Execstart in main unit
+            ExecStart=            
+            ExecStart=-/usr/sbin/agetty --autologin wavelet --noclear %I $TERM

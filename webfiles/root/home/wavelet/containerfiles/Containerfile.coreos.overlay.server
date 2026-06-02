@@ -1,0 +1,15 @@
+# This containerfile builds on the locally-built client image, adding only server-specific packages.
+# To be applied as an ostree rebase
+#
+# Build sequence:
+#   1. podman build -f Containerfile.coreos.overlay.client -t coreos_overlay_client .
+#   2. podman build -f Containerfile.coreos.overlay.server -t coreos_overlay_server .
+
+FROM coreos_overlay_client AS server
+
+RUN rpm-ostree install -y -A \
+        expect \
+        buildah butane inotify-tools \
+        zlib-ng-compat openssl ascii \
+        live555 && \
+    ostree container commit
