@@ -144,7 +144,7 @@ deleteHostFromDomain() {
 #
 #####
 
-set -x
+
 logName=/var/home/wavelet-root/logs/force_deprovision.log
 exec >> "${logName}" 2>&1
 event_server

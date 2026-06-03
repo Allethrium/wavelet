@@ -54,6 +54,8 @@ else
 fi
 
 declare -A processing_group
+declare -A _hostNameMap          # hostHash → hostname (populated by get_hosts_in_group)
+declare -A _inputDeviceMap       # inputHash → /UI/HOSTS/{hash}/inputs/ key (populated by get_hosts_in_group)
 sleepTimer=60
 
 # Process inputs
@@ -61,12 +63,13 @@ detect_operation(){
 	# Inputs are specified from the etcdctl process which spawns this module
 	# Therefore they will be populated along with their revision numbers in ENV
 	# TODO - consider a global dispatch table and a local valkey cache to avoid GRPc call
-	KEYNAME="/HOSTS/$hostNameSys"; read_etcd_global; thisHostHash="$printvalue"
+	thisHostHash="${etcdKey#/UI/HOSTS/}"
+	thisHostHash="${thisHostHash%%/*}"
 	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; groupHash="$printvalue"
 	echo -e "	Host Matching:\n		Key: $etcdKey\n		Value: $etcdValue"
 	case $etcdKey in
 		"/UI/HOSTS/$thisHostHash/IP")						exit 0 ;; # nooop
-		"/UI/HOSTS/$thisHostHash")							event_relabel;;
+		"/UI/HOSTS/$thisHostHash/control/label")			event_relabel;;
 		"/UI/HOSTS/$thisHostHash/control/authScreencast")	authorize_screencast;;
 		"/UI/HOSTS/$thisHostHash/control/blankStatus")		event_blank;;
 		"/UI/HOSTS/$thisHostHash/control/deprovision")		event_deprovision;;
@@ -101,20 +104,20 @@ detect_operation_server(){
 		groupHash="${etcdKey#*/UI/GROUPS/}"
 		groupHash="${groupHash%%/*}"
 		case "$etcdKey" in
-			*/control/audioStatus*)					event_group_enable_audio;;
-			*/control/bannerStatus*)				event_group_enable_banner;;
-			*/control/blankStatus*)					event_group_host_blank;;
-			*/control/liveStreamStatus*)			event_group_liveStream;;
-			*/control/persistStatus*)				event_group_input_persist;;
-			*/control/rebootStatus*)				event_group_host_reboot;;
-			*/control/resetStatus*)					event_group_host_reset;;
-			*/control/revealStatus*)				event_group_host_reveal;;
-			*/control/bannercontent*)				event_group_set_bannerContent;;
-			*/control/liveStreamData*)				event_group_set_liveStreamConfig;;
-			*/control/blueToothMAC*)				event_group_set_blueToothMAC;;
-			*/control/sourceHash*)					event_group_set_video_source;;
-			*/control/staticImage*)					event_group_set_staticImage;;
-			*/control/activeCodec*)					event_group_set_codec;;
+			*/control/audioStatus)			event_group_enable_audio;;
+			*/control/bannerStatus)			event_group_enable_banner;;
+			*/control/blankStatus)			event_group_host_blank;;
+			*/control/liveStreamStatus)		event_group_liveStream;;
+			*/control/persistStatus)		event_group_input_persist;;
+			*/control/rebootStatus)			event_group_host_reboot;;
+			*/control/resetStatus)			event_group_host_reset;;
+			*/control/revealStatus*)		event_group_host_reveal;;
+			*/control/bannercontent*)		event_group_set_bannerContent;;
+			*/control/liveStreamData)		event_group_set_liveStreamConfig;;
+			*/control/blueToothMAC)			event_group_set_blueToothMAC;;
+			*/control/sourceHash)			event_group_set_video_source;;
+			*/control/staticImage)			event_group_set_staticImage;;
+			*/control/activeCodec)			event_group_set_codec;;
 			*) exit 0;;
 		esac
 	elif [[ "$etcdKey" == "/UI/GLOBALS/control"* ]]; then
@@ -699,15 +702,13 @@ event_get_subscribeStreamCommand(){
    	# If that device is a network device which requires specific inputs
    	# Outputs: decoderSubType decoderSubscribecmd
    	local KEYNAME; local KEYVALUE; local printvalue
-	KEYNAME="/UI/HOSTS/"; read_etcd_prefix_keys
-	while IFS= read -r line; do
-		if [[ "$line" == *"/inputs/$etcdValue"* ]]; then
-			KEYNAME="$line"; read_etcd_global; hostSourceData="$printvalue"; hostSourceKey="$line"
-			break
-		fi
-	done <<<"$printvalue"
+	if [[ -n "${_inputDeviceMap[$etcdValue]:-}" ]]; then
+		hostSourceKey="${_inputDeviceMap[$etcdValue]}"
+	else
+		return 1
+	fi
+	KEYNAME="$hostSourceKey"; read_etcd_global; hostSourceData="$printvalue"
 	hostUIKey="${hostSourceKey%/inputs/*}"
-	KEYNAME="$hostUIKey"; read_etcd_global; deviceHostName="$printvalue"
 	if [[ "$hostSourceData" == *"NDI"* ]] || [[ "$hostSourceData" == *"RTSP"* ]]; then
 		if [[ -z "$printvalue" ]]; then
 			KEYNAME="$hostUIKey/IP"; read_etcd_global
@@ -758,14 +759,9 @@ event_process_group_videoSource_hosts(){
     local tempTxn; tempTxn=$(mktemp)
     for hostHash in "${hostsInGroup[@]}"; do
         (
-            local printvalue; local KEYNAME; local deviceHostName
-            KEYNAME="/UI/HOSTS/$hostHash"; read_etcd_global
-            deviceHostName="$printvalue"
+            local deviceHostName="${_hostNameMap[$hostHash]:-}"
 #            local versionKey; versionKey="/HOSTS/$deviceHostName/control/sourceCheckVersion"
 #            KEYNAME="$versionKey"; read_etcd_global
-            if [[ -n "$printvalue" ]]; then
-                currentVersion="$printvalue"
-            fi
             local currentVersion; currentVersion="0"
             if [[ "$directMode" -eq 1 ]]; then
                 # Direct NDI mode: keep VIDEO_SOURCE_CMD, set streamMode to subType
@@ -940,16 +936,6 @@ event_delete_group(){
 		exit 0
 	fi
 	KEYNAME="/UI/GROUPS/$primaryGroupHash"; read_etcd_prefix_list; primaryGroupKeys="$printvalue"
-	while read -r line; do
-		case $line in
-			*/control/blankStatus)
-				;;
-			*/control/sourceHash)
-				;;
-			*/control/revealStatus)
-				;;
-		esac
-	done <<<"$primaryGroupKeys"
 	KEYNAME="/UI/HOSTS/"; read_etcd_prefix_keys
 	hostsGroupMemberArray=()
 	while read -r line; do
@@ -1093,25 +1079,25 @@ run_server(){
 
 check_ndiDirectMode() {
 	# Interrogate the selected device hash to see if its parent host is in directMode.  If so, we start a UG encoder stream.
-	KEYNAME="/UI/HOSTS/"; read_etcd_prefix_list
-	local hostKey; local targetHostName; local allUIHosts
-	allUIHosts="$printvalue"
-	while IFS= read -r line; do
-		if [[ "$line" == *"/inputs/"* ]]; then
-			if [[ "$line" == *"$etcdValue"* ]]; then
-				# Store this key, and get the value on the next iteration, then return both.
-				hostKey="$line"
-			fi
-		fi
-	done <<<"$allUIHosts"
-	KEYNAME="${hostKey%%/inputs*}/control/directMode"; read_etcd_global
+	if [[ -z "${_inputDeviceMap[$etcdValue]:-}" ]]; then
+		echo "	Input device $etcdValue not found in cache."
+		exit 0
+	fi
+	local hostKey="${_inputDeviceMap[$etcdValue]}"
+	local hostHash="${hostKey#/UI/HOSTS/}"
+	hostHash="${hostHash%%/*}"
+	local targetHostName="${_hostNameMap[$hostHash]:-}"
+	if [[ -z "$targetHostName" ]]; then
+		echo "	Hostname not found for host hash $hostHash."
+		exit 0
+	fi
+	KEYNAME="/HOSTS/$targetHostName/control/directMode"; read_etcd_global
 	echo "directMode for device is $printvalue"
 	if [[ "$printvalue" == 1 ]]; then
 		# The NDI device is in direct mode and we shouldn't do anything more.
 		exit 0
 	else
 		# We regenerate our encoder process and handle this as an UltraGrid input
-		KEYNAME="${hostKey%%/inputs*}"; read_etcd_global; targetHostName="$printvalue"; echo "HostName: $printvalue"
 		if [[ -n "$targetHostName" ]]; then
 			KEYNAME="/HOSTS/$targetHostName/uv_encode_cmd/inputStream"; read_etcd_global
 			echo "		NDI Device set to indirect mode!  Adding UltraGrid encoder argument (base64): $printvalue"
@@ -1131,7 +1117,6 @@ event_encoder(){
         systemctl --user enable wavelet_reflector.service --now
     fi
 	echo -e "	Calling wavelet_encoder module with args:\n		$etcdValue\n	$thisHostHash\n			$1\n"
-	KEYNAME="/UI/HOSTS/$thisHostHash/control/blankStatus"; read_etcd_global
 	if [[ -z "$groupHash" ]]; then
 		KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; groupHash="$printvalue"
 	fi
@@ -1147,6 +1132,7 @@ check_reflector_subscription(){
 		KEYNAME="/HOSTS/$hostNameSys/reflectorRequest"; KEYVALUE="$etcdValue"; write_etcd_global &
 	else
 		echo "		Moving to a non-UltraGrid source, sending a reflector unsubscribe request!"
+		# TODO - Implement a "Switching Video Source" blank image
 		KEYNAME="/HOSTS/$hostNameSys/control/unsubRequest"; KEYVALUE="$previousVideoSourceValue"; write_etcd_global &
 		return 0
 	fi
@@ -1194,7 +1180,7 @@ check_reflector_subscription(){
 }
 
 run_decoder(){
-	# Begins the decoder process.
+	# Begins the decoder process
 	# On run, the decoder should be able to lookup the primary video source for the group it resides within.
 	# On UltraGrid sources, this means joining a reflector in order to get a video stream
 	ugName="UltraGrid.Decoder.service"
@@ -1522,8 +1508,10 @@ get_hosts_in_group(){
 	declare -A host_group_map
 	# We may need to change this so we can structure an object, mapfile and parse it back
 	hostsInGroup=()
+	fullPrefixList=()
 	KEYNAME="/UI/HOSTS/"; read_etcd_prefix_list
 	while IFS= read -r line; do
+		fullPrefixList+=("$line")
 		if [[ "$line" == */control/GROUP ]]; then
 			# Store this key, and get the value on the next iteration, then return both.
 			local host_hash="${line#/UI/HOSTS/}"
@@ -1535,6 +1523,20 @@ get_hosts_in_group(){
 			if [[ -n "$next_line" ]]; then
 				# Process the key-value pair
 				host_group_map["$host_hash"]="$next_line"
+			fi
+		elif [[ "$line" =~ ^/UI/HOSTS/[^/]+$ ]]; then
+			# This is the hostname value line (the one right after /UI/HOSTS/{hash})
+			local host_hash="${line#/UI/HOSTS/}"
+			IFS= read -r next_line
+			if [[ -n "$next_line" ]]; then
+				_hostNameMap["$host_hash"]="$next_line"
+			fi
+		elif [[ "$line" == */inputs/* ]] && [[ ! "$line" =~ /inputs/.*devpath_lookup ]]; then
+			# Store input device keys indexed by the last path component (the input hash)
+			local inputKey="${line##*/}"
+			IFS= read -r next_line
+			if [[ -n "$next_line" ]]; then
+				_inputDeviceMap["$inputKey"]="$line"
 			fi
 		fi
 	done <<<"$printvalue"
@@ -1554,7 +1556,10 @@ netCat(){
     local port="${1:-6161}"
     local controlPortCmd="${2:-$controlPortCmd}"
     echo "Port: $port, Command: $controlPortCmd"
-    nc -w 1 127.0.0.1 "$port" <<<"$controlPortCmd" &
+    response=$(nc 127.0.0.1 "$port" <<<"$controlPortCmd");
+    if [[ "$response" != *"200 OK"* ]]; then
+    	echo "	Control Port exception: $response"
+    fi
 }
 
 

@@ -200,11 +200,13 @@ else
 	WAVELET_SHUTDOWN_MOD="/usr/local/bin/wavelet_encoder_shutdown_timer.sh"
 fi
 clients="$(list_client_port)"
-if [[ -z "$clients" ]]; then
+if [[ "$clients" == *"No ports configured."* ]]; then
+	echo "	No clients listed!  initiating encoder shutdown timer for 300s"
 	echo "$(($(date +%s) + 300))" > /var/tmp/encoder_shutdown_at
 	"$WAVELET_SHUTDOWN_MOD" &
 	echo $! > /var/home/wavelet/config/encoder_shutdown_timer.pid
 else
+	echo "	Clients still subscribed, terminating any active timers for the encoder."
     pid=$(cat /var/home/wavelet/config/encoder_shutdown_timer.pid 2>/dev/null)
     if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
         kill -TERM "$pid"

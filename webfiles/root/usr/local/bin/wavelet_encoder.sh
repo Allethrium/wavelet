@@ -35,49 +35,6 @@ fi
 #	fi
 #}
 
-detect_input_present(){
-	# Before we do anything, once again we check that we have an input device present.
-	KEYNAME="/HOSTS/$hostNameSys/INPUT_DEVICE_PRESENT"; read_etcd_global
-		if [[ "$printvalue" -eq 1 ]]; then
-			echo -e "	$(date): An input device is present on this host, continuing.. \n"
-		else
-			if [[ "$hostNameSys" == *"svr"* ]]; then
-				echo -e "	This is the wavelet server, continuing.."
-			else
-				echo -e "	No input devices, and not a server, encoder shouldn't be running on this host."
-				echo "	Attempting device redetection anyway.."
-				/usr/local/bin/wavelet_detectv4l.sh "redetect"
-				exit 0
-			fi
-		fi
-	read_uv_hash_select
-}
-
-read_uv_hash_select() {
-	# The encoder should be looking for sourceHash in its assigned group.
-	KEYNAME="/UI/GROUPS/$groupHash/control/sourceHash";	read_etcd_global; groupInputHash="$printvalue"
-	case "$groupInputHash" in
-	0)
-		echo "	Blank Screen activated, clients will handle this locally."
-		exit 0
-		;;
-	1)
-		echo "	Static Image activated, clients will handle this locally."
-		exit 0
-		;;
-	2)
-		echo "	Testcard generation activated, clients will handle this locally."
-		exit 0
-		;;
-	3)	echo "	Blank activated, clients will handle this locally."
-		exit 0
-		;;
-	*)	echo "	Dynamic input device."
-		test_newDevice
-		;;
-	esac
-}
-
 test_newDevice(){
 	# Check to see if our host device update flag has been modified.
 	if [[ -n "$networkDeviceInput" ]]; then
@@ -183,8 +140,8 @@ generate_local_args(){
 #    sed -i -e '/^[[:space:]]*$/d' -e '/^[^,]*,[^,]*,$/{n;d}' "$deviceMapFile" 2>/dev/null
 	echo -e "	Generated switcher device list for all local input devices is:\n${sortedLocalDevices[*]}"
 	echo -e "	Generated command line input into etcd is:\n		$commandLine\n		Converting to base64 and injecting to etcd.."
-	encodedCommandLine="$(base64 -w 0 <<<"$commandLine")"
-	KEYNAME="/HOSTS/$hostNameSys/local_encoder_command"; KEYVALUE="$encodedCommandLine"; write_etcd_global &
+#	encodedCommandLine="$(base64 -w 0 <<<"$commandLine")"
+#	KEYNAME="/HOSTS/$hostNameSys/local_encoder_command"; KEYVALUE="$encodedCommandLine"; write_etcd_global &
 	# Read the encoder selection, then pull the correct encoder cmdline
 	KEYNAME="/UI/GROUPS/$groupHash/control/activeCodec"; read_etcd_global
 	KEYNAME="/UI/GLOBALS/CODECS/$printvalue"; read_etcd_global
@@ -218,8 +175,8 @@ generate_systemd_unit(){
 		# Zero that out so nothing will be populated
 		unset serverInputvar
 	fi
-	KEYNAME="/HOSTS/$hostNameSys/local_encoder_command"; read_etcd_global; localInputvar="$(base64 -d <<<"$printvalue")"
-
+#	KEYNAME="/HOSTS/$hostNameSys/local_encoder_command"; read_etcd_global; localInputvar="$(base64 -d <<<"$printvalue")"
+	localInputvar="$commandLine"
 	# Check if blankstatus != 1
 	KEYNAME="/HOSTS/$hostNameSys/control/blankStatus"; read_etcd_global
 #	multiplier=""
@@ -293,10 +250,11 @@ generate_systemd_unit(){
 			   KEYNAME="/HOSTS/$hostNameSys/control/encoder_primed"; KEYVALUE="1"; write_etcd_global &
 		   fi
 		   if (( new_matches >= 3 )) && (( primedSet = 1 )); then
+		   		echo "		Encoder ready, setting key.."
 			   KEYNAME="/HOSTS/$hostNameSys/control/encoder_ready"; KEYVALUE="1"; write_etcd_global &
 			   break
 		   fi
-	   done; then
+		done; then
 		echo "	Multiple UltraGrid log patterns detected, encoder is encoding!"
 	else
 		# timeout exited non-zero (124 = timed out)
@@ -354,23 +312,21 @@ set_channelIndex(){
 	fi
 
 	# Read the encoder selection, then pull the correct encoder cmdline
-	KEYNAME="/UI/GROUPS/$groupHash/control/activeCodec"; read_etcd_global
-	if [[ -z "$printvalue" ]]; then
-		printvalue="libaom-av1"
+	if [[ -z "${encoderVar:-}" ]]; then
+		KEYNAME="/UI/GROUPS/$groupHash/control/activeCodec"; read_etcd_global
+		if [[ -z "$printvalue" ]]; then printvalue="libaom-av1"; fi
+		KEYNAME="/UI/GLOBALS/CODECS/$printvalue"; read_etcd_global
+		encoderVar="${printvalue%%;*}"
 	fi
-
-	# Get the encoder settings string
-	KEYNAME="/UI/GLOBALS/CODECS/$printvalue"; read_etcd_global
-	encodervar="${printvalue%%;*}"
-	echo "	Found codec commandline: $encodervar"
-	if [[ "$(cat /var/home/wavelet/.config/systemd/user/UltraGrid.Encoder.service)" == *"$encodervar"* ]]; then
+	echo "	Found codec commandline: $encoderVar"
+	if [[ "$(cat /var/home/wavelet/.config/systemd/user/UltraGrid.Encoder.service)" == *"$encoderVar"* ]]; then
 		echo "	Codec has not changed.."
 	else
 		generate_systemd_unit
 	fi
 
 	echo "	Switching encoder to channel ${channelIndex%,*}"
-	response="$(nc -w 1 127.0.0.1 6162 <<<"capture.data ${channelIndex%,*}")" &
+	response="$(nc 127.0.0.1 6162 <<<"capture.data ${channelIndex%,*}")"
 	echo "	Task complete with response code: $response"
 	exit 0
 }
@@ -430,11 +386,11 @@ bannerTextGenerator(){
 
 cleanUpStatusKeys(){
 	# Cleans the encoder key signals on exit
-    KEYNAME="/HOSTS/$hostNameSys/ENCODER_ACTIVE"; delete_etcd_key_global  &
+#    KEYNAME="/HOSTS/$hostNameSys/ENCODER_ACTIVE"; delete_etcd_key_global  &
     KEYNAME="/HOSTS/$hostNameSys/control/encoder_primed"; delete_etcd_key_global  &
     KEYNAME="/HOSTS/$hostNameSys/control/encoder_ready"; delete_etcd_key_global  &
     # We don't know if this is an "OK" situation.
-    KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="OK: ENCODER STOP"; write_etcd_global &
+    KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="OK: LAUNCH SUCCESS"; write_etcd_global &
 }
 
 #####
@@ -458,9 +414,17 @@ for i in "$@"; do
 	case "$i" in
 		*inputHash=*)
 			requestedInputHash="${i#*=}";
+			if [[ -z $requestedInputHash ]]; then
+				echo "	Error:  Input hash value required"
+				exit 0
+			fi
 			;;
 		*groupHash=*)
 			groupHash="${i#*=}";
+			if [[ -z $groupHash ]]; then
+				echo "	Error:  Group hash  value required"
+				exit 0
+			fi
 			;;
 		*netDevIngest=*)
 			networkDeviceInput="${i#*=}";
@@ -489,4 +453,4 @@ if [[ ! -f "/var/home/wavelet/.config/systemd/user/UltraGrid.Reflector.service" 
 	"$WAVELET_REFLECTOR_MOD" "INIT" &
 fi
 
-detect_input_present
+test_newDevice
