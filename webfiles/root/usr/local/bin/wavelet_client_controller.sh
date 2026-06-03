@@ -63,7 +63,7 @@ detect_operation(){
 	# TODO - consider a global dispatch table and a local valkey cache to avoid GRPc call
 	KEYNAME="/HOSTS/$hostNameSys"; read_etcd_global; thisHostHash="$printvalue"
 	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; groupHash="$printvalue"
-	echo "	Host Matching $etcdKey -- $etcdValue"
+	echo -e "	Host Matching:\n		Key: $etcdKey\n		Value: $etcdValue"
 	case $etcdKey in
 		"/UI/HOSTS/$thisHostHash/IP")						exit 0 ;; # nooop
 		"/UI/HOSTS/$thisHostHash")							event_relabel;;
@@ -80,7 +80,7 @@ detect_operation(){
 		"/UI/HOSTS/$thisHostHash/control/updateImage")		regenerate_staticImage;;
 		"/UI/HOSTS/$thisHostHash/control/UIEnable")			toggle_userInterface;;
 		"/UI/HOSTS/$thisHostHash/control/videoSource")		wavelet_run;;
-		*) echo "	No match for this host"; exit 0;; #noop
+		*) echo "	No match for this host hash: $thisHostHash"; exit 0;; #noop
 	esac
 }
 
@@ -667,6 +667,10 @@ event_group_set_video_source() {
 	groupHash="${etcdKey#/UI/GROUPS/}"
 	groupHash="${groupHash%%/*}"
 	get_hosts_in_group
+	echo "	Hosts in group:"
+	for h in "${hostsInGroup[@]}"; do
+		echo "		$h"
+	done
 	if [[ "$etcdValue" =~ ^(0|1|2|3)$ ]]; then
 	    KEYNAME="/UI/GROUPS/$groupHash/control/previousVideoSourceKey"; KEYVALUE="$etcdValue--$etcdValue"; write_etcd_global &
 		unset decoderSubscribecmd
@@ -680,14 +684,19 @@ event_group_set_video_source() {
     	local directMode="${cmdOutput[0]}"
     	local decoderSubType="${cmdOutput[1]}"
     	local decoderSubscribecmd="${cmdOutput[2]}"
-    	echo "Populated base64 commandline: $decoderSubscribecmd, for subType $decoderSubType, with mode: $directMode"
+    	if [[ -n "$decoderSubscribecmd" ]]; then
+    		echo "	Populated base64 commandline: $decoderSubscribecmd, for subType $decoderSubType, with mode: $directMode"
+    	else
+    		echo "	No special decoder commands required.  UltraGrid local source."
+    	fi
     	event_process_group_videoSource_hosts
 	fi
 }
 
 event_get_subscribeStreamCommand(){
    	# Server only
-   	# This returns the correct subscribe stream command for the input device that's been selected
+   	# This returns the correct subscribe stream command for the input device that's been selected --
+   	# If that device is a network device which requires specific inputs
    	# Outputs: decoderSubType decoderSubscribecmd
    	local KEYNAME; local KEYVALUE; local printvalue
 	KEYNAME="/UI/HOSTS/"; read_etcd_prefix_keys
@@ -768,13 +777,14 @@ event_process_group_videoSource_hosts(){
 				EOF
             elif [[ -z "$decoderSubscribecmd" ]]; then
                 # No direct subscription: set explicit inactive state
+                # Note the video source subtype being "static" doesn't mean a the static image option.
                 cat >> "$tempTxn" <<-EOF
 					put "/HOSTS/$deviceHostName/control/videoSourceSubType" "static"
 					put "/HOSTS/$deviceHostName/control/videoSourceDirect" "0"
 					del "/HOSTS/$deviceHostName/VIDEO_SOURCE_CMD"
 				EOF
             else
-                # We are feeding through UltraGrid
+                # We are feeding a network video source through UltraGrid
             	cat >> "$tempTxn" <<-EOF
 					put "/HOSTS/$deviceHostName/control/videoSourceType" "ug"
 					put "/HOSTS/$deviceHostName/control/videoSourceActive" "1"
@@ -1118,7 +1128,7 @@ event_encoder(){
 	# The blank/unblank button controls that function in this context.
 	# We may want to ensure the group mass blank/unblank controls do NOT affect encoders!
     if [[ "$(systemctl --user is-active wavelet_reflector.service 2>/dev/null)" != "active" ]]; then
-        systemctl --user enable --now wavelet_reflector.service
+        systemctl --user enable wavelet_reflector.service --now
     fi
 	echo -e "	Calling wavelet_encoder module with args:\n		$etcdValue\n	$thisHostHash\n		$1\n"
 	KEYNAME="/UI/HOSTS/$thisHostHash/control/blankStatus"; read_etcd_global

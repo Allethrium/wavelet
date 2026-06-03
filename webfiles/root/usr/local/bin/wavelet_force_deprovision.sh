@@ -51,20 +51,23 @@ check_and_wait(){
 	# Checks the deprovision flag is 1, then checks the system deprovision active flag.  If no changes occur in 30s, move to next step.
 	echo "UI deprovision key is set to 1, setting the system deprovision key and waiting"
 	# Get the target host name from our watch key
-	targetHostHash="${ETCD_WATCH_KEY#/UI/HOSTS/*}"
-	targetHostHash="${targetHostHash%%/*}"
-	KEYNAME="/UI/HOSTS/$targetHostHash"; read_etcd_global
+	etcdKey="${ETCD_WATCH_KEY//\"}"
+	etcdValue="${ETCD_WATCH_VALUE//\"}"
+	targetHostKey=${etcdKey%/*}
+	KEYNAME="$targetHostKey"; read_etcd_global
 	if [[ -z "$printvalue" ]]; then
-		echo "	ERROR could not resolve hostname!  Exiting."
-		KEYNAME="/UI/HOSTS/$targetHostHash/control/healthStatus"; KEYVALUE="FTL:  DEPROVISION FAIL"; write_etcd_global
+		echo "	ERROR could not resolve host hash!  Exiting."
+		KEYNAME="$targetHostKey/control/healthStatus"; KEYVALUE="FTL:  DEPROVISION FAILURE!"; write_etcd_global &
 		exit 1
 	fi
-	targetHostName="$printvalue"
-	KEYNAME="/HOSTS/$targetHostName/DEPROVISION_ACTIVE"; KEYVALUE=1; write_etcd_global
+	# We have the host hash and update health status with the current stage of the process
+	targetHostHash="$printvalue"
+	KEYNAME="$targetHostKey/DEPROVISION_ACTIVE"; KEYVALUE=1; write_etcd_global &
+	KEYNAME="$targetHostKey/control/healthStatus"; KEYVALUE="INFO:  DEPROVISIONING"; write_etcd_global &
 	# Check if this host is currently an encoder and running a video signal, if it is, we'll need to reset the group source elsewhere.
-	KEYNAME="/UI/HOSTS/$targetHostHash/inputs/"; read_etcd_prefix_keys
 	KEYNAME="/UI/HOSTS/$targetHostHash/control/GROUP"; read_etcd_global; groupHash="$printvalue"
 	KEYNAME="/UI/HOSTS/$groupHash/control/sourceHash"; read_etcd_global; targetGroupVideoSourceHash="$printvalue"
+	KEYNAME="/UI/HOSTS/$targetHostHash/inputs/"; read_etcd_prefix_keys
 	inputs=()
 	if [[ -n "$printvalue" ]]; then
 		while IFS= read -r line; do
@@ -81,20 +84,13 @@ check_and_wait(){
 	fi
 	# After thirty seconds of giving the host time to clean its own keys up, we step in to remove anything else that may still remain:
 	sleep 30
-    KEYNAME="/HOSTS/$targetHostName/DEPROVISION_ACTIVE"; read_etcd_global
-	if [[ "$printvalue" == 1 ]]; then
-		echo "Deprovision key is still active after thirty seconds, deprovisioning has failed, or the host is nonresponsive."
-		# Remove host UI keys
-		KEYNAME="/UI/HOSTS/$targetHostHash"; delete_etcd_key_prefix_global
-		KEYNAME="/HOSTS/$targetHostName"; delete_etcd_key_prefix_global
-		# Remove host user and roles - needs to call service from wavelet-root for etcd root permissions!
-		destroy_host_role
-		deleteHostFromDomain
-		echo "Host removed from etcd and domain.  Certificates will no longer be valid."
-	else
-		echo "	Host keys not found, host has removed itself."
-		exit 0
-	fi
+	echo "	Cleaning up serverside.."
+	targetHostName="${targetHostKey##*/}"
+	destroy_host_role
+	deleteHostFromDomain
+	KEYNAME="/UI/HOSTS/$targetHostHash"; delete_etcd_key_prefix_global
+	KEYNAME="/HOSTS/$targetHostName"; delete_etcd_key_prefix_global
+	exit 0
 }
 
 execute_etcd_cmd() {
@@ -148,7 +144,7 @@ deleteHostFromDomain() {
 #
 #####
 
-
+set -x
 logName=/var/home/wavelet-root/logs/force_deprovision.log
 exec >> "${logName}" 2>&1
 event_server

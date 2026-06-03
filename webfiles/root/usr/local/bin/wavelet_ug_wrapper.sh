@@ -66,7 +66,13 @@ start_ultragrid(){
 	systemd-notify "READY=1"
 	echo "	UltraGrid AppImage started successfully!"
 	send_keepalive
-	# try init_switch, it will be attempted again once we get a display config in the log.
+	# Wait for UltraGrid window to appear before issuing swaymsg commands
+	waitTimeout=5
+	while ! swaymsg -t get_tree -s "$swaySocket" | jq -e '.nodes[] | select(.app_id? == "uv")' >/dev/null 2>&1; do
+		sleep 0.1
+		waitTimeout=$((waitTimeout - 1))
+		[[ $waitTimeout -le 0 ]] && break
+	done
 	swaymsg -s "$swaySocket" "[app_id=\"uv\"] move container to workspace 2, fullscreen enable"
 	init_switch
     set +x
@@ -78,7 +84,6 @@ send_keepalive(){
 }
 
 init_switch(){
-	set -x
 	local channelIndex
 	local errorMessage
 	printvalue=""
@@ -102,7 +107,6 @@ init_switch(){
 	else
 		echo -e "\033[32m	Switcher initialized, sending channel init!\033[0m" | systemd-cat -t "UltraGrid"
 	fi
-	set +x
 }
 
 netCat(){

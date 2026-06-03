@@ -490,9 +490,10 @@ server_bootstrap(){
 	touch /var/home/wavelet/server_bootstrap_completed
 	# Test the local environment for available codecs
 	event_generate_codecEntries
-	echo "	Server configuration is now complete, bringing services up.."
+	echo "	Server software configuration is now complete, generating initial server host data.."
 	# Server generates host hash and userspace systemd services here
-	hostHash="$(sha256sum <<<"$(cat /proc/sys/kernel/random/uuid)" | tr -d "[:space:]-")"
+	hostHash="$(sha256sum <<<"$(cat /proc/sys/kernel/random/uuid)" | tr -d ' -')"
+	echo "	Generating systemd units.."
 	event_generate_wavelet_ui_service
 	event_clear_devicemap
 	event_generate_reflector
@@ -503,6 +504,7 @@ server_bootstrap(){
 	event_generate_network_device
 	event_generate_host_monitor
 	systemctl --user daemon-reload
+	echo "	Starting systemd units.."
 	systemctl --user start \
 		http-php-pod.service \
 		httpd.service
