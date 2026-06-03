@@ -1889,7 +1889,7 @@ function createDetailMenu(classInstance) {
 
 function updateMenuState(checkbox) {
 	const hash = checkbox.dataset.hash;
-	console.log(`[updateMenuState] Called for hash: ${hash}`);
+	// console.log(`[updateMenuState] Called for hash: ${hash}`);
 	const menu = document.getElementById(`hamburgerMenu_${hash}`);
 	if (!menu) return;
 	const isActive = checkbox.checked;
@@ -1901,7 +1901,7 @@ function updateMenuState(checkbox) {
 		menu.classList.remove('active');
 		menu.style.opacity = '0';
 		menu.style.pointerEvents = 'none';
-		console.log(`[updateMenuState] Closing menu, hiding from interaction`);
+		// console.log(`[updateMenuState] Closing menu, hiding from interaction`);
 	}
 }
 

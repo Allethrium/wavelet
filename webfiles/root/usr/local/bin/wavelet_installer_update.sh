@@ -29,7 +29,7 @@ detect_self(){
 
 event_client(){
 	# retrieves tar.gz from server - note this is the server-prepared archive, not the git archive.
-	wget "https://svr.$(dnsdomainname):8080/ignition/wavelet_files.tar.gz"
+	wget "https://svr.$(dnsdomainname):8443/ignition/wavelet_files.tar.gz"
 	extract_base
 	extract_home && extract_usrlocalbin
 	exit 0
