@@ -279,6 +279,7 @@ generate_systemd_unit(){
 	# once this sequence has gone through we can be reasonably confident we are streaming video from a v4l2 device
 	# note we will need to make additions/mods if we aren't using v4l2 in future, say decklink etc.
 	MATCHES=0
+	local primedSet
 	if timeout 10 journalctl --user -u UltraGrid.Encoder -f 2>/dev/null | \
 	   while IFS= read -r line; do
 		   case "$line" in
@@ -286,11 +287,12 @@ generate_systemd_unit(){
 			   *transmit*FEC*symbol*size*symbols*per*packet*payload*size*) ((new_matches++)) ;;
 			   *V4L2*capture]*frames*in*seconds*=*FPS) ((new_matches++)) ;;
 		   esac
-		   if (( new_matches >= 1 )); then
+		   if (( new_matches >= 1 )) && [[ -z $primedSet ]]; then
 			   primedSet=1
+			   echo "		Encoder primed, setting key.."
 			   KEYNAME="/HOSTS/$hostNameSys/control/encoder_primed"; KEYVALUE="1"; write_etcd_global &
 		   fi
-		   if (( new_matches >= 3 )); then
+		   if (( new_matches >= 3 )) && (( primedSet = 1 )); then
 			   KEYNAME="/HOSTS/$hostNameSys/control/encoder_ready"; KEYVALUE="1"; write_etcd_global &
 			   break
 		   fi
@@ -368,8 +370,8 @@ set_channelIndex(){
 	fi
 
 	echo "	Switching encoder to channel ${channelIndex%,*}"
-	nc -w 1 127.0.0.1 6162 <<<"capture.data ${channelIndex%,*}" &
-	echo "	Task complete"
+	response="$(nc -w 1 127.0.0.1 6162 <<<"capture.data ${channelIndex%,*}")" &
+	echo "	Task complete with response code: $response"
 	exit 0
 }
 

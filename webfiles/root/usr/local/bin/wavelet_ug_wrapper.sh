@@ -62,7 +62,6 @@ start_ultragrid(){
     else
     	binaryPath="/usr/local/bin/ultragrid/squashfs-root/AppRun"
     fi
-    "$binaryPath" "${UG_ARGUMENTS[@]}" > "$UG_LOG_FILE" 2>&1 &
 	systemd-notify "READY=1"
 	echo "	UltraGrid AppImage started successfully!"
 	send_keepalive
@@ -204,7 +203,7 @@ decoder_unSub(){
 	# Send an unsubscribe request to a reflector
 	local channelData; local channelIndex; local channelSourceHash
 	# channelData is compound of index-sourcehash (I.E 4-123456hashvalue)
-	KEYNAME="/HOSTS/$(hostname)/control/channelData"; channelData="$printvalue"
+	KEYNAME="/HOSTS/$(hostname)/control/channelData"; read_etcd_global; channelData="$printvalue"
 	channelIndex="${channelData%%-*}"
 	channelSourceHash="${channelData##*-}"
 	KEYNAME="/HOSTS/$(hostname)/unsubRequest"; KEYVALUE="$channelSourceHash"; write_etcd_global &

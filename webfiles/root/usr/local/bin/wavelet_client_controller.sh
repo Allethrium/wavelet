@@ -761,8 +761,8 @@ event_process_group_videoSource_hosts(){
             local printvalue; local KEYNAME; local deviceHostName
             KEYNAME="/UI/HOSTS/$hostHash"; read_etcd_global
             deviceHostName="$printvalue"
-            local versionKey; versionKey="/HOSTS/$deviceHostName/control/sourceCheckVersion"
-            KEYNAME="$versionKey"; read_etcd_global
+#            local versionKey; versionKey="/HOSTS/$deviceHostName/control/sourceCheckVersion"
+#            KEYNAME="$versionKey"; read_etcd_global
             if [[ -n "$printvalue" ]]; then
                 currentVersion="$printvalue"
             fi
@@ -793,9 +793,9 @@ event_process_group_videoSource_hosts(){
 				EOF
             fi
             # Increment version counter to trigger client re-evaluation
-			local newVersion=$((currentVersion + 1))
+			# local newVersion=$((currentVersion + 1))
+			#put "$versionKey" "$newVersion"
 			cat >> "$tempTxn" <<-EOF
-				put "$versionKey" "$newVersion"
 				put "/UI/HOSTS/$hostHash/control/videoSource" "$etcdValue"
 			EOF
         ) &
@@ -924,7 +924,7 @@ event_change_group(){
    		exit 0
    	fi
    	echo "	Changing client group to hash: $etcdValue"
-   	KEYNAME="/HOSTS/$hostNameSys/control/sourceCheckVersion"; KEYVALUE="$(date +%s)"; write_etcd_global &
+#   	KEYNAME="/HOSTS/$hostNameSys/control/sourceCheckVersion"; KEYVALUE="$(date +%s)"; write_etcd_global &
    	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; KEYVALUE="$etcdValue"; write_etcd_global &
 }
 
@@ -982,7 +982,7 @@ event_delete_group(){
 						;;
 				esac
 			done
-			KEYNAME="/HOSTS/$hostNameSys/control/sourceCheckVersion"; KEYVALUE="$(date +%s)"; write_etcd_global &
+#			KEYNAME="/HOSTS/$hostNameSys/control/sourceCheckVersion"; KEYVALUE="$(date +%s)"; write_etcd_global &
 			KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; KEYVALUE="$etcdValue"; write_etcd_global &
 			wavelet_run
 		fi
@@ -1070,7 +1070,7 @@ run_server(){
 	# Check for input devices
 	KEYNAME="/HOSTS/$hostNameSys/INPUT_DEVICE_PRESENT"; read_etcd_global
 	if [[ "$printvalue" -eq 1 ]]; then
-		echo "      An input device is present on this server, proceeding"
+		echo "	An input device is present on this server, proceeding"
 		# Is this input on this host?
 		KEYNAME="/UI/HOSTS/$thisHostHash/inputs/"; read_etcd_prefix_keys
 		if [[ "$etcdValue" == 0 ]] || [[ "$etcdValue" == 1 ]] || [[ "$etcdValue" == 2 ]]; then
@@ -1078,10 +1078,10 @@ run_server(){
 			exit 0
 		else
             if [[ "$printvalue" != *"$etcdValue"* ]]; then
-                echo "      The requested input device is not present on this server.  Checking for indirect NET devices.."
+                echo "	The requested input device is not present on this server.  Checking for indirect NET devices.."
                 check_ndiDirectMode
             else
-                echo "      The requested input device: $etcdValue is not a static selection, and is present on this server, running encoder."
+                echo "	The requested input device: $etcdValue is not a static selection, and is present on this server, running encoder."
                 event_encoder
             fi
         fi
@@ -1130,7 +1130,7 @@ event_encoder(){
     if [[ "$(systemctl --user is-active wavelet_reflector.service 2>/dev/null)" != "active" ]]; then
         systemctl --user enable wavelet_reflector.service --now
     fi
-	echo -e "	Calling wavelet_encoder module with args:\n		$etcdValue\n	$thisHostHash\n		$1\n"
+	echo -e "	Calling wavelet_encoder module with args:\n		$etcdValue\n	$thisHostHash\n			$1\n"
 	KEYNAME="/UI/HOSTS/$thisHostHash/control/blankStatus"; read_etcd_global
 	if [[ -z "$groupHash" ]]; then
 		KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; groupHash="$printvalue"
