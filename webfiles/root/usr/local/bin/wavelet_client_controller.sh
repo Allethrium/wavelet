@@ -385,7 +385,6 @@ event_relabel(){
 		hostnamectl --pretty hostname "$etcdValue"
 	else
 		echo "		Server cannot be relabeled."
-		KEYNAME="/UI/HOSTS/$thisHostHash/control/label"; KEYVALUE="$hostNameSys"; write_etcd_global &
 	fi
 }
 event_reveal(){

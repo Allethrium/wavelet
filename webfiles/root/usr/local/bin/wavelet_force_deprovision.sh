@@ -49,7 +49,6 @@ event_server(){
 
 check_and_wait(){
 	# Checks the deprovision flag is 1, then checks the system deprovision active flag.  If no changes occur in 30s, move to next step.
-	echo "UI deprovision key is set to 1, setting the system deprovision key and waiting"
 	# Get the target host name from our watch key
 	etcdKey="${ETCD_WATCH_KEY//\"}"
 	etcdValue="${ETCD_WATCH_VALUE//\"}"
@@ -60,6 +59,7 @@ check_and_wait(){
 		KEYNAME="$targetHostKey/control/healthStatus"; KEYVALUE="FTL:  DEPROVISION FAILURE!"; write_etcd_global &
 		exit 1
 	fi
+	echo "UI deprovision key for host $targetHostKey is set to 1, setting the system deprovision key and waiting"
 	# We have the host hash and update health status with the current stage of the process
 	targetHostHash="$printvalue"
 	KEYNAME="$targetHostKey/DEPROVISION_ACTIVE"; KEYVALUE=1; write_etcd_global &

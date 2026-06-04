@@ -38,7 +38,7 @@ IMAGEFILE="$(ls *.iso | head -n1)"
 	embedDir="./ignition_files/"
 	ymlSource="./ignition_files/server_custom.yml"
 	outputIgn="./ignition_files/server.ign"
-	butane --pretty --strict --files-dir "$embedDir" "$ymlSource" --output "$outputIgn"
+	butane --pretty --files-dir "$embedDir" "$ymlSource" --output "$outputIgn"
 
 echo "	Customizing ISO files with Ignition\n"
 	# This will only want to be switched on if we are using an isolated system, it will significantly speed up boot time;

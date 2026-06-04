@@ -294,7 +294,6 @@ generate_device_info() {
 		fi
 	fi
 	unset cardType bus_info serial info
-	set +x
 }
 
 isDevice_input_or_output() {

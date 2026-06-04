@@ -316,7 +316,6 @@ get_ndi_devices(){
 			device="$(awk '{print $1}'<<<"$i")--$(grep -oP '\b(?:\d{1,3}\.){3}\d{1,3}'<<<"$i" | head -n 1)"
 			ndiDevices+=( "$device" )
 	done
-	set +x
 }
 
 check_etcd_env(){

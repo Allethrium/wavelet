@@ -41,7 +41,6 @@ handle_signal() {
 }
 
 start_ultragrid(){
-	set -x
 	# ~/.config/sway/config contains system-level settings for where the UltraGrid window should go
 	# In UI Mode, top-left, in normal mode, fullscreen.
 	# Note that the UG_ARGUMENTS parsed from the client controller are also different here
@@ -74,7 +73,6 @@ start_ultragrid(){
 	done
 	swaymsg -s "$swaySocket" "[app_id=\"uv\"] move container to workspace 2, fullscreen enable"
 	init_switch
-    set +x
 }
 
 send_keepalive(){
