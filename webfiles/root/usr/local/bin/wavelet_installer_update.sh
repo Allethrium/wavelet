@@ -28,10 +28,16 @@ detect_self(){
 
 
 event_client(){
-	# retrieves tar.gz from server - note this is the server-prepared archive, not the git archive.
-	wget "https://svr.$(dnsdomainname):8443/ignition/wavelet_files.tar.gz"
-	extract_base
-	extract_home && extract_usrlocalbin
+	# retrieves git mirror tar.gz from server and extracts directly into system paths.
+	curl -s -L -o "$setupPath/wavelet_files.tar.gz" "https://svr.$(dnsdomainname):8443/ignition/wavelet_files.tar.gz" || {
+		echo "Error downloading wavelet_files.tar.gz from server!"
+		exit 1
+	}
+	mkdir -p "$setupPath/webfiles/root"
+	tar xf "$setupPath/wavelet_files.tar.gz" -C "$setupPath/webfiles/root" --no-same-owner --strip-components=1
+
+	extract_etc && extract_home && extract_usrlocalbin
+	rm -rf "$setupPath/webfiles"
 	exit 0
 }
 
@@ -68,41 +74,35 @@ event_server(){
 	restorecon -R "/var/home/wavelet/http" > /dev/null
 }
 
-extract_base(){
-    # Extracts the prepared wavelet_files.tar.gz - this should only contain three tar.xz archives.
-	tar xf "$setupPath/wavelet_files.tar.gz" -C "$setupPath" --no-same-owner
-	cd "$setupPath/git" || return
-}
-
 extract_etc(){
 	umask 022
-	tar xf "$setupPath/etc.tar.xz" -C ./root/etc --no-same-owner --no-same-permissions
+	cp -an "$setupPath/webfiles/root/etc/"* /etc/ 2>/dev/null || true
 	echo -e "System config files setup successfully..\n"
-	rm -rf "$setupPath/etc.tar.xz"
+	rm -rf "$setupPath/webfiles/root/etc"
 }
 
 extract_home(){
-	tar xf "$setupPath/wavelethome.tar.xz" -C "/var/home"
+	cp -an "$setupPath/webfiles/root/home/"* /var/home/ 2>/dev/null || true
 	chown -R wavelet:wavelet "/var/home/wavelet"
 	chown -R wavelet-root:wavelet-root "/var/home/wavelet-root"
 	chmod 0755 "/var/home/wavelet/http"
 	chmod -R 0755 "/var/home/wavelet/http-php"
 	echo -e "Wavelet homedir setup successfully..\n"
-	rm -rf "$setupPath/wavelethome.tar.xz"
+	rm -rf "$setupPath/webfiles/root/home"
 }
 
 extract_usrlocalbin(){
 	# Save customized files to ensure no overwrite
-	cp /"usr/local/bin/ipa_link_up.sh" /var/tmp
+	cp /usr/local/bin/ipa_link_up.sh /var/tmp
 	umask 022
-	tar xf "$setupPath/usrlocalbin.tar.xz" -C "/usr/local/bin" --no-same-owner
+	cp -an "$setupPath/webfiles/root/usr/local/bin/"* /usr/local/bin/
+	chmod +x "/usr/local/bin"
+	chmod 0755 /usr/local/bin/*
 	if touch "/var/wavelet_ramfs/test.txt"; then
 		cp -af /usr/local/bin/* "/var/wavelet_ramfs"
 	fi
-	chmod +x "/usr/local/bin"
-	chmod 0755 /usr/local/bin/*
-	echo -e "Wavelet application modules setup successfully..\n"
-    rm -rf "$setupPath/usrlocalbin.tar.xz"
+	echo -e "Wavelet application modules setup successfullym ramdrive updated if it exists..\n"
+    rm -rf "$setupPath/webfiles/root/usr/local/bin"
     cp "/var/tmp/ipa_link_up.sh" "/usr/local/bin"
 }
 
