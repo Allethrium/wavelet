@@ -16,12 +16,13 @@ detect_self(){
 }
 
 generate_ipaHost(){
+	local factor2; local binVar; local decryptResult; local otp
 	# Kinit as admin so we can make configuration changes
-	echo "$(cat /var/secrets/ipaadmpw.secure)" | kinit admin
+	cat "/var/secrets/ipaadmpw.secure" | kinit admin
 	# Ping so ensure the IP:MAC is in the ARP table
-	ping "${targetMachineIP}" -c 1
+	ping "$targetMachineIP" -c 1
 	# Get client MAC Address
-	targetMACAddr="$(arp -a | grep "${targetMachineIP}" | awk '{print $4}' | head -n 1)"
+	targetMACAddr="$(arp -a | grep "$targetMachineIP" | awk '{print $4}' | head -n 1)"
 	# Generate the OTP encryption factor by SHA256ing the target IP+MAC (this ought to match a similar process on the target)
 	# In other words, both machines independently generate the password factor
 	# The 'ticket' is valid for an hour - may introduce annoying issues if we run a task at 12:59:59 though!
@@ -34,23 +35,23 @@ generate_ipaHost(){
         echo "Waiting $sleep_seconds seconds until next hour to avoid collision on encryption factor2."
         sleep "$sleep_seconds"
     fi
-	local factor2="$(echo -n $targetMachineIP,$(dnsdomainname),${targetMACAddr^^},$(date +"%H"))"
-	factor2="$(echo $factor2 | sha256sum | cut -d ' ' -f1)"
+	factor2="$targetMachineIP,$(dnsdomainname),${targetMACAddr^^},$(date +"%H"))"
+	factor2="$(sha256sum <<<"$factor2"| cut -d ' ' -f1)"
 	# Add IPA host principal (DNS should be fine here, so we don't need IP addresses)
 	# Since Kea DHCP may not have pushed the "correct" hostname to IPA, we force the host principal creation.
-	local otp="$(ipa host-add $targetHostName --random --force | grep 'Random password: ')"
+	otp="$(ipa host-add "$targetHostName" --random --force | grep 'Random password: ')"
 	# Clean, then Base64 the random password as it may contain escapable chars
-	local otp="${otp#*: }"; local otp="$(echo $otp | base64 -w 0)"
+	otp="${otp#*: }"; otp="$(base64 -w 0 <<<"$otp")"
 	if [[ "$otp" == "Cg==" ]]; then
 		echo "Random OTP password variable is base64 zero, something may have gone wrong with provisioning."
 		echo "Check FreeIPA server logs on server in /var/freeipa-data/var/log for more information."
 		exit 1
 	fi
 	# Generate our base64 encoded binary
-	local binVar="$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass pass:$factor2 - <<< $otp | base64 -w 0)"
-    local decryptResult="$(base64 -d <<< $binVar | openssl enc -d -aes-256-cbc -md sha512 -pbkdf2 -pass pass:$factor2 )"
-    local decryptResult="$(base64 -d <<< "$decryptResult")"
-	if [[ "$decryptResult" == "$(base64 -d <<< "${otp}")" ]]; then
+	binVar="$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass pass:"$factor2" - <<< "$otp" | base64 -w 0)"
+    decryptResult="$(base64 -d <<< "$binVar" | openssl enc -d -aes-256-cbc -md sha512 -pbkdf2 -pass pass:"$factor2 ")"
+    decryptResult="$(base64 -d <<< "$decryptResult")"
+	if [[ "$decryptResult" == "$(base64 -d <<< "$otp")" ]]; then
 		echo "  Password encrypted and tested successfully!"
 	else
 		echo "  Decrypt failed, something is wrong!"
@@ -73,8 +74,8 @@ generate_ipaHost(){
 
 remove_and_retry_enrollment(){
 	# Attempts enrollment a second time, if an initial enrollment had failed.
-	echo "$(cat /var/secrets/ipaadmpw.secure)" | kinit admin
-	ipa host-del $targetHostName
+	cat "/var/secrets/ipaadmpw.secure" | kinit admin
+	ipa host-del "$targetHostName"
 	generate_ipaHost
 }
 

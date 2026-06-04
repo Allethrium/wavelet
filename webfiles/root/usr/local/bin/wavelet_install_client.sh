@@ -52,7 +52,6 @@ request_otp(){
 	# Request domain enrollment OTP from server
 	local domainotprq; local output; local factor2
 	enrollOTP=""
-	found=false
 	ETCD_OTPFILE="$(mktemp)"
 	TMPFILE="$(mktemp)"
 	ETCDCTL_CACERT=""
@@ -76,9 +75,9 @@ request_otp(){
 		echo "	IP Address is empty, attempting to resolve.."
 		myIPAddr="$(hostname -I | xargs)"
 	fi
-	# Start watch service writing to tmpfile
+	# Start watch service writing JSON output to tmpfile for reliable parsing
 	etcdctl --user="ENROLL:$domainotprq" \
-	    watch "/ENROLL/REQUEST/$hostNameSys/OTP" -w simple > "$TMPFILE" 2>&1 &
+	    watch "/ENROLL/REQUEST/$hostNameSys/OTP" -w json > "$TMPFILE" 2>&1 &
 	WATCH_PID=$!
 	echo " Waiting 2 seconds for watch registration..."
 	sleep 2
@@ -87,38 +86,60 @@ request_otp(){
 	echo "	Writing request key at: /ENROLL/REQUEST/$hostNameSys"
 	etcdctl --user "ENROLL:$domainotprq" \
 		put "/ENROLL/REQUEST/$hostNameSys" -- "REQUEST;$myIPAddr" &
-	timeout=30
+
+	timeout=300
+	polling_threshold=101
 	elapsed=0
-	found=0
 	while (( elapsed < timeout )); do
-		if grep -q "^PUT$" "$TMPFILE"; then
-			mapfile -t lines < "$TMPFILE"
-			for ((i=0; i<${#lines[@]}; i++)); do
-				if [[ "${lines[i]}" == "PUT" ]]; then
-					ETCD_WATCH_VALUE="${lines[i+2]}"
-					echo "	Got OTP: $ETCD_WATCH_VALUE"
-					echo "$ETCD_WATCH_VALUE" > "$ETCD_OTPFILE"
-					found=true
-					break 2
-				fi
-			done
-			if [[ "$found" -eq 1 ]]; then
-				kill "$WATCH_PID" 2>/dev/null
-				rm -f "$TMPFILE"
-				return 0
+		# Parse JSON watch output for put events - extract the value field reliably
+		if [[ -s "$TMPFILE" ]]; then
+			ETCD_WATCH_VALUE="$(grep -o '"action":"put"' "$TMPFILE" >/dev/null 2>&1 && \
+			                    grep -o '"value":"[^"]*"' "$TMPFILE" | tail -1 | sed 's/"value":"//;s/"$//' || true)"
+			if [[ -n "$ETCD_WATCH_VALUE" ]]; then
+				echo "	Got OTP via watch: $ETCD_WATCH_VALUE"
+				echo "$ETCD_WATCH_VALUE" > "$ETCD_OTPFILE"
+				break
 			fi
 		fi
-		sleep .5
+
+		# At 10 seconds, if watch hasn't fired, something has gone wrong, but attempt a direct read
+		if (( elapsed >= polling_threshold )) && [[ ! -s "$ETCD_OTPFILE" ]]; then
+			echo "	Watch silent for ${polling_threshold}s, attempting direct poll..."
+			enrollOTP="$(etcdctl --user "ENROLL:$domainotprq" \
+			    get "/ENROLL/REQUEST/$hostNameSys/OTP" --print-value-only 2>/dev/null)"
+			if [[ -n "$enrollOTP" ]]; then
+				echo "	Got OTP via direct poll at ${elapsed}s: $enrollOTP"
+				echo "$enrollOTP" > "$ETCD_OTPFILE"
+				break
+			fi
+		fi
+
+		sleep .1
 		(( elapsed += 1 ))
 	done
+
 	enrollOTP="$(<"$ETCD_OTPFILE")"
-	kill $WATCH_PID 2>/dev/null
+	kill "$WATCH_PID" 2>/dev/null
 	rm -f "$TMPFILE"
-	rm -f "$ETCD_OTPFILE"
+
 	if [[ -z "$enrollOTP" ]]; then
-		echo "	ERROR - OTP Null!"
-		# Retry here?  do something else?
-		exit 1
+		echo "	ERROR - OTP Null after ${timeout}s! Triggering recovery..."
+		# Signal server to destroy and recreate the host account
+		etcdctl --user "ENROLL:$domainotprq" \
+		    put "/ENROLL/REQUEST/$hostNameSys/OTP_RECOVER" "$(hostname)" 2>/dev/null
+		echo "	Recovery signal sent, waiting for re-enrollment..."
+		# Retry the watch/poll cycle once more after recovery signal
+		sleep 5
+		enrollOTP="$(etcdctl --user "ENROLL:$domainotprq" \
+		    get "/ENROLL/REQUEST/$hostNameSys/OTP" --print-value-only 2>/dev/null)"
+		if [[ -n "$enrollOTP" ]]; then
+			echo "	GOT OTP on retry after recovery signal: $enrollOTP"
+			echo "$enrollOTP" > "$ETCD_OTPFILE"
+			request_otp_phase2
+		else
+			echo "	FATAL: Recovery failed, no OTP received."
+			exit 1
+		fi
 	else
 		echo "	Response file written, proceeding.."
 		request_otp_phase2
@@ -133,7 +154,7 @@ request_otp_phase2(){
 	if [[ -z "$output" ]]; then
 		echo "		Return OTP null!  Attempting immediate re-read!"
 		output="$(etcdctl --user "ENROLL:$domainotprq" \
-        	get "/ENROLL/REQUEST/$hostNameSys/OTP "--print-value-only)"
+        	get "/ENROLL/REQUEST/$hostNameSys/OTP" --print-value-only)"
     fi
 	echo "$output" > "$temp_base64"
 	temp_decrypted="$(mktemp)"
