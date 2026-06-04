@@ -35,7 +35,7 @@ generate_ipaHost(){
         echo "Waiting $sleep_seconds seconds until next hour to avoid collision on encryption factor2."
         sleep "$sleep_seconds"
     fi
-	factor2="$targetMachineIP,$(dnsdomainname),${targetMACAddr^^},$(date +"%H"))"
+	factor2="$targetMachineIP,$(dnsdomainname),${targetMACAddr^^},$(date + %H))"
 	factor2="$(sha256sum <<<"$factor2"| cut -d ' ' -f1)"
 	# Add IPA host principal (DNS should be fine here, so we don't need IP addresses)
 	# Since Kea DHCP may not have pushed the "correct" hostname to IPA, we force the host principal creation.
