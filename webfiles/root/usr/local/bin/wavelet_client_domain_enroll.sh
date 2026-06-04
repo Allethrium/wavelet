@@ -35,23 +35,22 @@ generate_ipaHost(){
         echo "Waiting $sleep_seconds seconds until next hour to avoid collision on encryption factor2."
         sleep "$sleep_seconds"
     fi
-	factor2="$targetMachineIP,$(dnsdomainname),${targetMACAddr^^},$(date + %H))"
-	factor2="$(sha256sum <<<"$factor2"| cut -d ' ' -f1)"
+	factor2="$(echo -n "$targetMachineIP","$(dnsdomainname)","${targetMACAddr^^}","$(date +"%H")")"
+	factor2="$(echo "$factor2" | sha256sum | cut -d ' ' -f1)"
 	# Add IPA host principal (DNS should be fine here, so we don't need IP addresses)
 	# Since Kea DHCP may not have pushed the "correct" hostname to IPA, we force the host principal creation.
 	otp="$(ipa host-add "$targetHostName" --random --force | grep 'Random password: ')"
 	# Clean, then Base64 the random password as it may contain escapable chars
-	otp="${otp#*: }"; otp="$(base64 -w 0 <<<"$otp")"
+	otp="${otp#*: }"; otp="$(echo -n "$otp" | base64 -w 0)"
 	if [[ "$otp" == "Cg==" ]]; then
 		echo "Random OTP password variable is base64 zero, something may have gone wrong with provisioning."
 		echo "Check FreeIPA server logs on server in /var/freeipa-data/var/log for more information."
 		exit 1
 	fi
 	# Generate our base64 encoded binary
-	binVar="$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass pass:"$factor2" - <<<"$otp" | base64 -w 0)"
-    decryptResult="$(base64 -d <<< "$binVar" | openssl enc -d -aes-256-cbc -md sha512 -pbkdf2 -pass pass:"$factor2")"
-    decryptResult="$(base64 -d <<< "$decryptResult")"
-	if [[ "$decryptResult" == "$(base64 -d <<< "$otp")" ]]; then
+	binVar="$(printf '%s' "$otp" | openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass pass:"$factor2" | base64 -w 0)"
+	decryptResult="$(echo -n "$binVar" | base64 -d | openssl enc -d -aes-256-cbc -md sha512 -pbkdf2 -pass pass:"$factor2")"
+	if [[ "$decryptResult" == "$otp" ]]; then
 		echo "  Password encrypted and tested successfully!"
 	else
 		echo "  Decrypt failed, something is wrong!"
