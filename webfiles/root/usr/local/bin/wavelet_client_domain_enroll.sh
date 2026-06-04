@@ -48,8 +48,8 @@ generate_ipaHost(){
 		exit 1
 	fi
 	# Generate our base64 encoded binary
-	binVar="$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass pass:"$factor2" - <<< "$otp" | base64 -w 0)"
-    decryptResult="$(base64 -d <<< "$binVar" | openssl enc -d -aes-256-cbc -md sha512 -pbkdf2 -pass pass:"$factor2 ")"
+	binVar="$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass pass:"$factor2" - <<<"$otp" | base64 -w 0)"
+    decryptResult="$(base64 -d <<< "$binVar" | openssl enc -d -aes-256-cbc -md sha512 -pbkdf2 -pass pass:"$factor2")"
     decryptResult="$(base64 -d <<< "$decryptResult")"
 	if [[ "$decryptResult" == "$(base64 -d <<< "$otp")" ]]; then
 		echo "  Password encrypted and tested successfully!"
