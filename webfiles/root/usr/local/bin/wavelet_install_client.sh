@@ -66,7 +66,7 @@ request_otp(){
         sleep "$sleep_seconds"
     fi
 	factor2="$(echo -n "$myIPAddr","$(dnsdomainname)","${myMACAddr^^}","$(date +"%H")")"
-	factor2="$(echo "$factor2" | sha256sum | cut -d ' ' -f1)"
+	factor2="$(echo "$factor2" | sha256sum | tr -d ' -')"
 	# Initiate domain enrollment request by accessing the etcd key with our preprovisioned enrollment pw.
 	domainotprq="$(cat /var/root/secrets/enrollpw)"
 	export ETCDCTL_CACERT="/var/home/wavelet/config/ca.crt"

@@ -874,7 +874,7 @@ event_set_directMode(){
 event_create_group(){
 	# Generate a new group hash
 	# Check that this hash doesn't already exist (REALLY small chance of a collision but.. why not)
-	local newGroupHash; newGroupHash="$(sha256sum < /proc/sys/kernel/random/uuid | cut -d ' ' -f1)"
+	local newGroupHash; newGroupHash="$(sha256sum < /proc/sys/kernel/random/uuid | tr -d ' -')"
 	# Declare vars locally
 	local KEYNAME
 	local KEYVALUE
