@@ -148,7 +148,7 @@ start_timer() {
 }
 
 stop_timer() {
-	local timer_id; local end_time; local start_time; local timer_duration
+	local timer_id; local end_time; local start_time; timer_duration=""
     timer_id="${1:-}"
     if [[ -z "$timer_id" ]]; then
         return 0
@@ -161,7 +161,7 @@ stop_timer() {
 }
 
 get_timer_elapsed() {
-	local timer_id; local start_time; local now
+	timer_id=""; local start_time; local now
     timer_id="${1:-}"
     if [[ -z "$timer_id" ]] || [[ -z "${timer_start_times[$timer_id]:-}" ]]; then
         echo "0"

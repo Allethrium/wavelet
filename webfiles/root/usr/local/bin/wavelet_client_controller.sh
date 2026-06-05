@@ -669,7 +669,7 @@ event_group_set_video_source() {
 	groupHash="${etcdKey#/UI/GROUPS/}"
 	groupHash="${groupHash%%/*}"
 	get_hosts_in_group
-	echo "	Hosts in group:"
+	echo "	Hosts in group (hash value):"
 	for h in "${hostsInGroup[@]}"; do
 		echo "		$h"
 	done
@@ -700,19 +700,20 @@ event_get_subscribeStreamCommand(){
    	# This returns the correct subscribe stream command for the input device that's been selected --
    	# If that device is a network device which requires specific inputs
    	# Outputs: decoderSubType decoderSubscribecmd
-   	local KEYNAME; local KEYVALUE; local printvalue
+   	local KEYNAME; local KEYVALUE; local printvalue; local deviceHostName; local hostIP
 	if [[ -n "${_inputDeviceMap[$etcdValue]:-}" ]]; then
 		hostSourceKey="${_inputDeviceMap[$etcdValue]}"
 	else
 		return 1
 	fi
 	KEYNAME="$hostSourceKey"; read_etcd_global; hostSourceData="$printvalue"
-	hostUIKey="${hostSourceKey%/inputs/*}"
+#	hostUIKey="${hostSourceKey%/inputs/*}"
+	# Generate the device fields hostSourceData - note ordering
+	hostIP="${hostSourceData%;*}"
+	deviceHostName="${hostIP#*;}"
+	hostIP="${hostIP%%;*}"
+	deviceHostName="${deviceHostName%%;*}.$(dnsdomainname)"
 	if [[ "$hostSourceData" == *"NDI"* ]] || [[ "$hostSourceData" == *"RTSP"* ]]; then
-		if [[ -z "$printvalue" ]]; then
-			KEYNAME="$hostUIKey/IP"; read_etcd_global
-			deviceHostName="$printvalue.$(dnsdomainname)"
-		fi
 		# Check directMode in the HOSTS prefix (not UI)
 		KEYNAME="/HOSTS/$deviceHostName/control/directMode"; read_etcd_global
 		local directMode="$printvalue"
@@ -921,6 +922,7 @@ event_change_group(){
    	fi
    	if [[ -z "$groupHash" ]]; then
    		# Restore the host to the primary group because something went wrong.
+   		echo "		No groupHash populated, resetting to server group.."
 		KEYNAME="/GROUPS/$(cat /var/home/wavelet/config/serverhostname.txt)"; read_etcd_global; etcdValue="$printvalue"
    		# Write the group key back and let the server orchestrator update the UI.
    	fi

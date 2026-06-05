@@ -224,7 +224,7 @@ populate_to_etcd(){
 	echo "	Populating ETCD with discovery data.."
 	# Packed format $HASH -- IP;DEVICE_LABEL(attempts to set the device hostname!);MAC;type
 	interfaceEntry="$ipAddr;$deviceHostName;$macAddr;$type;$subType"
-	KEYNAME="/HOSTS/$deviceHostName$(dnsdomainname)/MAC"; read_etcd_global
+	KEYNAME="/HOSTS/$deviceHostName.$(dnsdomainname)/MAC"; read_etcd_global
 	if [[ "$printvalue" == "${macAddr^^}" ]]; then
 		# The device already exists.
 		KEYNAME="/UI/HOSTS/$printvalue/inputs/"; read_etcd_prefix_global
