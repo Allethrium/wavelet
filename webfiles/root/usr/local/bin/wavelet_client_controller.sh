@@ -538,7 +538,7 @@ toggle_userInterface() {
 		rm -rf "/var/home/wavelet/config/webui.enabled"
         workspace=""
 		systemctl --user disable wavelet_ui.service --now --no-block
-        if [[ "$hostNameSys" == *"svr" ]]; then
+        if [[ "$hostNameSys" == *"svr"* ]]; then
         	echo "	This is the server, setting workspace to 1."
         	workspace=1
         	noDecoderWindow=true
@@ -1233,8 +1233,9 @@ run_decoder(){
 		KEYNAME="/UI/GROUPS/$groupHash/control/sourceHash"; read_etcd_global
 		etcdValue="$printvalue"
 		if [[ -z "$etcdValue" ]]; then
-			# default to splash
-			etcdValue=1
+			# default to initial static splash image
+			etcdValue=1; channel=1
+			KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; KEYVALUE="$channel-$etcdValue"; write_etcd_global &
 		fi
 	fi
 	echo "	Video Source Subtype: $videoSourceSubType"
@@ -1244,6 +1245,7 @@ run_decoder(){
    		channel="$etcdValue"
    	elif [[ "$videoSourceSubType" == "NDI" ]] || [[ "$videoSourceSubType" == "RTSP" ]]; then
    		# We should have a video source command
+   		# However if this is the first run, we have a problem because it won't be set at all..
    		videoSourceCmd=$(grep -A1 "/HOSTS/$hostNameSys/VIDEO_SOURCE_CMD" <<<"$thisHostKeys" | tail -n1 | base64 -d)
    		if [[ -z "$videoSourceCmd" ]]; then
    			# Fallback to etcd read (slower)

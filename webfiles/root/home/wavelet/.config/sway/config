@@ -37,8 +37,8 @@ blur_noise .13
 blur_radius 8
 corner_radius 9
 
-shadows enable
-shadow_blur_radius 8
+shadows disable
+shadow_blur_radius 4
 #shadow_inactive_color #00000000
 
 default_dim_inactive 0.2

@@ -352,6 +352,7 @@ event_change_group(){
 		triggerValue="$primaryGroup"
 	fi
 	echo "	Updating host to new group environment: $triggerValue"
+	KEYNAME="/HOSTS/$keyHostName/type"; read_etcd_global; hostType="$printvalue"
 	KEYNAME="/UI/GROUPS/$triggerValue"; read_etcd_prefix_list; groupKeys="$printvalue"
 	echo "	Group Keys:"
 	echo "$groupKeys"
@@ -398,6 +399,10 @@ put /UI/HOSTS/$hostHash/control/videoSource \"$groupSourceHash\"
 
 "
 	write_etcd_txn "$KEYDATA" &
+	# For decoders switching groups, resolve the new group's source just like new_host() does.
+	if [[ "$hostType" != *"svr"* ]] && [[ -n "$groupSourceHash" ]]; then
+		resolve_group_source_for_host "$keyHostName" "$hostHash" "$groupSourceHash"
+	fi
 }
 
 event_control_update() {
@@ -517,6 +522,72 @@ put /UI/HOSTS/$hostHash/control/videoSource \"$groupVideoSource\"
 	KEYNAME="/UI/HOSTS/$hostHash/newHost"; KEYVALUE="1"; write_etcd_global &
 	# Update input devices
     input_device_update
+	# For decoders, resolve the group's video source and populate decoder-side keys.
+	if [[ "$hostType" != *"svr"* ]] && [[ -n "$groupVideoSource" ]]; then
+		resolve_group_source_for_host "$keyHostName" "$hostHash" "$groupVideoSource"
+	fi
+}
+
+# Replicates the resolution logic from event_process_group_videoSource_hosts() but for a single new host.
+resolve_group_source_for_host(){
+	local targetHost="$1"
+	local targetHostHash="$2"
+	local sourceHash="$3"
+	if [[ "$sourceHash" =~ ^(0|1|2|3)$ ]]; then
+		# Static input - no special keys needed; run_decoder handles this via sourceHash directly
+		return 0
+	else
+		# Look up the input device matching this source hash across all hosts' UI inputs
+		local foundInputKey=""
+		KEYNAME="/UI/HOSTS/"; read_etcd_prefix_keys || true
+		while IFS= read -r line; do
+			if [[ "$line" == */inputs/"$sourceHash"* ]]; then
+				foundInputKey="$line"
+				break
+			fi
+		done <<<"$printvalue"
+		if [[ -z "$foundInputKey" ]]; then
+			# Source not found, default to static (mirrors run_decoder fallback)
+			return 0
+		fi
+		KEYNAME="$foundInputKey"; read_etcd_global || true
+		local sourceData="$printvalue"
+		if [[ "$sourceData" == *"NDI"* ]] || [[ "$sourceData" == *"RTSP"* ]]; then
+			# Network device - resolve stream command (mirrors event_get_subscribeStreamCommand)
+			local srcIP="${sourceData%;*}"
+			local srcHost="${srcIP#*;}"
+			srcIP="${srcIP%%;*}"
+			srcHost="${srcHost%%;*}.$(dnsdomainname)"
+			KEYNAME="/HOSTS/$srcHost/control/directMode"; read_etcd_global || true
+			local directMode="$printvalue"
+			if [[ "$directMode" == "1" ]]; then
+				# Direct mode - use subscribeStream command from the source device
+				KEYNAME="/HOSTS/$srcHost/subType"; read_etcd_global || true
+				local subType="$printvalue"
+				KEYNAME="/HOSTS/$srcHost/uv_stream_cmd/subscribeStream"; read_etcd_global || true
+			else
+				# Indirect mode - use inputStream from the encoder on the source host (mirrors event_get_subscribeStreamCommand)
+				subType="UG"
+				KEYNAME="/HOSTS/$srcHost/uv_encode_cmd/inputStream"; read_etcd_global || true
+			fi
+			local streamCmd="$printvalue"
+			if [[ -n "$streamCmd" ]]; then
+				local encodedCmd="$(printf '%s' "$streamCmd" | base64)"
+				KEYNAME="/HOSTS/$targetHost/control/videoSourceType"; KEYVALUE="network"; write_etcd_global &
+				KEYNAME="/HOSTS/$targetHost/control/videoSourceActive"; KEYVALUE="1"; write_etcd_global &
+				KEYNAME="/HOSTS/$targetHost/control/videoSourceSubType"; KEYVALUE="$subType"; write_etcd_global &
+				KEYNAME="/HOSTS/$targetHost/VIDEO_SOURCE_CMD"; KEYVALUE="$encodedCmd"; write_etcd_global &
+			else
+				# No stream command available, fall back to UG mode (mirrors event_process_group_videoSource_hosts else branch)
+				KEYNAME="/HOSTS/$targetHost/control/videoSourceType"; KEYVALUE="ug"; write_etcd_global &
+				KEYNAME="/HOSTS/$targetHost/control/videoSourceActive"; KEYVALUE="1"; write_etcd_global &
+				KEYNAME="/HOSTS/$targetHost/control/videoSourceSubType"; KEYVALUE="ug"; write_etcd_global &
+			fi
+		else
+			# Local input - no special keys needed; run_decoder handles this via sourceHash directly
+			return 0
+		fi
+	fi
 }
 
 audio_toggle(){
