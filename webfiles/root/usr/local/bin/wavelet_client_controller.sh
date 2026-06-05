@@ -1015,13 +1015,13 @@ get_ipValue(){
 			fi
 		done < <(nmcli -g UUID con show --active)
 	fi
-	# Validate the IP address
+	# Null value guard
 	if [[ -z "$ipValue" || "$ipValue" == "--" ]]; then
-		echo -e "			No valid IP address found, sleeping and retrying...\n"
-		sleep .25
-		get_ipValue
+		echo -e "			No valid IP address found, using alternative approach.....\n"
+		ipValue="$(ip -4 route get 1 | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' | head -n1)"
 		return
 	fi
+	# Validate
 	if valid_ipv4 "$ipValue"; then
 		echo -e "			IP Address is valid: $ipValue, continuing.."
 		KEYNAME="/HOSTS/$hostNameSys/IP"; KEYVALUE="$ipValue"; write_etcd_global &
@@ -1033,6 +1033,7 @@ get_ipValue(){
 }
 
 get_ipValue_quick(){
+	# Doesn't seem so reliable
 	ipValue="$(hostname -I | xargs)"
 	KEYNAME="/HOSTS/$hostNameSys/IP"; KEYVALUE="$ipValue"; write_etcd_global &
 }
@@ -1064,7 +1065,8 @@ run_server(){
 	if [[ "$printvalue" -eq 1 ]]; then
 		echo "	An input device is present on this server, proceeding"
 		# Is this input on this host?
-		KEYNAME="/UI/HOSTS/$thisHostHash/inputs/"; read_etcd_prefix_keys
+		KEYNAME="/HOSTS/$hostNameSys"; read_etcd_global; serverHostHash="$printvalue"
+		KEYNAME="/UI/HOSTS/$serverHostHash/inputs/"; read_etcd_prefix_keys
 		if [[ "$etcdValue" == 0 ]] || [[ "$etcdValue" == 1 ]] || [[ "$etcdValue" == 2 ]]; then
 			# The requested input device is a static.  Taking no further action
 			exit 0
@@ -1084,12 +1086,17 @@ run_server(){
 }
 
 check_ndiDirectMode() {
-	# Interrogate the selected device hash to see if its parent host is in directMode.  If so, we start a UG encoder stream.
+	# Interrogate the selected device hash to see if its parent host is in directMode.  If so, clients subscribe directly.
 	if [[ -z "${_inputDeviceMap[$etcdValue]:-}" ]]; then
 		echo "	Input device $etcdValue not found in cache."
 		exit 0
 	fi
 	local hostKey="${_inputDeviceMap[$etcdValue]}"
+	KEYNAME="$hostKey"; read_etcd_global; hostSourceData="$printvalue"
+	if [[ "$hostSourceData" != *"NDI"* ]] && [[ "$hostSourceData" != *"RTSP"* ]]; then
+		echo "	Input device $etcdValue is not a network device (type: $hostSourceData). Skipping."
+		exit 0
+	fi
 	local hostHash="${hostKey#/UI/HOSTS/}"
 	hostHash="${hostHash%%/*}"
 	local targetHostName="${_hostNameMap[$hostHash]:-}"
@@ -1100,15 +1107,13 @@ check_ndiDirectMode() {
 	KEYNAME="/HOSTS/$targetHostName/control/directMode"; read_etcd_global
 	echo "directMode for device is $printvalue"
 	if [[ "$printvalue" == 1 ]]; then
-		# The NDI device is in direct mode and we shouldn't do anything more.
+		# The NDI device is in direct mode and clients subscribe directly.
 		exit 0
 	else
 		# We regenerate our encoder process and handle this as an UltraGrid input
-		if [[ -n "$targetHostName" ]]; then
-			KEYNAME="/HOSTS/$targetHostName/uv_encode_cmd/inputStream"; read_etcd_global
-			echo "		NDI Device set to indirect mode!  Adding UltraGrid encoder argument (base64): $printvalue"
-			event_encoder "$printvalue"
-		fi
+		KEYNAME="/HOSTS/$targetHostName/uv_encode_cmd/inputStream"; read_etcd_global
+		echo "		NDI Device set to indirect mode!  Adding UltraGrid encoder argument (base64): $printvalue"
+		event_encoder "$printvalue"
 	fi
 }
 
