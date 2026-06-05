@@ -910,16 +910,21 @@ put \"$BASEKEYNAME/control/swatchValue\" \"#0f2b39\"
 
 event_change_group(){
 	# Runs on host
-   	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; groupHash="$printvalue"
-   	if [[ -z "$groupHash" ]]; then
-   		KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; KEYNAME="$etcdValue"; write_etcd_global &
+	KEYNAME=""; KEYVALUE=""
+   	if [[ "$hostNameSys" == *"svr"* ]]; then
+   		echo "		The server may not change groups from the primary group."
    		exit 0
-   	elif [[ "$etcdValue" == "$groupHash" ]]; then
+	fi
+   	if [[ "$etcdValue" == "$groupHash" ]]; then
    		echo "      Group value was updated to the same value as current group membership, doing nothing."
    		exit 0
    	fi
+   	if [[ -z "$groupHash" ]]; then
+   		# Restore the host to the primary group because something went wrong.
+		KEYNAME="/GROUPS/$(cat /var/home/wavelet/config/serverhostname.txt)"; read_etcd_global; etcdValue="$printvalue"
+   		# Write the group key back and let the server orchestrator update the UI.
+   	fi
    	echo "	Changing client group to hash: $etcdValue"
-#   	KEYNAME="/HOSTS/$hostNameSys/control/sourceCheckVersion"; KEYVALUE="$(date +%s)"; write_etcd_global &
    	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; KEYVALUE="$etcdValue"; write_etcd_global &
 }
 

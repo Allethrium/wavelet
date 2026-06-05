@@ -12,6 +12,12 @@ else
 	ETCDINTERACTIONMOD="/usr/local/bin/etcd_interaction_hooks.sh"
 fi
 
+binaryPath
+if [[ -f "/var/wavelet_ramfs/ultragrid/squashfs-root/AppRun" ]]; then
+	binaryPath="/var/wavelet_ramfs/ultragrid/squashfs-root/AppRun"
+else
+	binaryPath="/usr/local/bin/ultragrid/squashfs-root/AppRun"
+fi
 
 cleanup(){
     local sig="${1:-EXIT}"
@@ -46,21 +52,27 @@ start_ultragrid(){
 	# Note that the UG_ARGUMENTS parsed from the client controller are also different here
     timeout=5
     rm -f /var/home/wavelet/config/errorState.flag
+    "$binaryPath" "${UG_ARGUMENTS[@]}" > /var/home/wavelet/logs/ugDirect.log 2>&1 &
+    UG_PID=$!
+    if [[ -z "$swaySocket" ]]; then
+        local runtimeDir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+        for sock in "${runtimeDir}"/sway-ipc.*.sock; do
+            # Verify it's a socket and that sway is actually responding on it
+            if [[ -S "$sock" ]] && swaymsg -s "$sock" -t get_tree >/dev/null 2>&1; then
+                swaySocket="$sock"
+                break
+            fi
+        done
+    fi
     # Get sway socket and move the UltraGrid window to workspace 2 (2nd monitor if one exists, or 2nd workspace on primary monitor)
-	swaySocket="$(ls "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/sway-ipc.*.sock 2>/dev/null | xargs -I{} sh -c 'swaymsg -s {} -t get_tree >/dev/null 2>&1 && echo {}')"
-    [[ -z "$swaySocket" ]] && swaySocket="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+	swaymsg -t get_tree | jq '.nodes[] | select(.name? == "uv")'
     while ! swaymsg -t get_tree -s "$swaySocket" | jq -e '.nodes[] | select(.name? == "2")' >/dev/null 2>&1; do
 		sleep 0.1
 		timeout=$((timeout - 1))
 		[[ $timeout -le 0 ]] && break
 	done
+	[[ -z "$swaySocket" ]] && swaySocket="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
     swaymsg -s "$swaySocket" workspace 2
-    local binaryPath
-    if [[ -f "/var/wavelet_ramfs/ultragrid/squashfs-root/AppRun" ]]; then
-    	binaryPath="/var/wavelet_ramfs/ultragrid/squashfs-root/AppRun"
-    else
-    	binaryPath="/usr/local/bin/ultragrid/squashfs-root/AppRun"
-    fi
 	systemd-notify "READY=1"
 	echo "	UltraGrid AppImage started successfully!"
 	send_keepalive
@@ -108,8 +120,9 @@ init_switch(){
 
 netCat(){
     # Simple function to submit data to netcat
-    echo "Running:  nc -w 1 127.0.0.1 $port <<<$controlPortCmd"
-    response="$(nc -w 1 127.0.0.1 "$port" <<<"$controlPortCmd")"
+    echo "Running:  nc 127.0.0.1 $port <<<$controlPortCmd"
+    response="$(nc 127.0.0.1 "$port" <<<"$controlPortCmd")"
+    echo -e "Netcat response:\n$response"
     NC_PID=$!
 }
 

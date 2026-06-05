@@ -3218,9 +3218,12 @@ async function handleHostEvents(event) {
 						rebootStatus: hostItem.controls?.rebootStatus || "0",
 						resetStatus: hostItem.controls?.resetStatus || "0",
 						revealStatus: hostItem.controls?.revealStatus || "0",
-						healthStatus: hostItem.controls?.healthStatus || "0",
+						healthStatus: hostItem.controls?.healthStatus || "OK",
 						GROUP: hostItem.controls?.GROUP || null,
-						directMode: hostItem.controls?.directMode ?? "1"
+						directMode: hostItem.controls?.directMode ?? "1",
+						UIEnable: hostItem.controls?.UIEnable ?? "0",
+						screencastCapable: hostItem.controls?.screencastCapable ?? "0",
+						promote: hostItem.controls?.promote ?? "0"
 					}
 				};
 				const newHostInstance = new Host(hostData);
@@ -3388,9 +3391,12 @@ async function handleInputEvents(event) {
 							rebootStatus: hostItem.controls?.rebootStatus || "0",
 							resetStatus: hostItem.controls?.resetStatus || "0",
 							revealStatus: hostItem.controls?.revealStatus || "0",
-							healthStatus: hostItem.controls?.healthStatus || "0",
+							healthStatus: hostItem.controls?.healthStatus || "OK",
 							GROUP: hostItem.controls?.GROUP || null,
-							directMode: hostItem.controls?.directMode ?? "1"
+							directMode: hostItem.controls?.directMode ?? "1",
+							UIEnable: hostItem.controls?.UIEnable ?? "0",
+							screencastCapable: hostItem.controls?.screencastCapable ?? "0",
+							promote: hostItem.controls?.promote ?? "0"
 						}
 					};
 					hostInstance = new Host(hostData);

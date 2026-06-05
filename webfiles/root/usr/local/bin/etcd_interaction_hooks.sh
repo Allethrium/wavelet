@@ -89,6 +89,7 @@ delete_etcd_key_prefix_global(){
 }
 generate_service(){
 	# Can be called with more args with "generate_service" "$keyToWatch" 0 0 "$serviceName"
+	# serviceName populated in parent shall and parsed down
 	"$targetFile" "generate_service" "$serviceName"
 }
 
@@ -118,51 +119,22 @@ valid_ipv4() {
 }
 
 generate_errorDisplay(){
-	# We may wish to change this to mako-based transient error messages.
 	if [[ -z "$1" ]]; then
 		exit 0
 	fi
-	local staticImageFile="/var/home/wavelet/config/errorDisplay.png"
-	color="rgba(20, 20, 20, 128)"  # 50% transparent (alpha=128/255)
-	# Get our current desktop resolution
-	swaySocket="$(ls "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/sway-ipc.*.sock 2>/dev/null | xargs -I{} sh -c 'swaymsg -s {} -t get_tree >/dev/null 2>&1 && echo {}')"
-	output_info="$(swaymsg -t -s "$swaySocket" get_outputs -r | jq -r '.[0].rect | {width, height}')"
-	local screen_width; local screen_height
-	screen_width=$(echo "$output_info" | jq -r '.width')
-    screen_height=$(echo "$output_info" | jq -r '.height')
-	local imgWidth=$(( screen_width * 80 / 100 ))
-	local imgHeight=$(( screen_height * 50 / 100 ))
-	local xPos=$(( screen_width / 2 - imgWidth / 2 ))
-	local yPos=$(( screen_height / 3 ))
-	# Uses swayImg to throw up an error whilst the UG window is busy or inoperable
-	if [[ ! -f "$staticImageFile" ]]; then
-		magick \
-			-size 800x50 \
-			-background black \
-			-fill white \
-			-pointsize 32 \
-			-gravity NorthWest \
-			xc:"rgb(30,30,30)" \
-			\( -size 800x200 label:"W Δ V E L E T | ERR: $1" \) \
-			-composite \
-			-colorspace RGB "$staticImageFile"
-	fi
-	swayimg "$staticImageFile" & sleep .5
-    swaymsg -s "$swaySocket" "[app_id=\"swayimg\"] floating enable, fullscreen disable, move container to position -200 -300"
-    SWAYIMG_PID=$!
-	local swayimg_pid=$!
+	notify-send -u critical -a "Wavelet Error" -r "$(( RANDOM % 1000 + 9000 ))" \
+		-h string:x-mako-align:center \
+		"WAVELET ERROR" "$1" &
+	notifyPID=$!
 	KEYNAME="/HOSTS/$(hostname)/controls/healthStatus"; KEYVALUE="$1"; write_etcd_global
-	while [[ -f /var/home/wavelet/config/errorState.flag ]]; do
-		if [[ -f "$staticImageFile" ]]; then
-			kill -HUP "$swayimg_pid" 2>/dev/null || true
-		fi
-		sleep .1
+	while [[ -f "/var/home/wavelet/config/errorState.flag" ]]; do
+		sleep .5
 	done
-	kill "$swayimg_pid" 2>/dev/null || true
+	kill "$notifyPID" 2>/dev/null || true
 }
 
 generate_timer_id(){
-	echo "timer_"$(cat /proc/sys/kernel/random/uuid | tr -d '-')""
+	echo "timer_$(tr -d '-' </proc/sys/kernel/random/uuid)"
 }
 
 start_timer() {
@@ -176,34 +148,37 @@ start_timer() {
 }
 
 stop_timer() {
-    local timer_id="${1:-}"
+	local timer_id; local end_time; local start_time; local timer_duration
+    timer_id="${1:-}"
     if [[ -z "$timer_id" ]]; then
         return 0
     fi
-    local end_time=$(date +%s.%N)
-    local start_time=${timer_start_times[$timer_id]:-$end_time}
+    end_time=$(date +%s.%N)
+    start_time=${timer_start_times[$timer_id]:-$end_time}
     timer_duration=$(echo "$end_time - $start_time" | bc)
     unset 'timer_start_times[$timer_id]'
     unset 'timer_running_flags[$timer_id]'
 }
 
 get_timer_elapsed() {
-    local timer_id="${1:-}"
+	local timer_id; local start_time; local now
+    timer_id="${1:-}"
     if [[ -z "$timer_id" ]] || [[ -z "${timer_start_times[$timer_id]:-}" ]]; then
         echo "0"
         return 0
     fi
-    local start_time=${timer_start_times[$timer_id]}
-    local now=$(date +%s.%N)
+    start_time=${timer_start_times[$timer_id]}
+    now=$(date +%s.%N)
     echo "$now - $start_time" | bc
 }
 
 time_operation() {
-    local label="$1"
+	local label; local start; local end; local duration
+    label="$1"
     shift
-    local start=$(date +%s.%N)
+    start=$(date +%s.%N)
     "$@"
-    local end=$(date +%s.%N)
-    local duration=$(echo "$end - $start" | bc)
+    end=$(date +%s.%N)
+    duration=$(echo "$end - $start" | bc)
     echo "		[$label] took $duration" >&2
 }
