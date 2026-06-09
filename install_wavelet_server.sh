@@ -230,6 +230,7 @@ customization(){
 	echo "      Appending remaining keys to wavelet_keys.csv.."
 	# Build WiFi entries only if WiFi mode is enabled
 	wifiEntries=""
+	noWifiFlag=""
 	if [[ "${enableWifi}" == "1" ]]; then
 		wifiEntries="file,/var/home/wavelet/config/wifi_ssid,0600,true,,,${wifi_ssid}
 file,/var/home/wavelet/config/wifi_bssid,0600,true,,,${wifi_bssid}
@@ -237,11 +238,14 @@ file,/var/home/wavelet/config/wifi_pw,0600,true,,,${wifi_password}
 file,/var/home/wavelet-root/config/wifi_adminuser,0640,true,,,${wifi_deviceUser}
 file,/var/home/wavelet-root/config/wifi_adminpw,0640,true,,,${wifi_devicePassword}
 file,/var/home/wavelet-root/config/wifi_ipaddr,0640,true,,,${wifi_ipAddr}"
+	else
+		noWifiFlag="file,/var/no.wifi,0644,true,,,true"
 	fi
 cat >> ./ignition_files/wavelet_keys.csv << EOF
 file,${modeFilePath},0644,,,,enabled
 file,/etc/systemd/logind.conf.d/inhibit-suspend.conf,0644,,,,[Login]\nHandleLidSwitch=ignore
 file,/var/secrets/ipaadmpw.secure,0600,true,,,${DOMAIN_ADMIN_PASSWORD:-DomainAdminPasswordGoesHere}
+${noWifiFlag}
 ${wifiEntries}
 file,/var/home/wavelet/config/networkdevice_userpass,0600,true,,,${NETWORK_DEVICE_PASSWORD:-password}
 file,/var/${developerFileName},0644,true,,,${developerFileContent}
