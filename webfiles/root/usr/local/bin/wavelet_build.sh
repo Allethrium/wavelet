@@ -288,7 +288,6 @@ put /HOSTS/$hostNameSys/type \"dec\"
   		fi
 	fi
 	touch /var/home/wavelet/config/provisioned.complete
-	event_generate_wavelet_ui_service
 	event_connectNetwork
 	"$WAVELET_CLIENT_CONTROLLER_MOD" "RUN"
 }
@@ -353,7 +352,6 @@ event_server(){
 		wavelet_reflector \
 		wavelet_init \
 		wavelet_client_controller \
-		wavelet_ui \
 		wavelet_network_device --now --no-block
 	touch /var/home/wavelet/config/provisioned.complete
 	KEYNAME="/GROUPS/$hostNameSys"; read_etcd_global; groupHash="$printvalue"
@@ -495,7 +493,6 @@ server_bootstrap(){
 	# Server generates host hash and userspace systemd services here
 	hostHash="$(sha256sum <<<"$(cat /proc/sys/kernel/random/uuid)" | tr -d ' -')"
 	echo "	Generating systemd units.."
-	event_generate_wavelet_ui_service
 	event_clear_devicemap
 	event_generate_reflector
 	event_client_control_server
@@ -823,33 +820,6 @@ event_generate_reflector(){
 			generate_service \
 			-key="/HOSTS/$hostNameSys/DECODER_SUB_LIST" \
 			-module="wavelet_reflector"
-	fi
-}
-event_generate_wavelet_ui_service(){
-	# Final step of the server spinup, and starts the web interface on the server console.
-	if [[ -f "/var/home/wavelet/.config/systemd/user/wavelet_ui.service" ]]; then
-		echo "	Unit file already generated, moving on."
-		:
-	else
-		local targetFile
-		if [[ -f "/var/wavelet_ramfs/wavelet_start_UI.sh" ]]; then
-        	targetFile="/var/wavelet_ramfs/wavelet_start_UI.sh"
-        else
-        	targetFile="/usr/local/bin/wavelet_start_UI.sh"
-        fi
-		cat > "/var/home/wavelet/.config/systemd/user/wavelet_ui.service" <<-EOF
-			[Unit]
-			Description=Wavelet UI service
-			After=network-online.target http-php-pod.service
-			Wants=network-online.target http-php-pod.service etcd-quadlet.service
-
-			[Service]
-			Type=oneshot
-			ExecStart=/bin/bash -c ${targetFile}
-
-			[Install]
-			WantedBy=default.target
-			EOF
 	fi
 }
 event_generate_hotplug(){

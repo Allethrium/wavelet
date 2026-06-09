@@ -540,16 +540,29 @@ toggle_userInterface() {
 	# Legacy settings from config file
 	# for_window [app_id="uv"] floating enable, fullscreen enable
 	# for_window [class="uv"] floating enable, fullscreen enable
-	local swaySocket; local width; local height; local displayResolution; local noDecoderWindow
+	local swaySocket=""
+	for sock in "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/sway-ipc.*.sock; do
+		if [[ -S "$sock" ]] && swaymsg -s "$sock" -t get_tree >/dev/null 2>&1; then
+			swaySocket="$sock"
+			break
+		fi
+	done
+	if [[ -z "$swaySocket" ]]; then
+		echo "	ERROR: No valid sway socket found, aborting UI toggle." >&2
+		KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="ERR: UI Toggle failed"; write_etcd_global &
+		return 1
+	fi
+
+	echo "	Checking for running UltraGrid container.."
+
+
+	local width; local height; local displayResolution; local noDecoderWindow; local workspace
 	noDecoderWindow=false
-	swaySocket="$(ls "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/sway-ipc.*.sock 2>/dev/null | xargs -I{} sh -c 'swaymsg -s {} -t get_tree >/dev/null 2>&1 && echo {}')"
-    [[ -z "$swaySocket" ]] && swaySocket="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+	workspace=""
 	if [[ "$etcdValue" == 0 ]] || [[ -z "$etcdValue" ]]; then
 		echo "	Disabling UI functionality on this device.."
 		notify-send -e "UI Disabled"
 		rm -rf "/var/home/wavelet/config/webui.enabled"
-        workspace=""
-		systemctl --user disable wavelet_ui.service --now --no-block
         if [[ "$hostNameSys" == *"svr"* ]]; then
         	echo "	This is the server, setting workspace to 1."
         	workspace=1
@@ -558,48 +571,43 @@ toggle_userInterface() {
         	echo "	This is a client, setting workspace to 2."
         	workspace=2
         fi
-		local timeout=30
-		swaymsg -s "$swaySocket" workspace "$workspace"
-        while ! swaymsg -t get_tree -s "$swaySocket" | jq -e '.nodes[] | select(.name? == "2")' >/dev/null 2>&1; do
-            sleep 0.1
-            timeout=$((timeout - 1))
-            [[ $timeout -le 0 ]] && break
-        done
+
         if [[ "$workspace" != 1 ]] && [[ $noDecoderWindow != true ]]; then
-        	swaymsg -s "$swaySocket" "[app_id=\"uv\"] floating disable"
-        	swaymsg -s "$swaySocket" "[app_id=\"uv\"] move container to workspace $workspace"
-        	displayResolution="$(swaymsg -t get_outputs -s "$swaySocket" | jq -r '.[] | select(.active == true) | "\(.rect.width)x\(.rect.height)"' | head -n1)"
+        	displayResolution="$(swaymsg -t get_outputs -s "$swaySocket" \
+        		| jq -r '.[] | select(.active == true) | "\(.rect.width)x\(.rect.height)"' | head -n1)"
 			width="${displayResolution%x*}"
 			height="${displayResolution#*x}"
 			echo "	Got display resolution width: $width and height: $height"
-        	swaymsg -s "$swaySocket" "[app_id=\"uv\"] resize set $width $height, fullscreen enable"
+			echo "	Moving UltraGrid output container to workspace $workspace.."
+			swaymsg -s "$swaySocket" "[app_id="uv"] move container to workspace $workspace"
+			echo "	Resizing UltraGrid output container to fullscreen.."
+        	swaymsg -s "$swaySocket" \
+        		"[app_id="uv"] floating disable, resize set $width $height, fullscreen enable"
+			swaymsg -s "$swaySocket" "[app_id="org.mozilla.firefox"] kill"
+			swaymsg -s "$swaySocket" workspace "$workspace"
+			# Send more insistent termination signal to firefox if still running (hung etc.)
+			# pkill firefox
         fi
 	else
 		echo "	Enabling Web interface on this host.  Recommend kb/mouse as Human Interface Device!"
-		workspace=""
 		if [[ "$hostNameSys" == *"svr"* ]]; then
 			elapsedBootTime="$(uptime | awk '{print $3}')"
 			if [[ $elapsedBootTime -lt 3 ]]; then
-			# Sleep until everything has a chance to settle
-			sleep 4
-			workspace=2
+				sleep 4
+				workspace=2
 			fi
 		else
 			workspace=3
 		fi
-        systemctl --user enable wavelet_ui.service --now --no-block
 		notify-send -e "UI Enabled"
 		echo "$workspace" > "/var/home/wavelet/config/webui.enabled"
-        swaymsg -s "$swaySocket" workspace "$workspace"
-        while ! swaymsg -t get_tree -s "$swaySocket" | jq -e '.nodes[] | select(.name? == "3")' >/dev/null 2>&1; do
-            sleep 0.1
-            timeout=$((timeout - 1))
-            [[ $timeout -le 0 ]] && break
-        done
-        # Ensure the UltraGrid window (if exists) and the firefox window are moved to our workspace
-        swaymsg -s "$swaySocket" "[app_id=\"uv\"] floating enable, fullscreen disable"
-        swaymsg -s "$swaySocket" "[app_id=\"uv\"] resize set 495 270, move container to workspace $workspace, move container to position 1400 0"
-		swaymsg -s "$swaySocket" "[app_id=\"firefox\"] move container to workspace $workspace"
+		swaymsg -s "$swaySocket" workspace "$workspace"
+		swaymsg -s "$swaySocket" exec "/usr/bin/firefox" https://"$(cat /var/home/wavelet/config/serverhostname.txt)"
+		echo "	Disabling fullscreen and setting window float for UltraGrid container.."
+        swaymsg -s "$swaySocket" "[app_id="uv"] floating enable, fullscreen disable"
+        swaymsg -s "$swaySocket" "[app_id="uv"] resize set 495 270"
+		echo "	Moving UltraGrid container to workspace $workspace.."
+        swaymsg -s "$swaySocket" "[app_id="uv"] move container to workspace $workspace, move container to position 1400 0"
 	fi
 }
 toggle_screencast(){
