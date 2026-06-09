@@ -228,16 +228,21 @@ customization(){
 		printf "      Isolation mode: Wavelet provides DHCP/DNS.\n"
 	fi
 	echo "      Appending remaining keys to wavelet_keys.csv.."
+	# Build WiFi entries only if WiFi mode is enabled
+	wifiEntries=""
+	if [[ "${enableWifi}" == "1" ]]; then
+		wifiEntries="file,/var/home/wavelet/config/wifi_ssid,0600,true,,,${wifi_ssid}
+file,/var/home/wavelet/config/wifi_bssid,0600,true,,,${wifi_bssid}
+file,/var/home/wavelet/config/wifi_pw,0600,true,,,${wifi_password}
+file,/var/home/wavelet-root/config/wifi_adminuser,0640,true,,,${wifi_deviceUser}
+file,/var/home/wavelet-root/config/wifi_adminpw,0640,true,,,${wifi_devicePassword}
+file,/var/home/wavelet-root/config/wifi_ipaddr,0640,true,,,${wifi_ipAddr}"
+	fi
 cat >> ./ignition_files/wavelet_keys.csv << EOF
 file,${modeFilePath},0644,,,,enabled
 file,/etc/systemd/logind.conf.d/inhibit-suspend.conf,0644,,,,[Login]\nHandleLidSwitch=ignore
 file,/var/secrets/ipaadmpw.secure,0600,true,,,${DOMAIN_ADMIN_PASSWORD:-DomainAdminPasswordGoesHere}
-file,/var/home/wavelet/config/wifi_ssid,0600,true,,,${wifi_ssid:-wavelet_wifi}
-file,/var/home/wavelet/config/wifi_bssid,0600,true,,,${wifi_bssid:-00:00:00:00:00}
-file,/var/home/wavelet/config/wifi_pw,0600,true,,,${wifi_password:-wavelet-wifi-psk-password}
-file,/var/home/wavelet-root/config/wifi_adminuser,0640,true,,,${wifi_deviceUser:-admin}
-file,/var/home/wavelet-root/config/wifi_adminpw,0640,true,,,${wifi_devicePassword:-admin}
-file,/var/home/wavelet-root/config/wifi_ipaddr,0640,true,,,${wifi_ipAddr:-192.168.1.33}
+${wifiEntries}
 file,/var/home/wavelet/config/networkdevice_userpass,0600,true,,,${NETWORK_DEVICE_PASSWORD:-password}
 file,/var/${developerFileName},0644,true,,,${developerFileContent}
 file,/var/timezone.txt,0600,true,,,${timeZone}
@@ -290,11 +295,23 @@ interactive_setup() {
 	fi
 	echo -e "Target UltraGrid Continuous build (best used with Developer Mode)?"
 	read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] && dev_flag="DEV"
-	# Input for
-	# wifi_ipaddr
-	# wifi_password
-	# wifi_bddid
-	# wifi_ssid
+
+	# WiFi mode prompt
+	echo -e "\nEnable WiFi mode? This will configure the system to connect to a WiFi access point."
+	read -p "(Y/N): " confirm
+	if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
+		enableWifi="1"
+		echo -e "\nPlease input your WiFi configuration:"
+		read -p "WiFi SSID: " wifi_ssid
+		read -p "WiFi BSSID (MAC address, e.g. AA:BB:CC:DD:EE:FF): " wifi_bssid
+		read -p "WiFi PSK password: " wifi_password
+		read -p "WiFi Access Point IP address: " wifi_ipAddr
+		read -p "WiFi AP admin username: " wifi_deviceUser
+		read -p "WiFi AP admin password: " wifi_devicePassword
+	else
+		echo -e "\nWiFi mode disabled. The system will use wired networking."
+	fi
+
 	# domainname
 	# Iterate over the array of users and set passwords for each
 	init_users_yaml
@@ -329,8 +346,8 @@ interactive_setup() {
 }
 
 automatic_setup() {
-	if [[ -z ${PASSWORD} || -z ${wifi_ssid} || -z ${wifi_bssid} ]]; then
-		echo "Automatic setup requires minimum valid arguments, please ensure you've provided a password, wifi SSID and BSSID at the minimum. more if you need further customizations."
+	if [[ -z ${PASSWORD} ]]; then
+		echo "Automatic setup requires at minimum a password. WiFi parameters are optional; use --enablewifi to configure wireless later."
 		print_help
 	fi
 	INPUTFILES="server_custom.yml decoder_custom.yml"
@@ -353,6 +370,14 @@ automatic_setup() {
 			fi
 		done
 	done
+
+	# Report WiFi mode status to the user
+	if [[ "${enableWifi}" == "1" ]]; then
+		echo -e "\n${GREEN}	WiFi mode ENABLED. Wireless configuration will be written to ignition files.${NC}"
+	else
+		echo -e "\n${RED}	WiFi mode DISABLED. The system will use wired networking only.${NC}"
+	fi
+
   customization
 }
 
@@ -362,10 +387,11 @@ print_help(){
 	echo -e "Developer Mode: -d, --dev\nPulls from development branch on git."
 	echo -e "-ugd=, --ugdev, --ugcontinuous=\nTargets the continuous build of UltraGrid for newer and possibly less stable features."
 	echo -e "-p=, --pass=,--password=\nSets the wavelet-root password"
-	echo -e "-ws=, --wifissid=\nSets the preconfigured WiFi SSID"
-	echo -e "-wb=, --wifibssid=\nSets the preconfigured WiFi BSSID (WiFi Access Point's MAC address)"
-	echo -e "-apip=, --wifiapip=\nSets the preconfigured WiFi IP (WiFi Access Point's IP address)"
-	echo -e "-wp=, --wifipass=\nSets the preconfigured WiFi PSK for use in WPA2/WPA2 networks.  Legacy argument."
+	echo -e "--enablewifi\nEnable WiFi mode (required before using any -ws, -wb, -wip, -wp, -wap, -wau options)"
+	echo -e "-ws=, --wifissid=\nSets the preconfigured WiFi SSID (requires --enablewifi)"
+	echo -e "-wb=, --wifibssid=\nSets the preconfigured WiFi BSSID (WiFi Access Point's MAC address) (requires --enablewifi)"
+	echo -e "-apip=, --wifiapip=\nSets the preconfigured WiFi IP (WiFi Access Point's IP address) (requires --enablewifi)"
+	echo -e "-wp=, --wifipass=\nSets the preconfigured WiFi PSK for use in WPA2/WPA networks.  Legacy argument. (requires --enablewifi)"
 	echo -e "-4=, --ip4subnet=\nDefines the target IP4 subnet in CIDR notation (I.E 192.168.0.0/24)"
 	echo -e "-6=, --ip6subnet=\nDefines the target IP6 subnet in CIDR notation (I.E 2001:db8:1:2::/64)"
 	echo -e "-ip=, --serverip=\nDefines the server static IP4 address (I.E 192.168.0.2)"	
@@ -468,6 +494,9 @@ for i in "$@"
 			-wau=*|--wifiapuser=*)
 				wifi_deviceUser=${i#*=}; echo -e "WiFi AP User: ${wifi_deviceUser}";
 				;;
+			--enablewifi)
+				enableWifi="1"; echo -e "WiFi mode enabled. WiFi parameters will be written to ignition files.";
+				;;
 			--domain=*)
 				domain=${i#*=}; echo -e "Target domain: ${domain}";
 				;;
@@ -506,7 +535,7 @@ done
 if [[ -z "$timeZone" ]]; then
 	timeZone="America/New_York"
 fi
-requiredOptions=("PASSWORD" "wifi_ssid" "wifi_ipAddr" "domain" "svr_gw")
+requiredOptions=("PASSWORD" "domain" "svr_gw")
 for opt in "${requiredOptions[@]}"; do
 	echo "Required option $opt set!"
 	if [[ -z "${!opt}" ]]; then
