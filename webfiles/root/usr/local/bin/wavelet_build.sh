@@ -240,6 +240,7 @@ put /HOSTS/$hostNameSys/type \"dec\"
 		echo "	TBD: reprovision attempt call"
 		exit 1
 	fi
+	echo "$hostHash" > /var/home/wavelet/config/hosthash.conf
 	event_client_control
 	write_etcd_txn "$KEYDATA"
 	check_clientGroupMemberShip
@@ -535,6 +536,7 @@ put /HOSTS/$hostNameSys/wavelet_build_completed \"1\"
 
 "
 	write_etcd_txn "$KEYDATA"
+	echo "$hostHash" > /var/home/wavelet/config/hosthash.conf
 	echo "	System services and configuration keys generated, starting services now.."
 	event_server
 }

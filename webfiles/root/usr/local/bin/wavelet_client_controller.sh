@@ -65,6 +65,10 @@ detect_operation(){
 	# TODO - consider a global dispatch table and a local valkey cache to avoid GRPc call
 	thisHostHash="${etcdKey#/UI/HOSTS/}"
 	thisHostHash="${thisHostHash%%/*}"
+	if [[ "$thisHostHash" != "$(cat /var/home/wavelet/config/hosthash.conf)" ]]; then
+		# Not meant for this machine
+		exit 0
+	fi
 	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; groupHash="$printvalue"
 	echo -e "	Host Matching:\n		Key: $etcdKey\n		Value: $etcdValue"
 	case $etcdKey in
@@ -98,9 +102,8 @@ detect_operation_server(){
 		# we should start a deprovision timer here.
 		event_deprovision_timer
 	fi
-	if [[ "$etcdKey" == "/UI/HOSTS/"* ]]; then
-		detect_operation
-	elif [[ "$etcdKey" == "/UI/GROUPS/"* ]]; then
+
+	if [[ "$etcdKey" == "/UI/GROUPS/"* ]]; then
 		groupHash="${etcdKey#*/UI/GROUPS/}"
 		groupHash="${groupHash%%/*}"
 		case "$etcdKey" in
@@ -124,7 +127,13 @@ detect_operation_server(){
 		case "$etcdKey" in
 			/UI/GLOBALS/control/GROUP-CREATE*)		event_create_group;;
 			/UI/GLOBALS/control/GROUP-DELETE*)		event_delete_group;;
-	esac
+		esac
+	elif [[ "$etcdKey" == "/UI/HOSTS/"* ]]; then
+		local thisHostHash
+		thisHostHash="${etcdKey#/UI/HOSTS/}"
+    	if [[ "$thisHostHash" == "$(cat /var/home/wavelet/config/hosthash.conf)" ]]; then
+    		detect_operation
+    	fi
 	else
 		echo "  Invalid key match, exiting."
 		exit 0
