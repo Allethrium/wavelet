@@ -186,7 +186,7 @@ customization(){
         developerFileContent="DeveloperModeDisabled - will pull from master branch"
  	fi
 
-	if [[ $(cat dev_flag) == "DEV" ]]; then
+	if [[ "$dev_flag" == "DEV" ]]; then
         # Direct ignition sed
 		echo -e "${RED}		Targeting UltraGrid continuous build.\n		The continuous build might introduce experimental features, or less predictable behavior.\n${NC}"
 		if [[ "$registry" == "$svr_ip" ]]; then
@@ -201,7 +201,7 @@ customization(){
             fi
 		else
             echo "		LAN deployment selected.."
-			sed -i "s|UltraGrid-1.10.1-x86_64.AppImage|UltraGrid-continuous-x86_64.AppImage|g" ${INPUTFILES}
+			sed -i "s|UltraGrid-1.10.5-x86_64.AppImage|UltraGrid-continuous-x86_64.AppImage|g" ${INPUTFILES}
 			# Add a check here against the web UltraGrid continuous branch, print download/update message if it's out of date!
 			echo -e "\n		${GREEN}Please ensure this file is kept updated!${NC}"
         fi
@@ -289,7 +289,7 @@ interactive_setup() {
 		read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || client_networks || echo -e "${GREEN}System configured for isolated, authoritative mode." && isoMode="mode=iso"
 	fi
 	echo -e "Target UltraGrid Continuous build (best used with Developer Mode)?"
-	read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] && echo "DEV" > dev_flag || echo "" > dev_flag
+	read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] && dev_flag="DEV"
 	# Input for
 	# wifi_ipaddr
 	# wifi_password
@@ -550,7 +550,7 @@ if [[ -n "$registry" ]]; then
   sed -i "s|192.168.1.32:8080|${registry%%:*}:8080|g" $INPUTFILES
   sed -i "s|https://github.com/Allethrium/wavelet/archive/refs/heads/master.tar.gz|http://${registry%%:*}:8080/master.tar.gz|g" $INPUTFILES
   # Set UltraGrid to local LAN server, which ought to have both builds if build_registry.sh worked as it should.
-  sed -i "s|https://github.com/CESNET/UltraGrid/releases/download/v1.10.1/UltraGrid-1.10.1-x86_64.AppImage|http://${registry%%:*}:8080/UltraGrid-1.10.1-x86_64.AppImage|g" $INPUTFILES
+  sed -i "s|https://github.com/CESNET/UltraGrid/releases/download/v1.10.5/UltraGrid-1.10.5-x86_64.AppImage|http://${registry%%:*}:8080/UltraGrid-1.10.5-x86_64.AppImage|g" $INPUTFILES
   download_wavelet_git
 else
   echo "  Local registry option not defined, running standalone setup.."
