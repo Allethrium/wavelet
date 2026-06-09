@@ -131,7 +131,9 @@ detect_operation_server(){
 	elif [[ "$etcdKey" == "/UI/HOSTS/"* ]]; then
 		local thisHostHash
 		thisHostHash="${etcdKey#/UI/HOSTS/}"
+		thisHostHash="${thisHostHash%%/*}"
     	if [[ "$thisHostHash" == "$(cat /var/home/wavelet/config/hosthash.conf)" ]]; then
+    		echo "	HOSTS operation targeted at server, proceeding to detect_operation.."
     		detect_operation
     	fi
 	else
@@ -539,6 +541,7 @@ toggle_userInterface() {
 	# for_window [app_id="uv"] floating enable, fullscreen enable
 	# for_window [class="uv"] floating enable, fullscreen enable
 	local swaySocket; local width; local height; local displayResolution; local noDecoderWindow
+	noDecoderWindow=false
 	swaySocket="$(ls "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/sway-ipc.*.sock 2>/dev/null | xargs -I{} sh -c 'swaymsg -s {} -t get_tree >/dev/null 2>&1 && echo {}')"
     [[ -z "$swaySocket" ]] && swaySocket="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 	if [[ "$etcdValue" == 0 ]] || [[ -z "$etcdValue" ]]; then
@@ -562,7 +565,8 @@ toggle_userInterface() {
             timeout=$((timeout - 1))
             [[ $timeout -le 0 ]] && break
         done
-        if [[ "$workspace" != 1 ]] && [[ $noDecoderWindow == false ]]; then
+        if [[ "$workspace" != 1 ]] && [[ $noDecoderWindow != true ]]; then
+        	swaymsg -s "$swaySocket" "[app_id=\"uv\"] floating disable"
         	swaymsg -s "$swaySocket" "[app_id=\"uv\"] move container to workspace $workspace"
         	displayResolution="$(swaymsg -t get_outputs -s "$swaySocket" | jq -r '.[] | select(.active == true) | "\(.rect.width)x\(.rect.height)"' | head -n1)"
 			width="${displayResolution%x*}"
