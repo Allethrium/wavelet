@@ -1322,7 +1322,7 @@ run_decoder(){
 	inputs+=("-t file:$blankImageFile:loop")
 	inputs+=("${externalArg[@]}")
 	if [[ -f "/var/home/wavelet/config/webui.enabled" ]]; then
-		display="-d vulkan:keep-aspect:driver=wayland:size=640x360:nodecorate:tearing:hint=SDL_HINT_VIDEO_WAYLAND_PREFER_LIBDECOR=1"
+		display="-d vulkan:keep-aspect:driver=wayland:size=640x360:nodecorate:tearing"
 		export SDL_HINT_VIDEO_WAYLAND_MODE_EMULATION=0          # disable mode switching
 		export SDL_HINT_VIDEO_WAYLAND_SCALE_TO_DISPLAY=0        # don't scale to full display
 		export SDL_HINT_VIDEO_WAYLAND_WINDOW_MODE=windowed      # force windowed mode

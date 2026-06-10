@@ -498,10 +498,10 @@ for i in "$@"
 			-wau=*|--wifiapuser=*)
 				wifi_deviceUser=${i#*=}; echo -e "WiFi AP User: ${wifi_deviceUser}";
 				;;
-			--enablewifi)
+			-enablewifi)
 				enableWifi="1"; echo -e "WiFi mode enabled. WiFi parameters will be written to ignition files.";
 				;;
-			--domain=*)
+			-domain=*)
 				domain=${i#*=}; echo -e "Target domain: ${domain}";
 				;;
 			-ugd|--ugdev|--ugcontinuous)
