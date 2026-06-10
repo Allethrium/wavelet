@@ -207,7 +207,7 @@ customization(){
         fi
 	else
 		echo -e "\n		${GREEN}Tracking UltraGrid release build.\n${NC}"
-		releaseVer="1.10.1"
+		releaseVer="1.10.5"
 	fi
 	echo "      Generating wavelet_keys.csv"
 	# Set default values if none
@@ -232,6 +232,7 @@ customization(){
 	wifiEntries=""
 	noWifiFlag=""
 	if [[ "${enableWifi}" == "1" ]]; then
+		echo "		Generating WiFi entries.."
 		wifiEntries="file,/var/home/wavelet/config/wifi_ssid,0600,true,,,${wifi_ssid}
 file,/var/home/wavelet/config/wifi_bssid,0600,true,,,${wifi_bssid}
 file,/var/home/wavelet/config/wifi_pw,0600,true,,,${wifi_password}
@@ -239,6 +240,7 @@ file,/var/home/wavelet-root/config/wifi_adminuser,0640,true,,,${wifi_deviceUser}
 file,/var/home/wavelet-root/config/wifi_adminpw,0640,true,,,${wifi_devicePassword}
 file,/var/home/wavelet-root/config/wifi_ipaddr,0640,true,,,${wifi_ipAddr}"
 	else
+		echo "		Generating no-wifi flag.."
 		noWifiFlag="file,/var/no.wifi,0644,true,,,true"
 	fi
 cat >> ./ignition_files/wavelet_keys.csv << EOF
@@ -451,6 +453,58 @@ download_wavelet_git(){
 	fi
 }
 
+check_and_update_ultragrid_continuous(){
+	# Checks the UltraGrid continuous build checksum from GitHub against a cached local copy.
+	# Downloads and overwrites the local file if the remote checksum differs (new release).
+	local ug_release_repo="${UG_RELEASE_REPO:-CESNET/UltraGrid}"
+	local ug_download_url="https://github.com/${ug_release_repo}/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage"
+	local ug_cached_checksum="/var/home/wavelet/config/.ultragrid_continuous.sha256"
+	local ug_local_file="${WAVELET_HTTP_DIR:-/home/wavelet/http}/UltraGrid-continuous-x86_64.AppImage"
+	local remote_sha256=""
+	local local_sha256=""
+	# Fetch the latest release page to extract the SHA-256 of the continuous build
+	echo -e "	Checking UltraGrid continuous build checksum from GitHub..."
+	remote_sha256=$(curl -sL --max-time 30 \
+		"https://api.github.com/repos/${ug_release_repo}/releases/tags/continuous" | \
+		grep -oP '"sha256":\s*"\K[^"]+' || true)
+	if [[ -z "$remote_sha256" ]]; then
+		echo -e "	${RED}	WARNING: Could not fetch UltraGrid continuous checksum from GitHub.${NC}"
+		echo -e "	Continuing with existing local build."
+		return 0
+	fi
+	echo -e "	Remote checksum: ${remote_sha256}"
+	# Check if the local file exists and compute its checksum
+	if [[ ! -f "$ug_local_file" ]]; then
+		echo -e "	${GREEN}	UltraGrid continuous build not found locally. Downloading...${NC}"
+		mkdir -p "$(dirname "$ug_local_file")"
+		curl -sL --max-time 120 -o "$ug_local_file" "$ug_download_url"
+		if [[ $? -ne 0 ]]; then
+			echo -e "	${RED}	Error downloading UltraGrid continuous build! Aborting.${NC}"
+			exit 1
+		fi
+		chmod +x "$ug_local_file"
+		local_sha256=$(sha256sum "$ug_local_file" | cut -d' ' -f1)
+		echo "$remote_sha256" > "$ug_cached_checksum"
+		echo -e "	${GREEN}	UltraGrid continuous build downloaded and cached.${NC}"
+		return 0
+	fi
+	local_sha256=$(sha256sum "$ug_local_file" | cut -d' ' -f1)
+	echo -e "	Local checksum:  ${local_sha256}"
+	if [[ "$remote_sha256" == "$local_sha256" ]]; then
+		echo -e "	${GREEN}	UltraGrid continuous build is up to date.${NC}"
+		return 0
+	fi
+	echo -e "	${RED}	UltraGrid checksum mismatch! New version available. Downloading...${NC}"
+	curl -sL --max-time 120 -o "$ug_local_file" "$ug_download_url"
+	if [[ $? -ne 0 ]]; then
+		echo -e "	${RED}	Error downloading UltraGrid continuous build! Aborting.${NC}"
+		exit 1
+	fi
+	chmod +x "$ug_local_file"
+	echo "$remote_sha256" > "$ug_cached_checksum"
+	echo -e "	${GREEN}	UltraGrid continuous build updated successfully.${NC}"
+}
+
 
 ####
 #
@@ -472,7 +526,7 @@ for i in "$@"
 				echo "Labmode enabled, skipping prompts.  Please ensure your commandline contains all necessary arguments!"; labMode="True";
 				;;
 			-d|--dev)
-				echo -e "${RED}Dev mode enabled, switching git tree to working branch${NC}"	;	developerMode="1";
+				echo -e "${RED}Dev mode enabled, switching git tree to working branch${NC}"	;	developerMode="1"
 				;;
 			-h|--help)
 				print_help;	exit 0

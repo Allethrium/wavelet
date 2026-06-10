@@ -519,6 +519,7 @@ class SSEManager {
 		this.missedHeartbeats = 0;
 		this.reconnectAttempts = 0;
 		this.maxReconnectDelay = 30000;
+		this.lastStatus = null
 		this.heartbeatMonitor = null;
 	}
 	connect() {
@@ -539,15 +540,14 @@ class SSEManager {
 		es.onopen = () => {
 			console.log('SSE connected');
 			this.reconnectAttempts = 0;
-			updateConnectionStatus('connected');
+			this.updateConnectionStatus('connected');
 		};
 		es.onerror = (event) => {
-			console.error('SSE error:', event);
 			if (es.readyState === EventSource.CLOSED) {
-				updateConnectionStatus('disconnected');
+				this.updateConnectionStatus('disconnected');
 				this.scheduleReconnect();
 			} else {
-				updateConnectionStatus('reconnecting');
+				// transient error during active connection — ignore
 			}
 		};
 		// Named events override onmessage
@@ -581,7 +581,7 @@ class SSEManager {
 		}
 		// Status messages
 		if (data.status) {
-			updateConnectionStatus(data.status);
+			this.updateConnectionStatus(data.status);
 			return;
 		}
 		// Error messages
@@ -634,6 +634,15 @@ class SSEManager {
 				location.reload();
 			}
 		}, 1000);
+	}
+	updateConnectionStatus(status) {
+		if (this.lastStatus === status) return; // skip duplicate calls
+		this.lastStatus = status;
+		const statusEl = document.getElementById('connection-status');
+		if (statusEl) {
+			statusEl.textContent = status;
+			statusEl.className = `status-${status}`;
+		}
 	}
 	// Helper to route events to the existing handlers in your file
 	handleEtcdEvents(events) {
@@ -3471,16 +3480,6 @@ function handleGlobalsEvents(event) {
 	if (!foundGlobalsElement) {
 		console.log("Element not found for globals event");
 	}
-}
-
-function updateConnectionStatus(status) {
-	// UI helper functions
-	const statusEl = document.getElementById('connection-status');
-	if (statusEl) {
-		statusEl.textContent = status;
-		statusEl.className = `status-${status}`;
-	}
-	console.log('Connection status:', status);
 }
 
 function updateLastUpdateTime() {

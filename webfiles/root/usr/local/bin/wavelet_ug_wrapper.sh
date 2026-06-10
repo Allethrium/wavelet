@@ -378,6 +378,10 @@ while IFS= read -r line <&3; do
 		*Video*dec*stats*cumulative*:*total*867*disp*drop*corr*miss*FEC*noerr*OK*NOK*)
 			process_fecData "$line"
 			;;
+		*Error*while*decoding*frame*Invalid*data*found*when*processing*input.)
+			generate_errorDisplay "ERR: MAJOR CODEC ERROR"
+			echo -e "\033[33m	UltraGrid reports corrupted codec data for input stream!\033[0m" | systemd-cat -t "UltraGrid"
+			;;
 		*)
 			((sampleCounter++))
 			if (( sampleCounter % 50 == 0 )); then
