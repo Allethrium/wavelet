@@ -1274,7 +1274,7 @@ run_decoder(){
 	inputs+=("-t testcard:pattern=smpte_bars")
 	inputs+=("-t file:$blankImageFile:loop")
 	inputs+=("${externalArg[@]}")
-	display="-d vulkan:driver=wayland:nodecorate:nocursor:tearing:fs"
+	display="-d vulkan:nodecorate:nocursor:tearing:fs"
 	ugArgs=()
 #	ugArgs+=("--tool uv") # required for AppImage
 	ugArgs+=("${inputs[@]}")

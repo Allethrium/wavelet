@@ -95,8 +95,8 @@ connectwifi_enterprise(){
     	echo "  ERROR: Missing client certificates. Please ensure 802.1x certificates were issued."
     	return 1
 	fi
-	networkssid=$(cat /var/home/wavelet/config/wifi_ssid)
-	wifi_ap_mac=$(cat /var/home/wavelet/config/wifi_bssid)
+	networkssid="$(cat /var/home/wavelet/config/wifi_ssid)"
+	wifi_ap_mac="$(cat /var/home/wavelet/config/wifi_bssid)"
 	# Keep scanning until we get a match on wifi_ap_mac
 	attempt=0
 	max_attempts=60
