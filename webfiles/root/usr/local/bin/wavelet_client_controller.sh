@@ -1337,8 +1337,8 @@ set_channelIndex(){
 	KEYNAME="/HOSTS/$hostNameSys/control/previousVideoSourceKey"; KEYVALUE="$etcdValue"; write_etcd_global &
 	KEYNAME="/HOSTS/$hostNameSys/control/previousVideoSourceType"; KEYVALUE="$streamMode"; write_etcd_global &
 	# Are we in UI mode?
+	get_swaySocket
 	if [[ -f "/var/home/wavelet/config/webui.enabled" ]]; then
-		get_swaySocket
 		uiEnable_moveUGWindow
 	else
 		uiDisable_moveUGWindow
@@ -1542,9 +1542,10 @@ netCat(){
     # Simple function to submit data to netcat
     local port="${1:-6161}"
     local controlPortCmd="${2:-$controlPortCmd}"
-    echo "Port: $port, Command: $controlPortCmd"
+#    echo "Port: $port, Command: $controlPortCmd"
     response=$(nc 127.0.0.1 "$port" <<<"$controlPortCmd");
-    if [[ "$response" != *"202 Accepted"* ]]; then
+    # "202 Accepted" = UltraGrid change upstream after a bugfix, we will accept both
+    if [[ "$response" != *"202 Accepted"* ]] || [[ "$response" != *"202 OK"* ]]; then
     	echo "	Control Port exception: $response"
     fi
 }
