@@ -2,9 +2,9 @@
 for i in "$@"
 	do
 		case $i in
-			"mode=iso") echo -e "\n	Running in network isolation mode, enabling kargs for faster provisioning..\n"	;	isoMode="1"
+			"mode=iso") echo -e "	Running in network isolation mode, enabling kargs for faster provisioning..\n"	;	isoMode="1"
 			;;
-			*)			echo -e "\n	Initial Setup mode running, configuring Server ISO File..\n"			;	serverMode="1"
+			*)			echo -e "	Initial Setup mode running, configuring Server ISO File..\n"			;	serverMode="1"
 			;;
 		esac
 done
