@@ -1340,6 +1340,8 @@ set_channelIndex(){
 	if [[ -f "/var/home/wavelet/config/webui.enabled" ]]; then
 		get_swaySocket
 		uiEnable_moveUGWindow
+	else
+		uiDisable_moveUGWindow
 	fi
 }
 
@@ -1542,7 +1544,7 @@ netCat(){
     local controlPortCmd="${2:-$controlPortCmd}"
     echo "Port: $port, Command: $controlPortCmd"
     response=$(nc 127.0.0.1 "$port" <<<"$controlPortCmd");
-    if [[ "$response" != *"200 OK"* ]]; then
+    if [[ "$response" != *"202 Accepted"* ]]; then
     	echo "	Control Port exception: $response"
     fi
 }
