@@ -212,10 +212,7 @@ generate_systemd_unit(){
 		[Service]
 		ExecStart=$binaryFile $ugargs
 		KillMode=control-group
-		TimeoutStopSec=0.33
-		# Performance optimizations (applied from installer config)
-		# We drop these for the moment because of permissions issues.
-		# CPU_AFFINITY_SETTINGS
+		TimeoutStopSec=1
 
 		[Install]
 		WantedBy=default.target
@@ -326,7 +323,7 @@ set_channelIndex(){
 	fi
 
 	echo "	Switching encoder to channel ${channelIndex%,*}"
-	response="$(nc 127.0.0.1 6162 <<<"capture.data ${channelIndex%,*}")"
+	#response="$(nc 127.0.0.1 6162 <<<"capture.data ${channelIndex%,*}")"
 	echo "	Task complete with response code: $response"
 	exit 0
 }
@@ -392,6 +389,7 @@ cleanUpStatusKeys(){
     # We don't know if this is an "OK" situation.
     KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="OK: LAUNCH SUCCESS"; write_etcd_global &
 }
+
 
 #####
 #
