@@ -511,7 +511,6 @@ set_newHostName(){
 		echo "      Done, no further actions needed."
 	else
 		echo "     Hostname change command failed, please check logs"
-		exit 1
 	fi
 }
 # Promotion functionality

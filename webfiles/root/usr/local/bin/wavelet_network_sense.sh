@@ -68,6 +68,7 @@ fi
 # We only run on IPV4, and care only about committed leases or renewals, so other hooks should be discarded
 case "$1" in
     "lease4_renew")
+    	echo "	Lease renewed"
         main "$1"
         ;;
     "lease4_expire")
@@ -77,6 +78,7 @@ case "$1" in
         exit 0
         ;;
     "leases4_committed")
+    	echo "	Lease committed"
         main "$1"
         ;;
     "lease4_release")

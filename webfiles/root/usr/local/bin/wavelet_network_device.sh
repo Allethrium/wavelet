@@ -170,7 +170,7 @@ event_ptz_ndiHX(){
 	# If they come through.
 	type="net"
 	subType="NDI"
-	sleep 5 # We introduce a delay so mDNS can pick up the NDI source.
+	# sleep 5 # We introduce a delay so mDNS can pick up the NDI source.
 	event_checkForSupport
 }
 
@@ -179,7 +179,7 @@ event_checkForSupport(){
 	# LibNDI should be installed on wavelet by default along with avahi mDNS (DEPENDENCY)
 	echo "	Checking for device support.."
 	local deviceHostName
-	if [[ -z $deviceHostName ]]; then
+	if [[ -z "$deviceHostName" ]]; then
 		deviceHostName="$(nslookup $ipAddr | awk '{print $4}' | xargs)"
 	fi
 	if [[ "$printvalue" == "dec" ]]; then
