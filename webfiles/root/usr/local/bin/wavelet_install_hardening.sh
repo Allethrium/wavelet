@@ -1139,6 +1139,8 @@ configure_ntp(){
 
 configure_firewall(){
     # Configures NFT for kernel-native filtering
+    # TODO - add subnet var for better security scoping.
+    subNetCIDR="192.168.1.0/24"
     nft flush ruleset
     nft add table inet wavelet
     nft add chain inet wavelet input '{ type filter hook input priority 0; policy drop; }'
@@ -1166,11 +1168,12 @@ configure_firewall(){
     # etcd (internal)
     nft add rule inet wavelet input ip daddr 127.0.0.1/8 tcp dport "{ 2379,2380 }" accept
     nft add rule inet wavelet input ip saddr 127.0.0.1/8 tcp dport "{ 2379,2380 }" accept
+    nft add rule inet wavelet input ip saddr 192.168.1.0/24 tcp dport "{ 2379,2380 }" accept
     # FreeIPA
     nft add rule inet wavelet input ip saddr 192.168.1.0/24 udp dport "{ 88, 389, 636, 8822, 8823, 464 } " accept
     nft add rule inet wavelet input ip saddr 192.168.1.0/24 tcp dport "{ 88, 389, 636, 8822, 8823, 464 }" accept
     # Nginx, Apache
-    nft add rule inet wavelet input tcp dport "{ 80, 443, 8080 }" accept
+    nft add rule inet wavelet input tcp dport "{ 80, 443, 8080, 8443 }" accept
     # UltraGrid streaming (may need tweaking)
     nft add rule inet wavelet input ip daddr 127.0.0.1/8 udp dport "{ 3478-3480, 9800, 16384-16450, 30000-31000, 40000-40100 }" accept
     nft add rule inet wavelet input udp dport "{ 3478-3480, 9800, 16384-16450, 30000-31000, 40000-40100 }" accept
