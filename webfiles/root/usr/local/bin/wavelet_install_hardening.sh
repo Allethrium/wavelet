@@ -1167,7 +1167,7 @@ configure_firewall(){
     nft add rule inet wavelet input ip daddr 127.0.0.1/8 tcp dport "{ 2379,2380 }" accept
     nft add rule inet wavelet input ip saddr 127.0.0.1/8 tcp dport "{ 2379,2380 }" accept
     # FreeIPA
-    nft add rule inet wavelet input ip saddr 192.168.1.0/24 udp dport "{ 88, 389, 636, 8822, 8823, 464 } "accept
+    nft add rule inet wavelet input ip saddr 192.168.1.0/24 udp dport "{ 88, 389, 636, 8822, 8823, 464 } " accept
     nft add rule inet wavelet input ip saddr 192.168.1.0/24 tcp dport "{ 88, 389, 636, 8822, 8823, 464 }" accept
     # Nginx, Apache
     nft add rule inet wavelet input tcp dport "{ 80, 443, 8080 }" accept
@@ -1183,22 +1183,16 @@ configure_firewall(){
     nft add rule inet wavelet input tcp dport 443 accept
     # Avahi (mDNS/DNS-SD for NDI discovery)
     nft add rule inet wavelet input udp dport 5353 accept
+	nft add rule inet wavelet input udp dport 5969 accept
     nft add rule inet wavelet input udp dport 5354 accept
     nft add rule inet wavelet input udp dport 5355 accept
     # TFTP
     nft add rule inet wavelet input udp dport 69 accept
     # RTSP
     nft add rule inet wavelet input tcp dport 554 accept
-    # NDI
-    nft add rule inet wavelet input udp dport "{ 10000,10001 }" accept
-    nft add rule inet wavelet input udp dport "{ 10000-10100 }" accept
-    nft add rule inet wavelet input tcp dport "{ 33000-33004 }" accept
-    nft add rule inet wavelet input tcp dport 5900 accept
-    # Specific port exceptions for local subnet (these get checked before the blanket accept)
-    nft add rule inet wavelet input ip saddr 192.168.1.0/24 accept
-    # Reject rule for local subnet before final drop
-    nft add rule inet wavelet input ip saddr 192.168.1.0/24 reject with icmp type port-unreachable
-    nft add rule inet wavelet input reject with icmp type port-unreachable
+    # NDI usage ports
+    nft add rule inet wavelet input udp dport "{ 5960,6000 }" accept
+    nft add rule inet wavelet input tcp dport "{ 5960-6000 }" accept
     # Log drops for debugging
     nft add rule inet wavelet input log prefix "[WAVELET-INPUT] " level warn
     nft add rule inet wavelet input drop

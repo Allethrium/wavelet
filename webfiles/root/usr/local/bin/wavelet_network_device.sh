@@ -177,6 +177,7 @@ event_ptz_ndiHX(){
 event_checkForSupport(){
 	# This is a more general-purpose function to check for NDI and RTSP streams, and use them if available.
 	# LibNDI should be installed on wavelet by default along with avahi mDNS (DEPENDENCY)
+	# Recently, UltraGrid and ndi-discovery-server stopped functioning in this build, so we have a fallback to IP.
 	echo "	Checking for device support.."
 	local deviceHostName
 	if [[ -z "$deviceHostName" ]]; then
@@ -196,7 +197,6 @@ event_checkForSupport(){
 			deviceHostName="NDI-${dev%--*}"
 			subType="NDI"
 			populate_to_etcd
-			exit 0
 		else
 			if ffprobe -v quiet -show_streams "$UGdeviceStreamCommand"; then
 				deviceHostName="RTSP-$ipAddr"
@@ -205,10 +205,17 @@ event_checkForSupport(){
 				echo -e "		Device RTSP configured, however it may not work without further settings.\n"
 				continue
 			else
+				echo "		Discovery error! falling back on direct IP interrogation.."
+				event_checkIP
 				continue
 			fi
 		fi
 	done
+}
+
+event_checkIP(){
+	echo "	Attempting direct device type resolution by IP address.."
+	# do some acrobatics to locate NDI or RTSP support here
 }
 
 event_check_multiCast(){
@@ -291,31 +298,42 @@ del DHCP
 }
 
 get_ndi_devices(){
-	# Makes a nice array ${ndiDevices[@]} of NDI devices NAME--IP:PORT
-	local binaryFile
-	if [[ -f "/var/wavelet_ramfs/ultragrid/squashfs-root/AppRun" ]]; then
-		binaryFile="/var/wavelet_ramfs/ultragrid/squashfs-root/AppRun"
-	else
-		binaryFile="/usr/local/bin/ultragrid/squashfs-root/AppRun"
-	fi
-	blockStart=0
-	array=()
+	# Makes an array ${ndiDevices[@]} of NDI devices NAME--IP:PORT
 	ndiDevices=()
 	while IFS=$'\n' read -r line; do
-		if [[ $line ==  *'available sources'* ]]; then
-			# initialize sources
-			sources=""
-			blockStart=1
-		fi
-		if [[ $blockStart == 1 ]] && [[ $line != *'available sources'* ]] && [[ $line != *'Exit'* ]] && [[ -n $line ]]; then
-			array+=("$(echo $line)")
-		fi
-	done<<<"$("$binaryFile" --tool uv -t ndi:help)"
-	for i in "${array[@]}"; do
-			# We need to perform regex here to extract the IP address.
-			device="$(awk '{print $1}'<<<"$i")--$(grep -oP '\b(?:\d{1,3}\.){3}\d{1,3}'<<<"$i" | head -n 1)"
-			ndiDevices+=( "$device" )
-	done
+		[[ $line == *"ipa_ipvlan_shim"* ]] && continue
+		# Only process resolved records (=)
+		[[ $line != "=;"* ]] && continue
+		IFS=';' read -r _ _ _ name _ _ _ ip port _ <<< "$line"
+		name="${name%%[![:alnum:]_-]*}"
+        ip="${ip//\\./\.}"
+		ip="${ip%%[![:alnum:].-]*}"
+		ndiDevices+=("${name}--${ip}:${port}")
+	done <<<"$(avahi-browse -t -r -p _ndi._tcp)"
+#	local ultraGridBinaryFile
+#	if [[ -f "/var/wavelet_ramfs/ultragrid/squashfs-root/AppRun" ]]; then
+#		binaryFile="/var/wavelet_ramfs/ultragrid/squashfs-root/AppRun"
+#	else
+#		binaryFile="/usr/local/bin/ultragrid/squashfs-root/AppRun"
+#	fi
+#	blockStart=0
+#	array=()
+#	ndiDevices=()
+#	while IFS=$'\n' read -r line; do
+#		if [[ $line ==  *'available sources'* ]]; then
+#			# initialize sources
+#			sources=""
+#			blockStart=1
+#		fi
+#		if [[ $blockStart == 1 ]] && [[ $line != *'available sources'* ]] && [[ $line != *'Exit'* ]] && [[ -n $line ]]; then
+#			array+=("$(echo $line)")
+#		fi
+#	done<<<"$("$binaryFile" --tool uv -t ndi:help)"
+#	for i in "${array[@]}"; do
+#			# We need to perform regex here to extract the IP address.
+#			device="$(awk '{print $1}'<<<"$i")--$(grep -oP '\b(?:\d{1,3}\.){3}\d{1,3}'<<<"$i" | head -n 1)"
+#			ndiDevices+=( "$device" )
+#	done
 }
 
 check_etcd_env(){

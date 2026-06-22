@@ -43,7 +43,7 @@ RUN rm /etc/yum.repos.d/fedora-cisco-openh264.repo && \
         ffmpeg-free libpostproc-free libswresample-free libswscale-free libavdevice-free && \
     rpm-ostree install -y -A \
         ffmpeg ffmpeg-libs intel-media-driver libheif-freeworld \
-        libndi-sdk ndi-sdk-documentation \
+        libndi-sdk ndi-sdk ndi-sdk-documentation \
         libva-intel-driver vlc \
         gstreamer1-plugin-libav gstreamer1-plugins-bad-free-extras \
         gstreamer1-plugins-bad-freeworld gstreamer1-plugins-ugly && \
