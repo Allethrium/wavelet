@@ -404,9 +404,9 @@ setup_httpd_quadlet(){
 }
 nginx_quadlets(){
 	echo "Setting up NGINX + PHP-FPM quadlet.."
-	cat > /var/home/wavelet/.config/containers/systemd/php-fpm.container <<-EOF
+	cat > "/var/home/wavelet/.config/containers/systemd/php-fpm.container" <<-EOF
 		[Unit]
-		Description=PHP + FPM
+		Description=PHP:FPM
 
 		[Container]
 		Image=%H/php:latest
@@ -414,9 +414,10 @@ nginx_quadlets(){
 		AutoUpdate=registry
 		Secret=webui-key
 		Secret=webui-enc
+		Secret=redispw
 		Pod=http-php.pod
 	EOF
-	cat > /var/home/wavelet/.config/containers/systemd/nginx.container <<-EOF
+	cat > "/var/home/wavelet/.config/containers/systemd/nginx.container" <<-EOF
 		[Unit]
 		Description=NGINX
 
@@ -426,24 +427,43 @@ nginx_quadlets(){
 		AutoUpdate=registry
 		Pod=http-php.pod
 	EOF
-	mkdir -p /var/home/wavelet/http-php/log
+	cat > "/var/home/wavelet/.config/containers/systemd/redis.container" <<-EOF
+		[Unit]
+		Description=REDIS
+
+		[Container]
+		Image=%H/redis:latest
+		Environment=HOST_MACHINE_HOSTNAME=%H
+		Environment=REGIS_ARGS="%H"
+		AutoUpdate=registry
+		Secret=redispw
+		Pod=http-php.pod
+	EOF
+	mkdir -p "/var/home/wavelet/http-php/log"
 	# Generate the webui key as a podman secret, and then shred the password
 	podman secret create webui-key /var/home/wavelet/.ssh/secrets/.webui.key
 	podman secret create webui-enc /var/home/wavelet/config/.webui.enc
-	rm -rf /var/home/wavelet/.ssh/secrets/.webui.key; rm -rf /var/home/wavelet/config/.webui.enc
+	# Generate a random password for redis
+	local redisPW="$(cat '/proc/sys/kernel/random/uuid' | sha256sum | tr -d '- ')"
+	# SED the redis.conf file with generated password
+	sed -i "s/my-redis-password/$redisPW/g" "/var/home/wavelet/config/redis.conf"
+	echo "$redisPW" | podman secret create redispw -
+	rm -rf "/var/home/wavelet/.ssh/secrets/.webui.key"; rm -rf "/var/home/wavelet/config/.webui.enc"
 	# Move our crypt to an accessible volume
 	# Required:
 	# httpd TLS cert (used by HTTPD/Ignition server, Registry container service AND Nginx)
 	# webUI factors for auth to etcd cluster
-	cat > /var/home/wavelet/.config/containers/systemd/http-php.pod <<-EOF
+	cat > "/var/home/wavelet/.config/containers/systemd/http-php.pod" <<-EOF
 		[Pod]
 		PublishPort=9080:80
-		PublishPort=443:443
+		PublishPort=6379
+		PublishPort=443
 		Volume=/var/home/wavelet/config/certs/httpd.crt:/etc/pki/tls/certs/httpd.crt:z
 		Volume=/var/home/wavelet/config/certs/httpd.key:/etc/pki/tls/private/httpd.key:z
 		Volume=/var/home/wavelet/config/php/php-fpm.d/www.conf:/usr/local/etc/php-fpm.d/www.conf:z
 		Volume=/var/home/wavelet/config/php/php.ini:/etc/php.ini:z
 		Volume=/var/home/wavelet/config/php/php-fpm.conf:/usr/local/etc/php-fpm.conf:z
+		Volume=/var/home/wavelet/config/redis.conf:/usr/local/etc/redis.conf:z
 		Volume=/etc/ipa/ca.crt:/usr/local/share/ca-certificates/ca.crt
 		Volume=/var/home/wavelet/http-php/log:/var/log/nginx:Z
 		Volume=/var/home/wavelet/http-php/html:/var/www/html:Z

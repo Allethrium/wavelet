@@ -71,6 +71,7 @@ pull_registry_images(){
 	sourceList+=("registry.fedoraproject.org/fedora:42") # needed to avoid RADIUSD bug
 	sourceList+=("docker.io/library/nginx:alpine")
 	sourceList+=("docker.io/library/php:fpm")
+	sourceList+=("docker.io/redis:latest")
 	sourceList+=("docker.io/library/httpd")
 	sourceList+=("docker.io/library/registry")
 	sourceList+=("quay.io/freeipa/freeipa-server:almalinux-10")
