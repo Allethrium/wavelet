@@ -132,13 +132,27 @@ function validateValue($function, $value): void
 
 function checkImageData($imageData) {
 	// Validate image data before storing
-    $maxSize = 10 * 1024 * 1024; // 10MB
+    $maxSize = 20 * 1024 * 1024; // 20MB
     if (strlen($imageData) > $maxSize) {
         error_log("ERROR: Image size exceeds 10MB");
         http_response_code(400);
         echo json_encode(["error" => "Image size exceeds 10MB"]);
         exit;
     }
+	// MP4 check
+	$header = substr($imageData, 0, 12);
+	// MP4: size(4 bytes) + "ftyp" at offset 4
+	if (substr($header, 4, 4) === "ftyp") {
+		// Quick sanity: ensure first 4 bytes are a reasonable file size
+		$sizeBytes = unpack("N", substr($header, 0, 4));
+		if ($sizeBytes[1] > $maxSize || $sizeBytes[1] < 12) {
+			error_log("ERROR: Invalid MP4 file size header");
+			http_response_code(400);
+			echo json_encode(["error" => "Invalid MP4 file"]);
+			exit;
+		}
+		return 'mp4';
+	}
 	// Check for null bytes or control characters that might indicate malicious content
 	if (strpos($imageData, "\0") !== false && substr($imageData, 0, 2) !== "\xFF\xD8" && substr($imageData, 0, 8) !== "\x89PNG\r\n\x1a\n") {
 		error_log("ERROR: Suspicious null bytes detected in image data");
@@ -273,10 +287,14 @@ switch ($type) {
 							$prefixstring = "/UI/GROUPS/$hashID/control/activeCodec";
 							$keyValue = $dataValue;
 							break;
-						case 'changeLiveStreamSettings':
-							// in this case, keyValue is a compound ${urlData};${apiKey}
-							// The backend script expects this format and will fail if it is not correct
-							$prefixstring = "/UI/GROUPS/$hashID/control/LiveStreamData";
+						case 'changeLiveStreamURL':
+							// We now have a URL target key and an API key object
+							$prefixstring = "/UI/GROUPS/$hashID/control/LiveStreamURL";
+							$keyValue = $dataValue;
+							break;
+						case 'changeLiveStreamKey':
+							// We now have a URL target key and an API key object
+							$prefixstring = "/UI/GROUPS/$hashID/control/LiveStreamKey";
 							$keyValue = $dataValue;
 							break;
 						case 'groupCreated':
@@ -292,18 +310,26 @@ switch ($type) {
 							// It will enforce a 10mb (!) size limit, and ensure only image data are processed.
 							$imageData = base64_decode($dataValue, true);
 							$extension = checkImageData($imageData);
-                            $imageDir = '/var/home/wavelet/http-php/html/newimages/';
-                            if (!is_dir($imageDir)) {
-                                mkdir($imageDir, 0750, true);
-                            }
+                            $imageDir = dirname(__FILE__) . '/data/';
+							$userID = getmyuid();
+							if ( !file_exists($imageDir) ) {
+								mkdir ($imageDir, 0744);
+							}
+							// Explicit directory validation: fail safely if path doesn't exist
+							if (!is_dir($imageDir)) {
+								error_log("ERROR: Image storage directory missing: $imageDir");
+								http_response_code(500);
+								echo json_encode(["error" => "Image storage directory not configured"]);
+								exit;
+							}
                             $filename = uniqid('image_', true) . '.' . $extension;
-                            $filePath = $imageDir . '/' . $filename;
-                            if (file_put_contents($filePath, $imageData) === false) {
-                                error_log("ERROR: Failed to save image to $filePath");
-                                http_response_code(500);
-                                echo json_encode(["error" => "Failed to save image"]);
-                                exit;
-                            }
+                            $filePath = $imageDir . $filename;
+							if (file_put_contents($filePath, $imageData) === false) {
+								// Replace $userId with the actual User ID variable (e.g., $_SESSION['uid'], $userId, etc.)
+								error_log("ERROR: Failed to save image for User ID: $userID, Path: $filePath");
+								echo json_encode(["error" => "Failed to save image"]);
+								exit;
+							}
                             $prefixstring = "/UI/GROUPS/$hashID/control/staticImage";
                             $keyValue = $filename;
 							break;

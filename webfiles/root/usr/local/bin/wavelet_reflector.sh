@@ -47,7 +47,7 @@ add_client_port_patched(){
 
 delete_client_port_patched(){
     echo "		Deleting client IP: $1"
-    nc -w 1 127.0.0.1 6159 <<<"root delete-port $1"
+    nc -w 1 127.0.0.1 6159 <<<"root delete-port $1:5004"
 }
 
 list_client_port(){

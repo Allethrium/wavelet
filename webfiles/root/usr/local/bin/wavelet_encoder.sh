@@ -37,19 +37,33 @@ fi
 
 test_newDevice(){
 	# Check to see if our host device update flag has been modified.
-	if [[ -n "$networkDeviceInput" ]]; then
-		generate_local_args
-	fi
 	KEYNAME="/HOSTS/$hostNameSys/INPUT_DEVICE_NEW"; read_etcd_global
 	if [[ "$printvalue" == "1" ]]; then
 		echo "	New input flag set, regenerating UltraGrid Encoder systemD unit.."
 		generate_local_args
 	else
-		# verify everything is in the systemD unit as it should be, and set channel index
-		device_cmdline="$(cat "$deviceMapFile")"
-		if [[ "$(cat /var/home/wavelet/.config/systemd/user/UltraGrid.Encoder.service)" == *"$device_cmdline"* ]]; then
+#		echo "	Input flag vacant, testing for encoder service.."
+		# Verify systemd unit is running, and that the command lines present correspond to contents of the device map file.
+		systemctl --user is-active UltraGrid.Encoder.service >/dev/null 2>&1 && echo "	Systemd unit active.. " || generate_local_args
+		commandLines=()
+		while read -r line; do
+			lineVar="${line#*-t}"
+			commandLines+=("${lineVar% ,*}")
+		done <"$deviceMapFile"
+		local deviceMatching
+		for device in "${commandLines[@]}"; do
+			if [[ "$(cat /var/home/wavelet/.config/systemd/user/UltraGrid.Encoder.service)" == *"$device"* ]]; then
+				deviceMatching=true
+			else
+				deviceMatching=false
+			fi
+		done
+
+		if [[ "$deviceMatching" == true ]]; then
+#			echo "	Device already present in running encoder unit, setting channel index.."
 			set_channelIndex
 		else
+			echo "	Device not present in running encoder unit, regenerating encoder systemd unit and restarting.."
 			generate_local_args
 		fi
 	fi
@@ -212,10 +226,7 @@ generate_systemd_unit(){
 		[Service]
 		ExecStart=$binaryFile $ugargs
 		KillMode=control-group
-		TimeoutStopSec=0.33
-		# Performance optimizations (applied from installer config)
-		# We drop these for the moment because of permissions issues.
-		# CPU_AFFINITY_SETTINGS
+		TimeoutStopSec=1
 
 		[Install]
 		WantedBy=default.target
@@ -296,7 +307,7 @@ set_channelIndex(){
 			echo "	Requested input Hash; $requestedInputHash, path; $devicePath"
 			if grep -q "$devicePath" "$deviceMapFile" ; then
 				channelIndex="$(grep -F "$printvalue" "$deviceMapFile" | cut -d ',' -f1)"
-				echo "	Entry found in my device map, with channel index: $channelIndex"
+				echo "	Entry found in host device map file, with channel index: $channelIndex"
 			fi
 		fi
 	fi
@@ -393,6 +404,7 @@ cleanUpStatusKeys(){
     KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="OK: LAUNCH SUCCESS"; write_etcd_global &
 }
 
+
 #####
 #
 # Main
@@ -451,6 +463,8 @@ echo "	Checking for reflector process.."
 if [[ ! -f "/var/home/wavelet/.config/systemd/user/UltraGrid.Reflector.service" ]]; then
 	echo "	Running reflector initialization.."
 	"$WAVELET_REFLECTOR_MOD" "INIT" &
+else
+	echo "	Reflector running, continuing.."
 fi
 
 test_newDevice

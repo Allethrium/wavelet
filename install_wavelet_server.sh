@@ -92,14 +92,14 @@ generate_user_yaml(){
 	local ssh_authorized_keys=$(cat ${name}-ssh.pub)
 	local user_yaml="${name}_yaml.yml"
 	if [[ "${name}" = "wavelet-root" ]]; then
-		echo -e "\n	wavelet-root user, setting UID to 9337"
+#		echo -e "\n	wavelet-root user, setting UID to 9337"
 		uid="9337"
 		group1="wheel"
 		group2="sudo"
 		sed -i "s|#- GROUPGOESHERE|- $group1\n        #- GROUPGOESHERE|" "${user_yaml}"
 		sed -i "s|#- GROUPGOESHERE|- $group2\n        #- GROUPGOESHERE|" "${user_yaml}"
 	elif [[ "${name}" = "wavelet" ]]; then
-		echo -e "\n	wavelet user, setting UID to 1337"
+#		echo -e "\n	wavelet user, setting UID to 1337"
 		uid="1337"
 	else 
 		echo -e "			User ID not preset, system will assign them."
@@ -109,7 +109,7 @@ generate_user_yaml(){
 		sed -i "s|USERNAMEGOESHERE|USERNAMEGOESHERE\n      uid: $uid|" "${user_yaml}"
 	fi
 	# We use a pipe instead of a / here, because the pubkeys and passwords hashes may contain a / and therefore escape the rest of the data.
-	echo -e " 	Working on user ${name}\n"
+#	echo -e " 	Working on user ${name}\n"
 	sed -i "s|#ADD_USER_YAMLHERE|""|" "${user_yaml}"
 	sed -i "s|PASSWORDGOESHERE|$password_hash|" "${user_yaml}"
 	sed -i "s|PUBKEYGOESHERE|$ssh_authorized_keys|" "${user_yaml}"
@@ -188,28 +188,28 @@ customization(){
 
 	if [[ "$dev_flag" == "DEV" ]]; then
         # Direct ignition sed
-		echo -e "${RED}		Targeting UltraGrid continuous build.\n		The continuous build might introduce experimental features, or less predictable behavior.\n${NC}"
+		echo -e "${RED}	Targeting UltraGrid continuous build.${NC}"
 		if [[ "$registry" == "$svr_ip" ]]; then
-            echo "    Standalone deployment selected.."
+            echo "	Standalone deployment selected.."
 	        if [[ "$patchMode" == "ON" ]]; then
 	            # update this properly
-	            echo "      Pulling UG build artefact from branch repo https://github.com/armelvil/UltraGrid"
+	            echo "	Pulling UG build artefact from branch repo https://github.com/armelvil/UltraGrid"
                 sed -i "s|\/download\/v[^ ]*|\/download\/continuous\/UltraGrid-continuous-x86_64.AppImage|g" ${INPUTFILES}
             else
-                echo "      Pulling UG build artefact from upstream https://github.com/CESNET/UltraGrid"
+                echo "	Pulling UG build artefact from upstream https://github.com/CESNET/UltraGrid"
 	            sed -i "s|\/download\/v[^ ]*|\/download\/continuous\/UltraGrid-continuous-x86_64.AppImage|g" ${INPUTFILES}
             fi
 		else
-            echo "		LAN deployment selected.."
+            echo "	LAN deployment selected.."
 			sed -i "s|UltraGrid-1.10.5-x86_64.AppImage|UltraGrid-continuous-x86_64.AppImage|g" ${INPUTFILES}
 			# Add a check here against the web UltraGrid continuous branch, print download/update message if it's out of date!
-			echo -e "\n		${GREEN}Please ensure this file is kept updated!${NC}"
+			echo -e "\n	${GREEN}Please ensure this file is kept updated!${NC}"
         fi
 	else
-		echo -e "\n		${GREEN}Tracking UltraGrid release build.\n${NC}"
-		releaseVer="1.10.1"
+		echo -e "\n	${GREEN}Tracking UltraGrid release build.\n${NC}"
+		releaseVer="1.10.5"
 	fi
-	echo "      Generating wavelet_keys.csv"
+	echo "	Generating wavelet_keys.csv"
 	# Set default values if none
 	svr_ip="${svr_ip:-192.168.1.32}"
 	gateway="${gateway:-192.168.1.1}"
@@ -225,13 +225,14 @@ customization(){
 	else
 		modeFilePath="/var/isolationMode.enabled"
 		resolvContent="nameserver ${svr_ip}\\nnameserver ${gateway}\\nnameserver 9.9.9.9"
-		printf "      Isolation mode: Wavelet provides DHCP/DNS.\n"
+		printf "	Isolation mode: Wavelet provides DHCP/DNS.\n"
 	fi
-	echo "      Appending remaining keys to wavelet_keys.csv.."
+	echo "	Appending remaining keys to wavelet_keys.csv.."
 	# Build WiFi entries only if WiFi mode is enabled
 	wifiEntries=""
 	noWifiFlag=""
 	if [[ "${enableWifi}" == "1" ]]; then
+		echo "	Generating Wi-Fi entries.."
 		wifiEntries="file,/var/home/wavelet/config/wifi_ssid,0600,true,,,${wifi_ssid}
 file,/var/home/wavelet/config/wifi_bssid,0600,true,,,${wifi_bssid}
 file,/var/home/wavelet/config/wifi_pw,0600,true,,,${wifi_password}
@@ -239,6 +240,7 @@ file,/var/home/wavelet-root/config/wifi_adminuser,0640,true,,,${wifi_deviceUser}
 file,/var/home/wavelet-root/config/wifi_adminpw,0640,true,,,${wifi_devicePassword}
 file,/var/home/wavelet-root/config/wifi_ipaddr,0640,true,,,${wifi_ipAddr}"
 	else
+		echo "	Generating no-Wi-Fi flag.."
 		noWifiFlag="file,/var/no.wifi,0644,true,,,true"
 	fi
 cat >> ./ignition_files/wavelet_keys.csv << EOF
@@ -278,7 +280,7 @@ dir,/var/lib/systemd/linger/wavelet,0755,,,root,
 dir,/var/lib/systemd/linger/wavelet-root,0755,,,root,
 EOF
 	# Customize launching kernel args, this will accelerate the bootup as NetworkManager-wait-online won't hang for 30+s
-	echo "      Applying kernel args: ip=${svr_ip}::${gateway}:${subnet}:${serverHostName}::on"
+	echo "	Applying kernel args: ip=${svr_ip}::${gateway}:${subnet}:${serverHostName}::on"
 	sed -i "s|ip=192.168.1.32::192.168.1.1:255.255.255.0:svr.wavelet.allethrium::on|ip=${svr_ip}::${gateway}:${subnet}:${serverHostName}::on|g" ${INPUTFILES}
 	mkdir -p var
 	for file in ${INPUTFILES}; do
@@ -329,17 +331,17 @@ interactive_setup() {
 			echo -e "	Set password for ${user}"
 			echo -e "	Generating SSH public key for ${user}..\n"
 			ssh-keygen -t ed25519 -C "${user}@wavelet.allethrium" -f "${user}-ssh"
-			echo -e "	Generating YAML block for user..\n"
+#			echo -e "	Generating YAML block for user..\n"
 			cp users_yaml "${user}_yaml.yml"
 			generate_user_yaml "${user}"
 			# Now we add the user YAML block to the server ignition, preserving the tag as we go..
-			echo -e "\nAdding generated YAML block to ignition file for ${user}..\n"
+#			echo -e "\nAdding generated YAML block to ignition file for ${user}..\n"
 			f2="$(<${user}_yaml.yml)"
 			input_files_arr="(${INPUTFILES})"
 			for file in "${input_files_arr[@]}"; do
 				if [ -f "$file" ]; then
 					awk -vf2="$f2" '/#ADD_USER_YAML_HERE/{print f2;print;next}1' "${file}" > tmp && mv tmp "${file}"
-					echo -e "	YAML block for ${user} added to ignition file ${file}..\n"
+#					echo -e "	YAML block for ${user} added to ignition file ${file}..\n"
 				else
 					echo "	Warning: ${file} does not exist or is inaccessible!"
 				fi
@@ -362,13 +364,13 @@ automatic_setup() {
 		ssh-keygen -t ed25519 -C "${user}@wavelet.allethrium" -N '' <<< $'\ny' >/dev/null 2>&1
 		cp users_yaml "${user}_yaml.yml"
 		generate_user_yaml "${user}"
-		echo -e "	Adding generated YAML block to ignition file for ${user}.."
+#		echo -e "	Adding generated YAML block to ignition file for ${user}.."
 		f2="$(<${user}_yaml.yml)"
 		input_files_arr=(${INPUTFILES})
 		for file in "${input_files_arr[@]}"; do
 			if [ -f "$file" ]; then
 				awk -vf2="$f2" '/#ADD_USER_YAML_HERE/{print f2;print;next}1' "${file}" > tmp && mv tmp "${file}"
-				echo -e "	YAML block for ${user} added to ignition file ${file}.."
+#				echo -e "	YAML block for ${user} added to ignition file ${file}.."
 			else
 				echo "	Warning: ${file} does not exist or is inaccessible!"
 			fi
@@ -377,9 +379,9 @@ automatic_setup() {
 
 	# Report WiFi mode status to the user
 	if [[ "${enableWifi}" == "1" ]]; then
-		echo -e "\n${GREEN}	WiFi mode ENABLED. Wireless configuration will be written to ignition files.${NC}"
+		echo -e "${GREEN}	WiFi mode ENABLED. Wireless configuration will be written to ignition files.${NC}"
 	else
-		echo -e "\n${RED}	WiFi mode DISABLED. The system will use wired networking only.${NC}"
+		echo -e "${RED}	WiFi mode DISABLED. The system will use wired networking only.${NC}"
 	fi
 
   customization
@@ -415,10 +417,10 @@ validate_ip_port(){
   		exit 1
 	fi
 	if curl -s http://$registry_port/v2 > /dev/null; then
-		echo -e "${GREEN}		Registry running and responding to curl!${NC}"
+		echo -e "${GREEN}	Registry running and responding to curl!${NC}"
 		registry="$ip_part"
 	else
-		echo -e "${RED}		Registry not responding, please verify your settings..${NC}"
+		echo -e "${RED}	Registry not responding, please verify your settings..${NC}"
 		exit 1
 	fi
 }
@@ -443,12 +445,64 @@ download_wavelet_git(){
   fi
 	if curl -s -L -o "$HOME/.config/var/www/$GH_BRANCH.tar.gz" \
 		"https://github.com/Allethrium/wavelet/archive/refs/heads/$GH_BRANCH.tar.gz"; then
-			echo "		Acquired wavelet tarball, proceeding.."
+			echo "	Acquired wavelet tarball, proceeding.."
 	else
-			echo "		Error downloading wavelet tarball!  aborting!"
-			echo "		Please check this user's write permissions to ~/.config/var/www"
+			echo "	Error downloading wavelet tarball!  aborting!"
+			echo "	Please check this user's write permissions to ~/.config/var/www"
 			exit 1
 	fi
+}
+
+check_and_update_ultragrid_continuous(){
+	# Checks the UltraGrid continuous build checksum from GitHub against a cached local copy.
+	# Downloads and overwrites the local file if the remote checksum differs (new release).
+	local ug_release_repo="${UG_RELEASE_REPO:-CESNET/UltraGrid}"
+	local ug_download_url="https://github.com/${ug_release_repo}/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage"
+	local ug_cached_checksum="/var/home/wavelet/config/.ultragrid_continuous.sha256"
+	local ug_local_file="${WAVELET_HTTP_DIR:-/home/wavelet/http}/UltraGrid-continuous-x86_64.AppImage"
+	local remote_sha256=""
+	local local_sha256=""
+	# Fetch the latest release page to extract the SHA-256 of the continuous build
+	echo "	Checking UltraGrid continuous build checksum from GitHub..."
+	remote_sha256=$(curl -sL --max-time 30 \
+		"https://api.github.com/repos/${ug_release_repo}/releases/tags/continuous" | \
+		grep -oP '"sha256":\s*"\K[^"]+' || true)
+	if [[ -z "$remote_sha256" ]]; then
+		echo -e "	${RED}	WARNING: Could not fetch UltraGrid continuous checksum from GitHub.${NC}"
+		echo -e "	Continuing with existing local build."
+		return 0
+	fi
+	echo -e "	Remote checksum: ${remote_sha256}"
+	# Check if the local file exists and compute its checksum
+	if [[ ! -f "$ug_local_file" ]]; then
+		echo -e "	${GREEN}	UltraGrid continuous build not found locally. Downloading...${NC}"
+		mkdir -p "$(dirname "$ug_local_file")"
+		curl -sL --max-time 120 -o "$ug_local_file" "$ug_download_url"
+		if [[ $? -ne 0 ]]; then
+			echo -e "	${RED}	Error downloading UltraGrid continuous build! Aborting.${NC}"
+			exit 1
+		fi
+		chmod +x "$ug_local_file"
+		local_sha256=$(sha256sum "$ug_local_file" | cut -d' ' -f1)
+		echo "$remote_sha256" > "$ug_cached_checksum"
+		echo -e "	${GREEN}	UltraGrid continuous build downloaded and cached.${NC}"
+		return 0
+	fi
+	local_sha256=$(sha256sum "$ug_local_file" | cut -d' ' -f1)
+	echo -e "	Local checksum:  ${local_sha256}"
+	if [[ "$remote_sha256" == "$local_sha256" ]]; then
+		echo -e "	${GREEN}	UltraGrid continuous build is up to date.${NC}"
+		return 0
+	fi
+	echo -e "	${RED}	UltraGrid checksum mismatch! New version available. Downloading...${NC}"
+	curl -sL --max-time 120 -o "$ug_local_file" "$ug_download_url"
+	if [[ $? -ne 0 ]]; then
+		echo -e "	${RED}	Error downloading UltraGrid continuous build! Aborting.${NC}"
+		exit 1
+	fi
+	chmod +x "$ug_local_file"
+	echo "$remote_sha256" > "$ug_cached_checksum"
+	echo -e "	${GREEN}	UltraGrid continuous build updated successfully.${NC}"
 }
 
 
@@ -462,7 +516,7 @@ download_wavelet_git(){
 waveletdir="$(pwd)"
 #exec >$waveletdir/logs/server_bootstrap.log 2>&1
 secActive=0
-echo "Input Args: "; echo "${@}"
+echo "	Input Args: "; echo "	${*}"
 timeZone=""
 
 for i in "$@"
@@ -472,7 +526,7 @@ for i in "$@"
 				echo "Labmode enabled, skipping prompts.  Please ensure your commandline contains all necessary arguments!"; labMode="True";
 				;;
 			-d|--dev)
-				echo -e "${RED}Dev mode enabled, switching git tree to working branch${NC}"	;	developerMode="1";
+				echo -e "${RED}Dev mode enabled, switching git tree to working branch${NC}"	;	developerMode="1"
 				;;
 			-h|--help)
 				print_help;	exit 0
@@ -498,14 +552,12 @@ for i in "$@"
 			-wau=*|--wifiapuser=*)
 				wifi_deviceUser=${i#*=}; echo -e "WiFi AP User: ${wifi_deviceUser}";
 				;;
-			--enablewifi)
+			-enablewifi)
 				enableWifi="1"; echo -e "WiFi mode enabled. WiFi parameters will be written to ignition files.";
 				;;
-			--domain=*)
-				domain=${i#*=}; echo -e "Target domain: ${domain}";
+			-domain=*)	domain=${i#*=}; echo -e "Target domain: ${domain}";
 				;;
-			-ugd|--ugdev|--ugcontinuous)
-				dev_flag="DEV";
+			-ugd|--ugdev|--ugcontinuous)	dev_flag="DEV";
 				;;
 			-4=*|--ip4subnet=*)
 				ip4=${i#*=}; echo -e "WIP! IPv4 Subnet (CIDR) defined as: ${ip4}";
@@ -558,17 +610,14 @@ fi
 echo -e "\n	Copying base ignition files for customization.."
 cp ignition_files/ignition_server.yml ./server_custom.yml
 cp ignition_files/ignition_decoder.yml ./decoder_custom.yml
-ls -l ./*.yml
+#ls -l ./*.yml
 # remove old iso files
 rm -rf "${HOME}"/Downloads/wavelet_server.iso
 rm -rf "${HOME}"/Downloads/wavelet_decoder.iso
 
 if [[ -n "$registry" ]]; then
   echo "	We have defined a local registry for faster setup.  Wavelet will pull OCI layers from this registry."
-  echo "	NOTE:  Installation will FAIL with an out of date Server/Client image, or if it does not exist!"
-  echo "	NOTE:  The registry must be accessible from the wavelet subnet!"
-  echo "	NOTE:  Activating the registry option implies a functional local HTTPD server as well - please ensure it's operational!"
-  echo "	This means this install option should be activated on the deployment machine you intend to serve the images"
+  echo "	NOTE:  The registry must be accessible from the wavelet subnet until the server is provisioned."
   # We would verify the registry format here to ensure it's a valid type, script will break if not valid format
   # These get an IP from the local interface, useful in automation later
   #get_publicinterface
@@ -601,6 +650,9 @@ else
   echo "    Setting nameserver to gateway 9.9.9.9 for simple DNS resolution during initial setup.."
   sed -i "s|#nameserver|- nameserver=9.9.9.9|g" $INPUTFILES
 fi
+
+echo "	Dev mode is now enabled by default due to the need for running a patched UltraGrid AppImage.."
+dev_flag="DEV";
 
 if [[ ${labMode} == "True" ]]; then
 	automatic_setup

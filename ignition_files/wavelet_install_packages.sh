@@ -769,6 +769,8 @@ export ETCDCTL_CACERT=\"/etc/ipa/ca.crt\"" > "/etc/profile.d/etcdctl.sh"
   /usr/bin/chmod 0755 "/usr/local/bin"
   /usr/bin/chown wavelet:wavelet "/home/wavelet"
   /usr/bin/chown wavelet-root:wavelet-root "/home/wavelet-root"
+  # Add empty rdma files to suppress startup warnings
+  touch /etc/rdma/modules/{infiniband.conf,rdma.conf,roce.conf}
 }
 
 generate_files(){

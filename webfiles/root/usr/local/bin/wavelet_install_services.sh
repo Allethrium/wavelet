@@ -179,7 +179,7 @@ generate_coreos_image() {
 		echo "	Automated installer YAML already exists!"
 	fi
 	cp /var/home/wavelet/config/automated_installer.yml ./
-	butane --pretty --strict --files-dir ./ automated_installer.yml --output automated_installer.ign
+	butane --pretty --files-dir ./ automated_installer.yml --output automated_installer.ign
 	cp ./automated_installer.ign /var/home/wavelet/http/ignition/automated_installer.ign
 	cp /usr/local/bin/wavelet_install_client.sh /var/home/wavelet/http/ignition
 	# Customize for PXE boot automation
@@ -380,7 +380,7 @@ EOF
 	sed -i "s|#hostname#|$(dnsdomainname)|g" /var/home/wavelet/config/decoder_custom.yml
 	# Embed the expected SHA512 hash of the wavelet archive.  wavelet_installer_update should alter this value on new git pulls.
 	#sed -i "s|#waveletFilesVerificationHash|sha512-$(cat /var/secrets/waveletFiles_sha512.txt)|g" /var/home/wavelet/config/decoder_custom.yml
-	butane --pretty --strict --files-dir /var/home/wavelet/config/ /var/home/wavelet/config/decoder_custom.yml \
+	butane --pretty --files-dir /var/home/wavelet/config/ /var/home/wavelet/config/decoder_custom.yml \
 		--output /var/home/wavelet/http/ignition/decoder.ign
 	cp /home/wavelet/config/automated_coreos_deployment.sh /var/home/wavelet/http/ignition/
 	chown -R wavelet:wavelet /var/home/wavelet/http

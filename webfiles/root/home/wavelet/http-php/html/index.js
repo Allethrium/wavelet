@@ -519,6 +519,7 @@ class SSEManager {
 		this.missedHeartbeats = 0;
 		this.reconnectAttempts = 0;
 		this.maxReconnectDelay = 30000;
+		this.lastStatus = null
 		this.heartbeatMonitor = null;
 	}
 	connect() {
@@ -539,15 +540,14 @@ class SSEManager {
 		es.onopen = () => {
 			console.log('SSE connected');
 			this.reconnectAttempts = 0;
-			updateConnectionStatus('connected');
+			this.updateConnectionStatus('connected');
 		};
 		es.onerror = (event) => {
-			console.error('SSE error:', event);
 			if (es.readyState === EventSource.CLOSED) {
-				updateConnectionStatus('disconnected');
+				this.updateConnectionStatus('disconnected');
 				this.scheduleReconnect();
 			} else {
-				updateConnectionStatus('reconnecting');
+				// transient error during active connection — ignore
 			}
 		};
 		// Named events override onmessage
@@ -581,7 +581,7 @@ class SSEManager {
 		}
 		// Status messages
 		if (data.status) {
-			updateConnectionStatus(data.status);
+			this.updateConnectionStatus(data.status);
 			return;
 		}
 		// Error messages
@@ -634,6 +634,15 @@ class SSEManager {
 				location.reload();
 			}
 		}, 1000);
+	}
+	updateConnectionStatus(status) {
+		if (this.lastStatus === status) return; // skip duplicate calls
+		this.lastStatus = status;
+		const statusEl = document.getElementById('connection-status');
+		if (statusEl) {
+			statusEl.textContent = status;
+			statusEl.className = `status-${status}`;
+		}
 	}
 	// Helper to route events to the existing handlers in your file
 	handleEtcdEvents(events) {
@@ -880,6 +889,8 @@ function fetchData() {
 					bannerStatus: group.controls.bannerStatus || 0,
 					bannerContent: group.controls.bannerContent || "DEFAULT",
 					livestreamStatus: group.controls.livestreamStatus || 0,
+					livestreamURL: group.controls.livestreamURL || null,
+					livestreamKey: group.controls.livestreamKey || null,
 					persistInput: group.controls.persistInput || 0,
 					rebootStatus: group.controls.rebootStatus || 0,
 					resetStatus: group.controls.resetStatus || 0,
@@ -1928,9 +1939,10 @@ function createTextBox(itemInstance, spanText, targetAttribute) {
 	}
 	const placeholderText = {
 		label : itemInstance.controls.label,
-		blueToothMAC: "e.g., AA:BB:CC:DD:EE:FF",
-		liveStreamData: "e.g., https://abc.com/watch?v=ID:your_api_key_here",
-		bannerContent: "e.g., DOC CAM",
+		blueToothMAC: "ex., AA:BB:CC:DD:EE:FF",
+		liveStreamURL: "ex. https://abc.com/watch?v=ID",
+		liveStreamKey: "ex. your_api_key_here",
+		bannerContent: "ex. DOC CAM",
 	};
 	labelTextBox.setAttribute("placeholder", placeholderText[targetAttribute] || "Enter value...");
 	labelTextBox.setAttribute("type", "text");
@@ -2265,7 +2277,8 @@ function createMenuSet(item) {
 	// Additional Group controls (textboxes, file pickers, dropdowns
 	if (item.type === "group") {
 		menuSet.appendChild(createTextBox(item, "📶 BlueTooth MAC", "blueToothMAC", "changeBTMac"));
-		menuSet.appendChild(createTextBox(item, "📺 Livestream URL:APIKEY",  "liveStreamData", "changeLiveStreamSettings"));
+		menuSet.appendChild(createTextBox(item, "📺 Livestream URL",  "liveStreamURL", "changeLiveStreamSettings"));
+		menuSet.appendChild(createTextBox(item, "📺 Livestream Key",  "liveStreamKey", "changeLiveStreamSettings"));
 		menuSet.appendChild(createTextBox(item, "📝 Banner Text", "bannerContent", "changeBannerContent"));
 		menuSet.appendChild(createFilePicker(item));
 		const codecDropdown = createCodecDropdown(item);
@@ -3060,6 +3073,8 @@ function handleGroupEvents(event) {
 				chainedToGroup: null,
 				label: "New Group",
 				livestreamStatus: 0,
+				livestreamURL: null,
+				livestreamKey: null,
 				persistInput: 0,
 				rebootStatus: 0,
 				resetStatus: 0,
@@ -3471,16 +3486,6 @@ function handleGlobalsEvents(event) {
 	if (!foundGlobalsElement) {
 		console.log("Element not found for globals event");
 	}
-}
-
-function updateConnectionStatus(status) {
-	// UI helper functions
-	const statusEl = document.getElementById('connection-status');
-	if (statusEl) {
-		statusEl.textContent = status;
-		statusEl.className = `status-${status}`;
-	}
-	console.log('Connection status:', status);
 }
 
 function updateLastUpdateTime() {

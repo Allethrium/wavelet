@@ -6,3 +6,4 @@ if [ -f ~/.bashrc ]; then
 fi
 
 # User specific environment and startup programs
+export NDI_RUNTIME_DIR_V6=/usr/lib64/
