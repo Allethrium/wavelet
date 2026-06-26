@@ -463,7 +463,7 @@ nginx_quadlets(){
 		Volume=/var/home/wavelet/config/php/php-fpm.d/www.conf:/usr/local/etc/php-fpm.d/www.conf:z
 		Volume=/var/home/wavelet/config/php/php.ini:/etc/php.ini:z
 		Volume=/var/home/wavelet/config/php/php-fpm.conf:/usr/local/etc/php-fpm.conf:z
-		Volume=/var/home/wavelet/config/redis.conf:/usr/local/etc/redis.conf:z
+		Volume=/var/home/wavelet/config/redis.conf:/usr/local/etc/redis/redis.conf:z
 		Volume=/etc/ipa/ca.crt:/usr/local/share/ca-certificates/ca.crt
 		Volume=/var/home/wavelet/http-php/log:/var/log/nginx:Z
 		Volume=/var/home/wavelet/http-php/html:/var/www/html:Z
