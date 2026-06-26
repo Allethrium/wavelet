@@ -1,0 +1,15 @@
+# Customizes php:cli with redis package utilizing PIE
+
+# Note the container is designed to run in the http-php pod with appropriate volume mounts
+# Without these, the watch and core_processor will be unable to start
+
+FROM php:fpm
+
+RUN apt-get update && apt-get install -y \
+        libssl-dev \
+        && rm -rf /var/lib/apt/lists/*
+RUN printf '\n' | pecl install redis
+# remember to add extension to ini.
+RUN echo "extension=redis.so" >> /usr/local/etc/php/php.ini
+COPY scripts/php_entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh

@@ -8,7 +8,7 @@
 FROM coreos_overlay_client AS server
 
 RUN rpm-ostree install -y -A \
-        expect \
+        expect avahi-tools tcpdump nmap \
         buildah butane inotify-tools \
         zlib-ng-compat openssl ascii \
         live555 && \

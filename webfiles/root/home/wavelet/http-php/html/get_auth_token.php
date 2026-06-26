@@ -1,7 +1,8 @@
 <?php
+// Includes on every PHP module which interacts with etcd
+// Defines common parameters they may need
+// Also contains some other common QoL functions
 // Grabs an auth token based on the password string set during server spinup in NGINX config
-// These vars shouldn't be accessible from the web browser side, and even if they are, they grant access only to /UI/
-// This module defines the hostname for every other PHP module, as well as the location of the CA.
 
 if (!defined('HOST_NAME')) {
 	define('HOST_NAME', getenv('HOST_MACHINE_HOSTNAME'));
@@ -102,4 +103,17 @@ function get_prefix_range_end($prefix): string
 	}
 	// All bytes are 0xff, no range end needed (watch single key or all keys with this prefix)
 	return "\0";
+}
+
+function etcd_healthCheck(): bool{
+	// Health check
+	$HOST_NAME = "svr.wavelet.allethrium";
+	$ch = setCurl();
+	curl_setopt($ch, CURLOPT_URL, 'https://' . ($HOST_NAME) . ':2379/health');
+	$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+	if ($httpCode !== 200) {
+		return false;
+	} else {
+		return true;
+	}
 }

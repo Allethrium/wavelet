@@ -539,6 +539,7 @@ build_container_image "tftpd" "Containerfile.tftpd"
 build_container_image "tftpboot" "Containerfile.tftpboot"
 build_container_image "isc-kea" "Containerfile.isc-kea"
 build_container_image "radiusd" "Containerfile.radiusd"
+build_container_image "php-fpm-redis" "Containerfile.php-fpm-redis"
 
 pull_registry_images
 echo -e "${GREEN}Registry base images generated and stored in the registry on this host."

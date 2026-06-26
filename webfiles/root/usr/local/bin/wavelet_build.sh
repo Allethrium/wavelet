@@ -409,7 +409,7 @@ nginx_quadlets(){
 		Description=PHP:FPM
 
 		[Container]
-		Image=%H/php:latest
+		Image=%H/php-fpm-redis:latest
 		Environment=HOST_MACHINE_HOSTNAME=%H
 		AutoUpdate=registry
 		Secret=webui-key
@@ -433,8 +433,8 @@ nginx_quadlets(){
 
 		[Container]
 		Image=%H/redis:latest
+		Exec=redis-server /usr/local/etc/redis/redis.conf
 		Environment=HOST_MACHINE_HOSTNAME=%H
-		Environment=REGIS_ARGS="%H"
 		AutoUpdate=registry
 		Secret=redispw
 		Pod=http-php.pod
@@ -444,7 +444,7 @@ nginx_quadlets(){
 	podman secret create webui-key /var/home/wavelet/.ssh/secrets/.webui.key
 	podman secret create webui-enc /var/home/wavelet/config/.webui.enc
 	# Generate a random password for redis
-	local redisPW="$(cat '/proc/sys/kernel/random/uuid' | sha256sum | tr -d '- ')"
+	local redisPW="$(cat '/proc/sys/kernel/random/uuid' | sha256sum | tr -d ' -')"
 	# SED the redis.conf file with generated password
 	sed -i "s/my-redis-password/$redisPW/g" "/var/home/wavelet/config/redis.conf"
 	echo "$redisPW" | podman secret create redispw -
@@ -456,8 +456,7 @@ nginx_quadlets(){
 	cat > "/var/home/wavelet/.config/containers/systemd/http-php.pod" <<-EOF
 		[Pod]
 		PublishPort=9080:80
-		PublishPort=6379
-		PublishPort=443
+		PublishPort=443:443
 		Volume=/var/home/wavelet/config/certs/httpd.crt:/etc/pki/tls/certs/httpd.crt:z
 		Volume=/var/home/wavelet/config/certs/httpd.key:/etc/pki/tls/private/httpd.key:z
 		Volume=/var/home/wavelet/config/php/php-fpm.d/www.conf:/usr/local/etc/php-fpm.d/www.conf:z

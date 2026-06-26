@@ -281,7 +281,7 @@ pull_registry_images() {
     sourceList+=("${oci_registry}/coreos-installer:latest")
     sourceList+=("${oci_registry}/fedora:latest")
     sourceList+=("${oci_registry}/nginx:latest")
-    sourceList+=("${oci_registry}/php:latest")
+    sourceList+=("${oci_registry}/php-fpm-redis:latest") # PHP-FPM customized with redis package
     sourceList+=("${oci_registry}/redis:latest")
     sourceList+=("${oci_registry}/httpd:latest")
     sourceList+=("${oci_registry}/tftpboot")

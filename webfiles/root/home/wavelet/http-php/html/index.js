@@ -677,6 +677,8 @@ class SSEManager {
 		});
 	}
 }
+
+
 //
 //
 // Initial fetch calls
