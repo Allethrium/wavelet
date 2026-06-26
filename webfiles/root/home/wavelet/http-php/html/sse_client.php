@@ -82,7 +82,7 @@ if (isset($_SERVER['HTTP_LAST_EVENT_ID']) && $_SERVER['HTTP_LAST_EVENT_ID'] !== 
     $lastEventId = $_SERVER['HTTP_LAST_EVENT_ID'];
     log_msg("Replaying missed events from {$lastEventId}");
     // Query Redis for missed events
-    $redisMissed = $redisSock->xReadRange($redisStream, '(' . $lastEventId, '+', ['count' => 1000]);
+    $redisMissed = $redisSock->xRange($redisStream, $lastEventId, '+', 1000);
     $replayedCount = 0;
     if ($redisMissed !== false && isset($redisMissed[$redisStream])) {
         foreach ($redisMissed[$redisStream] as $eventId => $eventData) {
@@ -95,6 +95,9 @@ if (isset($_SERVER['HTTP_LAST_EVENT_ID']) && $_SERVER['HTTP_LAST_EVENT_ID'] !== 
             }
             $batch = [];
             foreach ($data as $event) {
+                if (!isset($event['key']) || $event['key'] === '') {
+                    continue;
+                }
                 buffer_event($event, $eventId);
                 $batch[] = $event;
             }
@@ -174,9 +177,12 @@ while (true) {
                 $data = [$data];
             }
 
-            // Buffer all events and collect valid ones
+            // Buffer all events and collect valid ones (must have 'key' for frontend)
             $batch = [];
             foreach ($data as $event) {
+                if (!isset($event['key']) || $event['key'] === '') {
+                    continue;
+                }
                 buffer_event($event, $eventId);
                 $batch[] = $event;
             }

@@ -411,6 +411,7 @@ nginx_quadlets(){
 		[Container]
 		Image=%H/php-fpm-redis:latest
 		Environment=HOST_MACHINE_HOSTNAME=%H
+		Exec=/bin/bash -c '/usr/local/bin/entrypoint.sh'
 		AutoUpdate=registry
 		Secret=webui-key
 		Secret=webui-enc

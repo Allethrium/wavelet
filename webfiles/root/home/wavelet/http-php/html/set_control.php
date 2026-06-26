@@ -32,7 +32,7 @@ $type           = $submissionData ["type"]; //  GROUP, HOST, INPUT, GLOBALS
 $token          = get_etcd_auth_token();
 
 // Debug logging - add this at the beginning to see all inputs
-error_log("DEBUG: Received request - Type: " . $type . ", Operation: " . $operation . ", Data: " . $opData . ", HashID: " . $hashID);
+//error_log("SET_CONTROL: DEBUG: Received request - Type: " . $type . ", Operation: " . $operation . ", Data: " . $opData . ", HashID: " . $hashID);
 
 function set_etcd($token, $keyPrefix, $keyValue): void
 {
@@ -45,7 +45,7 @@ function set_etcd($token, $keyPrefix, $keyValue): void
     curl_setopt($ch, CURLOPT_URL, 'https://' . (HOST_NAME) . ':2379/v3/kv/put');
 	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 	curl_setopt($ch, CURLOPT_POSTFIELDS, "{\"key\":\"$keyPrefix\", \"value\":\"$keyValue\"}");
-	error_log("DEBUG: Attempting to write to ETCD: " . $keyPrefix . " With Value: " . $keyValue);
+//	error_log("SET_CONTROL: DEBUG: Attempting to write to ETCD: " . $keyPrefix . " With Value: " . $keyValue);
 	curl_exec($ch);
 	if (curl_errno($ch)) {
 		http_response_code(500);
@@ -57,7 +57,7 @@ function set_etcd($token, $keyPrefix, $keyValue): void
 			http_response_code($httpCode);
 			echo json_encode(["error" => "etcd error: $httpCode"]);
 		} else {
-			error_log("DEBUG: Wrote: " . $keyPrefix . " With Value: " . $keyValue);
+//			error_log("SET_CONTROL: DEBUG: Wrote: " . $keyPrefix . " With Value: " . $keyValue);
 			echo json_encode([
 				"success" => true,
 //				"key" => $keyPrefix,
@@ -92,7 +92,7 @@ function validateValue($function, $value): void
 		"UIEnable"
 	);
 	// Debug: Log validation attempt
-	error_log("DEBUG: Validating function: " . $function . ", value: " . $value);
+//	error_log("SET_CONTROL: DEBUG: Validating function: " . $function . ", value: " . $value);
 	// Check if this is one of the status fields that need suffix mapping
 	$actualFunction = $function;
 	foreach($statusSuffixMap as $baseKey => $statusKey) {
@@ -100,7 +100,7 @@ function validateValue($function, $value): void
 			$actualFunction = $baseKey;
 			// Overwrite $function to the base value
 			$function = $baseKey;
-			error_log("DEBUG: Overwritten function to mapped base value: " . $function);
+//			error_log("SET_CONTROL: DEBUG: Overwritten function to mapped base value: " . $function);
 			break;
 		}
 	}
@@ -234,19 +234,19 @@ function checkImageData($imageData) {
 
 switch ($type) {
 	case 'GROUP':
-		error_log("DEBUG: GROUP operation");
+//		error_log("SET_CONTROL: DEBUG: GROUP operation");
 		switch ($operation) {
 			case 'deleteGroup':
 				// Asks Wavelet to delete the group
 				// If the group is populated, all hosts will revert to the default/server group
-				error_log("DEBUG: GROUP operation: deleteGroup:". $hashID);
+//				error_log("SET_CONTROL: DEBUG: GROUP operation: deleteGroup:". $hashID);
 				$prefixstring   =   "/UI/GLOBALS/control/GROUP-DELETE";
 				$keyValue       =   $hashID;
 				break;
 			case 'GROUPCONTROL':
 				$parts = explode(':', $opData, 3);
 				// Debug: Log the parsed parts
-				error_log("DEBUG: GROUPCONTROL parts: " . implode(", ", $parts));
+//				error_log("SET_CONTROL: DEBUG: GROUPCONTROL parts: " . implode(", ", $parts));
 				if (count($parts) < 2) {
 					error_log("ERROR: Missing data in GROUPCONTROL");
 					echo json_encode(["error" => "Missing data"]);
@@ -256,7 +256,7 @@ switch ($type) {
 				$subOperation = $parts[0];
 				$dataValue    = $parts[1];
 				$toggle      = $parts[2] ?? null; // This is a string literal "TOGGLE" to tell us it's a toggle value
-				error_log("DEBUG: GROUPCONTROL - subOperation: " . $subOperation . ", dataValue: " . $dataValue . ", toggle: " . $toggle);
+//				error_log("SET_CONTROL: DEBUG: GROUPCONTROL - subOperation: " . $subOperation . ", dataValue: " . $dataValue . ", toggle: " . $toggle);
 				if ($toggle === "TOGGLE") {
 					validateValue($parts[0], $parts[1]);
 					$prefixstring	=	"/UI/GROUPS/" . $hashID . "/control/" . $parts[0];
@@ -347,15 +347,15 @@ switch ($type) {
 				break;
 			default:
 				http_response_code(400);
-				error_log("DEBUG: ERROR: GROUP operation, default selector.");
+//				error_log("SET_CONTROL: DEBUG: ERROR: GROUP operation, default selector.");
 				return;
 		}
-		error_log("DEBUG: Final attempting etcd write: " . $prefixstring . " with value: " . $keyValue);
+//		error_log("SET_CONTROL: DEBUG: Final attempting etcd write: " . $prefixstring . " with value: " . $keyValue);
 		if (isset($prefixstring, $keyValue)) {
 			$keyPrefix = base64_encode($prefixstring);
 			$keyValue  = base64_encode($keyValue);
 			// Debug: Log final etcd call
-			error_log("DEBUG: Final GROUPCONTROL etcd call: " . $keyPrefix . " with value: " . $keyValue);
+//			error_log("SET_CONTROL: DEBUG: Final GROUPCONTROL etcd call: " . $keyPrefix . " with value: " . $keyValue);
 			set_etcd($token, $keyPrefix, $keyValue);
 		}
 		break;
@@ -377,7 +377,7 @@ switch ($type) {
 				$subOperation = $parts[0];
 				$dataValue    = $parts[1];
 				$toggle      = $parts[2] ?? null;
-				error_log("DEBUG: HOSTCONTROL - subOperation: " . $subOperation . ", dataValue: " . $dataValue . ", toggle: " . $toggle);
+//				error_log("SET_CONTROL: DEBUG: HOSTCONTROL - subOperation: " . $subOperation . ", dataValue: " . $dataValue . ", toggle: " . $toggle);
 				if ($toggle === "TOGGLE") {
 					validateValue($parts[0], $parts[1]);
 					$prefixstring	=	"/UI/HOSTS/" . $hashID . "/control/" . $parts[0];
@@ -415,7 +415,7 @@ switch ($type) {
 							$keyValue = $dataValue;
 							break;
 						default:
-							error_log("DEBUG: Unknown HOST subOperation: " . $subOperation);
+//							error_log("SET_CONTROL: DEBUG: Unknown HOST subOperation: " . $subOperation);
 							// Don't write if nothing matched
 							$prefixstring = null;
 							$keyValue = null;
@@ -428,7 +428,7 @@ switch ($type) {
 			$keyPrefix = base64_encode($prefixstring);
 			$keyValue = base64_encode($keyValue);
 			// Debug: Log final etcd call
-			error_log("DEBUG: Final HOSTCONTROL etcd call: " . $prefixstring . " with value: " . $keyValue);
+//			error_log("SET_CONTROL: DEBUG: Final HOSTCONTROL etcd call: " . $prefixstring . " with value: " . $keyValue);
 			set_etcd($token, $keyPrefix, $keyValue);
 		}
 		break;
@@ -437,16 +437,16 @@ switch ($type) {
 		switch ($operation) {
 			case 'createGroup':
 				// Asks Wavelet to generate a new group with a random name
-				error_log("DEBUG: GROUP operation: createGroup");
+//				error_log("SET_CONTROL: DEBUG: GROUP operation: createGroup");
 				$prefixstring   =   "/UI/GLOBALS/control/GROUP-CREATE";
 				$keyValue       =   "PLEASE";
 				break;
 			case 'GLOBALSCONTROL':
 				// Debug: Log incoming data
-				error_log("DEBUG: GLOBALSCONTROL received - Operation: " . $operation . ", Data: " . $opData);
+//				error_log("SET_CONTROL: DEBUG: GLOBALSCONTROL received - Operation: " . $operation . ", Data: " . $opData);
 				$parts = explode(':', $opData, 3);
 				// Debug: Log the parsed parts
-				error_log("DEBUG: GLOBALSCONTROL parts: " . implode(", ", $parts));
+//				error_log("SET_CONTROL: DEBUG: GLOBALSCONTROL parts: " . implode(", ", $parts));
 				if (count($parts) < 2) {
 					error_log("ERROR: Missing data in GLOBALSCONTROL");
 					echo json_encode(["error" => "Missing data"]);
@@ -456,7 +456,7 @@ switch ($type) {
 				$subOperation = $parts[0];
 				$dataValue    = $parts[1];
 				$toggle      = $parts[2] ?? null;
-				error_log("DEBUG: GLOBALSCONTROL - subOperation: " . $subOperation . ", dataValue: " . $dataValue . ", toggle: " . $toggle);
+//				error_log("SET_CONTROL:  GLOBALSCONTROL - subOperation: " . $subOperation . ", dataValue: " . $dataValue . ", toggle: " . $toggle);
 				if ($toggle === "TOGGLE") {
 					validateValue($parts[0], $parts[1]);
 					$prefixstring	=	"/UI/GLOBALS/controls/" . $parts[0];
@@ -470,18 +470,18 @@ switch ($type) {
 							break;
 						default:
 							// Debug: Log unknown subOperation
-							error_log("DEBUG: Unknown subOperation in GLOBALS: " . $subOperation);
+//							error_log("SET_CONTROL: DEBUG: Unknown subOperation in GLOBALS: " . $subOperation);
 							break;
 					}
 				}
 				break;
 		}
-		error_log("DEBUG: Final attempting etcd write: " . $prefixstring . " with value: " . $keyValue);
+//		error_log("SET_CONTROL: DEBUG: Final attempting etcd write: " . $prefixstring . " with value: " . $keyValue);
 		if (isset($prefixstring, $keyValue)) {
 			$keyPrefix = base64_encode($prefixstring);
 			$keyValue = base64_encode($keyValue);
 			// Debug: Log final etcd call
-			error_log("DEBUG: Final GLOBALSCONTROL etcd call: " . $keyPrefix . " with value: " . $keyValue);
+//			error_log("SET_CONTROL: DEBUG: Final GLOBALSCONTROL etcd call: " . $keyPrefix . " with value: " . $keyValue);
 			set_etcd($token, $keyPrefix, $keyValue);
 		}
 		break;
