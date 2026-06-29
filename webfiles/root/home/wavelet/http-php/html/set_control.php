@@ -279,6 +279,10 @@ switch ($type) {
 							$prefixstring = "/UI/GROUPS/$hashID/control/blueToothMAC";
 							$keyValue = $dataValue;
 							break;
+						case 'changeEncoderTimeout':
+							$prefixstring = "/UI/GROUPS/$hashID/control/encoderTimeoutSeconds";
+							$keyValue = $dataValue;
+							break;
 						case 'changeGroupSource':
 							$prefixstring = "/UI/GROUPS/$hashID/control/sourceHash";
 							$keyValue = $dataValue;

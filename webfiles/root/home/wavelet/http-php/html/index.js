@@ -2,7 +2,7 @@ const REALTIME_CONFIG = {
 	// Sets us up for websockets if it is available
 	USE_WEBSOCKETS: false, // Set to true when WebSocket server is deployed
 	WS_URL: `wss://${window.location.host}/ws`,
-	SSE_URL: '/sse.php'
+	SSE_URL: '/sse_client.php'
 };
 
 function escapeHTML(val) {
@@ -2278,6 +2278,7 @@ function createMenuSet(item) {
 	menuSet.appendChild(elementDiv);
 	// Additional Group controls (textboxes, file pickers, dropdowns
 	if (item.type === "group") {
+		menuSet.appendChild(createTextBox(item, "Encoder Timeout", "encoderTimeoutSeconds", "changeEncoderTimeout"));
 		menuSet.appendChild(createTextBox(item, "📶 BlueTooth MAC", "blueToothMAC", "changeBTMac"));
 		menuSet.appendChild(createTextBox(item, "📺 Livestream URL",  "liveStreamURL", "changeLiveStreamSettings"));
 		menuSet.appendChild(createTextBox(item, "📺 Livestream Key",  "liveStreamKey", "changeLiveStreamSettings"));

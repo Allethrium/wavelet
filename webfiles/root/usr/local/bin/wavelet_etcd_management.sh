@@ -376,8 +376,9 @@ generate_etcd_host_role() {
 	KEYNAME="/HOSTS/$clientHostName"; clientHash="$("$ETCDINTERACTIONMOD" 'read_etcd_global' $KEYNAME)"
 	# Set up client permissions - UI commands (Read Only under own hostname)
 	VAL="$clientHostName"; KEY="/UI/HOSTS/$clientHash"; createCmd "$KEY" "$VAL"; roleCmdReadOnly "$KEY"
-	# Everyone should be able to read globals
+	# Everyone should be able to read globals & the primary server group hash
 	roleCmdReadOnly "/UI/GLOBALS/"
+	roleCmdReadOnly "/GROUPS/$(hostname)"
 	# Read-only keys
 	KEY="CA_CERT"; roleCmdReadOnly "${KEY}"
 	KEY="SVR"; roleCmdReadOnly "${KEY}"

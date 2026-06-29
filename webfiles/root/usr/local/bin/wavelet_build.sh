@@ -179,38 +179,83 @@ event_decoder(){
 	echo -e "	Decoder startup routine started."
 	KEYDATA=""
 	local staticImagePath; local staticImageURL
-	local staticHashPath; local staticHashURL
+	local staticHashPath; local staticHashURL; local groupHash
 	local blankImagePath; local serverCheckSum; local localCheckSum
-	serverHostName="$(cat /var/home/wavelet/config/serverhostname.txt)"
 	# Provision request to etcd
+	serverHostName="$(cat /var/home/wavelet/config/serverhostname.txt)"
+	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global
+	if [[ -z "$printvalue" ]]; then
+		KEYNAME="/GROUPS/$serverHostName"; read_etcd_global; groupHash="$printvalue"
+	fi
+
+	# Get group video source
+	KEYNAME="/UI/GROUPS/$groupHash/control/sourceHash"; read_etcd_global
+	sourceHash="$printvalue"
+	if [[ -z "$sourceHash" ]] || ! [[ "$sourceHash" =~ ^[0-3]$ ]]; then
+		# default to initial static splash image
+		sourceHash=1
+	fi
+	channel="$sourceHash"
+	streamMode="static"
+
+	# Determine video source state keys (replicating run_decoder logic)
+	if [[ "$sourceHash" =~ ^[0-3]$ ]]; then
+		# Static image - no subscription needed
+		videoSourceType="static"
+		videoSourceActive="0"
+		videoSourceSubType="static"
+		videoSourceDirect="0"
+	else
+		# Defaulting to UltraGrid source
+		videoSourceType="ug"
+		videoSourceActive="1"
+		videoSourceSubType="ug"
+		videoSourceDirect="0"
+	fi
+
 	if [[ ! -f "/var/home/wavelet/config/provisioned.complete" ]]; then
 		echo "	First run, sending provision request to server.."
 		etcd_provision_watcher; sleep 2
 		etcd_provision_request
 		# Generate control keys under our host entry, if the mod key has been changed more than 0 times.
 		# In the case of a client, the initial host key has already been generated
+		# Get the primary group
+
+
 		KEYDATA="mod(\"/HOSTS/$hostNameSys\") > \"0\"
 
-put /HOSTS/$hostNameSys/control/blankStatus \"0\"
 put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
 put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
 put /HOSTS/$hostNameSys/control/resetStatus \"0\"
 put /HOSTS/$hostNameSys/control/revealStatus \"0\"
 put /HOSTS/$hostNameSys/control/healthStatus \"0\"
 put /HOSTS/$hostNameSys/type \"dec\"
+put /HOSTS/$hostNameSys/control/videoSourceType \"$videoSourceType\"
+put /HOSTS/$hostNameSys/control/videoSourceActive \"$videoSourceActive\"
+put /HOSTS/$hostNameSys/control/videoSourceSubType \"$videoSourceSubType\"
+put /HOSTS/$hostNameSys/control/videoSourceDirect \"$videoSourceDirect\"
+put /HOSTS/$hostNameSys/control/previousVideoSourceKey \"$sourceHash\"
+put /HOSTS/$hostNameSys/control/previousVideoSourceType \"$streamMode\"
+put /HOSTS/$hostNameSys/control/channel-Source \"$channel-$sourceHash\"
 put /HOSTS/$hostNameSys/wavelet_build_completed \"1\"
 
-put /HOSTS/$hostNameSys/control/blankStatus \"0\"
 put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
 put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
 put /HOSTS/$hostNameSys/control/resetStatus \"0\"
 put /HOSTS/$hostNameSys/control/revealStatus \"0\"
 put /HOSTS/$hostNameSys/control/healthStatus \"0\"
 put /HOSTS/$hostNameSys/type \"dec\"
+put /HOSTS/$hostNameSys/control/videoSourceType \"$videoSourceType\"
+put /HOSTS/$hostNameSys/control/videoSourceActive \"$videoSourceActive\"
+put /HOSTS/$hostNameSys/control/videoSourceSubType \"$videoSourceSubType\"
+put /HOSTS/$hostNameSys/control/videoSourceDirect \"$videoSourceDirect\"
+put /HOSTS/$hostNameSys/control/previousVideoSourceKey \"$sourceHash\"
+put /HOSTS/$hostNameSys/control/previousVideoSourceType \"$streamMode\"
+put /HOSTS/$hostNameSys/control/channel-Source \"$channel-$sourceHash\"
 put /HOSTS/$hostNameSys/wavelet_build_completed \"1\"
 
 "
-	touch /var/home/wavelet/config/provisioned.complete
+		touch /var/home/wavelet/config/provisioned.complete
 	else
 		# Write any data which may have been updated on the system side
 		# Note IP address is set already
@@ -223,6 +268,13 @@ put /HOSTS/$hostNameSys/control/resetStatus \"0\"
 put /HOSTS/$hostNameSys/control/revealStatus \"0\"
 put /HOSTS/$hostNameSys/control/healthStatus \"0\"
 put /HOSTS/$hostNameSys/type \"dec\"
+put /HOSTS/$hostNameSys/control/videoSourceType \"$videoSourceType\"
+put /HOSTS/$hostNameSys/control/videoSourceActive \"$videoSourceActive\"
+put /HOSTS/$hostNameSys/control/videoSourceSubType \"$videoSourceSubType\"
+put /HOSTS/$hostNameSys/control/videoSourceDirect \"$videoSourceDirect\"
+put /HOSTS/$hostNameSys/control/previousVideoSourceKey \"$sourceHash\"
+put /HOSTS/$hostNameSys/control/previousVideoSourceType \"$streamMode\"
+put /HOSTS/$hostNameSys/control/channel-Source \"$channel-$sourceHash\"
 
 put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
 put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
@@ -230,6 +282,13 @@ put /HOSTS/$hostNameSys/control/resetStatus \"0\"
 put /HOSTS/$hostNameSys/control/revealStatus \"0\"
 put /HOSTS/$hostNameSys/control/healthStatus \"0\"
 put /HOSTS/$hostNameSys/type \"dec\"
+put /HOSTS/$hostNameSys/control/videoSourceType \"$videoSourceType\"
+put /HOSTS/$hostNameSys/control/videoSourceActive \"$videoSourceActive\"
+put /HOSTS/$hostNameSys/control/videoSourceSubType \"$videoSourceSubType\"
+put /HOSTS/$hostNameSys/control/videoSourceDirect \"$videoSourceDirect\"
+put /HOSTS/$hostNameSys/control/previousVideoSourceKey \"$sourceHash\"
+put /HOSTS/$hostNameSys/control/previousVideoSourceType \"$streamMode\"
+put /HOSTS/$hostNameSys/control/channel-Source \"$channel-$sourceHash\"
 
 "
 	fi
@@ -287,7 +346,6 @@ put /HOSTS/$hostNameSys/type \"dec\"
   			wget -O "$staticImagePath" "$staticImageURL"
   		fi
 	fi
-	touch /var/home/wavelet/config/provisioned.complete
 	event_connectNetwork
 	"$WAVELET_CLIENT_CONTROLLER_MOD" "RUN"
 }
@@ -932,7 +990,8 @@ event_clear_devicemap(){
 	echo "	Device map file removed, will be regenerated on input device selection."
 }
 event_checkGroups(){
-	# Launched only from the server
+	# Launched only from the server upon initial bootrap
+	# Provides a key in /GROUPS/$hostNameSys for clients to find the primary group.
 	echo "	Executing etcd txn.  This will only work if a group does not already exist."
 	# Generate a new group with basic settings and server group as source.
 	# A Group typically associates an encoder or a server with a group of decoders, allowing for multiple sources and clients to run simultaneously
