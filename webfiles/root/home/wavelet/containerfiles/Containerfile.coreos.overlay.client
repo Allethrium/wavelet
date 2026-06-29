@@ -8,14 +8,15 @@
 # This containerfile aims to build all dependencies for Wavelet in a container for client systems.  It's the "base layer"
 # To be applied as an ostree rebase
 
-FROM quay.io/fedora/fedora-coreos:43.20260301.3.1
+FROM quay.io/fedora/fedora-coreos:stable
+# Stable known-good version: 43.20260301.3.1
 
 # Step 1: Configure repos and install packages that don't conflict with Fedora defaults
-RUN rpm-ostree override remove nfs-utils-coreos --install nfs-utils
+# RUN rpm-ostree override remove nfs-utils-coreos --install nfs-utils
 RUN rm /etc/yum.repos.d/fedora-cisco-openh264.repo && \
     curl -o /etc/yum.repos.d/swayfx.repo https://copr.fedorainfracloud.org/coprs/swayfx/swayfx/repo/fedora-43/swayfx-swayfx-fedora-43.repo && \
     rpm-ostree install -y -A \
-        wget fontawesome-fonts wl-clipboard nnn mako swayfx swayimg bemenu rofi-wayland lxsession \
+        wget fontawesome-fonts wl-clipboard nnn mako swayfx swayimg bemenu rofi-wayland lxsession nfs-utils \
         xwayland-run waybar chrony foot vim powerline powerline-fonts vim-powerline greetd \
         NetworkManager-wifi iw wireless-regdb wpa_supplicant nfs-utils \
         avahi nss-mdns rdma freeipa-client \
@@ -33,14 +34,16 @@ RUN rm /etc/yum.repos.d/fedora-cisco-openh264.repo && \
         fastfetch btop mesa-libOpenCL srt srt-libs pipewire-utils usbutils \
         plymouth plymouth-system-theme plymouth-theme-fade-in plymouth-theme-spinfinity \
         plymouth-plugin-script plymouth-scripts \
-        rkhunter clamav clamd clamav-freshclam firefox && \
+        rkhunter clamav clamd clamav-freshclam firefox
     # Step 2: Install rpmfusion repos, then replace Fedora's free ffmpeg with rpmfusion version
-    rpm-ostree install -y -A \
+RUN rpm-ostree install -y -A \
         https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
-        https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm && \
-    rpm-ostree override remove \
+        https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+RUN rpm-ostree override remove \
         libavcodec-free libavfilter-free libavformat-free libavutil-free \
-        ffmpeg-free libpostproc-free libswresample-free libswscale-free libavdevice-free && \
+        ffmpeg-free \
+#        libpostproc-free \
+        libswresample-free libswscale-free libavdevice-free && \
     rpm-ostree install -y -A \
         ffmpeg ffmpeg-libs intel-media-driver libheif-freeworld \
         libndi-sdk ndi-sdk ndi-sdk-documentation \

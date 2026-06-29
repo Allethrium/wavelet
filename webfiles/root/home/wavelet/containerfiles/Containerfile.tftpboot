@@ -14,26 +14,38 @@ RUN dnf install -y dnf-utils grub2-efi-x64-modules grub2-tools-extra grub2-pc-mo
     grub2-mknetdir --net-directory /tmp/var/lib/tftpboot/
 RUN cd /tmp/boot_rpms && yumdownloader shim shim-x64 grub2-efi grub2-efi-x64
 RUN cd /tmp/boot_rpms && \
+    echo -e "\nLOOKING FOR FILES: " && \
+    ls -laht /tmp/boot_rpms/ && \
     grub2efi32=$(ls /tmp/boot_rpms/grub2-efi-ia32*.rpm) && \
     grub2efi64=$(ls /tmp/boot_rpms/grub2-efi-x64*.rpm) && \
     shim=$(ls /tmp/boot_rpms/shim*.rpm | grep shim) && \
-    rpm2cpio ${grub2efi32} | cpio -idmv && \
-    rpm2cpio ${grub2efi64} | cpio -idmv && \
-    rpm2cpio ${shim} | cpio -idmv && \
+    rpm2cpio ${grub2efi32} | cpio -idmuv && \
+    rpm2cpio ${grub2efi64} | cpio -idmuv && \
+    rpm2cpio ${shim} | cpio -idmuv && \
     # Notes, mmx64.efi = MokManager
-    cp /tmp/boot_rpms/boot/efi/EFI/fedora/{grubia32.efi,grubx64.efi,shim.efi,shimx64.efi,BOOTX64.CSV,mmx64.efi} /tmp/var/lib/tftpboot/ && \
-    cp /tmp/boot_rpms/boot/efi/EFI/BOOT/{BOOTX64.EFI,fbx64.efi} /tmp/var/lib/tftpboot/
+    echo -e "\nLOOKING FOR EFI FILES:" && \
+    mkdir -p /tmp/var/lib/tftpboot/EFI/fedora && \
+    mkdir -p /tmp/var/lib/tftpboot/EFI/BOOT && \
+    mkdir -p /tmp/var/lib/tftpboot/boot/grub2/fonts && \
+    cp /tmp/boot_rpms/boot/grub2/fonts/unicode.pf2 /tmp/var/lib/tftpboot/boot/grub2/fonts/ && \
+    cp /tmp/boot_rpms/boot/grub2/grubenv /tmp/var/lib/tftpboot/boot/grub2/ && \
+    GRUBX64=$(find /tmp/boot_rpms/usr/lib/efi/grub2 -name 'grubx64.efi' | head -n1) && \
+    GRUBIA32=$(find /tmp/boot_rpms/usr/lib/efi/grub2 -name 'grubia32.efi' | head -n1) && \
+    cp "$GRUBX64" /tmp/var/lib/tftpboot/EFI/fedora/ && \
+    cp "$GRUBIA32" /tmp/var/lib/tftpboot/EFI/fedora/ && \
+    SHIMX64=$(find /tmp/boot_rpms/usr/lib/efi/shim -name 'shimx64.efi' | head -n1) && \
+    SHIM=$(find /tmp/boot_rpms/usr/lib/efi/shim -name 'shim.efi' | head -n1) && \
+    MMX64=$(find /tmp/boot_rpms/usr/lib/efi/shim -name 'mmx64.efi' | head -n1) && \
+    cp "$SHIMX64" /tmp/var/lib/tftpboot/EFI/fedora/ && \
+    cp "$SHIM" /tmp/var/lib/tftpboot/EFI/fedora/ && \
+    cp "$MMX64" /tmp/var/lib/tftpboot/EFI/fedora/ && \
+    BOOTX64=$(find /tmp/boot_rpms/usr/lib/efi/shim -name 'BOOTX64.EFI' | head -n1) && \
+    FBX64=$(find /tmp/boot_rpms/usr/lib/efi/shim -name 'fbx64.efi' | head -n1) && \
+    cp "$BOOTX64" /tmp/var/lib/tftpboot/EFI/BOOT/ && \
+    cp "$FBX64" /tmp/var/lib/tftpboot/EFI/BOOT/
 RUN mkdir -p /tar_root && \
     tar -cf tftpboot.tar.xz /tmp/var/lib/tftpboot && \
     cp tftpboot.tar.xz /tar_root
-RUN ls -laht /tmp/boot_rpms && \
-    ls -laht /tmp/boot_rpms/boot && \
-    ls -laht /tmp/boot_rpms/boot/efi && \
-    ls -laht /tmp/boot_rpms/boot/efi/EFI && \
-    ls -laht /tmp/boot_rpms/boot/efi/EFI/BOOT && \
-    ls -laht /tmp/boot_rpms/boot/efi/EFI/fedora && \
-    ls -laht /tmp/boot_rpms/boot/loader/entries && \
-    ls -laht /tmp/boot_rpms/boot/grub2
 CMD cd /tmp && mkdir -p tftpboot && \
     cp /tar_root/tftpboot.tar.xz /tmp && ls -lah && \
     tar -xvf tftpboot.tar.xz --strip-components=3
