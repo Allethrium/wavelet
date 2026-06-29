@@ -280,8 +280,16 @@ switch ($type) {
 							$keyValue = $dataValue;
 							break;
 						case 'changeEncoderTimeout':
-							$prefixstring = "/UI/GROUPS/$hashID/control/encoderTimeoutSeconds";
-							$keyValue = $dataValue;
+							// Validate that the value is an integer between 0 and 1440
+							$validatedTimeout = filter_var($dataValue, FILTER_VALIDATE_INT, array("options" => array("min_range" => 0, "max_range" => 1440)));
+							if ($validatedTimeout === false) {
+								error_log("ERROR: Encoder timeout must be an integer between 0 and 1440 (got: " . var_export($dataValue, true) . ")");
+								http_response_code(400);
+								echo json_encode(["error" => "Invalid encoder timeout: must be an integer between 0 and 1440"]);
+								return;
+							}
+							$prefixstring = "/UI/GROUPS/$hashID/control/encoderTimeout";
+							$keyValue = $validatedTimeout;
 							break;
 						case 'changeGroupSource':
 							$prefixstring = "/UI/GROUPS/$hashID/control/sourceHash";

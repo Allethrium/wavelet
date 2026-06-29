@@ -201,8 +201,17 @@ else
 fi
 clients="$(list_client_port)"
 if [[ "$clients" == *"No ports configured."* ]]; then
-	echo "	No clients listed!  initiating encoder shutdown timer for 300s"
-	echo "$(($(date +%s) + 300))" > /var/tmp/encoder_shutdown_at
+	echo "	No clients listed!  initiating encoder shutdown timer"
+	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; groupHash="$printvalue"
+	KEYNAME="/UI/GROUPS/$groupHash/control/encoderTimeout"; read_etcd_global; timeoutMinutes="$printvalue"
+	# timeoutMinutes is in minutes, convert to seconds
+	timeoutSeconds="${timeoutMinutes:-24}"
+	timeoutSeconds=$((timeoutSeconds * 60))
+	# Ensure minimum timeout of 300 seconds (5 minutes) if timeoutMinutes is 0
+	if [[ "$timeoutSeconds" -lt 300 ]]; then
+		timeoutSeconds=300
+	fi
+	echo "$(($(date +%s) + timeoutSeconds))" > /var/tmp/encoder_shutdown_at
 	"$WAVELET_SHUTDOWN_MOD" &
 	echo $! > /var/home/wavelet/config/encoder_shutdown_timer.pid
 else
