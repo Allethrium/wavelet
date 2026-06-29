@@ -46,7 +46,9 @@ Modifications and hardening will almost certainly break the system or introduce 
 
 Should this get any traction with a large number of deployments, properly managing the system with a back-end infrastructure is something we can look in to.
 
-The system builds upon the following projects (Incomplete list: If your stuff was used, and we neglected to credit you, feel free to let us know!):
+The system builds upon the following projects.  Their use in this project does not imply an endorsement on the part of their authors.
+
+(Incomplete list: If your stuff was used, and we neglected to credit you, feel free to let us know!):
 
 * UltraGrid      -  https://github.com/CESNET/UltraGrid
 * etcd           -  https://github.com/etcd-io/etcd
