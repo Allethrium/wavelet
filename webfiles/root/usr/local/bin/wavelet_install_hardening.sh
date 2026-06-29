@@ -1169,6 +1169,8 @@ configure_firewall(){
     nft add rule inet wavelet input ip daddr 127.0.0.1/8 tcp dport "{ 2379,2380 }" accept
     nft add rule inet wavelet input ip saddr 127.0.0.1/8 tcp dport "{ 2379,2380 }" accept
     nft add rule inet wavelet input ip saddr 192.168.1.0/24 tcp dport "{ 2379,2380 }" accept
+    # Registry
+    nft add rule inet wavelet input tcp dport 5000 accept
     # FreeIPA
     nft add rule inet wavelet input ip saddr 192.168.1.0/24 udp dport "{ 88, 389, 636, 8822, 8823, 464 } " accept
     nft add rule inet wavelet input ip saddr 192.168.1.0/24 tcp dport "{ 88, 389, 636, 8822, 8823, 464 }" accept

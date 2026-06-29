@@ -152,6 +152,7 @@ WantedBy=multi-user.target" > "/etc/systemd/system/wavelet_install_hardening.ser
 	# Revisit this for a better secrets storage method - since we're rootful, systemd-creds may actually work here.
 	chown -R root:wavelet-root /var/secrets
 	chmod 0750 /var/secrets; chmod 0640 /var/secrets/*
+	set_ethernet_mtu
 	echo "Installation completed, restarting server.."
 	systemctl reboot
 }
