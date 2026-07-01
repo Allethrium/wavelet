@@ -1601,7 +1601,6 @@ uiEnable_moveUGWindow(){
 	if [[ -z "$ugId" ]]; then
 		echo "	ERROR: Unable to determine window ID for UltraGrid!!"
 		KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="ERR: No UltraGrid sway window ID"; write_etcd_global &
-		exit 0
 	fi
 	swaymsg -s "$swaySocket" "[con_id=$ugId] floating enable, fullscreen disable"
 	swaymsg -s "$swaySocket" "[con_id=$ugId] resize set $targetWidth $targetHeight"
@@ -1630,7 +1629,6 @@ uiDisable_moveUGWindow(){
 		if [[ -z "$ugId" ]]; then
 			echo "	ERROR: Unable to determine window ID for UltraGrid!!"
 			KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="ERR: No UltraGrid sway window ID"; write_etcd_global &
-			exit 0
 		fi
 		echo "	Moving UltraGrid output container to workspace $workspace.."
 		swaymsg -s "$swaySocket" "[con_id=$ugId] move container to workspace $workspace"

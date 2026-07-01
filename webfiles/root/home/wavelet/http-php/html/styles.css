@@ -1029,6 +1029,46 @@ body {
     display: none;
 }
 
+.ndi-notifier {
+    display: inline-block;
+    background: rgb(175 76 107 / 0.2);
+    border: 1px solid #af4c6b;
+    font-size: 0.7em;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    vertical-align: middle;
+    font-weight: bold;
+}
+
+.ndi-notifier[data-active="1"] {
+    display: inline-block;
+}
+
+.ndi-notifier[data-active="0"] {
+    display: none;
+}
+
+.rtsp-notifier {
+    display: inline-block;
+    background: rgb(175 107 76 / 0.2);
+    border: 1px solid #af6b4c;
+    font-size: 0.7em;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    vertical-align: middle;
+    font-weight: bold;
+}
+
+.rtsp-notifier[data-active="1"] {
+    display: inline-block;
+}
+
+.rtsp-notifier[data-active="0"] {
+    display: none;
+}
+
 .ui-notifier {
     display: inline-flex;
     align-items: center;

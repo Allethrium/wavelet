@@ -398,6 +398,14 @@ class Host {
 			this.encNotifier = createENCNotifier(this);
 			buttonsDiv.appendChild(this.encNotifier);
 		}
+		if (this.type === "NDI") {
+			this.ndiNotifier = createNDINotifier(this);
+			buttonsDiv.appendChild(this.ndiNotifier);
+		}
+		if (this.type === "RTSP") {
+			this.rtspNotifier = createRTSPNotifier(this);
+			buttonsDiv.appendChild(this.rtspNotifier);
+		}
 		if (this.controls.UIEnable === "1") {
 			buttonsDiv.appendChild(createUINotifier(this));
 		}
@@ -1825,6 +1833,50 @@ function createUINotifier(hostInstance) {
 	return uiNotifierDiv;
 }
 
+function createNDINotifier(hostInstance) {
+	const ndiNotifierDiv = document.createElement("div");
+	ndiNotifierDiv.classList.add("ndi-notifier");
+	ndiNotifierDiv.title = "This host is an NDI network device";
+	const ndiText = document.createTextNode("NDI");
+	ndiNotifierDiv.appendChild(ndiText);
+	const ndiEnabledValue = hostInstance.type === "NDI" ? "1" : "0";
+	ndiNotifierDiv.setAttribute('data-active', ndiEnabledValue);
+	if (ndiEnabledValue === "1") {
+		const buttonsDiv = hostInstance.element?.querySelector('.host-buttons');
+		if (buttonsDiv) {
+			const existing = buttonsDiv.querySelector('.ndi-notifier');
+			if (existing) existing.remove();
+			buttonsDiv.appendChild(ndiNotifierDiv);
+			hostInstance.ndiNotifier = ndiNotifierDiv;
+		}
+	} else {
+		hostInstance.ndiNotifier = ndiNotifierDiv;
+	}
+	return ndiNotifierDiv;
+}
+
+function createRTSPNotifier(hostInstance) {
+	const rtspNotifierDiv = document.createElement("div");
+	rtspNotifierDiv.classList.add("rtsp-notifier");
+	rtspNotifierDiv.title = "This host is an RTSP network device";
+	const rtspText = document.createTextNode("RTSP");
+	rtspNotifierDiv.appendChild(rtspText);
+	const rtspEnabledValue = hostInstance.type === "RTSP" ? "1" : "0";
+	rtspNotifierDiv.setAttribute('data-active', rtspEnabledValue);
+	if (rtspEnabledValue === "1") {
+		const buttonsDiv = hostInstance.element?.querySelector('.host-buttons');
+		if (buttonsDiv) {
+			const existing = buttonsDiv.querySelector('.rtsp-notifier');
+			if (existing) existing.remove();
+			buttonsDiv.appendChild(rtspNotifierDiv);
+			hostInstance.rtspNotifier = rtspNotifierDiv;
+		}
+	} else {
+		hostInstance.rtspNotifier = rtspNotifierDiv;
+	}
+	return rtspNotifierDiv;
+}
+
 function createDetailMenu(classInstance) {
 	// Unified detail menu creator for both hosts and groups classes
 	const itemType = classInstance.type;
@@ -2810,6 +2862,14 @@ async function createGroupElement(groupItem) {
 	if (!(groupItem instanceof Group)) {
 		groupItem = new Group(groupItem);
 	}
+	// Check if the DOM element already exists to prevent duplicates on page refresh
+	const existingElement = document.querySelector(`[data-hash="${groupItem.hashID}"][data-type="group"]`);
+	if (existingElement) {
+		// Update the existing element's swatch color and ensure the groupItem.element reference is set
+		existingElement.style.backgroundColor = groupItem.controls.swatchValue || "#0f2b39";
+		groupItem.element = existingElement;
+		return existingElement;
+	}
 	let divEntry = document.createElement("div");
 	groupItem.category = "GROUP";
 	divEntry.classList.add('groups_divider_inner');
@@ -3065,6 +3125,11 @@ function handleGroupEvents(event) {
 	// console.debug("Group class Instance: ", groupItem);
 	let groupItem = window.root.groups.get(hashID);
 	if (parts[3] === "newGroup" && event.value === "1") {
+		// If the group already exists in the registry, don't create a new one
+		if (groupItem) {
+			console.log(`Group ${hashID} already exists, ignoring newGroup event.`);
+			return;
+		}
 		const newGroup = new Group({
 			hashID: hashID,
 			// controls

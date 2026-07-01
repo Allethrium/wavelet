@@ -252,9 +252,11 @@ menuentry 'Legacy PXE (Syslinux)' {
     pxelinux
 }
 " > /var/lib/tftpboot/grub.cfg
-
+	# Ensure correct files exist in the tftpboot rootdir
+	cp /var/lib/tftpboot/EFI/fedora/{grubx64.efi,shim.efi,shimx64.efi} /var/lib/tftpboot/
     # Copy configs to HTTP server
     cp /var/lib/tftpboot/grub.cfg /var/home/wavelet/http/pxe/
+    cp /var/lib/tftpboot/EFI/fedora/{grubx64.efi,shim.efi,shimx64.efi} /var/home/wavelet/http/pxe/
     cp /var/lib/tftpboot/pxelinux.cfg/default /var/home/wavelet/http/pxe/pxelinux.cfg/
 }
 

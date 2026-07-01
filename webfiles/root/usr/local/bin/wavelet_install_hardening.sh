@@ -1170,7 +1170,7 @@ configure_firewall(){
     # Nginx, Apache
     nft add rule inet wavelet input tcp dport "{ 80, 443, 8080, 8443 }" accept
     # UltraGrid streaming
-    nft add rule inet wavelet input udp dport "{ 3478-3480, 9800, 16384-16450, 30000-31000, 40000-40100 }" accept
+    nft add rule inet wavelet input udp dport "{ 5004-5010, 3478-3480, 9800, 16384-16450, 30000-31000, 40000-40100 }" accept
     # RADSEC (RADIUS over TLS)
     nft add rule inet wavelet input tcp dport 2083 accept
     # Avahi (mDNS/DNS-SD for NDI discovery)

@@ -9,11 +9,14 @@
 # To be applied as an ostree rebase
 
 # For now we must lock to FC 43, because the RPMfusion repos for FFMPEG 8 break NDI.
-FROM quay.io/fedora/fedora-coreos:43.20260301.3.1
+# Working: https://mirror.fcix.net/rpmfusion/free/fedora/updates/43/x86_64/repoview/ffmpeg.html 7.1.4-1
+# Broken: https://mirror.fcix.net/rpmfusion/free/fedora/updates/44/x86_64/repoview/ffmpeg.html 8.1.2-1
 # Stable known-good version: 43.20260301.3.1
+# This version still requires the override-remove of nfs-utils-coreos
+FROM quay.io/fedora/fedora-coreos:43.20260301.3.1
 
 # Step 1: Configure repos and install packages that don't conflict with Fedora defaults
-# RUN rpm-ostree override remove nfs-utils-coreos --install nfs-utils
+RUN rpm-ostree override remove nfs-utils-coreos --install nfs-utils
 RUN rm /etc/yum.repos.d/fedora-cisco-openh264.repo && \
     curl -o /etc/yum.repos.d/swayfx.repo https://copr.fedorainfracloud.org/coprs/swayfx/swayfx/repo/fedora-43/swayfx-swayfx-fedora-43.repo && \
     rpm-ostree install -y -A \
