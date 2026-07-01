@@ -1012,12 +1012,6 @@ get_ipValue(){
 	fi
 }
 
-get_ipValue_quick(){
-	# Doesn't seem so reliable
-	ipValue="$(hostname -I | xargs)"
-	KEYNAME="/HOSTS/$hostNameSys/IP"; KEYVALUE="$ipValue"; write_etcd_global &
-}
-
 # Replaces wavelet_run.sh
 wavelet_run(){
 	# Detect_self in this case relies on the etcd type key
@@ -1127,7 +1121,7 @@ check_reflector_subscription(){
 		KEYNAME="/HOSTS/$hostNameSys/control/unsubRequest"; KEYVALUE="$previousVideoSourceValue"; write_etcd_global &
 		return 0
 	fi
-	get_ipValue_quick
+	get_ipValue
 
 	if [[ -z "$currentVideoSourceHash" ]]; then
 		# This is technically an error state.

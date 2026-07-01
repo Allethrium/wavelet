@@ -181,7 +181,8 @@ generate_systemd_unit(){
 	KEYNAME="/HOSTS/$hostNameSys/IP"; read_etcd_global
 	destinationipv4="$printvalue"
 	# N.B This isn't the same as ethernet MTU.
-	UGMTU="9000"
+	# Revert this from 9000->1500 as an MTU of 9000 seems to be breaking now.
+	UGMTU="1500"
 	# Grab our inputVars.
 	if [[ "$hostNameSys" = *"svr"* ]]; then
 		KEYNAME="/HOSTS/$hostNameSys/server_commands"; read_etcd_global; serverInputvar="$(base64 -d <<<"$printvalue")"

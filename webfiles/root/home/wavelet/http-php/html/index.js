@@ -523,13 +523,13 @@ class SSEManager {
 		this.heartbeatMonitor = null;
 	}
 	connect() {
-		// Step 1: Prevent stacking connections
+		// Prevent stacking connections
 		if (this.eventSource) {
 			console.warn('SSE already connected, closing old connection');
 			this.close();
 		}
 		this.eventSource = new EventSource(this.url);
-		// Step 2: Centralize all event binding here
+		// Centralize all event binding here
 		this.setupListeners();
 		// Start the heartbeat monitor immediately
 		this.startHeartbeatMonitor();
@@ -572,7 +572,7 @@ class SSEManager {
 		};
 	}
 	handleData(data) {
-		// 1. Defensive check: Ensure data is a valid object before processing
+		// Defensive check: Ensure data is a valid object before processing
 		if (!data || typeof data !== 'object') return;
 		// Heartbeat handling with ID tracking
 		if (data.time && data.server_time) {
@@ -2981,7 +2981,7 @@ async function createGroupElement(groupItem) {
 
 //
 //
-// Initial page load function, initialization and SSE handlers
+// Initial page load function, initialization and SSE functions
 //
 //
 
@@ -3256,6 +3256,7 @@ async function handleHostEvents(event) {
 						keyFull: input.keyFull,
 						labelText: input.labelText,
 						type: "input",
+						subType: input.subType || "net",
 						hostHash: hashID,
 						isActive: input.isActive || false,
 						directMode: input.directMode ?? 1
@@ -3347,7 +3348,7 @@ async function handleHostEvents(event) {
 			} else {
 				if (controlName !== "videoSource") {
 					// noop, it's a silent key
-					console.log("silent control: ", controlName);
+					// console.log("silent control: ", controlName);
 				}
 			}
 		} catch (error) {
@@ -3381,7 +3382,7 @@ async function handleInputEvents(event) {
 			let valueParts = (event.value || '').split(';');
 			let hostName = valueParts[0] || '';
 			let labelText = valueParts[1] || "Input " + inputHash.substring(0, 8);
-			let subType = valueParts[3] || "net";
+			let subType = valueParts[4] || valueParts[3] || "net";
 			try {
 				// Check if host already exists in registry
 				let hostInstance = window.root.hosts.get(hostHash);

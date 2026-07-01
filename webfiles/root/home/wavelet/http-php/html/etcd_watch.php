@@ -68,7 +68,7 @@ function process_events($events, $watchCounter, $redisClient, $redisStream): int
 }
 
 // Main etcd watch loop
-function run_watch($token, $redisClient, $redisStream): bool {
+function run_watch(&$token, $redisClient, $redisStream): bool {
     if (empty($token)) {
         error_log("ETCD_WATCH: ERROR: Authentication token is missing or invalid");
         return false;
@@ -104,7 +104,7 @@ function run_watch($token, $redisClient, $redisStream): bool {
 
     $buffer = '';
 
-    curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch, $data) use ($prefixRangeStart, &$buffer, &$watchCounter, $redisClient, $redisStream) {
+    curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch, $data) use ($prefixRangeStart, &$buffer, &$watchCounter, $redisClient, $redisStream, &$token) {
         $buffer .= $data;
         while (($pos = strpos($buffer, "\n")) !== false) {
             $line = substr($buffer, 0, $pos);
@@ -130,6 +130,16 @@ function run_watch($token, $redisClient, $redisStream): bool {
             if (isset($result['canceled']) && $result['canceled'] === true) {
                 $cancelReason = $result['cancel_reason'] ?? 'Unknown reason';
                 error_log("ETCD_WATCH: Watch canceled: " . $cancelReason);
+                if (strpos($cancelReason, 'invalid auth token') !== false || strpos($cancelReason, 'Unauthenticated') !== false) {
+                    error_log("ETCD_WATCH: Refreshing auth token...");
+                    $newToken = get_etcd_auth_token();
+                    if ($newToken !== false) {
+                        $token = $newToken;
+                        error_log("ETCD_WATCH: Auth token refreshed successfully");
+                    } else {
+                        error_log("ETCD_WATCH: ERROR: Failed to refresh auth token");
+                    }
+                }
                 return -1;
             }
             // Watch created

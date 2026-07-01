@@ -8,7 +8,8 @@
 # This containerfile aims to build all dependencies for Wavelet in a container for client systems.  It's the "base layer"
 # To be applied as an ostree rebase
 
-FROM quay.io/fedora/fedora-coreos:stable
+# For now we must lock to FC 43, because the RPMfusion repos for FFMPEG 8 break NDI.
+FROM quay.io/fedora/fedora-coreos:43.20260301.3.1
 # Stable known-good version: 43.20260301.3.1
 
 # Step 1: Configure repos and install packages that don't conflict with Fedora defaults
@@ -35,14 +36,14 @@ RUN rm /etc/yum.repos.d/fedora-cisco-openh264.repo && \
         plymouth plymouth-system-theme plymouth-theme-fade-in plymouth-theme-spinfinity \
         plymouth-plugin-script plymouth-scripts \
         rkhunter clamav clamd clamav-freshclam firefox
-    # Step 2: Install rpmfusion repos, then replace Fedora's free ffmpeg with rpmfusion version
+# Step 2: Install rpmfusion repos, then replace Fedora's free ffmpeg with rpmfusion version
 RUN rpm-ostree install -y -A \
         https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
         https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
 RUN rpm-ostree override remove \
         libavcodec-free libavfilter-free libavformat-free libavutil-free \
         ffmpeg-free \
-#        libpostproc-free \
+        libpostproc-free \
         libswresample-free libswscale-free libavdevice-free && \
     rpm-ostree install -y -A \
         ffmpeg ffmpeg-libs intel-media-driver libheif-freeworld \

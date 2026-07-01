@@ -1139,7 +1139,6 @@ configure_ntp(){
 
 configure_firewall(){
     # Configures NFT for kernel-native filtering
-    # TODO - add subnet var for better security scoping.
     subNetCIDR="192.168.1.0/24"
     nft flush ruleset
     nft add table inet wavelet
@@ -1149,46 +1148,33 @@ configure_firewall(){
     # Allow loopback
     nft add rule inet wavelet input iif lo accept
     nft add rule inet wavelet input ct state established,related accept
-    # Rate limiting to prevent brute-force on key ports
-    nft add rule inet wavelet input tcp dport "{ 22, 389 }" limit rate 10/second accept
-    nft add rule inet wavelet input udp dport "{ 53, 88, 464 }" limit rate 10/second accept
+    # Rate limiting to prevent brute-force on SSH
+    nft add rule inet wavelet input tcp dport 22 limit rate 10/second accept
     # Allow ICMP
     nft add rule inet wavelet input ip protocol icmp accept
     nft add rule inet wavelet input ip6 nexthdr icmpv6 accept
     # Allow DNS
-    nft add rule inet wavelet input ip daddr 127.0.0.1/8 udp dport 53 accept
     nft add rule inet wavelet input udp dport 53 accept
-    nft add rule inet wavelet input ip daddr 127.0.0.1/8 tcp dport 53 accept
     nft add rule inet wavelet input tcp dport 53 accept
     # DHCP and PXE
-    nft add rule inet wavelet input ip daddr 127.0.0.1/8 udp dport "{ 67,68 }" accept
     nft add rule inet wavelet input udp dport "{ 67,68 }" accept
     # NTP
     nft add rule inet wavelet input udp dport 123 accept
-    # etcd (internal)
-    nft add rule inet wavelet input ip daddr 127.0.0.1/8 tcp dport "{ 2379,2380 }" accept
-    nft add rule inet wavelet input ip saddr 127.0.0.1/8 tcp dport "{ 2379,2380 }" accept
-    nft add rule inet wavelet input ip saddr 192.168.1.0/24 tcp dport "{ 2379,2380 }" accept
+    # etcd (clients)
+    nft add rule inet wavelet input ip saddr "$subNetCIDR" tcp dport "{ 2379,2380 }" accept
     # Registry
     nft add rule inet wavelet input tcp dport 5000 accept
     # FreeIPA
-    nft add rule inet wavelet input ip saddr 192.168.1.0/24 udp dport "{ 88, 389, 636, 8822, 8823, 464 } " accept
-    nft add rule inet wavelet input ip saddr 192.168.1.0/24 tcp dport "{ 88, 389, 636, 8822, 8823, 464 }" accept
+    nft add rule inet wavelet input ip saddr "$subNetCIDR" udp dport "{ 88, 389, 636, 8822, 8823, 464 }" accept
+    nft add rule inet wavelet input ip saddr "$subNetCIDR" tcp dport "{ 88, 389, 636, 8822, 8823, 464 }" accept
     # Nginx, Apache
     nft add rule inet wavelet input tcp dport "{ 80, 443, 8080, 8443 }" accept
-    # UltraGrid streaming (may need tweaking)
-    nft add rule inet wavelet input ip daddr 127.0.0.1/8 udp dport "{ 3478-3480, 9800, 16384-16450, 30000-31000, 40000-40100 }" accept
+    # UltraGrid streaming
     nft add rule inet wavelet input udp dport "{ 3478-3480, 9800, 16384-16450, 30000-31000, 40000-40100 }" accept
-    # NTP (required to sync devices)
-    nft add rule inet wavelet input tcp dport 123 accept
-    nft add rule inet wavelet input udp dport 123 accept
     # RADSEC (RADIUS over TLS)
     nft add rule inet wavelet input tcp dport 2083 accept
-    # PXE/UEFI-HTTPS (for firmware updates)
-    nft add rule inet wavelet input tcp dport 443 accept
     # Avahi (mDNS/DNS-SD for NDI discovery)
     nft add rule inet wavelet input udp dport 5353 accept
-	nft add rule inet wavelet input udp dport 5969 accept
     nft add rule inet wavelet input udp dport 5354 accept
     nft add rule inet wavelet input udp dport 5355 accept
     # TFTP
@@ -1196,10 +1182,10 @@ configure_firewall(){
     # RTSP
     nft add rule inet wavelet input tcp dport 554 accept
     # NDI usage ports
-    nft add rule inet wavelet input udp dport "{ 5960,6000 }" accept
+    nft add rule inet wavelet input udp dport "{ 5960-6000 }" accept
     nft add rule inet wavelet input tcp dport "{ 5960-6000 }" accept
     # Log drops for debugging
-    nft add rule inet wavelet input log prefix "[WAVELET-INPUT] " level warn
+    nft add rule inet wavelet input log prefix "WAVELET-INPUT: " level warn
     nft add rule inet wavelet input drop
 }
 

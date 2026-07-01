@@ -224,6 +224,11 @@ install_security_layer(){
 
 configure_firewall(){
     # Configures NFT for kernel-native filtering
+    # Note this is the client/encoder. It can serve UltraGrid, RTSP, and NDI traffic,
+    # but it does not host backend services (etcd, FreeIPA, RADSEC). Those are only on the main server.
+    # Inbound traffic is allowed for discovery (mDNS/NDI), media serving (UltraGrid/RTSP/NDI),
+    # and established/related connections for services the client initiates (DNS, FreeIPA, etcd, RADSEC).
+    subNetCIDR="192.168.1.0/24"
     nft flush ruleset
     nft add table inet wavelet
     nft add chain inet wavelet input '{ type filter hook input priority 0; policy drop; }'
@@ -232,57 +237,30 @@ configure_firewall(){
     # Allow loopback
     nft add rule inet wavelet input iif lo accept
     nft add rule inet wavelet input ct state established,related accept
-    # Rate limiting to prevent brute-force on key ports
-    nft add rule inet wavelet input tcp dport "{ 22, 389 }" limit rate 10/second accept
-    nft add rule inet wavelet input udp dport "{ 53, 88, 464 }" limit rate 10/second accept
+    # Rate limiting to prevent brute-force on key client ports (SSH, Cockpit)
+    nft add rule inet wavelet input tcp dport 22 limit rate 10/second accept
+    nft add rule inet wavelet input tcp dport 9090 limit rate 10/second accept
     # Allow ICMP
     nft add rule inet wavelet input ip protocol icmp accept
     nft add rule inet wavelet input ip6 nexthdr icmpv6 accept
-    # Allow DNS
-    nft add rule inet wavelet input ip daddr 127.0.0.1/8 udp dport 53 accept
-    nft add rule inet wavelet input udp dport 53 accept
-    nft add rule inet wavelet input ip daddr 127.0.0.1/8 tcp dport 53 accept
-    nft add rule inet wavelet input tcp dport 53 accept
-    # DHCP and PXE
-    nft add rule inet wavelet input ip daddr 127.0.0.1/8 udp dport "{ 67,68 }" accept
-    nft add rule inet wavelet input udp dport "{ 67,68 }" accept
-    # NTP
-    nft add rule inet wavelet input udp dport 123 accept
-    # etcd (internal)
-    nft add rule inet wavelet input ip daddr 127.0.0.1/8 tcp dport "{ 2379,2380 }" accept
-    nft add rule inet wavelet input ip saddr 127.0.0.1/8 tcp dport "{ 2379,2380 }" accept
-    # FreeIPA
-    nft add rule inet wavelet input ip saddr 192.168.1.0/24 udp dport "{ 88, 389, 636, 8822, 8823, 464 } "accept
-    nft add rule inet wavelet input ip saddr 192.168.1.0/24 tcp dport "{ 88, 389, 636, 8822, 8823, 464 }" accept
-    # Nginx, Apache
-    nft add rule inet wavelet input tcp dport "{ 80, 443, 8080 }" accept
-    # UltraGrid streaming (may need tweaking)
-    nft add rule inet wavelet input ip daddr 127.0.0.1/8 udp dport "{ 3478-3480, 9800, 16384-16450, 30000-31000, 40000-40100 }" accept
-    nft add rule inet wavelet input udp dport "{ 3478-3480, 9800, 16384-16450, 30000-31000, 40000-40100 }" accept
-    # RADSEC (RADIUS over TLS)
-    nft add rule inet wavelet input tcp dport 2083 accept
-    # PXE/UEFI-HTTPS (for firmware updates)
-    nft add rule inet wavelet input tcp dport 443 accept
-    # Avahi (mDNS/DNS-SD for NDI discovery)
+    # Avahi (mDNS/DNS-SD for NDI discovery) - Client needs to receive multicast/broadcast
     nft add rule inet wavelet input udp dport 5353 accept
     nft add rule inet wavelet input udp dport 5354 accept
     nft add rule inet wavelet input udp dport 5355 accept
-    # TFTP
-    nft add rule inet wavelet input udp dport 69 accept
-    # RTSP
+    # UltraGrid streaming (serving/receiving as encoder)
+    nft add rule inet wavelet input udp dport "{ 3478-3480, 9800, 16384-16450, 30000-31000, 40000-40100 }" accept
+    # RTSP (serving as encoder)
     nft add rule inet wavelet input tcp dport 554 accept
-    # NDI
+    # NDI media serving/reception (encoder as source or receiver/display)
+    # NDI video streams (UDP)
     nft add rule inet wavelet input udp dport "{ 10000,10001 }" accept
     nft add rule inet wavelet input udp dport "{ 10000-10100 }" accept
+    # NDI control (TCP)
     nft add rule inet wavelet input tcp dport "{ 33000-33004 }" accept
+    # NDI VNC / remote control (TCP)
     nft add rule inet wavelet input tcp dport 5900 accept
-    # Specific port exceptions for local subnet (these get checked before the blanket accept)
-    nft add rule inet wavelet input ip saddr 192.168.1.0/24 accept
-    # Reject rule for local subnet before final drop
-    nft add rule inet wavelet input ip saddr 192.168.1.0/24 reject with icmp type port-unreachable
-    nft add rule inet wavelet input reject with icmp type port-unreachable
     # Log drops for debugging
-    nft add rule inet wavelet input log prefix "[WAVELET-INPUT] " level warn
+    nft add rule inet wavelet input log prefix "WAVELET-INPUT " level warn
     nft add rule inet wavelet input drop
 }
 
