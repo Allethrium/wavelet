@@ -30,20 +30,20 @@ event_server(){
 	# Filter our trigger env
 	triggerKey="$ETCD_WATCH_KEY"
 	triggerValue="$ETCD_WATCH_VALUE"
-	if [[ "$triggerKey" != *"/DEPROVISION"* ]] && [[ "$triggerValue" != 1 ]]; then
+	if [[ "$triggerKey" != *"/DEPROVISION"* ]] || [[ "$triggerValue" != 1 ]]; then
 		exit 0
 	fi
 	keyHostName="${triggerKey#*/HOSTS/}"; keyHostName="${keyHostName%%/*}"
 	if [[ -z "$keyHostName" ]]; then
 	  exit 0
 	fi
-	KEYNAME="/HOSTS/$keyHostName"; read_etcd_global; hostHash="$printvalue"
-	KEYNAME="/HOSTS/$keyHostName/control/GROUP"; read_etcd_global; hostGroup="$printvalue"
-	# If this isn't a deprovision key, do nothing.
-	if [[ "$triggerKey" == *"svr"* ]]; then
+	# Guard against deprovisioning the server
+	if [[ "$keyHostName" == *"svr"* ]]; then
 		echo "	Removing the server would be silly!"
 		exit 0
 	fi
+	KEYNAME="/HOSTS/$keyHostName"; read_etcd_global; hostHash="$printvalue"
+	KEYNAME="/HOSTS/$keyHostName/control/GROUP"; read_etcd_global; hostGroup="$printvalue"
 	check_and_wait
 }
 
@@ -95,6 +95,7 @@ check_and_wait(){
 
 execute_etcd_cmd() {
 	local cmd="$1"
+	local user="wavelet-root"
 	echo "Executing: $cmd" >> "/var/home/$user/logs/etcdlog.log"
 	eval "etcdctl $cmd"
 }
@@ -102,12 +103,12 @@ execute_etcd_cmd() {
 destroy_host_role() {
 	# Destroys the etcd role + credentials for the selected host
 	# Called from wavelet_force_deprovision
+	user="wavelet-root"
 	if [[ "$EUID" -ne 9337 ]]; then
 		echo "	Please run as wavelet-root" >> "/var/home/$user/logs/etcdlog.log"
 		exit
 	fi
 	# Log directory setup
-	user="wavelet-root"
 	mkdir -p "/var/home/$user/logs"
 	mkdir -p "/var/home/$user/config"
 	# Get user arguments from secure credentials (will fail if run without etcd root user)

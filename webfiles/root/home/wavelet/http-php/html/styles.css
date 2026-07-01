@@ -1147,3 +1147,241 @@ body {
     border-color: #9000ff;
     background: rgba(144, 0, 255, 0.2);
 }
+
+/* ==================== CSS Breakpoint Resolutions ==================== */
+
+/* 1080p Baseline (1920x1080) - Default styles apply here */
+/* All base styles above are written for 1080p as the minimum supported resolution */
+
+/* Tablet/Phone Resolution (ARM UI Platform Target) - ~768px to 1024px width */
+@media screen and (max-width: 1024px) and (min-width: 768px) {
+    :root {
+        --font-size-small: 10px;
+        --font-size-base: 11px;
+        --font-size-medium: 12px;
+        --font-size-large: 13px;
+    }
+
+    .groups_btn {
+        max-width: 30%;
+        height: 10%;
+    }
+
+    .btn__inner {
+        min-width: 60px;
+        min-height: 18px;
+    }
+
+    .source-dropdown {
+        width: 60%;
+    }
+
+    .group_control_row_div {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5em;
+    }
+
+    .label {
+        flex: 0 0 auto;
+        text-align: left;
+        padding-right: 0;
+    }
+
+    .source-text-div > .label,
+    .group_control_row_div > .label {
+        flex: 0 0 auto;
+    }
+
+    .toggle_div {
+        max-width: 100%;
+    }
+
+    .function_divider,
+    .function_divider_inner {
+        max-width: 100%;
+    }
+
+    body {
+        font-size: var(--font-size-base);
+    }
+
+    .title {
+        font-size: var(--font-size-medium);
+        margin: 10px;
+        padding: 6px;
+    }
+}
+
+/* Mobile/Phone Resolution - < 768px width */
+@media screen and (max-width: 767px) {
+    :root {
+        --font-size-small: 9px;
+        --font-size-base: 10px;
+        --font-size-medium: 11px;
+        --font-size-large: 12px;
+    }
+
+    .groups_btn {
+        max-width: 45%;
+        height: 12%;
+        margin: var(--margin-xs);
+        padding: var(--padding-xs);
+    }
+
+    .btn__inner {
+        min-width: 50px;
+        min-height: 16px;
+    }
+
+    .source-dropdown {
+        width: 80%;
+        margin: var(--margin-small);
+        padding: var(--padding-small);
+    }
+
+    .group_control_row_div {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5em;
+        padding: var(--padding-small);
+    }
+
+    .label {
+        flex: 0 0 auto;
+        text-align: left;
+        padding-right: 0;
+    }
+
+    .source-text-div > .label,
+    .group_control_row_div > .label {
+        flex: 0 0 auto;
+    }
+
+    .toggle_div {
+        max-width: 100%;
+        margin: var(--margin-small);
+        padding: var(--padding-small);
+    }
+
+    .function_divider,
+    .function_divider_inner {
+        max-width: 100%;
+        margin: var(--margin-small);
+        padding: var(--padding-small);
+    }
+
+    .input_divider {
+        margin: var(--margin-small);
+        padding: var(--padding-small);
+    }
+
+    .buttons_container,
+    .host-buttons,
+    .detailMenu_container {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    body {
+        font-size: var(--font-size-small);
+    }
+
+    .title {
+        font-size: var(--font-size-small);
+        margin: 8px;
+        padding: 4px;
+    }
+
+    .groups_divider {
+        margin: var(--margin-small);
+        padding: var(--padding-small);
+    }
+
+    .groups_divider_inner {
+        margin: 8px;
+    }
+}
+
+/* 4K Displays (3840x2160) - Enhanced scaling for high-resolution screens */
+@media screen and (min-width: 2560px) {
+    :root {
+        --font-size-small: 14px;
+        --font-size-base: 16px;
+        --font-size-medium: 18px;
+        --font-size-large: 20px;
+    }
+
+    .groups_btn {
+        max-width: 20%;
+        height: 8%;
+    }
+
+    .btn__inner {
+        min-width: 90px;
+        min-height: 24px;
+    }
+
+    .source-dropdown {
+        width: 45%;
+        padding: 12px;
+        font-size: 16px;
+    }
+
+    .inputTextbox {
+        padding: 12px 16px;
+        font-size: 16px;
+    }
+
+    .toggleSwitch {
+        width: 50px;
+        height: 26px;
+    }
+
+    .toggleSwitch:before {
+        width: 20px;
+        height: 20px;
+        top: 3px;
+        left: 3px;
+    }
+
+    .toggle-checkbox:checked + .toggleSwitch:before {
+        left: 27px;
+    }
+
+    .toggle-label {
+        font-size: 16px;
+        padding: 6px 12px;
+    }
+
+    .group_control_row_div {
+        padding: var(--padding-large);
+        margin: var(--margin-medium);
+    }
+
+    .function_divider,
+    .function_divider_inner {
+        max-width: 600px;
+    }
+
+    .title {
+        font-size: var(--font-size-large);
+        padding: 12px;
+        margin: 20px;
+    }
+
+    .groups_divider,
+    .groups_divider_inner,
+    .function_divider,
+    .input_divider {
+        padding: 8px;
+        margin: 8px;
+    }
+
+    .system_divider_inner,
+    .host_divider {
+        padding: var(--padding-large);
+        margin: var(--margin-large);
+    }
+}

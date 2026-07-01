@@ -275,9 +275,16 @@ event_deprovision_timer(){
 		echo "	Deprovision flag is set.  System will deprovision itself.."
 		echo "	Setting hard deprovision flag to start teardown timer.."
 		# Get the hostname here from our activation key
-		KEYNAME="${etcdKey%/control/deprovision*}"; read_etcd_global
-		targetHostName="${printvalue#/UI/HOSTS/*}"
-		targetHostName="${targetHostName%%/*}"
+		# etcdKey is like /UI/HOSTS/hostHash/control/deprovision
+		hostHash="${etcdKey#/UI/HOSTS/}"
+		hostHash="${hostHash%%/control/deprovision*}"
+		if [[ -z "$hostHash" ]]; then
+			echo "	ERR: hostHash is null, cannot continue!"
+			exit 0
+		fi
+		# Get hostname from the UI/HOSTS/hostHash key
+		KEYNAME="/UI/HOSTS/$hostHash"; read_etcd_global
+		targetHostName="$printvalue"
 		if [[ -z "$targetHostName" ]]; then
 			echo "	ERR: target host name is null, cannot continue!"
 			exit 0

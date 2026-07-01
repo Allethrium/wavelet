@@ -3525,9 +3525,11 @@ function parseEventToDataObject(event) {
 			return null;
 		}
 		// Special handling for host-input relationship
-		if (eventData.section === "HOSTS" && parts.length >= 4 && parts[2] === "inputs") {
+		if (parts.length >= 4 && parts[2] === "inputs") {
 			eventData.isInputEvent = true;
-			eventData.section = "INPUTS";
+			if (eventData.section === "HOSTS") {
+				eventData.section = "INPUTS";
+			}
 		}
 		// Only set inputHash for actual input events (where category is "inputs")
 		if (eventData.isInputEvent) {
