@@ -58,37 +58,45 @@ declare -A _hostNameMap          # hostHash → hostname (populated by get_hosts
 declare -A _inputDeviceMap       # inputHash → /UI/HOSTS/{hash}/inputs/ key (populated by get_hosts_in_group)
 sleepTimer=60
 
+# NDI sources mapfile for lazy regeneration
+NDI_SOURCES_MAPFILE="/var/home/wavelet/config/ndi_sources.map"
+
 # Process inputs
 detect_operation(){
 	# Inputs are specified from the etcdctl process which spawns this module
 	# Therefore they will be populated along with their revision numbers in ENV
-	# TODO - consider a global dispatch table and a local valkey cache to avoid GRPc call
 	thisHostHash="${etcdKey#/UI/HOSTS/}"
 	thisHostHash="${thisHostHash%%/*}"
+	local control_suffix="${etcdKey#/UI/HOSTS/$thisHostHash/control/}"
+	control_suffix="${control_suffix%%/*}"
+
 	if [[ "$thisHostHash" != "$(cat /var/home/wavelet/config/hosthash.conf)" ]]; then
 		# Not meant for this machine
+		echo "	No match for this host hash: $thisHostHash"
 		exit 0
 	fi
 	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; groupHash="$printvalue"
-	echo -e "	Host Matching:\n		Key: $etcdKey\n		Value: $etcdValue"
-	case $etcdKey in
-		"/UI/HOSTS/$thisHostHash/IP")						exit 0 ;; # nooop
-		"/UI/HOSTS/$thisHostHash/control/label")			event_relabel;;
-		"/UI/HOSTS/$thisHostHash/control/authScreencast")	authorize_screencast;;
-		"/UI/HOSTS/$thisHostHash/control/blankStatus")		event_blank;;
-		"/UI/HOSTS/$thisHostHash/control/deprovision")		event_deprovision;;
-		"/UI/HOSTS/$thisHostHash/directMode")				event_set_directMode;;
-		"/UI/HOSTS/$thisHostHash/control/enableScreencast")	toggle_screencast;;
-		"/UI/HOSTS/$thisHostHash/control/GROUP")			event_change_group;;
-		"/UI/HOSTS/$thisHostHash/control/promote")			event_promote;;
-		"/UI/HOSTS/$thisHostHash/control/rebootStatus")	    event_reboot;;
-		"/UI/HOSTS/$thisHostHash/control/resetStatus")	    event_reset;;
-		"/UI/HOSTS/$thisHostHash/control/revealStatus")	    event_reveal;;
-		"/UI/HOSTS/$thisHostHash/control/updateImage")		regenerate_staticImage;;
-		"/UI/HOSTS/$thisHostHash/control/UIEnable")			toggle_userInterface;;
-		"/UI/HOSTS/$thisHostHash/control/videoSource")		wavelet_run;;
-		*) echo "	No match for this host hash: $thisHostHash"; exit 0;; #noop
+#	echo -e "	Host Matching:\n		Key: $etcdKey\n		Value: $etcdValue"
+	case "$control_suffix" in
+		"label")			handler_function="event_relabel";;
+		"authScreencast")	handler_function="authorize_screencast";;
+		"blankStatus")		handler_function="event_blank";;
+		"deprovision")		handler_function="event_deprovision";;
+		"directMode")		handler_function="event_set_directMode";;
+		"enableScreencast")	handler_function="toggle_screencast";;
+		"GROUP")			handler_function="event_change_group";;
+		"promote")			handler_function="event_promote";;
+		"rebootStatus")	    handler_function="event_reboot";;
+		"resetStatus")	    handler_function="event_reset";;
+		"revealStatus")	    handler_function="event_reveal";;
+		"updateImage")		handler_function="regenerate_staticImage";;
+		"UIEnable")			handler_function="toggle_userInterface";;
+		"videoSource")		handler_function="wavelet_run";;
+		*) echo "	Invalid function key: $control_suffix"; exit 0;; #noop
 	esac
+	if [[ -n "$handler_function" ]] && declare -f "$handler_function" > /dev/null; then
+        $handler_function
+    fi
 }
 
 detect_operation_server(){
@@ -102,32 +110,34 @@ detect_operation_server(){
 		# we should start a deprovision timer here.
 		event_deprovision_timer
 	fi
-
-	if [[ "$etcdKey" == "/UI/GROUPS/"* ]]; then
+	local control_suffix="${etcdKey#/UI/HOSTS/$thisHostHash/control/}"
+	control_suffix="${control_suffix%%/*}"
+	if [[ "$etcdKey" == "/UI/GROUPS/"* ]] || [[ "$etcdKey" == *"UI/GLOBALS/"* ]]; then
 		groupHash="${etcdKey#*/UI/GROUPS/}"
+		local control_suffix="${groupHash%%/*}"
 		groupHash="${groupHash%%/*}"
-		case "$etcdKey" in
-			*/control/audioStatus)			event_group_enable_audio;;
-			*/control/bannerStatus)			event_group_enable_banner;;
-			*/control/blankStatus)			event_group_host_blank;;
-			*/control/liveStreamStatus)		event_group_liveStream;;
-			*/control/persistStatus)		event_group_input_persist;;
-			*/control/rebootStatus)			event_group_host_reboot;;
-			*/control/resetStatus)			event_group_host_reset;;
-			*/control/revealStatus*)		event_group_host_reveal;;
-			*/control/bannercontent*)		event_group_set_bannerContent;;
-			*/control/liveStreamData)		event_group_set_liveStreamConfig;;
-			*/control/blueToothMAC)			event_group_set_blueToothMAC;;
-			*/control/sourceHash)			event_group_set_video_source;;
-			*/control/staticImage)			event_group_set_staticImage;;
-			*/control/activeCodec)			event_group_set_codec;;
+		case "$control_suffix" in
+			"audioStatus")		handler_function="event_group_enable_audio";;
+			"bannerStatus")		handler_function="event_group_enable_banner";;
+			"blankStatus")		handler_function="event_group_host_blank";;
+			"liveStreamStatus")	handler_function="event_group_liveStream";;
+			"persistStatus")	handler_function="event_group_input_persist";;
+			"rebootStatus")		handler_function="event_group_host_reboot";;
+			"resetStatus")		handler_function="event_group_host_reset";;
+			"revealStatus")		handler_function="event_group_host_reveal";;
+			"bannercontent")	handler_function="event_group_set_bannerContent";;
+			"liveStreamData")	handler_function="event_group_set_liveStreamConfig";;
+			"blueToothMAC")		handler_function="event_group_set_blueToothMAC";;
+			"sourceHash")		handler_function="event_group_set_video_source";;
+			"staticImage")		handler_function="event_group_set_staticImage";;
+			"activeCodec")		handler_function="event_group_set_codec";;
+			"GROUP-CREATE")		handler_function="event_create_group";;
+			"GROUP-DELETE")		handler_function="event_delete_group";;
 			*) exit 0;;
 		esac
-	elif [[ "$etcdKey" == "/UI/GLOBALS/control"* ]]; then
-		case "$etcdKey" in
-			/UI/GLOBALS/control/GROUP-CREATE*)		event_create_group;;
-			/UI/GLOBALS/control/GROUP-DELETE*)		event_delete_group;;
-		esac
+		if [[ -n "$handler_function" ]] && declare -f "$handler_function" > /dev/null; then
+			$handler_function
+		fi
 	elif [[ "$etcdKey" == "/UI/HOSTS/"* ]]; then
 		local thisHostHash
 		thisHostHash="${etcdKey#/UI/HOSTS/}"
@@ -190,15 +200,22 @@ process_hostlist() {
 		# If the server is part of this group (IE daily reboot) the clients need to delay themselves rebooting
 		hostValue="SVR"
     fi
-    local batch_size=10
-    for ((i=0; i<${#write_cmds[@]}; i+=batch_size)); do
-        local batch=("${write_cmds[@]:i:batch_size}")
-        for cmd in "${batch[@]}"; do
-            KEYNAME="${cmd%=*}"; KEYVALUE="${cmd#*=}"; write_etcd_global &
-        done
-        wait
-    done
-    unset write_cmds
+	local txn_buffer=""
+	for cmd in "${write_cmds[@]}"; do
+		local k="${cmd%=*}"
+		local v="${cmd#*=}"
+		txn_buffer+="put \"$k\" \"$v"$'\n'
+	done
+	# Remove trailing newline
+	txn_buffer="${txn_buffer%$'\n'}"
+	# Execute as a single transaction
+	if [[ ${#write_cmds[@]} -gt 0 ]]; then
+		local KEYDATA
+		KEYDATA=$'mod("/UI/HOSTS/") = "0"\n\n'"$txn_buffer"$'\n\n'"$txn_buffer"$'\n'
+		write_etcd_txn "$KEYDATA" &
+		wait
+	fi
+	unset write_cmds
 }
 
 event_group_host_blank() {
@@ -374,16 +391,9 @@ event_unblank(){
 	if [[ "$hostNameSys" == *"svr"* ]]; then
 		exit 0
 	fi
-	local channelData; local channelIndex; local channelSourceHash; local videoSourceType
+	local channelData; local channelIndex; local channelSourceHash
 	echo -e "	Blank flag change detected (unblank), switching host to selected input channel..\n"
     pactl set-sink-mute "$(pactl get-default-sink)" 0
-    # Check our explicit state keys first
-    KEYNAME="/HOSTS/$hostNameSys/control/videoSourceType"; read_etcd_global
-    videoSourceType="$printvalue"
-    if [[ -z "$videoSourceType" ]]; then
-    	# Fallback to channel-Source if state not set
-    	videoSourceType="static"
-    fi
     # Get channel data from persistent key
     KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; read_etcd_global
     channelData="$printvalue"
@@ -393,7 +403,7 @@ event_unblank(){
     fi
     channelIndex="${channelData%%-*}"
     channelSourceHash="${channelData##*-}"
-    echo "	Previous video source is on channel: $channelIndex with source hash: $channelSourceHash (type: $videoSourceType)"
+    echo "	Previous video source is on channel: $channelIndex with source hash: $channelSourceHash"
 	controlPortCmd="capture.data $channelIndex"; netCat "6161" "$controlPortCmd"
 }
 event_relabel(){
@@ -412,14 +422,8 @@ event_reveal(){
 	if [[ "$etcdValue" == "0" ]] || [[ -z "$etcdValue" ]]; then
 		exit 0
 	fi
-   	local channelData; local channelIndex; local channelSourceHash; local videoSourceType
+   	local channelData; local channelIndex; local channelSourceHash
    	echo "	Showing testcard on this client for 15 seconds.."
-   	# Check our explicit state keys first
-   	KEYNAME="/HOSTS/$hostNameSys/control/videoSourceType"; read_etcd_global
-   	videoSourceType="$printvalue"
-   	if [[ -z "$videoSourceType" ]]; then
-   		videoSourceType="static"
-   	fi
    	# Get channel data from persistent key
    	KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; read_etcd_global
    	channelData="$printvalue"
@@ -429,7 +433,7 @@ event_reveal(){
    	fi
    	channelIndex="${channelData%%-*}"
    	channelSourceHash="${channelData##*-}"
-   	echo "		Previous video source is on channel: $channelIndex with source hash: $channelSourceHash (type: $videoSourceType)"
+   	echo "		Previous video source is on channel: $channelIndex with source hash: $channelSourceHash"
    	controlPortCmd="capture.data 2"; netCat "6161" "$controlPortCmd"
    	sleep 15
 	controlPortCmd="capture.data $channelIndex"; netCat "6161" "$controlPortCmd"
@@ -739,33 +743,28 @@ event_process_group_videoSource_hosts(){
     local tempTxn; tempTxn=$(mktemp)
     for hostHash in "${hostsInGroup[@]}"; do
         (
-            local deviceHostName="${_hostNameMap[$hostHash]:-}"
+            local deviceHostName="${_hostNameMap[$hostHash]:-}"; local configPayload
 #            local versionKey; versionKey="/HOSTS/$deviceHostName/control/sourceCheckVersion"
 #            KEYNAME="$versionKey"; read_etcd_global
             local currentVersion; currentVersion="0"
             if [[ "$directMode" -eq 1 ]]; then
                 # Direct NDI mode: keep VIDEO_SOURCE_CMD, set streamMode to subType
+                configPayload="type:network|active:1|subType:$decoderSubType|cmd:$decoderSubscribecmd"
 				cat >> "$tempTxn" <<-EOF
-					put "/HOSTS/$deviceHostName/control/videoSourceType" "network"
-					put "/HOSTS/$deviceHostName/control/videoSourceActive" "1"
-					put "/HOSTS/$deviceHostName/control/videoSourceSubType" "$decoderSubType"
-					put "/HOSTS/$deviceHostName/VIDEO_SOURCE_CMD" "$decoderSubscribecmd"
+					put "/HOSTS/$deviceHostName/VIDEO_SOURCE_CMD" "$configPayload"
 				EOF
             elif [[ -z "$decoderSubscribecmd" ]]; then
                 # No direct subscription: set explicit inactive state
                 # Note the video source subtype being "static" doesn't mean a the static image option.
+                configPayload="type:static|active:0|subType:static|cmd:"
                 cat >> "$tempTxn" <<-EOF
-					put "/HOSTS/$deviceHostName/control/videoSourceSubType" "static"
-					put "/HOSTS/$deviceHostName/control/videoSourceDirect" "0"
-					del "/HOSTS/$deviceHostName/VIDEO_SOURCE_CMD"
+					put "/HOSTS/$deviceHostName/VIDEO_SOURCE_CMD" "$configPayload"
 				EOF
             else
                 # We are feeding a network video source through UltraGrid
+                configPayload="type:ug|active:1|subType:ug|cmd:"
             	cat >> "$tempTxn" <<-EOF
-					put "/HOSTS/$deviceHostName/control/videoSourceType" "ug"
-					put "/HOSTS/$deviceHostName/control/videoSourceActive" "1"
-					put "/HOSTS/$deviceHostName/control/videoSourceSubType" "ug"
-					del "/HOSTS/$deviceHostName/VIDEO_SOURCE_CMD"
+            		put "/HOSTS/$deviceHostName/VIDEO_SOURCE_CMD" "$configPayload"
 				EOF
             fi
             # Increment version counter to trigger client re-evaluation
@@ -974,6 +973,7 @@ get_ipValue(){
 		connType=$(nmcli -g connection.type con show "$uuid")
 		if [[ "$connType" == "802-3-ethernet" ]]; then
 			connectionName=$(nmcli -g connection.id con show "$uuid")
+			# Todo try to replace with bash param expansion
 			ipValue=$(nmcli -g IP4.ADDRESS con show "$uuid" | head -n1 | cut -d'/' -f1)
 			if [[ -n "$ipValue" && "$ipValue" != "--" ]]; then
 				echo -e "			Found active wired connection \"$connectionName\" with IP: $ipValue"
@@ -987,6 +987,7 @@ get_ipValue(){
 			connType=$(nmcli -g connection.type con show "$uuid")
 			if [[ "$connType" == "802-11-wireless" ]]; then
 				connectionName=$(nmcli -g connection.id con show "$uuid")
+				# Todo try to replace with bash param expansion
 				ipValue=$(nmcli -g IP4.ADDRESS con show "$uuid" | head -n1 | cut -d'/' -f1)
 				if [[ -n "$ipValue" && "$ipValue" != "--" ]]; then
 					echo -e "			Found active wireless connection \"$connectionName\" with IP: $ipValue"
@@ -998,6 +999,7 @@ get_ipValue(){
 	# Null value guard
 	if [[ -z "$ipValue" || "$ipValue" == "--" ]]; then
 		echo -e "			No valid IP address found, using alternative approach.....\n"
+		# Todo try to replace with bash param expansion
 		ipValue="$(ip -4 route get 1 | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' | head -n1)"
 		return
 	fi
@@ -1172,41 +1174,29 @@ run_decoder(){
 	ugPath="/var/home/wavelet/.config/systemd/user"
 	staticImageFile="/var/home/wavelet/config/staticImage.mp4"
 	blankImageFile="/var/home/wavelet/config/blankImage.bmp"
-	local printvalue; local display; local ugArgs; local tries; local inputs; local display; local audio; local command
-	local keyValue; local blankStatus
-	local streamMode; local externalArg; local videoSourceCmd; local videoSourceType; local videoSourceSubType
+	local printvalue; local display; local ugArgs; local tries; local inputs
+	local display; local audio; local command; local keyValue; local blankStatus
+	local streamMode; local externalArg; local activeFlag
+	local videoSourceCmd; local videoSourceType; local videoSourceSubType; local configPayload
 	blankStatus=0
-	KEYNAME="/HOSTS/$hostNameSys"; read_etcd_prefix_list; thisHostKeys="$printvalue"
-	exec 3<<<"$thisHostKeys"
-	while read -u 3 -r line; do
-		if [[ "$line" == "/HOSTS/$hostNameSys/control/blankStatus" ]]; then
-			read -u 3 -r keyValue || keyValue=""
-			if [[ "$keyValue" == "1" ]]; then
-				echo "	Blank is ON"
-				blankStatus=1
-			fi
-		fi
-		if [[ "$line" == "/HOSTS/$hostNameSys/control/GROUP" ]]; then
-			read -u 3 -r keyValue || keyValue=""
-			if [[ -z "$keyValue" ]]; then
-				echo "      This host has no group membership defined.  Something is broken.  Attempting to revert decoder to Primary group.."
-				KEYNAME="/UI/PRIMARY"; read_etcd_global; groupHash="$printvalue"
-				KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; KEYVALUE="$printvalue"; write_etcd_global &
-				run_decoder
-				exit 0
-			else
-				groupHash="$keyValue"
-			fi
-		fi
-		if [[ "$line" == "/HOSTS/$hostNameSys/control/videoSourceSubType" ]]; then
-			read -u 3 -r videoSourceSubType
-		fi
-		if [[ "$line" == "/HOSTS/$hostNameSys/control/videoSourceType" ]]; then
-			read -u 3 -r videoSourceType
-		fi
-	done <&3
-	exec 3<&-
-
+	KEYNAME="/HOSTS/$hostNameSys/control/videoSourceConfig"; read_etcd_prefix_list; configPayload="$printvalue"
+	if [[ -z "$configPayload" ]]; then
+		msg="ERR: videoSourceConfig not found for $hostNameSys.  Exiting decoder run attempt!"
+		KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="$msg"; write_etcd_global &
+		return 1
+	fi
+	# Parse the payload compound KV (Format: type:X|active:Y|subType:Z|cmd:W)
+	videoSourceType="${configPayload##*type:}"
+	videoSourceType="${videoSourceType%%|*}"
+	activeFlag="${configPayload##*active:}"
+	activeFlag="${activeFlag%%|*}"
+	videoSourceSubType="${configPayload##*subType:}"
+	videoSourceSubType="${videoSourceSubType%%|*}"
+	videoSourceCmd="${configPayload##*cmd:}"
+	if [[ -n "$videoSourceCmd" && "$videoSourceCmd" != "cmd:" ]]; then
+		videoSourceCmd="$(base64 -d <<<"$videoSourceCmd")"
+	fi
+	echo "	Parsed videoSourceConfig - Type: $videoSourceType, SubType: $videoSourceSubType, Active: $activeFlag"
 	if [[ -n "${firstRunState:-}" ]]; then
 		echo "      Decoder first run, grabbing group $groupHash video source"
 		KEYNAME="/UI/GROUPS/$groupHash/control/sourceHash"; read_etcd_global
@@ -1223,22 +1213,19 @@ run_decoder(){
    		streamMode="static"
    		channel="$etcdValue"
    	elif [[ "$videoSourceSubType" == "NDI" ]] || [[ "$videoSourceSubType" == "RTSP" ]]; then
-   		# We should have a video source command
-   		# However if this is the first run, we have a problem because it won't be set at all..
-   		videoSourceCmd=$(grep -A1 "/HOSTS/$hostNameSys/VIDEO_SOURCE_CMD" <<<"$thisHostKeys" | tail -n1 | base64 -d)
-   		if [[ -z "$videoSourceCmd" ]]; then
-   			# Fallback to etcd read (slower)
-   			KEYNAME="/HOSTS/$hostNameSys/VIDEO_SOURCE_CMD"; read_etcd_global
-   			if [[ -z "$printvalue" ]]; then
-   				KEYNAME="/HOSTS/$hostNameSys/OLD_VIDEO_SOURCE_CMD"; read_etcd_global
-   			fi
-   			videoSourceCmd="$(base64 -d <<<"$printvalue")"
-   		fi
-  		echo "	Checking video source type: $videoSourceCmd (explicit type: $videoSourceType)"
+   		echo "	Checking video source type: $videoSourceCmd (explicit type: $videoSourceType)"
+  		# Architectural note:
+  		# Since we cannot reliably use excl_init to ensure unused devices aren't in the event loop,
+  		# we must assume all inputs defined here in addition to the statics are live at all times.
+   		# This places a processing burden on the clients even if it is just dropping frames.
+   		# Therefore: we cannot simply additively append every encoder/source device
+   		# on the entire system as a potential input,
+   		# which may seem more efficient from the regen gap perspective.
+   		# It may be possible to implement an input shim however?
 		case "$videoSourceCmd" in
   			*ndi*)
-  				externalArg+=("-t ug_input:5004")
-   				externalArg+=("$videoSourceCmd")
+  				externalArg+=("-t ug_input:5004") # Always keep a UG input to avoid unnecessary unit regen
+   				externalArg+=("$videoSourceCmd") # NDI command referencing the specific ndi name/IP here
    				streamMode="ndi"
    				channel="5"
    				;;
@@ -1249,11 +1236,10 @@ run_decoder(){
    				channel="5"
    				;;
    			*)
-   				# Unknown type, fall back to UG
+   				# Unknown type, fall back to UG only.
    				streamMode="ug"
    				channel="4"
    				externalArg+=("-t ug_input:5004")
-   				externalArg+=("-t ndi")
    				;;
    		esac
    	else
@@ -1302,8 +1288,54 @@ run_decoder(){
 	fi
 	# check for an already running UG systemd unit
 	if systemctl --user is-active UltraGrid.Decoder.service >/dev/null 2>&1; then
+		# Check if UGArgs match existing service AND NDI sources are already in the unit
+		ugArgsMatch=false
 		if [[ "$(cat "$ugPath/$ugName")" == *"${externalArg[*]}"* ]]; then
-			echo "		UGArgs match existing service, no regeneration needed"
+			# Check if all NDI sources in externalArg are already in the systemd unit
+			if [[ "$videoSourceSubType" == "NDI" ]]; then
+				# Extract NDI source name from videoSourceCmd
+				local ndiSourceName=""
+				if [[ "$videoSourceCmd" == *"ndi:"* ]]; then
+					ndiSourceName="${videoSourceCmd#*ndi:}"
+					ndiSourceName="${ndiSourceName%% *}"
+					ndiSourceName="${ndiSourceName%%,*}"
+				fi
+
+				if [[ -n "$ndiSourceName" ]]; then
+					# Check if this NDI source is already in the systemd unit file
+					if grep -q "ndi:$ndiSourceName" "$ugPath/$ugName" || grep -q "$ndiSourceName" "$ugPath/$ugName"; then
+						echo "		NDI source $ndiSourceName already in existing service, no regeneration needed"
+						ugArgsMatch=true
+					else
+						echo "		NDI source $ndiSourceName not in existing service, regeneration needed"
+						ugArgsMatch=false
+					fi
+				else
+					# Fallback to checking externalArg
+					if [[ "$(cat "$ugPath/$ugName")" == *"${externalArg[*]}"* ]]; then
+						echo "		UGArgs match existing service, no regeneration needed"
+						ugArgsMatch=true
+					else
+						echo "		UGArgs do not match existing service, regeneration needed"
+						ugArgsMatch=false
+					fi
+				fi
+			else
+				# Not NDI, use existing logic
+				if [[ "$(cat "$ugPath/$ugName")" == *"${externalArg[*]}"* ]]; then
+					echo "		UGArgs match existing service, no regeneration needed"
+					ugArgsMatch=true
+				else
+					echo "		UGArgs do not match existing service, regeneration needed"
+					ugArgsMatch=false
+				fi
+			fi
+		else
+			ugArgsMatch=false
+		fi
+
+		if [[ "$ugArgsMatch" == true ]]; then
+			echo "		No regeneration needed, UGArgs and NDI sources match existing service"
 		else
 			# echo "		UGArgs do not match existing service, regeneration needed"
 			regenerate_decoder_ugUnit
@@ -1389,6 +1421,7 @@ regenerate_staticImage(){
 		wget -O "/var/home/wavelet/config/staticImage.mp4" "$printvalue"
 		wget -O "/var/home/wavelet/config/staticImage.sha256" "${printvalue%.mp4}.sha256"
   		serverCheckSum="$(cat "/var/home/wavelet/config/staticImage.sha256")"
+  		# Todo try to replace with bash param expansion
 		localCheckSum=$(sha256sum "/var/home/wavelet/config/staticImage.mp4" | cut -d' ' -f1)
 		if [[ "$localCheckSum" != "$serverCheckSum" ]]; then
 	  		echo "	ERR: static image hash mismatch!"
@@ -1488,6 +1521,70 @@ start_ug(){
 		done
 	fi
 	return 0
+}
+
+update_ndi_sources_mapfile(){
+	# NDI sources mapfile management functions
+	# Updates the NDI sources mapfile with current NDI sources for the group
+	# Format: channelIndex:ndiSourceName:sourceHash
+	local groupHash="$1"
+	local mapfileContent=""
+	# Clear the mapfile
+	echo "" > "$NDI_SOURCES_MAPFILE"
+	# Get all NDI sources in the group from etcd
+	local ndiSources=()
+	local index=1
+	# Iterate through all hosts in the group to find NDI sources
+	for hostHash in "${hostsInGroup[@]}"; do
+		local hostKey="${_hostNameMap[$hostHash]:-}"
+		if [[ -n "$hostKey" ]]; then
+			# Check if this host has NDI inputs
+			KEYNAME="/HOSTS/$hostKey/NDI_SOURCES"; read_etcd_global
+			if [[ -n "$printvalue" ]]; then
+				# Parse NDI sources from the key value
+				IFS=';' read -ra sourceArray <<< "$printvalue"
+				for source in "${sourceArray[@]}"; do
+					if [[ -n "$source" ]]; then
+						ndiSources+=("$index:$source:$hostHash")
+						((index++))
+					fi
+				done
+			fi
+		fi
+	done
+	# Sort NDI sources to ensure consistent ordering across all clients
+	IFS=$'\n' sortedNdiSources=($(sort <<<"${ndiSources[*]}")); unset IFS
+	# Write sorted sources to mapfile
+	for sourceEntry in "${sortedNdiSources[@]}"; do
+		echo "$sourceEntry" >> "$NDI_SOURCES_MAPFILE"
+	done
+}
+
+check_ndi_source_in_mapfile(){
+	# Checks if a specific NDI source is already in the mapfile
+	local ndiSource="$1"
+	if [[ ! -f "$NDI_SOURCES_MAPFILE" ]]; then
+		return 1
+	fi
+	# Search for the NDI source in the mapfile
+	if grep -q ":$ndiSource:" "$NDI_SOURCES_MAPFILE"; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+get_ndi_source_channel_index(){
+	# Gets the channel index for a specific NDI source from the mapfile
+	local ndiSource="$1"
+	local channelIndex=""
+	if [[ ! -f "$NDI_SOURCES_MAPFILE" ]]; then
+		echo ""
+		return 1
+	fi
+	# Extract the channel index for the given NDI source
+	channelIndex=$(grep ":$ndiSource:" "$NDI_SOURCES_MAPFILE" | cut -d':' -f1)
+	echo "$channelIndex"
 }
 
 get_hosts_in_group(){

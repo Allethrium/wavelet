@@ -2804,6 +2804,7 @@ function createInputElement(inputInstance) {
 	if (inputInstance.subType === "NDI" || inputInstance.subType === "RTSP") {
 		const directToggle = createToggleBox(parentHost, "directMode", "DIRECT MODE");
 		directToggle.title = "Toggles direct mode on/off.  If off, this net device will run via the UltraGrid Encoder.";
+		deviceControlsDiv.createTextNode(`${inputInstance.subType}`);
 		deviceControlsDiv.appendChild(directToggle);
 	}
 	// TODO Chrome or MiraCast or apple play devices.

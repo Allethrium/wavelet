@@ -28,17 +28,17 @@ exec systemctl --user start mako.service
 smart_gaps on
 gaps outer -3
 gaps inner 3
-default_border pixel 7
+default_border pixel 5
 default_floating_border pixel 3
 
 blur enable
 blur_passes 2
-blur_noise .13
-blur_radius 8
+blur_noise .7
+blur_radius 5
 corner_radius 9
 
 shadows disable
-shadow_blur_radius 4
+shadow_blur_radius 0
 #shadow_inactive_color #00000000
 
 default_dim_inactive 0.2
@@ -220,17 +220,17 @@ set $text-inactive  #59485000
 # Layer effects
 #
 layer_effects "waybar" {
-    blur enable;
+    blur disable;
     blur_xray enable;
     blur_ignore_transparent enable;
-    shadows enable;
+    shadows disable;
     corner_radius 20;
 }
 layer_effects "notifications" {
-    blur enable;
+    blur disable;
     blur_xray disable;
     blur_ignore_transparent disable;
-    shadows enable;
+    shadows disable;
     corner_radius 20;
 }
 
