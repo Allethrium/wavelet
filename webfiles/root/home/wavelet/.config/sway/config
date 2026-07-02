@@ -32,10 +32,10 @@ default_border pixel 5
 default_floating_border pixel 3
 
 blur enable
-blur_passes 2
-blur_noise .7
-blur_radius 5
-corner_radius 9
+blur_passes 3
+blur_noise .1
+blur_radius 3
+corner_radius 8
 
 shadows disable
 shadow_blur_radius 0

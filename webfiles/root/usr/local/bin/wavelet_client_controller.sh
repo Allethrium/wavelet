@@ -68,7 +68,7 @@ detect_operation(){
 	thisHostHash="${etcdKey#/UI/HOSTS/}"
 	thisHostHash="${thisHostHash%%/*}"
 	local control_suffix="${etcdKey#/UI/HOSTS/$thisHostHash/control/}"
-	control_suffix="${control_suffix%%/*}"
+	control_suffix="${control_suffix##*/}"
 
 	if [[ "$thisHostHash" != "$(cat /var/home/wavelet/config/hosthash.conf)" ]]; then
 		# Not meant for this machine
@@ -114,7 +114,7 @@ detect_operation_server(){
 	control_suffix="${control_suffix%%/*}"
 	if [[ "$etcdKey" == "/UI/GROUPS/"* ]] || [[ "$etcdKey" == *"UI/GLOBALS/"* ]]; then
 		groupHash="${etcdKey#*/UI/GROUPS/}"
-		local control_suffix="${groupHash%%/*}"
+		local control_suffix="${groupHash##*/}"
 		groupHash="${groupHash%%/*}"
 		case "$control_suffix" in
 			"audioStatus")		handler_function="event_group_enable_audio";;
@@ -1288,54 +1288,8 @@ run_decoder(){
 	fi
 	# check for an already running UG systemd unit
 	if systemctl --user is-active UltraGrid.Decoder.service >/dev/null 2>&1; then
-		# Check if UGArgs match existing service AND NDI sources are already in the unit
-		ugArgsMatch=false
 		if [[ "$(cat "$ugPath/$ugName")" == *"${externalArg[*]}"* ]]; then
-			# Check if all NDI sources in externalArg are already in the systemd unit
-			if [[ "$videoSourceSubType" == "NDI" ]]; then
-				# Extract NDI source name from videoSourceCmd
-				local ndiSourceName=""
-				if [[ "$videoSourceCmd" == *"ndi:"* ]]; then
-					ndiSourceName="${videoSourceCmd#*ndi:}"
-					ndiSourceName="${ndiSourceName%% *}"
-					ndiSourceName="${ndiSourceName%%,*}"
-				fi
-
-				if [[ -n "$ndiSourceName" ]]; then
-					# Check if this NDI source is already in the systemd unit file
-					if grep -q "ndi:$ndiSourceName" "$ugPath/$ugName" || grep -q "$ndiSourceName" "$ugPath/$ugName"; then
-						echo "		NDI source $ndiSourceName already in existing service, no regeneration needed"
-						ugArgsMatch=true
-					else
-						echo "		NDI source $ndiSourceName not in existing service, regeneration needed"
-						ugArgsMatch=false
-					fi
-				else
-					# Fallback to checking externalArg
-					if [[ "$(cat "$ugPath/$ugName")" == *"${externalArg[*]}"* ]]; then
-						echo "		UGArgs match existing service, no regeneration needed"
-						ugArgsMatch=true
-					else
-						echo "		UGArgs do not match existing service, regeneration needed"
-						ugArgsMatch=false
-					fi
-				fi
-			else
-				# Not NDI, use existing logic
-				if [[ "$(cat "$ugPath/$ugName")" == *"${externalArg[*]}"* ]]; then
-					echo "		UGArgs match existing service, no regeneration needed"
-					ugArgsMatch=true
-				else
-					echo "		UGArgs do not match existing service, regeneration needed"
-					ugArgsMatch=false
-				fi
-			fi
-		else
-			ugArgsMatch=false
-		fi
-
-		if [[ "$ugArgsMatch" == true ]]; then
-			echo "		No regeneration needed, UGArgs and NDI sources match existing service"
+			echo "		UGArgs match existing service, no regeneration needed"
 		else
 			# echo "		UGArgs do not match existing service, regeneration needed"
 			regenerate_decoder_ugUnit
@@ -1523,17 +1477,20 @@ start_ug(){
 	return 0
 }
 
+# NDI sources mapfile management functions
 update_ndi_sources_mapfile(){
-	# NDI sources mapfile management functions
 	# Updates the NDI sources mapfile with current NDI sources for the group
 	# Format: channelIndex:ndiSourceName:sourceHash
 	local groupHash="$1"
 	local mapfileContent=""
+
 	# Clear the mapfile
 	echo "" > "$NDI_SOURCES_MAPFILE"
+
 	# Get all NDI sources in the group from etcd
 	local ndiSources=()
 	local index=1
+
 	# Iterate through all hosts in the group to find NDI sources
 	for hostHash in "${hostsInGroup[@]}"; do
 		local hostKey="${_hostNameMap[$hostHash]:-}"
@@ -1552,8 +1509,10 @@ update_ndi_sources_mapfile(){
 			fi
 		fi
 	done
+
 	# Sort NDI sources to ensure consistent ordering across all clients
 	IFS=$'\n' sortedNdiSources=($(sort <<<"${ndiSources[*]}")); unset IFS
+
 	# Write sorted sources to mapfile
 	for sourceEntry in "${sortedNdiSources[@]}"; do
 		echo "$sourceEntry" >> "$NDI_SOURCES_MAPFILE"
@@ -1563,9 +1522,11 @@ update_ndi_sources_mapfile(){
 check_ndi_source_in_mapfile(){
 	# Checks if a specific NDI source is already in the mapfile
 	local ndiSource="$1"
+
 	if [[ ! -f "$NDI_SOURCES_MAPFILE" ]]; then
 		return 1
 	fi
+
 	# Search for the NDI source in the mapfile
 	if grep -q ":$ndiSource:" "$NDI_SOURCES_MAPFILE"; then
 		return 0
@@ -1578,10 +1539,12 @@ get_ndi_source_channel_index(){
 	# Gets the channel index for a specific NDI source from the mapfile
 	local ndiSource="$1"
 	local channelIndex=""
+
 	if [[ ! -f "$NDI_SOURCES_MAPFILE" ]]; then
 		echo ""
 		return 1
 	fi
+
 	# Extract the channel index for the given NDI source
 	channelIndex=$(grep ":$ndiSource:" "$NDI_SOURCES_MAPFILE" | cut -d':' -f1)
 	echo "$channelIndex"
