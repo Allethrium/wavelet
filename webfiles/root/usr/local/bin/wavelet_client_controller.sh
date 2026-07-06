@@ -629,7 +629,7 @@ del \"$BASEKEYNAME/control/screencastRequest\"
 		until [[ -f "/var/home/wavelet/config/screencast/device.connected" ]]; do
 			sleep .1
 		done
-		KEYNAME="/HOSTS/$hostNameSys/controls/screencastRequest"; KEYVALUE="screenCastDevice"; write_etcd_global &
+		KEYNAME="/HOSTS/$hostNameSys/control/screencastRequest"; KEYVALUE="screenCastDevice"; write_etcd_global &
 		rm -rf "/var/home/wavelet/config/screencast/device.connected"
 		# Now nothing happens until we get the authorized flag back from the frontend.
 	fi
@@ -748,23 +748,23 @@ event_process_group_videoSource_hosts(){
 #            KEYNAME="$versionKey"; read_etcd_global
             local currentVersion; currentVersion="0"
             if [[ "$directMode" -eq 1 ]]; then
-                # Direct NDI mode: keep VIDEO_SOURCE_CMD, set streamMode to subType
+                # Direct NDI mode: keep cmd, set streamMode to subType
                 configPayload="type:network|active:1|subType:$decoderSubType|cmd:$decoderSubscribecmd"
 				cat >> "$tempTxn" <<-EOF
-					put "/HOSTS/$deviceHostName/VIDEO_SOURCE_CMD" "$configPayload"
+					put "/HOSTS/$deviceHostName/control/videoSourceConfig" "$configPayload"
 				EOF
             elif [[ -z "$decoderSubscribecmd" ]]; then
                 # No direct subscription: set explicit inactive state
                 # Note the video source subtype being "static" doesn't mean a the static image option.
                 configPayload="type:static|active:0|subType:static|cmd:"
                 cat >> "$tempTxn" <<-EOF
-					put "/HOSTS/$deviceHostName/VIDEO_SOURCE_CMD" "$configPayload"
+					put "/HOSTS/$deviceHostName/control/videoSourceConfig" "$configPayload"
 				EOF
             else
                 # We are feeding a network video source through UltraGrid
                 configPayload="type:ug|active:1|subType:ug|cmd:"
             	cat >> "$tempTxn" <<-EOF
-            		put "/HOSTS/$deviceHostName/VIDEO_SOURCE_CMD" "$configPayload"
+            		put "/HOSTS/$deviceHostName/control/videoSourceConfig" "$configPayload"
 				EOF
             fi
             # Increment version counter to trigger client re-evaluation
@@ -1179,11 +1179,24 @@ run_decoder(){
 	local streamMode; local externalArg; local activeFlag
 	local videoSourceCmd; local videoSourceType; local videoSourceSubType; local configPayload
 	blankStatus=0
+	if [[ -n "${firstRunState:-}" ]]; then
+		echo "      Decoder first run, grabbing group $groupHash video source"
+		KEYNAME="/UI/GROUPS/$groupHash/control/sourceHash"; read_etcd_global
+		etcdValue="$printvalue"
+		if [[ -z "$etcdValue" ]]; then
+			# default to initial static splash image
+			etcdValue=1; channel=1
+			KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; KEYVALUE="$channel-$etcdValue"; write_etcd_global &
+		fi
+		# Generate a configPayLoad for first run
+		configPayLoad=""
+	fi
 	KEYNAME="/HOSTS/$hostNameSys/control/videoSourceConfig"; read_etcd_prefix_list; configPayload="$printvalue"
 	if [[ -z "$configPayload" ]]; then
 		msg="ERR: videoSourceConfig not found for $hostNameSys.  Exiting decoder run attempt!"
 		KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="$msg"; write_etcd_global &
-		return 1
+		echo "	$msg"
+		exit 0
 	fi
 	# Parse the payload compound KV (Format: type:X|active:Y|subType:Z|cmd:W)
 	videoSourceType="${configPayload##*type:}"
@@ -1197,16 +1210,6 @@ run_decoder(){
 		videoSourceCmd="$(base64 -d <<<"$videoSourceCmd")"
 	fi
 	echo "	Parsed videoSourceConfig - Type: $videoSourceType, SubType: $videoSourceSubType, Active: $activeFlag"
-	if [[ -n "${firstRunState:-}" ]]; then
-		echo "      Decoder first run, grabbing group $groupHash video source"
-		KEYNAME="/UI/GROUPS/$groupHash/control/sourceHash"; read_etcd_global
-		etcdValue="$printvalue"
-		if [[ -z "$etcdValue" ]]; then
-			# default to initial static splash image
-			etcdValue=1; channel=1
-			KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; KEYVALUE="$channel-$etcdValue"; write_etcd_global &
-		fi
-	fi
 	echo "	Video Source Subtype: $videoSourceSubType"
    	if [[ "$etcdValue" =~ ^[0-3]$ ]]; then
    		# Static image - no subscription needed
@@ -1705,7 +1708,7 @@ uiDisable_moveUGWindow(){
 #
 ###
 
-
+set -x
 exec >>/var/home/wavelet/logs/client.log 2>&1
 
 start_timer

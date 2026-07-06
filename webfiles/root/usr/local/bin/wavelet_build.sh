@@ -292,7 +292,7 @@ put /HOSTS/$hostNameSys/control/channel-Source \"$channel-$sourceHash\"
 
 "
 	fi
-	sleep .5
+	sleep 2
 	KEYNAME="/HOSTS/$hostNameSys"; read_etcd_global; hostHash="$printvalue"
 	if [[ -z "$hostHash" ]]; then
 		echo "	We do not have a valid host hash, which indicates something went wrong with the client provision process!"
@@ -347,6 +347,8 @@ put /HOSTS/$hostNameSys/control/channel-Source \"$channel-$sourceHash\"
   		fi
 	fi
 	event_connectNetwork
+	echo "	CONFIGURATION COMPLETED."
+	echo "		Launching client_controller in firstrun mode.."
 	"$WAVELET_CLIENT_CONTROLLER_MOD" "RUN"
 }
 event_encoder(){
@@ -614,6 +616,8 @@ put /HOSTS/$hostNameSys/wavelet_build_completed \"1\"
 	echo "$hostHash" > /var/home/wavelet/config/hosthash.conf
 	echo "	System services and configuration keys generated, starting services now.."
 	event_server
+	# Ensure we hit the group videoSource key once to force a videoSourceConfig refresh
+    KEYNAME="/GROUPS/$groupHash/control/sourceHash"; KEYNAME="1"; write_etcd_global &
 }
 
 # This generates a wrapper and etcd watch service, defined by:
@@ -980,7 +984,7 @@ event_generate_network_device(){
 event_generate_cluster_uuid() {
 	# Generates a cluster UUID and ensures this cluster knows the server hostname
 	KEYNAME="CLUSTERID"; KEYVALUE="$(cat /proc/sys/kernel/random/uuid)"; write_etcd_global &
-	KEYNAME="/UI/GLOBALS/controls/CLUSTERID"; write_etcd_global &
+	KEYNAME="/UI/GLOBALS/control/CLUSTERID"; write_etcd_global &
 	KEYNAME="SVR"; KEYVALUE="$(hostname)"; write_etcd_global &
 }
 event_clear_devicemap(){
@@ -1027,13 +1031,13 @@ put $BASEKEYNAME/control/label \"SVR (Primary group)\"
 put $BASEKEYNAME/control/reboot \"0\"
 put $BASEKEYNAME/control/reset \"0\"
 put $BASEKEYNAME/control/revealStatus \"0\"
-put $BASEKEYNAME/control/sourceHash \"1\"
+put $BASEKEYNAME/control/sourceHash \"0\"
 put $BASEKEYNAME/control/sourceCapable \"1\"
 put $BASEKEYNAME/control/livestreamStatus \"0\"
 put $BASEKEYNAME/control/inputPersist \"0\"
 put /GROUPS/$hostNameSys \"$groupHash\"
 put /HOSTS/$hostNameSys/control/GROUP \"$groupHash\"
-put /UI/GLOBALS/controls/lowInformationMode \"0\"
+put /UI/GLOBALS/control/lowInformationMode \"0\"
 
 "
 	echo "	Data: "

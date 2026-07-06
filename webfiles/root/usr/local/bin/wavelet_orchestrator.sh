@@ -79,7 +79,7 @@ event_server(){
 			event_change_group;;
 		*/control/screenCastCapable)
 			# Enable screencasting, as a suitable WiFi device has been detected.
-			KEYNAME="/UI/HOSTS/$hostHash/control/screenCastCapabale"; KEYVALUE="$triggerValue"; write_etcd_global & ;;
+			KEYNAME="/UI/HOSTS/$hostHash/control/screenCastCapable"; KEYVALUE="$triggerValue"; write_etcd_global & ;;
 		*)
 			exit 0;; # noop
 		esac
@@ -449,6 +449,10 @@ new_host(){
         fi
         KEYNAME="/HOSTS/$keyHostName/IP"; KEYVALUE="$hostIPAddress"; write_etcd_global &
     fi
+    # Here we need to generate an appropriate videoSourcePayLoad key.
+    if [[ "$groupVideoSource" == "1" ]]; then
+    	videoSourcePayLoad="type:static|active:0|subType:static|cmd"
+    fi
     # Build an etcd transaction - it doesn't matter if the key exists or not, we overwrite it.
     if [[ "$hostType" == *"svr"* ]]; then
     	KEYDATA="mod(\"/UI/HOSTS/$hostHash\") = \"0\"
@@ -483,6 +487,10 @@ put /UI/HOSTS/$hostHash/control/videoSource \"$groupVideoSource\"
 
 		"
     else
+    	# For decoders, resolve the group's video source and populate decoder-side keys.
+        if [[ "$hostType" != *"svr"* ]] && [[ -n "$groupVideoSource" ]]; then
+        	resolve_group_source_for_host "$keyHostName" "$hostHash" "$groupVideoSource"
+        fi
     	KEYDATA="mod(\"/UI/HOSTS/$hostHash\") = \"0\"
 
 put /UI/HOSTS/$hostHash/control/GROUP \"$hostGroup\"
@@ -497,6 +505,7 @@ put /UI/HOSTS/$hostHash/control/revealStatus \"0\"
 put /UI/HOSTS/$hostHash/control/rebootStatus \"0\"
 put /UI/HOSTS/$hostHash/control/healthStatus \"0\"
 put /UI/HOSTS/$hostHash/control/UIEnable \"0\"
+put /UI/HOSTS/$hostHash/control/videoSourceConfig \"$videoSourcePayLoad\"
 put /UI/HOSTS/$hostHash/control/videoSource \"$groupVideoSource\"
 
 put /UI/HOSTS/$hostHash/control/GROUP \"$hostGroup\"
@@ -511,6 +520,7 @@ put /UI/HOSTS/$hostHash/control/revealStatus \"0\"
 put /UI/HOSTS/$hostHash/control/rebootStatus \"0\"
 put /UI/HOSTS/$hostHash/control/healthStatus \"0\"
 put /UI/HOSTS/$hostHash/control/UIEnable \"0\"
+put /UI/HOSTS/$hostHash/control/videoSourceConfig \"$videoSourcePayLoad\"
 put /UI/HOSTS/$hostHash/control/videoSource \"$groupVideoSource\"
 
 		"
@@ -522,10 +532,6 @@ put /UI/HOSTS/$hostHash/control/videoSource \"$groupVideoSource\"
 	KEYNAME="/UI/HOSTS/$hostHash/newHost"; KEYVALUE="1"; write_etcd_global &
 	# Update input devices
     input_device_update
-	# For decoders, resolve the group's video source and populate decoder-side keys.
-	if [[ "$hostType" != *"svr"* ]] && [[ -n "$groupVideoSource" ]]; then
-		resolve_group_source_for_host "$keyHostName" "$hostHash" "$groupVideoSource"
-	fi
 }
 
 # Replicates the resolution logic from event_process_group_videoSource_hosts() but for a single new host.
