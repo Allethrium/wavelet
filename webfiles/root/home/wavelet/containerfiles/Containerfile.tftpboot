@@ -1,0 +1,66 @@
+# This container should download appropriate packages,
+# And generate a fully functional /var/lib/tftpboot directory.
+# It takes a bash script input from the launch directory.
+# Called from systemd init unit during server spinup
+# Order is:
+# ExecStartPre = build
+# Exec = RUN
+# ExecPost = wavelet_pxe_grubconfig.sh
+
+FROM quay.io/fedora/fedora:latest
+RUN rm -f /etc/yum.repos.d/fedora-cisco-openh264.repo && mkdir -p /tmp/boot_rpms && dnf update -y --refresh
+RUN dnf install -y dnf-utils grub2-efi-x64-modules grub2-tools-extra grub2-pc-modules shadow-utils \
+    podman fuse-overlayfs cpio yum-utils --exclude container-selinux && \
+    grub2-mknetdir --net-directory /tmp/var/lib/tftpboot/
+RUN mkdir -p /tmp/boot_rpms && \
+    cd /tmp/boot_rpms && yumdownloader --resolve shim-ia32 shim-x64 grub2-efi-x64 grub2-efi-ia32
+RUN cd /tmp/boot_rpms && \
+    echo -e "\nLOOKING FOR FILES: " && \
+    ls -laht /tmp/boot_rpms/ && \
+    grub2efi32=$(ls /tmp/boot_rpms/grub2-efi-ia32*.rpm 2>/dev/null | head -n1) && \
+    grub2efi64=$(ls /tmp/boot_rpms/grub2-efi-x64*.rpm 2>/dev/null | head -n1) && \
+    shimx64=$(ls /tmp/boot_rpms/shim-x64*.rpm 2>/dev/null | head -n1) && \
+    shimia32=$(ls /tmp/boot_rpms/shim-ia32*.rpm 2>/dev/null | head -n1) && \
+    echo -e "\ngrub2efi32=$grub2efi32\ngrub2efi64=$grub2efi64\nshimx64=$shimx64\nshimia32=$shimis32\n" && \
+    if [ -n "$grub2efi32" ]; then rpm2cpio "$grub2efi32" | cpio -idmuv; fi && \
+    if [ -n "$grub2efi64" ]; then rpm2cpio "$grub2efi64" | cpio -idmuv; fi && \
+    if [ -n "$shimx64" ]; then rpm2cpio "$shimx64" | cpio -idmuv; fi && \
+    if [ -n "$shimia32" ]; then rpm2cpio "$shimia32" | cpio -idmuv; fi && \
+    # Notes, mmx64.efi = MokManager
+    echo -e "\nLOOKING FOR EFI FILES:" && \
+    mkdir -p /tmp/var/lib/tftpboot/EFI/fedora && \
+    mkdir -p /tmp/var/lib/tftpboot/EFI/BOOT && \
+    mkdir -p /tmp/var/lib/tftpboot/boot/grub2/fonts && \
+    # Find unicode.pf2 and grubenv in the extracted RPMs
+    UNICODE_PF2=$(find /tmp/boot_rpms/ -name 'unicode.pf2' | head -n1) && \
+    if [ -n "$UNICODE_PF2" ]; then cp "$UNICODE_PF2" /tmp/var/lib/tftpboot/boot/grub2/fonts/; fi && \
+    GRUBENV=$(find /tmp/boot_rpms -name 'grubenv' | grep -v grubenv-efi | head -n1) && \
+    if [ -n "$GRUBENV" ]; then cp "$GRUBENV" /tmp/var/lib/tftpboot/boot/grub2/; fi && \
+    GRUBX64=$(find /tmp/boot_rpms -name 'grubx64.efi' | head -n1) && \
+    GRUBIA32=$(find /tmp/boot_rpms -name 'grubia32.efi' | head -n1) && \
+    if [ -n "$GRUBX64" ]; then cp "$GRUBX64" /tmp/var/lib/tftpboot/EFI/fedora/; fi && \
+    if [ -n "$GRUBIA32" ]; then cp "$GRUBIA32" /tmp/var/lib/tftpboot/EFI/fedora/; fi && \
+    SHIMX64=$(find /tmp/boot_rpms -name 'shimx64.efi' | head -n1) && \
+    SHIMIA32=$(find /tmp/boot_rpms -name 'shimia32.efi' | head -n1) && \
+    SHIM=$(find /tmp/boot_rpms -name 'shim.efi' | head -n1) && \
+    MMX64=$(find /tmp/boot_rpms -name 'mmx64.efi' | head -n1) && \
+    FBX64=$(find /tmp/boot_rpms -name 'fbx64.efi' | head -n1) && \
+    if [ -n "$SHIMX64" ]; then cp "$SHIMX64" /tmp/var/lib/tftpboot/EFI/fedora/; fi && \
+    if [ -n "$SHIMIA32" ]; then cp "$SHIMIA32" /tmp/var/lib/tftpboot/EFI/fedora/; fi && \
+    if [ -n "$SHIM" ]; then cp "$SHIM" /tmp/var/lib/tftpboot/EFI/fedora/; fi && \
+    if [ -n "$MMX64" ]; then cp "$MMX64" /tmp/var/lib/tftpboot/EFI/fedora/; fi && \
+    if [ -n "$FBX64" ]; then cp "$FBX64" /tmp/var/lib/tftpboot/EFI/BOOT/; fi && \
+    BOOTX64=$(find /tmp/boot_rpms/ -name 'BOOTX64.EFI' | head -n1) || \
+              BOOTX64=$(find /tmp/boot_rpms -name 'BOOTX64.EFI' | head -n1) || \
+              BOOTX64="$SHIMX64" && \
+    if [ -n "$BOOTX64" ]; then cp "$BOOTX64" /tmp/var/lib/tftpboot/EFI/BOOT/; fi && \
+    echo -e "\n=== FINAL TFTPBOOT EFI STRUCTURE ===" && \
+    ls -laR /tmp/var/lib/tftpboot/EFI/
+
+RUN mkdir -p /tar_root && \
+    tar -cJf /tar_root/tftpboot.tar.xz -C /tmp var/lib/tftpboot && \
+    ls -la /tar_root/
+
+# NOTE in services setup, host /var/lib is mounted to container /tmp/
+CMD mkdir -p /tmp/lib/tftpboot && \
+    tar -xJf /tar_root/tftpboot.tar.xz --strip-components=3 -C /tmp/tftpboot
