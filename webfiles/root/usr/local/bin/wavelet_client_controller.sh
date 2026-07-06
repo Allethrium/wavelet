@@ -1166,6 +1166,64 @@ check_reflector_subscription(){
 	fi
 }
 
+reconstruct_configPayload(){
+	local sourceHash
+	local configPayload=""
+	# Determine sourceHash
+	if [[ -n "${firstRunState:-}" ]]; then
+		sourceHash="$etcdValue"
+	else
+		KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; read_etcd_global
+		local channelData="$printvalue"
+		if [[ -z "$channelData" ]]; then
+			channelData="1-1"
+		fi
+		sourceHash="${channelData##*-}"
+	fi
+	# Check if static input (0|1|2|3)
+	if [[ "$sourceHash" =~ ^(0|1|2|3)$ ]]; then
+		configPayload="type:static|active:0|subType:static|cmd:"
+	else
+		# Not a static input, default to UltraGrid network source payload
+		configPayload="type:ug|active:1|subType:ug|cmd:"
+		# Try to determine if it's direct NDI mode
+		local hostSourceKey=""
+		if [[ -n "${_inputDeviceMap[$sourceHash]:-}" ]]; then
+			hostSourceKey="${_inputDeviceMap[$sourceHash]}"
+		else
+			# Search etcd for the input key if not in map
+			local inputKeys
+			inputKeys=$(etcdctl get /UI/HOSTS --prefix --keys-only | grep "/inputs/$sourceHash$")
+			if [[ -n "$inputKeys" ]]; then
+				hostSourceKey=$(echo "$inputKeys" | head -n1)
+			fi
+		fi
+		if [[ -n "$hostSourceKey" ]]; then
+			KEYNAME="$hostSourceKey"; read_etcd_global; hostSourceData="$printvalue"
+			if [[ "$hostSourceData" == *"NDI"* ]] || [[ "$hostSourceData" == *"RTSP"* ]]; then
+				local deviceHostName
+				local hostIP="${hostSourceData%;*}"
+				deviceHostName="${hostIP#*;}"
+				hostIP="${hostIP%%;*}"
+				deviceHostName="${deviceHostName%%;*}.$(dnsdomainname)"
+				KEYNAME="/HOSTS/$deviceHostName/control/directMode"; read_etcd_global
+				local directMode="$printvalue"
+				if [[ "$directMode" == "1" ]]; then
+					# Direct NDI mode: reconstruct full network payload
+					KEYNAME="/HOSTS/$deviceHostName/subType"; read_etcd_global
+					local decoderSubType="$printvalue"
+					KEYNAME="/HOSTS/$deviceHostName/uv_stream_cmd/subscribeStream"; read_etcd_global
+					local decoderSubscribecmd="$printvalue"
+					if [[ -n "$decoderSubscribecmd" ]]; then
+						configPayload="type:network|active:1|subType:$decoderSubType|cmd:$decoderSubscribecmd"
+					fi
+				fi
+			fi
+		fi
+	fi
+	echo "$configPayload"
+}
+
 run_decoder(){
 	# Begins the decoder process
 	# On run, the decoder should be able to lookup the primary video source for the group it resides within.
@@ -1192,9 +1250,19 @@ run_decoder(){
 		fi
 		# Generate a configPayLoad for first run
 		configPayload="type:static|active:0|subType:static|cmd:"
+	else
+		KEYNAME="/HOSTS/$hostNameSys/control/videoSourceConfig"; read_etcd_global
+		if [[ -z "$printvalue" ]]; then
+			# We have an error and need to get a proper configPayload or build it from scratch here.
+			# PLACEHOLDER:
+			configPayload="$(reconstruct_configPayload)"
+		else
+			configPayload="$printvalue"
+		fi
 	fi
-	KEYNAME="/HOSTS/$hostNameSys/control/videoSourceConfig"; read_etcd_global; configPayload="$printvalue"
+
 	if [[ -z "$configPayload" ]]; then
+		# Final error and we stop trying here.
 		msg="ERR: videoSourceConfig not found for $hostNameSys.  Exiting decoder run attempt!"
 		KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="$msg"; write_etcd_global &
 		echo "	$msg"
