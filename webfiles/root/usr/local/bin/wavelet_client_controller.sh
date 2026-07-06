@@ -1180,6 +1180,8 @@ run_decoder(){
 	local videoSourceCmd; local videoSourceType; local videoSourceSubType; local configPayload
 	blankStatus=0
 	if [[ -n "${firstRunState:-}" ]]; then
+		# Acquire the groupHash value.  This key is always written, if it is not, we have a badly broken installation.
+		KEYNAME="/GROUPS/$(cat /var/home/wavelet/config/serverhostname.txt)"; read_etcd_global; groupHash="$printvalue"
 		echo "      Decoder first run, grabbing group $groupHash video source"
 		KEYNAME="/UI/GROUPS/$groupHash/control/sourceHash"; read_etcd_global
 		etcdValue="$printvalue"
@@ -1189,9 +1191,9 @@ run_decoder(){
 			KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; KEYVALUE="$channel-$etcdValue"; write_etcd_global &
 		fi
 		# Generate a configPayLoad for first run
-		configPayLoad=""
+		configPayLoad="type:static|active:0|subType:static|cmd:"
 	fi
-	KEYNAME="/HOSTS/$hostNameSys/control/videoSourceConfig"; read_etcd; configPayload="$printvalue"
+	KEYNAME="/HOSTS/$hostNameSys/control/videoSourceConfig"; read_etcd_global; configPayload="$printvalue"
 	if [[ -z "$configPayload" ]]; then
 		msg="ERR: videoSourceConfig not found for $hostNameSys.  Exiting decoder run attempt!"
 		KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="$msg"; write_etcd_global &
@@ -1708,7 +1710,7 @@ uiDisable_moveUGWindow(){
 #
 ###
 
-set -x
+
 exec >>/var/home/wavelet/logs/client.log 2>&1
 
 start_timer
