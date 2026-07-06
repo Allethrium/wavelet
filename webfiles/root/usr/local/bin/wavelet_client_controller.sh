@@ -1191,7 +1191,7 @@ run_decoder(){
 			KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; KEYVALUE="$channel-$etcdValue"; write_etcd_global &
 		fi
 		# Generate a configPayLoad for first run
-		configPayLoad="type:static|active:0|subType:static|cmd:"
+		configPayload="type:static|active:0|subType:static|cmd:"
 	fi
 	KEYNAME="/HOSTS/$hostNameSys/control/videoSourceConfig"; read_etcd_global; configPayload="$printvalue"
 	if [[ -z "$configPayload" ]]; then
