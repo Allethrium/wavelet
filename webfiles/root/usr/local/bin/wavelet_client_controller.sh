@@ -1191,7 +1191,7 @@ run_decoder(){
 		# Generate a configPayLoad for first run
 		configPayLoad=""
 	fi
-	KEYNAME="/HOSTS/$hostNameSys/control/videoSourceConfig"; read_etcd_prefix_list; configPayload="$printvalue"
+	KEYNAME="/HOSTS/$hostNameSys/control/videoSourceConfig"; read_etcd; configPayload="$printvalue"
 	if [[ -z "$configPayload" ]]; then
 		msg="ERR: videoSourceConfig not found for $hostNameSys.  Exiting decoder run attempt!"
 		KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="$msg"; write_etcd_global &
