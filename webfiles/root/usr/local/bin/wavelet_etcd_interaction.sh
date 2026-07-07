@@ -214,9 +214,9 @@ case "$action" in
 		declare -A commandLine=([3]="get" [2]="$inputKeyName" [1]="--prefix" [0]="--print-value-only"); fID="clearText";
 		;;
 	read_etcd_json_revision)
-		declare -A commandLine=([3]="get -w json" [1]="$inputKeyName");
+		declare -A commandLine=([3]="$inputKeyName" [2]="get -w json");
 		;;
-	read_etcd_lastrevision)
+	read_etcd_revisionID)
 		declare -A commandLine=([2]="get" [1]="$inputKeyName" [0]="--rev=$revisionID");
 		;;
 	# Write an etcd value under a hostname.  Keys here are base64

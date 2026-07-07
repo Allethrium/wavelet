@@ -39,6 +39,14 @@ read_etcd_prefix_values(){
 	# Gets the VALUES ONLY in a specified range
 	printvalue=$("$targetFile" "read_etcd_prefix_values" "$KEYNAME")
 }
+read_etcd_json_revision(){
+	# Gets the revision value of the current key
+	printvalue=$("$targetFile" "read_etcd_json_revision" "$KEYNAME")
+}
+read_etcd_lastrevision(){
+	# reads the previous revision value of the key at a specific revision ID
+	printvalue=$("$targetFile" "read_etcd_revisionID" "$KEYNAME" "$REVISIONID")
+}
 write_etcd(){
 	"$targetFile" "write_etcd" "$KEYNAME" "$KEYVALUE"
 	#echo -e "		Key Name: ${KEYNAME}\n		Set as: ${KEYVALUE}\n		Host: /${hostNameSys}/\n"

@@ -63,7 +63,7 @@ pull_registry_images(){
 	registry_addr=$(hostname -f)
 	local registry_url="$registry_addr:5000"
 	podman image prune -f >/dev/null 2>&1
-	podman untag "localhost/$imageTarget"
+	podman untag localhost/$imageTarget
 	sourceList=()
   	sourceList+=("quay.io/coreos/etcd:v3.6.4")
 	sourceList+=("quay.io/coreos/coreos-installer:release")

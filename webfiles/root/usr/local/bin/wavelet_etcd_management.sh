@@ -358,11 +358,18 @@ generate_etcd_host_role() {
 		execute_etcd_cmd "$cmd"
 	}
 	roleCmd() {
+		# Read + Write and prefixes
 		cmd="role grant-permission $clientHostNameShort readwrite ${1} --prefix=true"
 		execute_etcd_cmd "$cmd"
 	}
 	roleCmdReadOnly() {
+		# ReadOnly and prefixes
 		cmd="role grant-permission $clientHostNameShort read ${1} --prefix=true"
+		execute_etcd_cmd "$cmd"
+	}
+	roleCmdReadKeyOnly() {
+		# Read that key only
+		cmd="role grant-permission $clientHostNameShort read ${1} --prefix=false"
 		execute_etcd_cmd "$cmd"
 	}
 	# Generate then acquire the hash value for this host
@@ -376,9 +383,13 @@ generate_etcd_host_role() {
 	KEYNAME="/HOSTS/$clientHostName"; clientHash="$("$ETCDINTERACTIONMOD" 'read_etcd_global' $KEYNAME)"
 	# Set up client permissions - UI commands (Read Only under own hostname)
 	VAL="$clientHostName"; KEY="/UI/HOSTS/$clientHash"; createCmd "$KEY" "$VAL"; roleCmdReadOnly "$KEY"
-	# Everyone should be able to read globals & the primary server group hash
+	# Everyone should be able to read:
+	# globals
+	# the primary server group hash
+	# the server host hash.
 	roleCmdReadOnly "/UI/GLOBALS/"
 	roleCmdReadOnly "/GROUPS/$(hostname)"
+	roleCmdReadKeyOnly "/HOSTS/$(hostname)"
 	# Read-only keys
 	KEY="CA_CERT"; roleCmdReadOnly "${KEY}"
 	KEY="SVR"; roleCmdReadOnly "${KEY}"

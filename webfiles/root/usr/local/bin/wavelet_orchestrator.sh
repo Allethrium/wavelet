@@ -1,5 +1,4 @@
 #!/bin/bash
-trap 'stop_timer' EXIT
 # Is launched from a systemd prefix watcher looking at /HOSTS/
 # Must filter out keys from /HOSTS/$hostname and parse in order to do anything useful
 
@@ -28,61 +27,82 @@ detect_self(){
 	if [[ "$(hostname)" = *"svr"* ]]; then
 		event_server
 	else
-		echo -e "The orchestrator will not run on anything other than the server!"
+		echo "The orchestrator will only run on the server!"
 		exit 1
 	fi
 }
 
 event_server(){
 	# Filter our trigger env and generate local environment data
+	local control_suffix
 	triggerKey="${ETCD_WATCH_KEY//\"}"
 	triggerValue="${ETCD_WATCH_VALUE//\"}"
 	keyHostName="${triggerKey#*/HOSTS/}"; keyHostName="${keyHostName%%/*}"
-	KEYNAME="/HOSTS/$keyHostName"; read_etcd_global; hostHash="$printvalue"
-    if [[ -z "$hostHash" ]]; then
-    	echo "	No hostHash available!  Skipping event for $triggerKey"
-    	exit 0
+	hostHash=""; hostGroup=""; primaryGroup=""
+	configFileExists=false
+	control_suffix="${triggerKey#/HOSTS/"$keyHostName"/control/}"
+	control_suffix="${control_suffix##*/}"
+	case "$control_suffix" in
+		"healthStatus")	handler_function="health_status_update";;
+		"inputUpdate")	handler_function="input_device_update";;
+		"wavelet_build_completed")	handler_function="new_host";;
+		"reflectorRequest")	handler_function="event_subscription_request";;
+		"unsubRequest")	handler_function="event_unsubscription_request";;
+		"NETWORK_SENSE")	handler_function="event_network_sense";;
+		"IP")	handler_function="event_update_ip";;
+		"encoder_primed")	handler_function="event_encoder_primed";;
+		"encoder_ready")	handler_function="event_encoder_ready";;
+		"GROUP")	handler_function="event_change_group";;
+		"screenCastCapable")	handler_function="event_screenCastCapable";;
+		"generateConf")	handler_function="event_generate_client_conf";;
+		*) exit 0;; #noop
+	esac
+	if [[ -n "$handler_function" ]] && declare -f "$handler_function" > /dev/null; then
+		echo "Triggered with: $triggerKey, $triggerValue"
+		# TODO:
+		# Look for the hostHash and other data in the local conf file, otherwise pull it from etcd
+		declare -A client_config
+		configFile="/var/home/wavelet/config/$keyHostName.conf"
+		if [[ -f "$configFile" ]]; then
+			while IFS= read -r line; do
+				# Skip empty lines and comments
+				[[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+				# Skip lines without '='
+				[[ "$line" != *=* ]] && continue
+				# Split on first '='
+				key="${line%%=*}"
+				value="${line#*=}"
+				# Remove 'export ' prefix if present
+				if [[ "$key" == export\ * ]]; then
+					key="${key#export }"
+				fi
+				client_config["$key"]="$value"
+			done <"$configFile"
+			hostHash="${client_config[CLIENT_HOSTHASH]}"
+			hostGroup="${client_config[GROUP_HASH]}"
+			primaryGroup="${client_config[PRIMARY_GROUPHASH]}"
+			configFileExists=true
+		else
+			KEYNAME="/HOSTS/$keyHostName"; read_etcd_global; hostHash="$printvalue"
+			KEYNAME="/HOSTS/$keyHostName/control/GROUP"; read_etcd_global; hostGroup="$printvalue"
+			# $hostNameSys = this machine (svr), so we are reading for the primary group hash value.
+			KEYNAME="HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; primaryGroup="$printvalue"
+		fi
+		if [[ "$configFileExists" == false ]]; then
+			# Ensure a conf file is generated for this host
+			update_host_config_full
+		fi
+		if [[ -z "$hostHash" ]]; then
+			echo "	No hostHash available!  Skipping event for $triggerKey"
+			exit 0
+		fi
+        $handler_function
     fi
-	KEYNAME="/HOSTS/$keyHostName/control/GROUP"; read_etcd_global; hostGroup="$printvalue"
-	KEYNAME="HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; primaryGroup="$printvalue"
-	if [[ "$keyHostName" != *"$(dnsdomainname)" ]]; then
-		echo "Invalid client hostname.."
-		exit 0
-	fi
-	echo "Triggered with: $triggerKey, $triggerValue"
-	case "$triggerKey" in
-		*healthStatus*)
-			health_status_update;; # Updates the device health status in UI prefix
-		*inputUpdate*)
-			input_device_update;; # Looks for inputs registered on this host and updates UI prefix
-		*wavelet_build_completed*)
-			new_host;; # Proceeds to update UI with new host keys
-		*TOGGLES*)
-			toggle_control;; # Handles any toggles we may need
-		*HOSTUPDATE*)
-			host_update;; # Generalized flag for informing orchestrator host status has changed
-		*reflectorRequest*)
-			event_subscription_request;; # Adds the decoder to a reflector subscription
-		*unsubRequest*)
-			event_unsubscription_request;;# Removes the decoder from a reflector subscription
-		*DECODER_ERR*)
-			event_decoder_sub_error;; # Responds to a reflector noting a ping failure/network error with a decoder
-		*NETWORK_SENSE*)
-			event_network_sense;; # Responds to a network_sense key being written from DHCP.
-		*/IP)
-			event_update_ip;; # Updates a host IP
-		*/control/encoder_primed)
-			event_encoder_primed;; # Signal the encoder process is up and we are nearly streaming
-		*/control/encoder_ready)
-			event_encoder_ready;; # Encoder is correctly streaming video
-		*/control/GROUP)
-			event_change_group;;
-		*/control/screenCastCapable)
-			# Enable screencasting, as a suitable WiFi device has been detected.
-			KEYNAME="/UI/HOSTS/$hostHash/control/screenCastCapable"; KEYVALUE="$triggerValue"; write_etcd_global & ;;
-		*)
-			exit 0;; # noop
-		esac
+}
+
+event_screenCastCapable(){
+	# Notifies the UI that this device is screen cast capable and will (eventually) display a widget in adv. settings.
+	KEYNAME="/UI/HOSTS/$hostHash/control/screenCastCapable"; KEYVALUE="$triggerValue"; write_etcd_global &
 }
 
 input_device_update(){
@@ -165,28 +185,6 @@ compare_entries(){
         # And we reset the update key to 0
 	fi
     KEYNAME="/HOSTS/$keyHostName/control/inputUpdate"; delete_etcd_key &
-}
-
-get_hosts_in_group(){
-	echo "      Searching for hosts within the group $hostGroup.."
-	hostsInGroup=()
-	local hostName
-  	while IFS= read -r line; do
-   		if [[ "$line" == *"/control/GROUP"* ]]; then
-   	  		KEYNAME="$line"; read_etcd_global
-   	  		if [[ "$printvalue" == "$hostGroup" ]]; then
-   		  		hostName="${line#*/HOSTS/}"
-   		  		hostName="${hostName%%/control/GROUP*}"
-   		  		KEYNAME="/HOSTS/$hostName/IP"; read_etcd_global; ipAddr="$printvalue"
-   		  		if [[ "$hostName" == "$targetHostName" ]]; then
-   		  			echo "      Skipping adding the encoder to its own reflector in order to avoid transmission loops!"
-   		  			continue
-   		  		else
-   		  			hostsInGroup+=("$hostName:$ipAddr")
-   		  		fi
-   			fi
-   		fi
-	done <<<"$allHostKeys"
 }
 
 event_subscription_request(){
@@ -294,7 +292,7 @@ health_status_update(){
     # Notifies the decoder that it's errored and that the subscription attempt to the reflector failed.  Also updates UI status
     local KEYDATA
     # Perform an atomic write with an etcdctl check that the key exists and it not null included
-    KEYDATA="mod(\"/HOSTS/$targetHostName\") > \"0\"
+    KEYDATA="mod(\"/HOSTS/$keyHostName\") > \"0\"
 
 put /UI/HOSTS/$hostHash/control/healthStatus \"$triggerValue\"
 put /UI/HOSTS/$hostHash/control/lastError \"$(date +%s)\"
@@ -329,6 +327,8 @@ event_update_ip(){
 	fi
 	KEYNAME="/UI/HOSTS/$hostHash/IP"; KEYVALUE="$triggerValue"; write_etcd_global &
 	echo "	Updating host $keyHostName UI key: $KEYNAME to IP: $triggerValue"
+	# Update the host config file with the new IP
+	update_host_config_key "HOST_IP" "$triggerValue"
 }
 
 event_encoder_primed(){
@@ -338,10 +338,6 @@ event_encoder_primed(){
 event_encoder_ready(){
 	# Set sourceHashStatus to ready
 	KEYNAME="/UI/GROUPS/$hostGroup/control/sourceHashStatus"; KEYVALUE="1"; write_etcd_global &
-}
-event_encoder_error(){
-	# Set sourceHashStatus to error/dead
-	KEYNAME="/UI/GROUPS/$hostGroup/control/sourceHashStatus"; KEYVALUE="3"; write_etcd_global &
 }
 
 event_change_group(){
@@ -381,18 +377,17 @@ event_change_group(){
 	echo -e "Group keys:\n	blank:$blankStatusValue\n	reveal:$revealStatusValue\n	sourcehash: $groupSourceHash\n previous source: $groupPreviousVideoSource"
 	# Note we are populating both UI and host keys here, less the host/control/GROUP key, which triggered this transaction.
 	# This is to ensure that we don't get a momentarily "flash" of group input when a host is dragged.
+	# put /UI/HOSTS/$hostHash/control/GROUP \"$triggerValue\" - unsure we want to set the UI groups option here.  That's circular..
     KEYDATA="mod(\"/UI/HOSTS/$hostHash\") = \"0\"
 
 put /HOSTS/$keyHostName/control/blankStatus \"$blankStatusValue\"
 put /HOSTS/$keyHostName/control/revealStatus \"$revealStatusValue\"
-put /UI/HOSTS/$hostHash/control/GROUP \"$triggerValue\"
 put /UI/HOSTS/$hostHash/control/blankStatus \"$blankStatusValue\"
 put /UI/HOSTS/$hostHash/control/revealStatus \"$revealStatusValue\"
 put /UI/HOSTS/$hostHash/control/videoSource \"$groupSourceHash\"
 
 put /HOSTS/$keyHostName/control/blankStatus \"$blankStatusValue\"
 put /HOSTS/$keyHostName/control/revealStatus \"$revealStatusValue\"
-put /UI/HOSTS/$hostHash/control/GROUP \"$triggerValue\"
 put /UI/HOSTS/$hostHash/control/blankStatus \"$blankStatusValue\"
 put /UI/HOSTS/$hostHash/control/revealStatus \"$revealStatusValue\"
 put /UI/HOSTS/$hostHash/control/videoSource \"$groupSourceHash\"
@@ -403,19 +398,7 @@ put /UI/HOSTS/$hostHash/control/videoSource \"$groupSourceHash\"
 	if [[ "$hostType" != *"svr"* ]] && [[ -n "$groupSourceHash" ]]; then
 		resolve_group_source_for_host "$keyHostName" "$hostHash" "$groupSourceHash"
 	fi
-}
-
-event_control_update() {
-	# Updates the control key for the host in its UI
-	if [[ "$triggerKey" == *"videoSource"* ]]; then
-		# we don't do anything
-		return
-	else
-		# This writes to the UI key to ensure the UI controls reflect the actual system state
-		uiKey="${triggerKey##*/}"
-		echo "		Updating UI control status for key $triggerKey and value $triggerValue.."
-		KEYNAME="/UI/HOSTS/$hostHash/control/$uiKey"; KEYVALUE="$triggerValue"; write_etcd_global
-	fi
+	update_host_config_key "GROUP_HASH" "$triggerValue"
 }
 
 new_host(){
@@ -426,12 +409,12 @@ new_host(){
 	fi
     # Check group membership
     if [[ -z "$hostGroup" ]]; then
-        echo "	Host is not currently a group member, adding to default server group."
-        KEYNAME="/GROUPS/$hostNameSys"; read_etcd_global; hostGroup="$printvalue"
+		echo "	Host is not currently a group member, adding to default server group."
+		KEYNAME="/GROUPS/$hostNameSys"; read_etcd_global; hostGroup="$printvalue"
 	fi
 	if [[ -z "$hostHash" ]]; then
-	    echo "	No host hash has been generated!  Cannot continue to provision the host.."
-	    exit 0
+		echo "	No host hash has been generated!  Cannot continue to provision the host.."
+		exit 0
 	fi
 	echo "      Generating a new host entry for: $keyHostName.."
 	KEYNAME="/HOSTS/$keyHostName/IP"; read_etcd_global; hostIPAddress="$printvalue"
@@ -532,6 +515,8 @@ put /UI/HOSTS/$hostHash/control/videoSource \"$groupVideoSource\"
 	KEYNAME="/UI/HOSTS/$hostHash/newHost"; KEYVALUE="1"; write_etcd_global &
 	# Update input devices
     input_device_update
+    # Generate the host config file
+    update_host_config_full
 }
 
 # Replicates the resolution logic from event_process_group_videoSource_hosts() but for a single new host.
@@ -681,45 +666,102 @@ bluetooth_connect(){
 	# do we need to do anything with Pipewire here to set the exUBT/BT device as the audio sink?
 }
 
-toggle_control() {
-    # Handles toggle responses from the host, overwrites values in the UI and ensures it appropriately reflects the host state.
-    echo "	Toggle activated on host $triggerKey for value: $triggerValue, updating UI"
-    # Update the toggle value in the UI
-   	KEYNAME="/UI/HOSTS/$hostHash/control/${triggerKey##*/control/}"; KEYVALUE="$triggerValue"; write_etcd_global
+event_generate_client_conf(){
+	# This is a client distress signal notifying the server to generate a proper conf file
+	echo "	Generating conf file for misconfigured client.."
 }
 
-set_poll_key(){
-    # Responsible for telling the UI which element to refresh
-    # Ideally, the UI should look for the parent div to the presented hash, then remove and regenerate it.
-	# generates a timestamp, concats with with the type after a three second delay to allow the system to settle
-	sleep 3
-	KEYNAME="/UI/POLL_UPDATE"; KEYVALUE="$(date +%s)|${1}"; write_etcd_global
-	echo "/UI/POLL_UPDATE key updated with ${KEYVALUE}, UI should pick up changes on next polling cycle!"
+update_host_config_key() {
+	# Updates a single key for the host config file
+	# Takes two positional args: configKey, configValue
+	local configKey="$1"
+	local configValue="$2"
+
+	# Update the corresponding variable based on configKey
+	case "$configKey" in
+		HOST_IP)
+			HOST_IP="$configValue"
+			;;
+		GROUP_HASH)
+			GROUP_HASH="$configValue"
+			;;
+		HOST_TYPE)
+			HOST_TYPE="$configValue"
+			;;
+	esac
+
+	# Upload the client config
+	upload_client_config
 }
 
-host_update(){
-    # Since HOSTUPDATE is provided with the update key in the value field, we do;
-    KEYNAME="$ETCD_WATCH_VALUE"; read_etcd_global; KEYVALUE="$printvalue"
-    # now we'd write the KEYNAME correspondant in the UI appropriately.
+update_host_config_full() {
+	# Updates the host config file.
+	# Hosts refer to this file locally in order to reduce etcd reads and other waits.
+	# Build immutable contents
+	# Wavelet clusterID.  Clients cannot move between clusters (each runs own DC/CA)
+	KEYNAME="/UI/GLOBALS/control/CLUSTERID"; read_etcd_global; CLUSTER_ID="$printvalue"
+	# The primary group hash, clients with no group always return here.
+	# Since we are in the orchestrator.sh module, this is only ever going to be svr.
+	KEYNAME="/GROUPS/$hostNameSys"; read_etcd_global; PRIMARY_GROUPHASH="$printvalue"
+	# The server hostname.  note the text file exists because its needed earlier on bootstrap,
+	# maybe we can clean this up.
+	SERVER_HOSTNAME=$(<"/var/home/wavelet/config/serverhostname.txt")
+	# must modify etcd_management so hosts can read this specific key (but not prefix behind it)
+	KEYNAME="/HOSTS/$SERVER_HOSTNAME"; read_etcd_global; SERVER_HOSTHASH="$printvalue"
+	# the client often needs reference to its own hosthash.  This is generated by orchestrator during new_host setup.
+	KEYNAME="/HOSTS/$keyHostName"; read_etcd_global; CLIENT_HOSTHASH="$printvalue"
+	# Input device status
+	KEYNAME="/HOSTS/$keyHostName/INPUT_DEVICE_PRESENT"; read_etcd_global; INPUT_DEVICE_PRESENT="${printvalue:-0}"
+	KEYNAME="/HOSTS/$keyHostName/IP"; read_etcd_global; HOST_IP="$printvalue"
+	KEYNAME="/HOSTS/$keyHostName/control/type"; read_etcd_global; HOST_TYPE="$printvalue"
+	# Build the Mod configuration content
+	# Orchestrator responds to /HOSTS/$clientHostName/control/GROUP
+	KEYNAME="/HOSTS/$keyHostName/control/GROUP"; read_etcd_global; GROUP_HASH="$printvalue"
+		# Clients ALWAYS start as a decoder, then it is controlled from /UI/HOSTS/$hostHash/control/type via event_promote
+	HOST_TYPE="dec"
+	upload_client_config
 }
 
-# These keys are what we will need to focus on.  Data can be pulled from /HOSTS/hostname mostly
+upload_client_config(){
+	# Handles the checksumming and actual uploading
+	# Get current version
+	if [[ -z "$hostHash" ]]; then
+		hostHash="$CLIENT_HOSTHASH"
+	fi
+	KEYNAME="/UI/HOSTS/$hostHash/conf"; read_etcd_json_revision
+	currentVersion="$(jq -r '.kvs[0].mod_revision // 0' <<<"$printvalue")"
+	local newVersion=$((currentVersion + 1))
+	# Here, we build the file contents properly.
+	local configContent="/var/home/wavelet/config/$keyHostName.conf"
+	cat > "$configContent" <<-EOF
+		export CLUSTER_ID="$CLUSTER_ID"
+		export PRIMARY_GROUPHASH="$PRIMARY_GROUPHASH"
+		export SERVER_HOSTNAME="$SERVER_HOSTNAME"
+		export SERVER_HOSTHASH="$SERVER_HOSTHASH"
+		export CLIENT_HOSTHASH="$CLIENT_HOSTHASH"
+		export GROUP_HASH="$GROUP_HASH"
+		export HOST_TYPE="$HOST_TYPE"
+		export HOST_IP="$HOST_IP"
+		export INPUT_DEVICE_PRESENT="$INPUT_DEVICE_PRESENT"
+		export MOD_REVISION="$newVersion"
+	EOF
+	# Calculate checksum
+	local checksum=$(echo "$configContent" | sha256sum | tr -d ' \t\n-')
+	# Encode to base64
+	local encodedConfig=$(base64 -w 0 <<<"$configContent")
+	# Atomic transaction to update config, checksum, and version
+	# on the client side, the client_controller will activate on confHash being written and pull the new config
+	KEYDATA="mod(\"/UI/HOSTS/$hostHash/conf\") = \"0\"
 
-#	Network_device should now populate itself in /HOSTS/ as it is.. well, a host.
-#	We can store cred + certificate data here, as well as its group membership
-#	Network devices are the only kind of input that gets its own group membership, because on a wavelet host
-#	it would always be the host handling the reflector, and therefore being a better representative of the group
+put /UI/HOSTS/$hostHash/conf \"$encodedConfig\"
+put /UI/HOSTS/$hostHash/confHash \"$checksum\"
 
-#	From these keys, we will be responsible for ensuring that group membership requests are processed
-#	network inputs should be automatically provisioned with a groupHash UUID and reflector args,
-#	in effect spinning up a reflector "instance" for every network device we detect.
-#	Wavelet encoder HOSTS will get their own reflector by default
-#	/$hostNameSys/DECODER_SUB_LIST -- $groupHash ID's the device with its hash
-#	subkeys in DECODER_SUB_LIST are hostname - IPAddr and represent the decoder members of the group
-#	I'd really like to explore the mDNS functionality more to get this working transparently...
+put /UI/HOSTS/$hostHash/conf \"$encodedConfig\"
+put /UI/HOSTS/$hostHash/confHash \"$checksum\"
 
-#	We are also responsible for counting encoders when they have the device ENCODER_QUERY asks for.
-#		KEYNAME="/UI/HOSTS/$hostHash/notify/HASH_ACTIVE/$hashValue"; KEYVALUE="1"; write_etcd_global > HASH_ACTIVE main key to UI?
+"
+	write_etcd_txn "$KEYDATA" &
+}
 
 
 #####

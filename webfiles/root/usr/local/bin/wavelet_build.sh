@@ -984,6 +984,7 @@ event_generate_network_device(){
 event_generate_cluster_uuid() {
 	# Generates a cluster UUID and ensures this cluster knows the server hostname
 	KEYNAME="CLUSTERID"; KEYVALUE="$(cat /proc/sys/kernel/random/uuid)"; write_etcd_global &
+	clusterID="$KEYVALUE"
 	KEYNAME="/UI/GLOBALS/control/CLUSTERID"; write_etcd_global &
 	KEYNAME="SVR"; KEYVALUE="$(hostname)"; write_etcd_global &
 }

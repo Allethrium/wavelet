@@ -53,14 +53,6 @@ else
 	WAVELET_SCREENCAST_MOD="/usr/local/bin/wavelet_screencast.sh"
 fi
 
-declare -A processing_group
-declare -A _hostNameMap          # hostHash → hostname (populated by get_hosts_in_group)
-declare -A _inputDeviceMap       # inputHash → /UI/HOSTS/{hash}/inputs/ key (populated by get_hosts_in_group)
-sleepTimer=60
-
-# NDI sources mapfile for lazy regeneration
-NDI_SOURCES_MAPFILE="/var/home/wavelet/config/ndi_sources.map"
-
 # Process inputs
 detect_operation(){
 	# Inputs are specified from the etcdctl process which spawns this module
@@ -70,12 +62,11 @@ detect_operation(){
 	local control_suffix="${etcdKey#/UI/HOSTS/$thisHostHash/control/}"
 	control_suffix="${control_suffix##*/}"
 
-	if [[ "$thisHostHash" != "$(cat /var/home/wavelet/config/hosthash.conf)" ]]; then
+	if [[ "$thisHostHash" != "$hostHash" ]]; then
 		# Not meant for this machine
 		echo "	No match for this host hash: $thisHostHash"
 		exit 0
 	fi
-	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; groupHash="$printvalue"
 #	echo -e "	Host Matching:\n		Key: $etcdKey\n		Value: $etcdValue"
 	case "$control_suffix" in
 		"label")			handler_function="event_relabel";;
@@ -92,6 +83,7 @@ detect_operation(){
 		"updateImage")		handler_function="regenerate_staticImage";;
 		"UIEnable")			handler_function="toggle_userInterface";;
 		"videoSource")		handler_function="wavelet_run";;
+		"confHash")			handler_function="sync_host_config";;
 		*) echo "	Invalid function key: $control_suffix"; exit 0;; #noop
 	esac
 	if [[ -n "$handler_function" ]] && declare -f "$handler_function" > /dev/null; then
@@ -142,7 +134,7 @@ detect_operation_server(){
 		local thisHostHash
 		thisHostHash="${etcdKey#/UI/HOSTS/}"
 		thisHostHash="${thisHostHash%%/*}"
-    	if [[ "$thisHostHash" == "$(cat /var/home/wavelet/config/hosthash.conf)" ]]; then
+    	if [[ "$thisHostHash" == "$hostHash" ]]; then
     		echo "	HOSTS operation targeted at server, proceeding to detect_operation.."
     		detect_operation
     	fi
@@ -526,8 +518,6 @@ set_newHostName(){
 }
 # Promotion functionality
 event_promote(){
-	KEYNAME="/HOSTS/$hostNameSys/type"; read_etcd_global
-	hostType="$printvalue"
 	echo "      Host type is: $hostType"
 	case "$hostType" in
 		enc*)
@@ -902,11 +892,13 @@ event_change_group(){
    	if [[ -z "$groupHash" ]]; then
    		# Restore the host to the primary group because something went wrong.
    		echo "		No groupHash populated, resetting to server group.."
-		KEYNAME="/GROUPS/$(cat /var/home/wavelet/config/serverhostname.txt)"; read_etcd_global; etcdValue="$printvalue"
+		KEYNAME="/GROUPS/$serverHostname"; read_etcd_global; etcdValue="$printvalue"
    		# Write the group key back and let the server orchestrator update the UI.
    	fi
    	echo "	Changing client group to hash: $etcdValue"
    	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; KEYVALUE="$etcdValue"; write_etcd_global &
+   	# TODO - update this to the wavelet.conf
+   	echo "$etcdValue" > "/var/home/wavelet/config/group.conf"
 }
 
 #delete a group
@@ -915,7 +907,6 @@ event_delete_group(){
 	echo "      Finding components in specified group.."
 	# We also need the hash of the primary group
 	# As this is always run on the server, and the server is always in the primary group:
-	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; primaryGroupHash="$printvalue"
 	if [[ "$etcdValue" == "$primaryGroupHash" ]]; then
 		echo "      Cannot delete the primary group!!"
 		exit 0
@@ -967,7 +958,8 @@ event_delete_group(){
 get_ipValue(){
 	# Gets the current IPv4 address for this host from active ethernet/wifi connections
 	# Prioritizes wired connections, falls back to wifi if no wired connection active
-	local ipValue; local connectionName; local connType
+	local ipValue; local connectionName; local connType; local uuid
+	local ipValue_wired=""; local ipValue_wireless=""
 	# First try to get IP from active wired (ethernet) connection
 	while read -r uuid; do
 		connType=$(nmcli -g connection.type con show "$uuid")
@@ -1017,11 +1009,7 @@ get_ipValue(){
 # Replaces wavelet_run.sh
 wavelet_run(){
 	# Detect_self in this case relies on the etcd type key
-    # firstRunState="$1"
-	local printvalue
-	echo "	etcd Value is: $etcdValue"
-	KEYNAME="/HOSTS/$hostNameSys/type"; read_etcd_global
-	case "$printvalue" in
+	case "$hostType" in
 		enc*) 					event_encoder
 		;;
 		decX.*)					echo -e  "	    I am a Decoder, but my hostname is generic.\n	An error has occurred at some point, and needs troubleshooting.\nTerminating process.\n"; exit 0
@@ -1037,11 +1025,9 @@ wavelet_run(){
 
 run_server(){
 	# Check for input devices
-	KEYNAME="/HOSTS/$hostNameSys/INPUT_DEVICE_PRESENT"; read_etcd_global
-	if [[ "$printvalue" -eq 1 ]]; then
+	if [[ "$inputDevicePresent" -eq 1 ]]; then
 		echo "	An input device is present on this server, proceeding"
 		# Is this input on this host?
-		KEYNAME="/HOSTS/$hostNameSys"; read_etcd_global; serverHostHash="$printvalue"
 		KEYNAME="/UI/HOSTS/$serverHostHash/inputs/"; read_etcd_prefix_keys
 		if [[ "$etcdValue" == 0 ]] || [[ "$etcdValue" == 1 ]] || [[ "$etcdValue" == 2 ]]; then
 			# The requested input device is a static.  Taking no further action
@@ -1104,9 +1090,6 @@ event_encoder(){
         systemctl --user enable wavelet_reflector.service --now
     fi
 	echo -e "	Calling wavelet_encoder module with args:\n		$etcdValue\n	$thisHostHash\n			$1\n"
-	if [[ -z "$groupHash" ]]; then
-		KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; groupHash="$printvalue"
-	fi
 	"$WAVELET_ENCODER_MOD" "inputHash=$etcdValue" "groupHash=$groupHash" "netDevIngest=$1" &
 }
 
@@ -1239,7 +1222,6 @@ run_decoder(){
 	blankStatus=0
 	if [[ -n "${firstRunState:-}" ]]; then
 		# Acquire the groupHash value.  This key is always written, if it is not, we have a badly broken installation.
-		KEYNAME="/GROUPS/$(cat /var/home/wavelet/config/serverhostname.txt)"; read_etcd_global; groupHash="$printvalue"
 		echo "      Decoder first run, grabbing group $groupHash video source"
 		KEYNAME="/UI/GROUPS/$groupHash/control/sourceHash"; read_etcd_global
 		etcdValue="$printvalue"
@@ -1411,6 +1393,8 @@ regenerate_decoder_ugUnit(){
 		regenerate_staticImage
 		regenerate_blankImage
 	fi
+	# Invalidate sway cache since UG service is being restarted
+	rm -f /var/home/wavelet/config/ug_con_id.cache
 	# Generate the decoder process and start
 	tries=0
 	if ! start_ug; then
@@ -1440,7 +1424,6 @@ regenerate_staticImage(){
 		exit 0
 	fi
 	local attempt=1
-	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; groupHash="$printvalue"
 	KEYNAME="/UI/GROUPS/$groupHash/control/staticImage"; read_etcd_global
 	echo "        Downloading static image video loop for local playback from $printvalue.."
 	# We just grab the mp4 loop direct from the webserver URL, including the sha256 hash
@@ -1678,7 +1661,7 @@ netCat(){
 #    echo "Port: $port, Command: $controlPortCmd"
     response=$(nc 127.0.0.1 "$port" <<<"$controlPortCmd");
     # "202 Accepted" = UltraGrid change upstream after a bugfix, we will accept both
-    if [[ "$response" != *"202 Accepted"* ]] || [[ "$response" != *"202 OK"* ]]; then
+    if [[ "$response" != *"202 Accepted"* ]] || [[ "$response" != *"200 OK"* ]]; then
     	echo "	Control Port exception: $response"
     fi
 }
@@ -1701,74 +1684,117 @@ get_swaySocket(){
 
 # Find UltraGrid container ID by matching app_id, class, OR instance == "uv".
 find_ug_con_id(){
-	local ugId; local sortCommand
-	sortCommand='recurse(.nodes[]?, .floating[]?) | select((.app_id == "uv") or (.window_properties.class == "uv")) | .id // empty'
-	ugId="$(swaymsg -t get_tree -s "$swaySocket" | jq -r "$sortCommand")"
-	if [[ -z "$ugId" ]]; then
-		echo "	WARNING: UltraGrid container not found in sway tree." >&2
-		return 1
-	fi
-	echo "$ugId"
+	# Find UltraGrid container ID by matching app_id, class, OR instance == "uv".
+    local cacheFile="/var/home/wavelet/config/ug_con_id.cache"
+    if [[ -f "$cacheFile" ]]; then
+        local cachedId
+        cachedId="$(cat "$cacheFile")"
+        if [[ -n "$cachedId" ]]; then
+            # Use cached ID directly. If UG was restarted, the sway commands below will handle it gracefully.
+            echo "$cachedId"
+            return 0
+        fi
+    fi
+    # Fetch and cache
+    local ugId; local sortCommand
+    sortCommand='recurse(.nodes[]?, .floating[]?) | select((.app_id == "uv") or (.window_properties.class == "uv")) | .id // empty'
+    ugId="$(swaymsg -t get_tree -s "$swaySocket" | jq -r "$sortCommand")"
+    if [[ -n "$ugId" ]]; then
+        echo "$ugId" > "$cacheFile"
+        echo "$ugId"
+    else
+        echo "	WARNING: UltraGrid container not found in sway tree." >&2
+        return 1
+    fi
 }
 
 uiEnable_moveUGWindow(){
-	local workspace; local width; local height;local targetWidth; local targetHeight; local ugId
-	# Determines resolution, workspace and moves the UG window appropriately
-	if [[ "$hostNameSys" == *"svr"* ]]; then
-		elapsedBootTime="$(uptime | awk '{print $3}')"
-		if [[ $elapsedBootTime -lt 3 ]]; then
-			sleep 4
-			workspace=2
-		fi
-	else
-		workspace=3
-	fi
-	displayResolution="$(swaymsg -t get_outputs -s "$swaySocket" \
-			| jq -r '.[] | select(.active == true) | "\(.rect.width)x\(.rect.height)"' | head -n1)"
-	width="${displayResolution%x*}"
-	height="${displayResolution#*x}"
-	targetWidth=$(( width / 2 ))
-	targetHeight=$(( height * 9 / 16 ))
-	echo "	Disabling fullscreen and setting window float for UltraGrid container.."
-	ugId="$(find_ug_con_id)" || return 0
-	if [[ -z "$ugId" ]]; then
-		echo "	ERROR: Unable to determine window ID for UltraGrid!!"
-		KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="ERR: No UltraGrid sway window ID"; write_etcd_global &
-	fi
-	swaymsg -s "$swaySocket" "[con_id=$ugId] floating enable, fullscreen disable"
-	swaymsg -s "$swaySocket" "[con_id=$ugId] resize set $targetWidth $targetHeight"
-	echo "	Moving UltraGrid container to workspace $workspace.."
-	swaymsg -s "$swaySocket" "[con_id=$ugId] move container to workspace $workspace, move container to position 1400 0"
+    local workspace; local width; local height;local targetWidth; local targetHeight; local ugId
+    local displayResolution
+    local resCacheFile="/var/home/wavelet/config/display_resolution.cache"
+    # Determines resolution, workspace and moves the UG window appropriately
+    if [[ "$hostNameSys" == *"svr"* ]]; then
+        elapsedBootTime="$(uptime | awk '{print $3}')"
+        if [[ $elapsedBootTime -lt 3 ]]; then
+            sleep 4
+            workspace=2
+        fi
+    else
+        workspace=3
+    fi
+    # Use cached display resolution if available
+    if [[ -f "$resCacheFile" ]]; then
+        displayResolution="$(cat "$resCacheFile")"
+    else
+        displayResolution="$(swaymsg -t get_outputs -s "$swaySocket" \
+                | jq -r '.[] | select(.active == true) | "\(.rect.width)x\(.rect.height)"' | head -n1)"
+        if [[ -n "$displayResolution" ]]; then
+            echo "$displayResolution" > "$resCacheFile"
+        fi
+    fi
+    if [[ -z "$displayResolution" ]]; then
+        echo "	ERROR: Unable to determine display resolution!"
+        KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="ERR: No display resolution"; write_etcd_global &
+        return 1
+    fi
+    width="${displayResolution%x*}"
+    height="${displayResolution#*x}"
+    targetWidth=$(( width / 2 ))
+    targetHeight=$(( height * 9 / 16 ))
+    echo "	Disabling fullscreen and setting window float for UltraGrid container.."
+    ugId="$(find_ug_con_id)" || return 0
+    if [[ -z "$ugId" ]]; then
+        echo "	ERROR: Unable to determine window ID for UltraGrid!!"
+        KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="ERR: No UltraGrid sway window ID"; write_etcd_global &
+    fi
+    swaymsg -s "$swaySocket" "[con_id=$ugId] floating enable, fullscreen disable"
+    swaymsg -s "$swaySocket" "[con_id=$ugId] resize set $targetWidth $targetHeight"
+    echo "	Moving UltraGrid container to workspace $workspace.."
+    swaymsg -s "$swaySocket" "[con_id=$ugId] move container to workspace $workspace, move container to position 1400 0"
 }
 
 uiDisable_moveUGWindow(){
-	local workspace; local width; local height; local ugId; local displayResolution; local noDecoderWindow
-	# Determines resolution, workspace and moves the UG window appropriately
-	if [[ "$hostNameSys" == *"svr"* ]]; then
-		echo "	This is the server, setting workspace to 1."
-		workspace=1
-		noDecoderWindow=true
-	else
-		echo "	This is a client, setting workspace to 2."
-		workspace=2
-	fi
-	if [[ "$workspace" != 1 ]] && [[ $noDecoderWindow != true ]]; then
-		displayResolution="$(swaymsg -t get_outputs -s "$swaySocket" \
-				| jq -r '.[] | select(.active == true) | "\(.rect.width)x\(.rect.height)"' | head -n1)"
-		width="${displayResolution%x*}"
-		height="${displayResolution#*x}"
-		echo "	Got display resolution width: $width and height: $height"
-		ugId="$(find_ug_con_id)" || return 0
-		if [[ -z "$ugId" ]]; then
-			echo "	ERROR: Unable to determine window ID for UltraGrid!!"
-			KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="ERR: No UltraGrid sway window ID"; write_etcd_global &
-		fi
-		echo "	Moving UltraGrid output container to workspace $workspace.."
-		swaymsg -s "$swaySocket" "[con_id=$ugId] move container to workspace $workspace"
-		echo "	Resizing UltraGrid output container to fullscreen.."
-		swaymsg -s "$swaySocket" "[con_id=$ugId] floating disable, resize set $width $height"
-		swaymsg -s "$swaySocket" "[con_id=$ugId] fullscreen enable"
-	fi
+    local workspace; local width; local height; local ugId; local displayResolution; local noDecoderWindow
+    local resCacheFile="/var/home/wavelet/config/display_resolution.cache"
+    # Determines resolution, workspace and moves the UG window appropriately
+    if [[ "$hostNameSys" == *"svr"* ]]; then
+        echo "	This is the server, setting workspace to 1."
+        workspace=1
+        noDecoderWindow=true
+    else
+        echo "	This is a client, setting workspace to 2."
+        workspace=2
+    fi
+    if [[ "$workspace" != 1 ]] && [[ $noDecoderWindow != true ]]; then
+        # Use cached display resolution if available
+        if [[ -f "$resCacheFile" ]]; then
+            displayResolution="$(cat "$resCacheFile")"
+        else
+            displayResolution="$(swaymsg -t get_outputs -s "$swaySocket" \
+                    | jq -r '.[] | select(.active == true) | "\(.rect.width)x\(.rect.height)"' | head -n1)"
+            if [[ -n "$displayResolution" ]]; then
+                echo "$displayResolution" > "$resCacheFile"
+            fi
+        fi
+        if [[ -z "$displayResolution" ]]; then
+            echo "	ERROR: Unable to determine display resolution!"
+            KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="ERR: No display resolution"; write_etcd_global &
+            return 1
+        fi
+        width="${displayResolution%x*}"
+        height="${displayResolution#*x}"
+        echo "	Got display resolution width: $width and height: $height"
+        ugId="$(find_ug_con_id)" || return 0
+        if [[ -z "$ugId" ]]; then
+            echo "	ERROR: Unable to determine window ID for UltraGrid!!"
+            KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="ERR: No UltraGrid sway window ID"; write_etcd_global &
+        fi
+        echo "	Moving UltraGrid output container to workspace $workspace.."
+        swaymsg -s "$swaySocket" "[con_id=$ugId] move container to workspace $workspace"
+        echo "	Resizing UltraGrid output container to fullscreen.."
+        swaymsg -s "$swaySocket" "[con_id=$ugId] floating disable, resize set $width $height"
+        swaymsg -s "$swaySocket" "[con_id=$ugId] fullscreen enable"
+    fi
 }
 
 
@@ -1794,6 +1820,89 @@ etcdKey="${ETCD_WATCH_KEY//\":-}"
 if [[ "$etcdKey" == \"*\" ]]; then
 	etcdKey="${etcdKey#\"}"
 	etcdKey="${etcdKey%\"}"
+fi
+
+declare -A processing_group
+declare -A _hostNameMap          # hostHash → hostname (populated by get_hosts_in_group)
+declare -A _inputDeviceMap       # inputHash → /UI/HOSTS/{hash}/inputs/ key (populated by get_hosts_in_group)
+sleepTimer=60
+
+# NDI sources mapfile for lazy regeneration
+NDI_SOURCES_MAPFILE="/var/home/wavelet/config/ndi_sources.map"
+
+# Host configuration associative array (flat key-value format)
+declare -A host_config
+configFileExists=false
+
+# Load this host's env vars from the conf file using flat key-value parsing
+# re: /UI/HOSTS/$hostHash/conf
+configFile="/var/home/wavelet/config/$(hostname).conf"
+if [[ -f "$configFile" ]]; then
+	while IFS= read -r line; do
+		line="${line//$'\r'/}"
+		[[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+		[[ "$line" != *=* ]] && continue
+		key="${line%%=*}"
+		value="${line#*=}"
+		host_config["$key"]="$value"
+	done <"$configFile"
+	configFileExists=true
+fi
+
+
+# Populate host configuration variables from the parsed host_config array
+hostHash="${host_config[CLIENT_HOSTHASH]:-}"
+groupHash="${host_config[GROUP_HASH]:-}"
+hostType="${host_config[HOST_TYPE]:-}"
+serverHostname="${host_config[SERVER_HOSTNAME]:-}"
+clusterId="${host_config[CLUSTER_ID]:-}"
+primaryGroupHash="${host_config[PRIMARY_GROUPHASH]:-}"
+serverHostHash="${host_config[SERVER_HOSTHASH]:-}"
+hostIp="${host_config[HOST_IP]:-}"
+inputDevicePresent="${host_config[INPUT_DEVICE_PRESENT]:-}"
+modRevision="${host_config[MOD_REVISION]:-}"
+
+if [[ "$configFileExists" == "false" ]]; then
+	echo "	Config file not available, sending generateConf signal to server and waiting for config generation.."
+	KEYNAME="/HOSTS/$hostNameSys/control/generateConf"; KEYVALUE="1"; write_etcd_global &
+
+	# Wait for the config file to be generated (up to 3 seconds)
+	waitCount=0
+	maxWait=30
+	while [[ ! -f "$configFile" ]] && [[ $waitCount -lt $maxWait ]]; do
+		sleep 0.1
+		((waitCount++))
+	done
+
+	# Get the config file from etcd if it wasn't generated as a file
+	if [[ ! -f "$configFile" ]]; then
+		KEYNAME="/HOSTS/$hostNameSys"; read_etcd_global; hostHash="$printvalue"
+		KEYNAME="/UI/HOSTS/$hostHash/conf"; read_etcd
+		echo "$printvalue" > "$configFile"
+	fi
+
+	if [[ -f "$configFile" ]]; then
+		host_config=()
+		while IFS= read -r line; do
+			line="${line//$'\r'/}"
+			[[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+			[[ "$line" != *=* ]] && continue
+			key="${line%%=*}"
+			value="${line#*=}"
+			host_config["$key"]="$value"
+		done <"$configFile"
+		hostHash="${host_config[CLIENT_HOSTHASH]:-}"
+		groupHash="${host_config[GROUP_HASH]:-}"
+		hostType="${host_config[HOST_TYPE]:-}"
+		serverHostname="${host_config[SERVER_HOSTNAME]:-}"
+	else
+		# Fallback to etcd reads if config file still not available
+		echo "	Config file not available after wait, using sequential data reads from etcd.."
+		KEYNAME="/HOSTS/$hostNameSys"; read_etcd_global; hostHash="$printvalue"
+		KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; groupHash="$printvalue"
+		KEYNAME="/HOSTS/$hostNameSys/control/type"; read_etcd_global; hostType="$printvalue"
+		serverHostname="svr.$(dnsdomainname)"
+	fi
 fi
 
 case "$@" in
