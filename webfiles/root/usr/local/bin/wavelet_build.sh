@@ -220,8 +220,6 @@ event_decoder(){
 		# Generate control keys under our host entry, if the mod key has been changed more than 0 times.
 		# In the case of a client, the initial host key has already been generated
 		# Get the primary group
-
-
 		KEYDATA="mod(\"/HOSTS/$hostNameSys\") > \"0\"
 
 put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
@@ -598,6 +596,39 @@ server_bootstrap(){
     event_checkGroups
 	KEYNAME="/GROUPS/$hostNameSys"; read_etcd_global; groupHash="$printvalue"
 	sleep 1
+	currentVersion=0
+	local newVersion=$((currentVersion + 1))
+	serverIPAddress="$(<"/var/home/wavelet/config/etcd_ip")"
+	# Build our initial server.conf file
+	local configContent="/var/home/wavelet/config/$hostNameSys.conf"
+	cat > "$configContent" <<-EOF
+		export CLUSTER_ID="$clusterID"
+		export PRIMARY_GROUPHASH="$groupHash"
+		export SERVER_HOSTNAME="$hostNameSys"
+		export SERVER_HOSTHASH="$hostHash"
+		export CLIENT_HOSTHASH="$hostHash"
+		export GROUP_HASH="$groupHash"
+		export HOST_TYPE="svr"
+		export HOST_IP="$serverIPAddress"
+		export INPUT_DEVICE_PRESENT="0"
+		export MOD_REVISION="$newVersion"
+	EOF
+	# Calculate checksum
+	local checksum=$(sha256sum <"$configContent" | tr -d ' \t\n-')
+	# Encode to base64
+	local encodedConfig=$(base64 -w 0 <"$configContent")
+	# Atomic transaction to update config, checksum, and version
+	# on the client side, the client_controller will activate on confHash being written and pull the new config
+	KEYDATA="mod(\"/UI/HOSTS/$hostHash/conf\") = \"0\"
+
+put /UI/HOSTS/$hostHash/conf \"$encodedConfig\"
+put /UI/HOSTS/$hostHash/confHash \"$checksum\"
+
+put /UI/HOSTS/$hostHash/conf \"$encodedConfig\"
+put /UI/HOSTS/$hostHash/confHash \"$checksum\"
+
+"
+	write_etcd_txn "$KEYDATA" &
 	KEYDATA="mod(\"/HOSTS/$hostNameSys\") = \"0\"
 
 put /HOSTS/$hostNameSys \"$hostHash\"
