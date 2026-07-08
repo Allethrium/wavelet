@@ -1811,13 +1811,13 @@ start_timer
 trap 'stop_timer "$timer_id_out"; echo "Total: ${timer_duration}s" >&2' EXIT
 
 hostNameSys="$(hostname)"
-etcdValue="${ETCD_WATCH_VALUE//\":-}"
-if [[ "$etcdValue" == \"*\" ]]; then
+etcdValue="$ETCD_WATCH_VALUE"
+if [[ "$etcdValue" == \"*\" && "$etcdValue" == *\" ]]; then
 	etcdValue="${etcdValue#\"}"
 	etcdValue="${etcdValue%\"}"
 fi
-etcdKey="${ETCD_WATCH_KEY//\":-}"
-if [[ "$etcdKey" == \"*\" ]]; then
+etcdKey="$ETCD_WATCH_KEY"
+if [[ "$etcdKey" == \"*\" && "$etcdKey" == *\" ]]; then
 	etcdKey="${etcdKey#\"}"
 	etcdKey="${etcdKey%\"}"
 fi

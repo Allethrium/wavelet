@@ -38,8 +38,11 @@ event_server(){
 	triggerKey="${ETCD_WATCH_KEY//\"}"
 	triggerValue="${ETCD_WATCH_VALUE//\"}"
 	# Sanitize triggerValue
+	triggerValue="${triggerValue//\"/}"
 	triggerValue="${triggerValue//\'/}"
-	triggerValue="${triggerValue//[$'\t\r\n ']/}"
+	triggerValue="${triggerValue//$'\n'/}"
+	triggerValue="${triggerValue//$'\r'/}"
+	triggerValue="${triggerValue//$'\t'/}"
 	keyHostName="${triggerKey#*/HOSTS/}"; keyHostName="${keyHostName%%/*}"
 	hostHash=""; hostGroup=""; primaryGroup=""
 	configFileExists=false
@@ -267,6 +270,8 @@ event_unsubscription_request(){
     # Removes a decoder/UltraGrid client from an UltraGrid reflector on the targeted host
 	supplicantHostName="${triggerKey#*/HOSTS/}"
 	supplicantHostName="${supplicantHostName%%/*}"
+	# Architectural note - read_etcd_prefix_list gives us all the host keys in one read
+	# It's far more efficient to make this one grab, then iterate through the list.
 	KEYNAME="/HOSTS/"; read_etcd_prefix_list; allHostKeys="$printvalue"
 	local counter=0; local sourceHostKey; local videoSourceHost
 
@@ -341,7 +346,12 @@ event_update_ip(){
 	if [[ -z "$triggerValue" ]]; then
 		exit 0
 	fi
-	ip_count=$(echo "$triggerValue" | grep -oP '\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b' | wc -l)
+	ip_count=0
+	temp_value="$triggerValue"
+	while [[ "$temp_value" =~ ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}) ]]; do
+		((ip_count++))
+		temp_value="${temp_value#*"${BASH_REMATCH[1]}"}"
+	done
 	if [[ $ip_count -gt 1 ]]; then
 		echo "	ERROR! Host has $ip_count IP addresses in field: '$triggerValue'"
 		exit 1
@@ -767,9 +777,9 @@ upload_client_config(){
 		export MOD_REVISION="$newVersion"
 	EOF
 	# Calculate checksum
-	local checksum=$(echo "$configContent" | sha256sum | tr -d ' \t\n-')
+	local checksum=$(sha256sum <"$configContent" | tr -d ' \t\n-')
 	# Encode to base64
-	local encodedConfig=$(base64 -w 0 <<<"$configContent")
+	local encodedConfig=$(base64 -w 0 <"$configContent")
 	# Atomic transaction to update config, checksum, and version
 	# on the client side, the client_controller will activate on confHash being written and pull the new config
 	KEYDATA="mod(\"/UI/HOSTS/$hostHash/conf\") = \"0\"
