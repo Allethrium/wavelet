@@ -37,6 +37,9 @@ event_server(){
 	local control_suffix
 	triggerKey="${ETCD_WATCH_KEY//\"}"
 	triggerValue="${ETCD_WATCH_VALUE//\"}"
+	# Sanitize triggerValue
+	triggerValue="${triggerValue//\'/}"
+	triggerValue="${triggerValue//[$'\t\r\n ']/}"
 	keyHostName="${triggerKey#*/HOSTS/}"; keyHostName="${keyHostName%%/*}"
 	hostHash=""; hostGroup=""; primaryGroup=""
 	configFileExists=false
@@ -76,6 +79,14 @@ event_server(){
 				if [[ "$key" == export\ * ]]; then
 					key="${key#export }"
 				fi
+				# Sanitize key
+				key="${key//\"/}"
+				key="${key//\'/}"
+				key="${key//[$'\t\r\n ']/}"
+				# Sanitize value
+				value="${value//\"/}"
+				value="${value//\'/}"
+				value="${value//[$'\t\r\n ']/}"
 				client_config["$key"]="$value"
 			done <"$configFile"
 			hostHash="${client_config[CLIENT_HOSTHASH]}"
@@ -88,6 +99,16 @@ event_server(){
 			# $hostNameSys = this machine (svr), so we are reading for the primary group hash value.
 			KEYNAME="HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; primaryGroup="$printvalue"
 		fi
+		# Sanitize hash variables
+		hostHash="${hostHash//\"/}"
+		hostHash="${hostHash//\'/}"
+		hostHash="${hostHash//[$'\t\r\n ']/}"
+		hostGroup="${hostGroup//\"/}"
+		hostGroup="${hostGroup//\'/}"
+		hostGroup="${hostGroup//[$'\t\r\n ']/}"
+		primaryGroup="${primaryGroup//\"/}"
+		primaryGroup="${primaryGroup//\'/}"
+		primaryGroup="${primaryGroup//[$'\t\r\n ']/}"
 		if [[ "$configFileExists" == false ]]; then
 			# Ensure a conf file is generated for this host
 			update_host_config_full
