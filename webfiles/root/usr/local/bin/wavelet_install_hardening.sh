@@ -402,7 +402,7 @@ configure_idm(){
 		--network=ipa_ipvlan \
 		-v /var/freeipa-data:/data:Z \
 		--tls-verify=false \
-		"$hostNameSys/freeipa-server:latest" ipa-server-install -q
+		"$hostNameSys/freeipa-server:latest" ipa-server-install -q -U < "/var/freeipa-data/ipa-server-install-options"
 
 	# Wait for server install to complete
 	file="/var/freeipa-data/var/log/ipaserver-install.log" >> /var/home/wavelet/logs/hardening.log

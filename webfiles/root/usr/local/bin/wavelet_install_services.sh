@@ -463,6 +463,9 @@ else
 	exit 1
 fi
 
+# Enable entropy daemon for quicker CA generation during hardening
+# Haveged is installed in the client layer, so is available on all wavelet devices.
+systemctl enable haveged --now
 
 # Firewalld is installed from.. somewhere as a dependency.  Disable (for now until performance testing, because a firewall would be nice)
 systemctl disable firewalld.service --now
