@@ -467,6 +467,8 @@ new_host(){
     if [[ "$groupVideoSource" == "1" ]]; then
     	videoSourcePayLoad="type:static|active:0|subType:static|cmd"
     fi
+    # Generate the host config file
+    update_host_config_full
     # Build an etcd transaction - it doesn't matter if the key exists or not, we overwrite it.
     if [[ "$hostType" == *"svr"* ]]; then
     	KEYDATA="mod(\"/UI/HOSTS/$hostHash\") = \"0\"
@@ -546,8 +548,6 @@ put /UI/HOSTS/$hostHash/control/videoSource \"$groupVideoSource\"
 	KEYNAME="/UI/HOSTS/$hostHash/newHost"; KEYVALUE="1"; write_etcd_global &
 	# Update input devices
     input_device_update
-    # Generate the host config file
-    update_host_config_full
 }
 
 # Replicates the resolution logic from event_process_group_videoSource_hosts() but for a single new host.
@@ -707,7 +707,6 @@ update_host_config_key() {
 	# Takes two positional args: configKey, configValue
 	local configKey="$1"
 	local configValue="$2"
-
 	# Update the corresponding variable based on configKey
 	case "$configKey" in
 		HOST_IP)
@@ -720,7 +719,21 @@ update_host_config_key() {
 			HOST_TYPE="$configValue"
 			;;
 	esac
-
+	# Only upload config if all required variables are set
+	# This prevents errors during bootstrap
+	local missing_vars=()
+	[[ -z "$CLUSTER_ID" ]] && missing_vars+=("CLUSTER_ID")
+	[[ -z "$PRIMARY_GROUPHASH" ]] && missing_vars+=("PRIMARY_GROUPHASH")
+	[[ -z "$SERVER_HOSTNAME" ]] && missing_vars+=("SERVER_HOSTNAME")
+	[[ -z "$SERVER_HOSTHASH" ]] && missing_vars+=("SERVER_HOSTHASH")
+	[[ -z "$CLIENT_HOSTHASH" ]] && missing_vars+=("CLIENT_HOSTHASH")
+	[[ -z "$HOST_TYPE" ]] && missing_vars+=("HOST_TYPE")
+	[[ -z "$HOST_IP" ]] && missing_vars+=("HOST_IP")
+	[[ -z "$INPUT_DEVICE_PRESENT" ]] && missing_vars+=("INPUT_DEVICE_PRESENT")
+	if (( ${#missing_vars[@]} > 0 )); then
+		echo "	Config not fully populated yet (missing: ${missing_vars[*]}), deferring config upload." >&2
+		return 0
+	fi
 	# Upload the client config
 	upload_client_config
 }
@@ -744,12 +757,18 @@ update_host_config_full() {
 	# Input device status
 	KEYNAME="/HOSTS/$keyHostName/INPUT_DEVICE_PRESENT"; read_etcd_global; INPUT_DEVICE_PRESENT="${printvalue:-0}"
 	KEYNAME="/HOSTS/$keyHostName/IP"; read_etcd_global; HOST_IP="$printvalue"
-	KEYNAME="/HOSTS/$keyHostName/control/type"; read_etcd_global; HOST_TYPE="$printvalue"
+	KEYNAME="/HOSTS/$keyHostName/type"; read_etcd_global; HOST_TYPE="$printvalue"
 	# Build the Mod configuration content
 	# Orchestrator responds to /HOSTS/$clientHostName/control/GROUP
 	KEYNAME="/HOSTS/$keyHostName/control/GROUP"; read_etcd_global; GROUP_HASH="$printvalue"
-		# Clients ALWAYS start as a decoder, then it is controlled from /UI/HOSTS/$hostHash/control/type via event_promote
-	HOST_TYPE="dec"
+	# Clients ALWAYS start as a decoder, then it is controlled from /UI/HOSTS/$hostHash/control/type via event_promote
+	if [[ -z "$HOST_TYPE" ]]; then
+		if [[ "$keyHostName" == "$hostNameSys" ]]; then
+			HOST_TYPE="svr"
+		else
+			HOST_TYPE="dec"
+		fi
+	fi
 	upload_client_config
 }
 

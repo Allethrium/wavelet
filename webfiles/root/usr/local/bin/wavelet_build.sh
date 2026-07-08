@@ -401,6 +401,8 @@ event_server(){
 		echo "	Server bootstrap not completed"
 		server_bootstrap
 	fi
+	# Source conf file
+	source "/var/home/wavelet/config/$(hostname).conf"
 	# Tag device redetect
 	echo -e "\n	System services and configuration keys generated, starting services now.."
 	systemctl --user daemon-reload
@@ -412,8 +414,8 @@ event_server(){
 		wavelet_client_controller \
 		wavelet_network_device --now --no-block
 	touch /var/home/wavelet/config/provisioned.complete
-	KEYNAME="/GROUPS/$hostNameSys"; read_etcd_global; groupHash="$printvalue"
-	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; KEYVALUE="$groupHash"; write_etcd_global &
+	# Always update our group to the server primary group on run
+	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; KEYVALUE="$PRIMARY_GROUPHASH"; write_etcd_global &
 	echo "	Running initial device detection.."
 	sleep 2
 	/bin/bash -c "$WAVELET_DETECTV4L_MOD 'redetect'"
@@ -584,9 +586,6 @@ server_bootstrap(){
 	systemctl --user start \
 		http-php-pod.service \
 		httpd.service
-	systemctl --user enable \
-		wavelet_orchestrator \
-		--now
 	systemctl --user start wavelet_host_monitor.timer
 	# Populate server state keys, the mod condition check specifies the root key revision at 0
 	# Therefore, nothing must write to the HOSTS/svr hostname key prior to this step.
@@ -614,7 +613,9 @@ server_bootstrap(){
 		export INPUT_DEVICE_PRESENT="0"
 		export MOD_REVISION="$newVersion"
 	EOF
-	echo "Generated config: $(cat $configContent)"
+	echo -e "Generated config:\n$(cat $configContent)"
+	# export vars for utilization
+	source "$configContent"
 	# Calculate checksum
 	local checksum=$(sha256sum <"$configContent" | tr -d ' \t\n-')
 	# Encode to base64
@@ -642,12 +643,15 @@ put /HOSTS/$hostNameSys/control/healthStatus \"0\"
 put /HOSTS/$hostNameSys/control/GROUP \"$groupHash\"
 put /HOSTS/$hostNameSys/IP \"$serverIPAddress\"
 put /HOSTS/$hostNameSys/type \"svr\"
-put /HOSTS/$hostNameSys/wavelet_build_completed \"1\"
 
 "
 	write_etcd_txn "$KEYDATA"
 	echo "	System services and configuration keys generated, starting services now.."
 	event_server
+	# re-order the orchestrator so that it only starts after the server keys are fully populated.
+	systemctl --user enable wavelet_orchestrator --now
+	sleep 2
+	KEYNAME="/HOSTS/$hostNameSys/wavelet_build_completed"; KEYVALUE="1"; write_etcd_global
 	# Ensure we hit the group videoSource key once to force a videoSourceConfig refresh
 	KEYNAME="/GROUPS/$groupHash/control/sourceHash"; KEYNAME="1"; write_etcd_global &
 }
