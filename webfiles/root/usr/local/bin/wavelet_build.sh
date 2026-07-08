@@ -601,7 +601,8 @@ server_bootstrap(){
 	serverIPAddress="$(<"/var/home/wavelet/config/etcd_ip")"
 	# Build our initial server.conf file
 	local configContent="/var/home/wavelet/config/$hostNameSys.conf"
-	cat > "$configContent" <<-EOF
+	echo "Generating svr config file.."
+	cat <<-EOF > "$configContent"
 		export CLUSTER_ID="$clusterID"
 		export PRIMARY_GROUPHASH="$groupHash"
 		export SERVER_HOSTNAME="$hostNameSys"
@@ -613,6 +614,7 @@ server_bootstrap(){
 		export INPUT_DEVICE_PRESENT="0"
 		export MOD_REVISION="$newVersion"
 	EOF
+	echo "Generated config: $(cat $configContent)"
 	# Calculate checksum
 	local checksum=$(sha256sum <"$configContent" | tr -d ' \t\n-')
 	# Encode to base64
@@ -638,17 +640,16 @@ put /HOSTS/$hostNameSys/control/UIEnable \"1\"
 put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
 put /HOSTS/$hostNameSys/control/healthStatus \"0\"
 put /HOSTS/$hostNameSys/control/GROUP \"$groupHash\"
-put /HOSTS/$hostNameSys/IP \"$(cat /var/home/wavelet/config/etcd_ip)\"
+put /HOSTS/$hostNameSys/IP \"$serverIPAddress\"
 put /HOSTS/$hostNameSys/type \"svr\"
 put /HOSTS/$hostNameSys/wavelet_build_completed \"1\"
 
 "
 	write_etcd_txn "$KEYDATA"
-	echo "$hostHash" > /var/home/wavelet/config/hosthash.conf
 	echo "	System services and configuration keys generated, starting services now.."
 	event_server
 	# Ensure we hit the group videoSource key once to force a videoSourceConfig refresh
-    KEYNAME="/GROUPS/$groupHash/control/sourceHash"; KEYNAME="1"; write_etcd_global &
+	KEYNAME="/GROUPS/$groupHash/control/sourceHash"; KEYNAME="1"; write_etcd_global &
 }
 
 # This generates a wrapper and etcd watch service, defined by:

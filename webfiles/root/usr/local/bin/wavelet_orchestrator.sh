@@ -759,9 +759,30 @@ upload_client_config(){
 	if [[ -z "$hostHash" ]]; then
 		hostHash="$CLIENT_HOSTHASH"
 	fi
-	KEYNAME="/UI/HOSTS/$hostHash/conf"; read_etcd_json_revision
-	currentVersion="$(jq -r '.kvs[0].mod_revision // 0' <<<"$printvalue")"
-	local newVersion=$((currentVersion + 1))
+	# etcd is not reponding correctly to this command.
+#	KEYNAME="/UI/HOSTS/$hostHash/conf"; read_etcd_json_revision
+#	currentVersion="$(jq -r '.kvs[0].mod_revision // 0' <<<"$printvalue")"
+	local newVersion=1
+
+	# Guard: ensure required variables are not empty
+	local missing_vars=()
+	[[ -z "$hostHash" ]] && missing_vars+=("hostHash")
+	[[ -z "$keyHostName" ]] && missing_vars+=("keyHostName")
+	[[ -z "$CLUSTER_ID" ]] && missing_vars+=("CLUSTER_ID")
+	[[ -z "$PRIMARY_GROUPHASH" ]] && missing_vars+=("PRIMARY_GROUPHASH")
+	[[ -z "$SERVER_HOSTNAME" ]] && missing_vars+=("SERVER_HOSTNAME")
+	[[ -z "$SERVER_HOSTHASH" ]] && missing_vars+=("SERVER_HOSTHASH")
+	[[ -z "$CLIENT_HOSTHASH" ]] && missing_vars+=("CLIENT_HOSTHASH")
+	[[ -z "$GROUP_HASH" ]] && missing_vars+=("GROUP_HASH")
+	[[ -z "$HOST_TYPE" ]] && missing_vars+=("HOST_TYPE")
+	[[ -z "$HOST_IP" ]] && missing_vars+=("HOST_IP")
+	[[ -z "$INPUT_DEVICE_PRESENT" ]] && missing_vars+=("INPUT_DEVICE_PRESENT")
+
+	if (( ${#missing_vars[@]} > 0 )); then
+		echo "Error: Required configuration variables are not set or are empty: ${missing_vars[*]}" >&2
+		return 1
+	fi
+
 	# Here, we build the file contents properly.
 	local configContent="/var/home/wavelet/config/$keyHostName.conf"
 	cat > "$configContent" <<-EOF
@@ -776,6 +797,7 @@ upload_client_config(){
 		export INPUT_DEVICE_PRESENT="$INPUT_DEVICE_PRESENT"
 		export MOD_REVISION="$newVersion"
 	EOF
+	echo "Generated config: $(cat $configContent)"
 	# Calculate checksum
 	local checksum=$(sha256sum <"$configContent" | tr -d ' \t\n-')
 	# Encode to base64
