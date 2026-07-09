@@ -71,6 +71,7 @@ event_server(){
 		# Look for the hostHash and other data in the local conf file, otherwise pull it from etcd
 		declare -A client_config
 		configFile="/var/home/wavelet/config/$keyHostName.conf"
+		echo "Searching for:  $configFile"
 		if [[ -f "$configFile" ]]; then
 			while IFS= read -r line; do
 				# Skip empty lines and comments
@@ -101,6 +102,7 @@ event_server(){
 		else
 			if [[ "$handler_function" == "event_generate_client_conf" ]]; then
             	# This is a new host and we are going to generate the config directly
+            	echo "Generating a new config file for host: $keyHostName"
             	event_generate_client_conf
             	exit 0
             else
@@ -123,6 +125,7 @@ event_server(){
 			echo "	No hostHash available!  Skipping event for $triggerKey"
 			exit 0
 		fi
+		echo " DEBUG: ORCHESTRATOR: $(env)"
         $handler_function
     fi
 }
@@ -703,11 +706,11 @@ bluetooth_connect(){
 event_generate_client_conf(){
 	# This is a client distress signal notifying the server to generate a proper conf file
 	if [[ "$triggerValue" -eq 1 ]]; then
-		echo "	Generating conf file for a new, or misconfigured client.."
+		echo "	Generating conf file for a new client.."
 		update_host_config_full
 		KEYNAME="/HOSTS/$keyHostName/control/generateConf"; delete_etcd_key
 	else
-		echo "	generate Conf keyvalue is not correct, noop."
+		echo "	generate Conf keyvalue is not correct. NOOP"
 	fi
 }
 
@@ -728,21 +731,6 @@ update_host_config_key() {
 			HOST_TYPE="$configValue"
 			;;
 	esac
-	# Only upload config if all required variables are set
-	# This prevents errors during bootstrap
-	local missing_vars=()
-	[[ -z "$CLUSTER_ID" ]] && missing_vars+=("CLUSTER_ID")
-	[[ -z "$PRIMARY_GROUPHASH" ]] && missing_vars+=("PRIMARY_GROUPHASH")
-	[[ -z "$SERVER_HOSTNAME" ]] && missing_vars+=("SERVER_HOSTNAME")
-	[[ -z "$SERVER_HOSTHASH" ]] && missing_vars+=("SERVER_HOSTHASH")
-	[[ -z "$CLIENT_HOSTHASH" ]] && missing_vars+=("CLIENT_HOSTHASH")
-	[[ -z "$HOST_TYPE" ]] && missing_vars+=("HOST_TYPE")
-	[[ -z "$HOST_IP" ]] && missing_vars+=("HOST_IP")
-	[[ -z "$INPUT_DEVICE_PRESENT" ]] && missing_vars+=("INPUT_DEVICE_PRESENT")
-	if (( ${#missing_vars[@]} > 0 )); then
-		echo "	Config not fully populated yet (missing: ${missing_vars[*]}), deferring config upload." >&2
-		return 0
-	fi
 	# Upload the client config
 	upload_client_config
 }
@@ -750,8 +738,6 @@ update_host_config_key() {
 update_host_config_full() {
 	# Updates the host config file.
 	# Hosts refer to this file locally in order to reduce etcd reads and other waits.
-	# Build immutable contents
-	# Wavelet clusterID.  Clients cannot move between clusters (each runs own DC/CA)
 	KEYNAME="/UI/GLOBALS/control/CLUSTERID"; read_etcd_global; CLUSTER_ID="$printvalue"
 	# The primary group hash, clients with no group always return here.
 	# Since we are in the orchestrator.sh module, this is only ever going to be svr.
@@ -775,6 +761,7 @@ update_host_config_full() {
 		if [[ "$keyHostName" == "$hostNameSys" ]]; then
 			HOST_TYPE="svr"
 		else
+			# No, we aren't always a dec, sometimes we are a "net" device!
 			HOST_TYPE="dec"
 		fi
 	fi
@@ -784,33 +771,16 @@ update_host_config_full() {
 upload_client_config(){
 	# Handles the checksumming and actual uploading
 	# Get current version
-	if [[ -z "$hostHash" ]]; then
+	if [[ -z "$hostHash" ]] && [[ -n "$CLIENT_HOSTHASH" ]]; then
 		hostHash="$CLIENT_HOSTHASH"
 	fi
-	# etcd is not reponding correctly to this command.
+	# etcd is not responding correctly to this command.
 #	KEYNAME="/UI/HOSTS/$hostHash/conf"; read_etcd_json_revision
 #	currentVersion="$(jq -r '.kvs[0].mod_revision // 0' <<<"$printvalue")"
 	local newVersion=1
-
-	# Guard: ensure required variables are not empty
-	local missing_vars=()
-	[[ -z "$hostHash" ]] && missing_vars+=("hostHash")
-	[[ -z "$keyHostName" ]] && missing_vars+=("keyHostName")
-	[[ -z "$CLUSTER_ID" ]] && missing_vars+=("CLUSTER_ID")
-	[[ -z "$PRIMARY_GROUPHASH" ]] && missing_vars+=("PRIMARY_GROUPHASH")
-	[[ -z "$SERVER_HOSTNAME" ]] && missing_vars+=("SERVER_HOSTNAME")
-	[[ -z "$SERVER_HOSTHASH" ]] && missing_vars+=("SERVER_HOSTHASH")
-	[[ -z "$CLIENT_HOSTHASH" ]] && missing_vars+=("CLIENT_HOSTHASH")
-	[[ -z "$GROUP_HASH" ]] && missing_vars+=("GROUP_HASH")
-	[[ -z "$HOST_TYPE" ]] && missing_vars+=("HOST_TYPE")
-	[[ -z "$HOST_IP" ]] && missing_vars+=("HOST_IP")
-	[[ -z "$INPUT_DEVICE_PRESENT" ]] && missing_vars+=("INPUT_DEVICE_PRESENT")
-
-	if (( ${#missing_vars[@]} > 0 )); then
-		echo "Error: Required configuration variables are not set or are empty: ${missing_vars[*]}" >&2
-		return 1
-	fi
-
+	echo "Generating conf file with variables:"
+	echo -e "	$hostHash\n	$keyHostName	\n$CLUSTER_ID	\n$PRIMARY_GROUPHASH	\n$SERVER_HOSTNAME\n"
+	echo -e "	$SERVER_HOSTHASH\n	$CLIENT_HOSTHASH	\n$GROUP_HASH	\n$HOST_TYPE	\n$HOST_IP\n	$INPUT_DEVICE_PRESENT\n"
 	# Here, we build the file contents properly.
 	local configContent="/var/home/wavelet/config/$keyHostName.conf"
 	cat > "$configContent" <<-EOF
@@ -834,11 +804,11 @@ upload_client_config(){
 	# on the client side, the client_controller will activate on confHash being written and pull the new config
 	KEYDATA="mod(\"/UI/HOSTS/$hostHash/conf\") = \"0\"
 
-put /UI/HOSTS/$hostHash/conf \"$encodedConfig\"
-put /UI/HOSTS/$hostHash/confHash \"$checksum\"
+put /HOSTS/$hostHash/conf \"$encodedConfig\"
+put /HOSTS/$hostHash/confHash \"$checksum\"
 
-put /UI/HOSTS/$hostHash/conf \"$encodedConfig\"
-put /UI/HOSTS/$hostHash/confHash \"$checksum\"
+put /HOSTS/$hostHash/conf \"$encodedConfig\"
+put /HOSTS/$hostHash/confHash \"$checksum\"
 
 "
 	write_etcd_txn "$KEYDATA" &

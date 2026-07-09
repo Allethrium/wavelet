@@ -652,6 +652,8 @@ put /HOSTS/$hostNameSys/control/type \"svr\"
 	# re-order the orchestrator so that it only starts after the server keys are fully populated.
 	systemctl --user enable wavelet_orchestrator --now
 	sleep 2
+	# Conf file should already be generated, so we can set the wavelet_build_completed flag
+	# This signals the orchestrator to publish the host to the UI.
 	KEYNAME="/HOSTS/$hostNameSys/wavelet_build_completed"; KEYVALUE="1"; write_etcd_global &
 	# Ensure we hit the group videoSource key once to force a videoSourceConfig refresh
 	KEYNAME="/GROUPS/$groupHash/control/sourceHash"; KEYNAME="1"; write_etcd_global &

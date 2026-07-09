@@ -1801,7 +1801,8 @@ uiDisable_moveUGWindow(){
 event_get_config(){
 	# Load this host's env vars from the conf file using flat key-value parsing
 	# re: /UI/HOSTS/$hostHash/conf
-	configFile="/var/home/wavelet/config/$(hostname).conf"
+	configFile="/var/home/wavelet/config/$hostNameSys.conf"
+	declare -A host_config
 	if [[ -f "$configFile" ]]; then
 		while IFS= read -r line; do
 			line="${line//$'\r'/}"
@@ -1813,6 +1814,40 @@ event_get_config(){
 		done <"$configFile"
 		configFileExists=true
 	fi
+
+	if [[ "$configFileExists" == "false" ]]; then
+		echo "	Config file not available, sending generateConf signal to server and waiting for config generation.."
+		KEYNAME="/HOSTS/$hostNameSys/control/generateConf"; KEYVALUE="1"; write_etcd_global &
+			# Wait for the config file to be generated (up to 3 seconds)
+		waitCount=0
+		maxWait=30
+		while [[ ! -f "$configFile" ]] && [[ $waitCount -lt $maxWait ]]; do
+			sleep 0.1
+			((waitCount++))
+		done
+		KEYNAME="/HOSTS/$hostNameSys/conf"; read_etcd_global; confData="$(base64 -d <<<"$printvalue")"
+		KEYNAME="/HOSTS/$hostNameSys/confHash"; read_etcd_global; confHash="$printvalue"
+	fi
+
+	if [[ "$(sha256sum <<<"$confData" | tr -d ' \t\n-')" != "$confHash" ]] && [[ -n "$confHash" ]]; then
+		# This would also catch nulls
+		echo "	CLIENT_CONTROLLER: confHash does not checksum with configFile data!"
+		exit 1
+	else
+		echo "$confData" > "$configFile"
+	fi
+
+	while IFS= read -r line; do
+		line="${line//$'\r'/}"
+		[[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+		[[ "$line" != *=* ]] && continue
+        key="${line%%=*}"
+        key="${key#export *}"
+        value="${line#*=}"
+        value="${value#\"}"
+        value="${value%\"}"
+		host_config["$key"]="$value"
+	done <"$configFile"
 	# Populate host configuration variables from the parsed host_config array
 	hostHash="${host_config[CLIENT_HOSTHASH]:-}"
 	groupHash="${host_config[GROUP_HASH]:-}"
@@ -1824,46 +1859,8 @@ event_get_config(){
 	hostIp="${host_config[HOST_IP]:-}"
 	inputDevicePresent="${host_config[INPUT_DEVICE_PRESENT]:-}"
 	modRevision="${host_config[MOD_REVISION]:-}"
-	if [[ "$configFileExists" == "false" ]]; then
-		echo "	Config file not available, sending generateConf signal to server and waiting for config generation.."
-		KEYNAME="/HOSTS/$hostNameSys/control/generateConf"; KEYVALUE="1"; write_etcd_global &
-			# Wait for the config file to be generated (up to 3 seconds)
-		waitCount=0
-		maxWait=30
-		while [[ ! -f "$configFile" ]] && [[ $waitCount -lt $maxWait ]]; do
-			sleep 0.1
-			((waitCount++))
-		done
-			# Get the config file from etcd if it wasn't generated as a file
-		if [[ ! -f "$configFile" ]]; then
-			KEYNAME="/HOSTS/$hostNameSys"; read_etcd_global; hostHash="$printvalue"
-			KEYNAME="/UI/HOSTS/$hostHash/conf"; read_etcd
-			echo "$printvalue" > "$configFile"
-		fi
-			if [[ -f "$configFile" ]]; then
-			host_config=()
-			while IFS= read -r line; do
-				line="${line//$'\r'/}"
-				[[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-				[[ "$line" != *=* ]] && continue
-				key="${line%%=*}"
-				value="${line#*=}"
-				host_config["$key"]="$value"
-			done <"$configFile"
-			hostHash="${host_config[CLIENT_HOSTHASH]:-}"
-			groupHash="${host_config[GROUP_HASH]:-}"
-			hostType="${host_config[HOST_TYPE]:-}"
-			serverHostname="${host_config[SERVER_HOSTNAME]:-}"
-		else
-			# Fallback to etcd reads if config file still not available
-			echo "	Config file not available after wait, using sequential data reads from etcd.."
-			KEYNAME="/HOSTS/$hostNameSys"; read_etcd_global; hostHash="$printvalue"
-			KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; groupHash="$printvalue"
-			KEYNAME="/HOSTS/$hostNameSys/control/type"; read_etcd_global; hostType="$printvalue"
-			serverHostname="svr.$(dnsdomainname)"
-		fi
-	fi
 }
+
 
 ###
 #
@@ -1904,7 +1901,12 @@ configFileExists=false
 event_get_config
 
 case "$@" in
-	*SVR*)	detect_operation_server;;
-	*HOST*)	detect_operation;;
-	*RUN*)	firstRunState="true"; touch /var/home/wavelet/config/firstrun_token; wavelet_run;; # This is the initial encoder setup so we must ensure videoSource is set
+	*SVR*)
+		detect_operation_server;;
+	*HOST*)
+		detect_operation;;
+	*RUN*)
+		firstRunState="true"
+		touch /var/home/wavelet/config/firstrun_token
+		wavelet_run;; # This is the initial encoder setup so we must ensure videoSource is set
 esac

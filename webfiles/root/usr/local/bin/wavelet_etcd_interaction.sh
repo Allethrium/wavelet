@@ -72,6 +72,7 @@ etcdCommand(){
             exit "$etcd_exit_code"
         fi
     fi
+    echo "	Got result: $printvalue" >> "/var/home/$user/logs/etcdlog.log"
 }
 
 generate_service() {
