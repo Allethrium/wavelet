@@ -83,7 +83,6 @@ detect_operation(){
 		"updateImage")		handler_function="regenerate_staticImage";;
 		"UIEnable")			handler_function="toggle_userInterface";;
 		"videoSource")		handler_function="wavelet_run";;
-		"confHash")			handler_function="sync_host_config";;
 		*) echo "	Invalid function key: $control_suffix"; exit 0;; #noop
 	esac
 	if [[ -n "$handler_function" ]] && declare -f "$handler_function" > /dev/null; then
@@ -1042,8 +1041,8 @@ run_server(){
             fi
         fi
 	else
-		echo "      No detectable input devices are present on this server."
-		echo "      The server will handle only primary group streaming and system coordination tasks."
+		echo "		No detectable input devices are present on this server."
+		echo "		The server will handle only primary group streaming and system coordination tasks."
 	fi
 }
 
@@ -1814,31 +1813,32 @@ event_get_config(){
 		done <"$configFile"
 		configFileExists=true
 	fi
-	if [[ "$configFileExists" == "false" ]]; then
-		echo "	Config file not available, sending generateConf signal to server and waiting for config generation.."
-		KEYNAME="/HOSTS/$hostNameSys/control/generateConf"; KEYVALUE="1"; write_etcd_global &
-			# Wait for the config file to be generated (up to 3 seconds)
-		waitCount=0
-		maxWait=30
-		while [[ ! -f "$configFile" ]] && [[ $waitCount -lt $maxWait ]]; do
-			sleep 0.1
-			((waitCount++))
-		done
-		KEYNAME="/HOSTS/$hostNameSys/conf"; read_etcd_global; confData="$(base64 -d <<<"$printvalue")"
-		KEYNAME="/HOSTS/$hostNameSys/confHash"; read_etcd_global; confHash="$printvalue"
-
-		if [[ "$(sha256sum <<<"$confData" | tr -d ' \t\n-')" != "$confHash" ]] && [[ -n "$confHash" ]]; then
-			# This would also catch nulls
-			echo "	CLIENT_CONTROLLER: confHash does not checksum with configFile data!"
-			exit 1
-		fi
-		if [[ -z "$confData" ]]; then
-			echo "	CLIENT_CONTROLLER: No config file data"
-			return 1
-		else
-			echo "$confData" > "$configFile"
-		fi
-	fi
+	# Now handled via wavelet_build.sh
+#	if [[ "$configFileExists" == "false" ]]; then
+#		echo "	Config file not available, sending generateConf signal to server and waiting for config generation.."
+#		KEYNAME="/HOSTS/$hostNameSys/control/generateConf"; KEYVALUE="1"; write_etcd_global &
+#			# Wait for the config file to be generated (up to 3 seconds)
+#		waitCount=0
+#		maxWait=30
+#		while [[ ! -f "$configFile" ]] && [[ $waitCount -lt $maxWait ]]; do
+#			sleep 0.1
+#			((waitCount++))
+#		done
+#		KEYNAME="/HOSTS/$hostNameSys/conf"; read_etcd_global; confData="$(base64 -d <<<"$printvalue")"
+#		KEYNAME="/HOSTS/$hostNameSys/confHash"; read_etcd_global; confHash="$printvalue"
+#
+#		if [[ "$(sha256sum <<<"$confData" | tr -d ' \t\n-')" != "$confHash" ]] && [[ -n "$confHash" ]]; then
+#			# This would also catch nulls
+#			echo "	CLIENT_CONTROLLER: confHash does not checksum with configFile data!"
+#			exit 1
+#		fi
+#		if [[ -z "$confData" ]]; then
+#			echo "	CLIENT_CONTROLLER: No config file data"
+#			return 1
+#		else
+#			echo "$confData" > "$configFile"
+#		fi
+#	fi
 	while IFS= read -r line; do
 		line="${line//$'\r'/}"
 		[[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue

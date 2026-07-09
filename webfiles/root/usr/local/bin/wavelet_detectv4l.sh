@@ -431,9 +431,10 @@ optimize_device_for_ultragrid() {
 detect_self(){
 	systemctl --user daemon-reload
 	# Detect_self in this case relies on the etcd type key
-	# TODO - replace with conf file source
-	KEYNAME="/HOSTS/${hostNameSys}/type"; read_etcd_global
-	echo -e "	Host type is: ${printvalue}"
+	if [[ -z "$HOST_TYPE" ]]; then
+		KEYNAME="/HOSTS/$hostNameSys/control/type"; read_etcd_global; HOST_TYPE="$printvalue"
+	fi
+	echo "Host type is: $HOST_TYPE\n"
 	case "${printvalue}" in
 		enc*)                                   echo -e "	I am an Encoder\n"										;	encoder_checkNetwork 1
 		;;
@@ -544,6 +545,11 @@ exec >>"$logName" 2>&1
 
 chown wavelet:wavelet /var/home/wavelet/logs/detectv4l.log
 hostNameSys="$(hostname)"
+
+# source conf file variables
+source "/var/home/wavelet/config/$hostNameSys.conf"
+
+# TODO Here get missing data if any, or proceed
 
 for i in "$@"; do
 	case "$i" in

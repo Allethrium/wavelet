@@ -122,15 +122,14 @@ etcd_provision_request(){
 detect_self(){
 	systemctl --user daemon-reload
 	systemctl --user enable foot-server.socket --now
+	# We need a network connection first.
+	event_connectNetwork
 	if [[ -f "/var/home/wavelet/config/provisioned.complete" ]]; then
 		echo "Provisioning completed, detecting self via etcd.."
 		# We must get a ping from the server before continuing
 		# since we are already provisioned, a wifi connection by default is available
 		# If the no-wifi flag is set, ethernet should already be available
-		serverHostName="$(cat /var/home/wavelet/config/serverhostname.txt)"
-		if [[ ! -f /var/no.wifi ]]; then
-			event_connectNetwork
-		fi
+		serverHostName="$(<"/var/home/wavelet/config/serverhostname.txt")"
 		"$WAVELET_SCREENCAST_MOD" "capable"
 		# Wait until etcd service is available on the server before proceeding
 		until result=$("$ETCDINTERACTIONMOD" "check_status"); do
@@ -145,24 +144,29 @@ detect_self(){
 		done
 
 		# Detect_self in this case relies on the etcd type key
-		# TODO - replace with the conf file value
-		KEYNAME="/HOSTS/$hostNameSys/control/type"; read_etcd_global
-		echo -e "Host type is: $printvalue\n"
-		# test if i'm the server
-		if [[ "$(hostname)" = *"svr"* ]]; then
-			# This is fine because a server always has etcd rights
-			echo -e "	I am a Server. Proceeding..."; event_server
-		else
-			# Handle encoder or decoder paths
-			# This is fine because an encoder will have previously been a decoder, and have etcd rights.
-			if [[ "$printvalue" = *"enc"* ]]; then
-				echo "	I am an encoder"; event_encoder
-			else
-				# This is for anything NOT a svr or enc, including an unpopulated new device.
-				# This COULD have etcd rights, or not and just "fail".  This is why it's not specific.
-				echo "	I am a decoder"; event_decoder
-			fi
+		configFile="/var/home/wavelet/config/$hostNameSys.conf"
+		if [[ -f "$configFile" ]]; then
+			source "$configFile"
 		fi
+		if [[ -z "$HOST_TYPE" ]]; then
+			KEYNAME="/HOSTS/$hostNameSys/control/type"; read_etcd_global; HOST_TYPE="$printvalue"
+		fi
+		echo "	Host type is: $HOST_TYPE"
+		# Launch for host type
+		case "$HOST_TYPE" in
+			"svr") # This is fine, because a server always has etcd rights
+				echo"	I am a Server. Proceeding..."
+				event_server
+				;;
+			"enc") # An encoder must have always started as a decoder host before being promoted
+				echo "	I am an encoder"
+				event_encoder
+				;;
+			*) # This is for anything NOT a svr or enc, including an unpopulated new device.
+				echo "	I am New, a decoder, or an unsupported device"
+				event_decoder
+				;;
+		esac
 	else
 		echo "		Provisioning is NOT complete, detecting self via system hostname.."
 		case "$(hostname)" in
@@ -172,55 +176,60 @@ detect_self(){
 	fi
 }
 
-# These codeblocks directly enable the appropriate service immediately.
-# It was written before the need for this script became apparent.
-# to run systemd as another user (IE from root) do systemctl --user -M wavelet@  service.service
-
 event_decoder(){
+	# Starts the decoder, or bootstraps if config not yet complete
 	echo -e "	Decoder startup routine started."
 	KEYDATA=""
 	local staticImagePath; local staticImageURL
 	local staticHashPath; local staticHashURL; local groupHash
 	local blankImagePath; local serverCheckSum; local localCheckSum
-	# Provision request to etcd
-	serverHostName="$(cat /var/home/wavelet/config/serverhostname.txt)"
-	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global
-	if [[ -z "$printvalue" ]]; then
-		KEYNAME="/GROUPS/$serverHostName"; read_etcd_global; groupHash="$printvalue"
-	fi
-
-	# Get group video source
-	KEYNAME="/UI/GROUPS/$groupHash/control/sourceHash"; read_etcd_global
-	sourceHash="$printvalue"
-	if [[ -z "$sourceHash" ]] || ! [[ "$sourceHash" =~ ^[0-3]$ ]]; then
-		# default to initial static splash image
-		sourceHash=1
-	fi
-	channel="$sourceHash"
-	streamMode="static"
-
-	# Determine video source state keys (replicating run_decoder logic)
-	if [[ "$sourceHash" =~ ^[0-3]$ ]]; then
-		# Static image - no subscription needed
-		videoSourceType="static"
-		videoSourceActive="0"
-		videoSourceSubType="static"
-		videoSourceDirect="0"
+	if [[ -f "$configFile" ]]; then
+		# Bootstrap already completed, proceed to run
+		echo "	Decoder config file found!  Proceeding with normal startup.."
 	else
-		# Defaulting to UltraGrid source
-		videoSourceType="ug"
-		videoSourceActive="1"
-		videoSourceSubType="ug"
-		videoSourceDirect="0"
+		# We are a new host, and should be requesting conf file generation
+		event_decoder_newHost
 	fi
+	# we can now source our configFile and proceed
+	# Note KEYDATA duplicate blocks correspond to if/then in etcd txn
+	source "$configFile"
+	KEYDATA="mod(\"/HOSTS/$hostNameSys\") > \"0\"
 
+put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
+put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
+put /HOSTS/$hostNameSys/control/resetStatus \"0\"
+put /HOSTS/$hostNameSys/control/revealStatus \"0\"
+put /HOSTS/$hostNameSys/control/healthStatus \"0\"
+put /HOSTS/$hostNameSys/control/type \"dec\"
+
+put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
+put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
+put /HOSTS/$hostNameSys/control/resetStatus \"0\"
+put /HOSTS/$hostNameSys/control/revealStatus \"0\"
+put /HOSTS/$hostNameSys/control/healthStatus \"0\"
+put /HOSTS/$hostNameSys/control/type \"dec\"
+
+"
+	sleep 2
+	event_client_control
+	write_etcd_txn "$KEYDATA"
+	check_clientGroupMemberShip
+	systemctl --user daemon-reload
+	systemctl --user --no-block enable wavelet_client_controller --now
+	echo "	Triggering wavelet_client_controller.sh directly.."
+	"$WAVELET_CLIENT_CONTROLLER_MOD" "RUN"
+}
+event_decoder_newHost(){
+	# Handles an entirely new wavelet client
+	# Provision request to etcd
 	if [[ ! -f "/var/home/wavelet/config/provisioned.complete" ]]; then
-		echo "	First run, sending provision request to server.."
+		echo "	Sending provision request to server for Etcd credentials.."
 		etcd_provision_watcher; sleep 2
 		etcd_provision_request
 		# Generate control keys under our host entry, if the mod key has been changed more than 0 times.
 		# In the case of a client, the initial host key has already been generated
 		# Get the primary group
+		# Note KEYDATA duplicate blocks correspond to if/then in etcd txn
 		KEYDATA="mod(\"/HOSTS/$hostNameSys\") > \"0\"
 
 put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
@@ -255,108 +264,37 @@ put /HOSTS/$hostNameSys/wavelet_build_completed \"1\"
 
 "
 		touch /var/home/wavelet/config/provisioned.complete
-	else
-		# Write any data which may have been updated on the system side
-		# Note IP address is set already
-		# blankStatus shouldn't change on reboot
-		KEYDATA="mod(\"/HOSTS/$hostNameSys\") > \"0\"
-
-put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
-put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
-put /HOSTS/$hostNameSys/control/resetStatus \"0\"
-put /HOSTS/$hostNameSys/control/revealStatus \"0\"
-put /HOSTS/$hostNameSys/control/healthStatus \"0\"
-put /HOSTS/$hostNameSys/control/type \"dec\"
-put /HOSTS/$hostNameSys/control/videoSourceType \"$videoSourceType\"
-put /HOSTS/$hostNameSys/control/videoSourceActive \"$videoSourceActive\"
-put /HOSTS/$hostNameSys/control/videoSourceSubType \"$videoSourceSubType\"
-put /HOSTS/$hostNameSys/control/videoSourceDirect \"$videoSourceDirect\"
-put /HOSTS/$hostNameSys/control/previousVideoSourceKey \"$sourceHash\"
-put /HOSTS/$hostNameSys/control/previousVideoSourceType \"$streamMode\"
-put /HOSTS/$hostNameSys/control/channel-Source \"$channel-$sourceHash\"
-
-put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
-put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
-put /HOSTS/$hostNameSys/control/resetStatus \"0\"
-put /HOSTS/$hostNameSys/control/revealStatus \"0\"
-put /HOSTS/$hostNameSys/control/healthStatus \"0\"
-put /HOSTS/$hostNameSys/control/type \"dec\"
-put /HOSTS/$hostNameSys/control/videoSourceType \"$videoSourceType\"
-put /HOSTS/$hostNameSys/control/videoSourceActive \"$videoSourceActive\"
-put /HOSTS/$hostNameSys/control/videoSourceSubType \"$videoSourceSubType\"
-put /HOSTS/$hostNameSys/control/videoSourceDirect \"$videoSourceDirect\"
-put /HOSTS/$hostNameSys/control/previousVideoSourceKey \"$sourceHash\"
-put /HOSTS/$hostNameSys/control/previousVideoSourceType \"$streamMode\"
-put /HOSTS/$hostNameSys/control/channel-Source \"$channel-$sourceHash\"
-
-"
 	fi
-	sleep 2
-	KEYNAME="/HOSTS/$hostNameSys"; read_etcd_global; hostHash="$printvalue"
-	if [[ -z "$hostHash" ]]; then
-		echo "	We do not have a valid host hash, which indicates something went wrong with the client provision process!"
-		echo "	TBD: reprovision attempt call"
+	# Continue to request conf generation now the client host keys are generated
+	KEYNAME="/HOSTS/$hostNameSys/control/generateConf"; write_etcd_global
+	sleep 1
+	KEYNAME="/HOSTS/$hostNameSys/confHash"; read_etcd_global; confHash="$printvalue"
+	if [[ -z "$confHash" ]]; then
+		sleep 2
+		KEYNAME="/HOSTS/$hostNameSys/confHash"; read_etcd_global; confHash="$printvalue"
+	fi
+	KEYNAME="/HOSTS/$hostNameSys/conf"; read_etcd_global; confData="$(base64 -d <<<"$printvalue")"
+	# Parse the sha256 hash against our conf data and source the conf file if good.
+	# As this is a brand new client, there is no reason this would fail.
+	if [[ "$(sha256sum <<<"$confData" | tr -d ' \t\n-')" != "$confHash" ]] && [[ -n "$confHash" ]]; then
+		# This would also catch nulls
+		echo "	WAVELET_BUILD: confHash does not checksum with configFile data!"
 		exit 1
 	fi
-	echo "$hostHash" > /var/home/wavelet/config/hosthash.conf
-	event_client_control
-	write_etcd_txn "$KEYDATA"
-	check_clientGroupMemberShip
-	systemctl --user daemon-reload
-	systemctl --user --no-block enable wavelet_client_controller --now
-
-	staticImagePath="/var/home/wavelet/config/staticImage.mp4"
-	blankImagePath="/var/home/wavelet/config/blankImage.bmp"
-
-	# Generate the decoder blank image
-	if [[ ! -f "$blankImagePath" ]]; then
-  		echo "	Blank display image source isn't available, generating prototype.."
-  		color="rgb(.2, .2, .2, 0)"
-  		backGroundColor="rgb(.2, .2, .2, 0)"
-  		magick -size 1920x1080 -pointsize 50 -background "$color" -bordercolor "$backGroundColor" \
-  			-gravity Center -fill white label:'This screen is intentionally blank.' \
-  			-colorspace RGB "$blankImagePath"
-  	fi
-  	# Generate the decoder static image if it doesn't exist or has changed
-  	KEYNAME="/UI/GROUPS/$groupHash/control/staticImage"; read_etcd_global
-  	if [[ -z "$printvalue" ]]; then
-  		# We use the default Wavelet image
-  		printvalue="https://$serverHostName/images/init_staticImage.mp4"
-  	fi
-  	staticImageURL="$printvalue"
-
-	if [[ ! -f "$staticImagePath" ]]; then
-  		echo "	Static display image file isn't on this client, downloading from server.."
-  		# this is a URL reference to the appropriate group staticImage on the server
-  		# init_staticImage.mp4 for factory default, or staticImage_$groupHash.mp4 for a custom image.
-  		# a sha256 hash should also be generated so that we can test data integrity.
-  		# it always overwrites staticImage.mp4 LOCALLY
-  		echo "	Getting static image for Group hash: $printvalue"
-  		wget -O "$staticImagePath" "$staticImageURL"
-  	else
-  		# Hash our current staticImage against the server's checksum
-  		staticHashURL="${printvalue%*.mp4}.sha256"
-  		staticHashPath="/var/home/wavelet/config/${staticHashURL##*/}.sha256"
-  		wget -O "$staticHashPath" "$staticHashURL"
-  		serverCheckSum="$(cat "$staticHashPath")"
-		localCheckSum=$(sha256sum "$staticImagePath" | cut -d' ' -f1)
-  		if [[ "$localCheckSum" != "$serverCheckSum" ]]; then
-  			echo "	Static image file contents have changed!  Regenerating the video file.."
-  			wget -O "$staticImagePath" "$staticImageURL"
-  		fi
+	if [[ -z "$confData" ]]; then
+		echo "	WAVELET_BUILD: No config file data"
+		exit 1
+	else
+		echo "$confData" > "$configFile"
 	fi
-	event_connectNetwork
-	KEYNAME="/HOSTS/$hostNameSys/control/generateConf"; KEYVALUE="1"; write_etcd_global &
-	echo "	CONFIGURATION COMPLETED."
-	echo "		Launching client_controller in firstrun mode.."
-	"$WAVELET_CLIENT_CONTROLLER_MOD" "RUN"
+	event_configure_static_images
 }
+
 event_encoder(){
 	# This may be obsolete with client_controller now handling much of the runtime logic.
 	# An encoder started life as a decoder, so we don't need to call much of the initial generation logic.
 	echo "   Encoder routine started.."
     event_generate_hotplug
-    event_connectNetwork
 	systemctl --user daemon-reload
 	# Populate encoder state keys, if the mod key has been changed more than 0 times.
 	KEYDATA="mod(\"/HOSTS/$hostNameSys\") > \"0\"
@@ -382,7 +320,7 @@ put /HOSTS/$hostNameSys/wavelet_build_completed \"1\"
 	fi
 	# Set build_completed, request a config generation from the orchestrator and bringup client controller.
 	echo "  Encoder process complete.."
-    systemctl --user enable wavelet_client_control --now &
+    systemctl --user enable wavelet_client_controller --now &
     "$WAVELET_CLIENT_CONTROLLER_MOD" "RUN"
     "$WAVELET_DETECTV4L_MOD" "redetect"
 }
@@ -649,6 +587,47 @@ put /HOSTS/$hostNameSys/confHash \"$checksum\"
 	event_server
 }
 
+event_configure_static_images(){
+	# Called during decoder client setup.
+	staticImagePath="/var/home/wavelet/config/staticImage.mp4"
+	blankImagePath="/var/home/wavelet/config/blankImage.bmp"
+	# Generate the decoder blank image
+	if [[ ! -f "$blankImagePath" ]]; then
+  		echo "	Blank display image source isn't available, generating prototype.."
+  		color="rgb(.2, .2, .2, 0)"
+  		backGroundColor="rgb(.2, .2, .2, 0)"
+  		magick -size 1920x1080 -pointsize 50 -background "$color" -bordercolor "$backGroundColor" \
+  			-gravity Center -fill white label:'This screen is intentionally blank.' \
+  			-colorspace RGB "$blankImagePath"
+  	fi
+  	# Generate the decoder static image if it doesn't exist or has changed
+  	KEYNAME="/UI/GROUPS/$groupHash/control/staticImage"; read_etcd_global
+  	if [[ -z "$printvalue" ]]; then
+  		# We use the default Wavelet image
+  		printvalue="https://$serverHostName/images/init_staticImage.mp4"
+  	fi
+  	staticImageURL="$printvalue"
+	if [[ ! -f "$staticImagePath" ]]; then
+  		echo "	Static display image file isn't on this client, downloading from server.."
+  		# this is a URL reference to the appropriate group staticImage on the server
+  		# init_staticImage.mp4 for factory default, or staticImage_$groupHash.mp4 for a custom image.
+  		# a sha256 hash should also be generated so that we can test data integrity.
+  		# it always overwrites staticImage.mp4 LOCALLY
+  		echo "	Getting static image for Group hash: $printvalue"
+  		wget -O "$staticImagePath" "$staticImageURL"
+  	else
+  		# Hash our current staticImage against the server's checksum
+  		staticHashURL="${printvalue%*.mp4}.sha256"
+  		staticHashPath="/var/home/wavelet/config/${staticHashURL##*/}.sha256"
+  		wget -O "$staticHashPath" "$staticHashURL"
+  		serverCheckSum="$(cat "$staticHashPath")"
+		localCheckSum=$(sha256sum "$staticImagePath" | cut -d' ' -f1)
+  		if [[ "$localCheckSum" != "$serverCheckSum" ]]; then
+  			echo "	Static image file contents have changed!  Regenerating the video file.."
+  			wget -O "$staticImagePath" "$staticImageURL"
+  		fi
+	fi
+}
 # This generates a wrapper and etcd watch service, defined by:
 # generate_service keyToWatch moduleToRun
 # Short explanation
