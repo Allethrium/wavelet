@@ -278,8 +278,8 @@ class Host {
 		this.controls = data.controls || {}; // hostType and most other data are in controls
 		this.lastUpdate = Date.now();
 		this.ipAddress = data.ipAddress || null;
-		this.hostType = data.hostType;  // SVR, DEC, ENC
-		this.type = data.type;			// Host, NDI, RTSP or other
+		this.hostType = data.controls.type;  // SVR, DEC, ENC, NDI, RTSP, other
+		this.type = data.type; // Host, net, infra
 		this.inputs = new Map(); // An input source MUST be on a host, and also must register in the group instance.
 		this.emitter = {
 			listeners: new Map(),

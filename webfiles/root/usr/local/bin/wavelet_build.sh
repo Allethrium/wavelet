@@ -614,25 +614,14 @@ server_bootstrap(){
 		export INPUT_DEVICE_PRESENT="0"
 		export MOD_REVISION="$newVersion"
 	EOF
-	echo -e "Generated config:\n$(cat $configContent)"
+	echo -e "Generated svr config:\n\n$(cat $configContent)\n"
 	# export vars for utilization
 	source "$configContent"
 	# Calculate checksum
 	local checksum=$(sha256sum <"$configContent" | tr -d ' \t\n-')
 	# Encode to base64
 	local encodedConfig=$(base64 -w 0 <"$configContent")
-	# Atomic transaction to update config, checksum, and version
-	# on the client side, the client_controller will activate on confHash being written and pull the new config
-	KEYDATA="mod(\"/UI/HOSTS/$hostHash/conf\") = \"0\"
-
-put /UI/HOSTS/$hostHash/conf \"$encodedConfig\"
-put /UI/HOSTS/$hostHash/confHash \"$checksum\"
-
-put /UI/HOSTS/$hostHash/conf \"$encodedConfig\"
-put /UI/HOSTS/$hostHash/confHash \"$checksum\"
-
-"
-	write_etcd_txn "$KEYDATA" &
+	# Atomic transaction to update config, checksum, and version and other keys.
 	KEYDATA="mod(\"/HOSTS/$hostNameSys\") = \"0\"
 
 put /HOSTS/$hostNameSys \"$hostHash\"
@@ -644,6 +633,8 @@ put /HOSTS/$hostNameSys/control/healthStatus \"0\"
 put /HOSTS/$hostNameSys/control/GROUP \"$groupHash\"
 put /HOSTS/$hostNameSys/control/IP \"$serverIPAddress\"
 put /HOSTS/$hostNameSys/control/type \"svr\"
+put /HOSTS/$hostNameSys/conf \"$encodedConfig\"
+put /HOSTS/$hostNameSys/confHash \"$checksum\"
 
 "
 	write_etcd_txn "$KEYDATA"

@@ -125,7 +125,6 @@ event_server(){
 			echo "	No hostHash available!  Skipping event for $triggerKey"
 			exit 0
 		fi
-		echo " DEBUG: ORCHESTRATOR: $(env)"
         $handler_function
     fi
 }
