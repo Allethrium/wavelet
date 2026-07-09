@@ -414,10 +414,7 @@ event_server(){
 		wavelet_client_controller \
 		wavelet_network_device --now --no-block
 	touch /var/home/wavelet/config/provisioned.complete
-	# Always update our group to the server primary group on run
-	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; KEYVALUE="$PRIMARY_GROUPHASH"; write_etcd_global &
 	echo "	Running initial device detection.."
-	sleep 2
 	/bin/bash -c "$WAVELET_DETECTV4L_MOD 'redetect'"
 }
 
