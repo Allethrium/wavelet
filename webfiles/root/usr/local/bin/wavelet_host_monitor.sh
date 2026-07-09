@@ -48,9 +48,9 @@ main(){
       		if ! valid_ipv4 "$ip"; then
       			continue
       		fi
-           	# Extract hostname from /HOSTS/hostname/IP
+           	# Extract hostname from /HOSTS/hostname/control/IP
            	hostname="${key#/HOSTS/}"
-           	hostname="${hostname%/IP}"
+           	hostname="${hostname%/control/IP}"
             # Check if this IP key already exists
 			if [[ -z "${hostList[$ip]+isset}" ]]; then
 				# Store IP as key, hostname as value

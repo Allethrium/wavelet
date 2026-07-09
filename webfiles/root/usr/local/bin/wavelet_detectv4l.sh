@@ -431,6 +431,7 @@ optimize_device_for_ultragrid() {
 detect_self(){
 	systemctl --user daemon-reload
 	# Detect_self in this case relies on the etcd type key
+	# TODO - replace with conf file source
 	KEYNAME="/HOSTS/${hostNameSys}/type"; read_etcd_global
 	echo -e "	Host type is: ${printvalue}"
 	case "${printvalue}" in

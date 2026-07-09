@@ -179,7 +179,7 @@ fi
 # We respond on-demand to put or delete requests here.  That's it.
 
 if [[ "$triggerType" == "DELETE" ]]; then
-    KEYNAME="/HOSTS/$triggerHostName/IP"; read_etcd_global
+    KEYNAME="/HOSTS/$triggerHostName/control/IP"; read_etcd_global
     if [[ -z "$printvalue" ]]; then
         printvalue="$(dig +short "$triggerHostName")"
     fi

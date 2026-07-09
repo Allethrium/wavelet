@@ -231,7 +231,8 @@ populate_to_etcd(){
 	echo "	Populating ETCD with discovery data.."
 	# Packed format $HASH -- IP;DEVICE_LABEL(attempts to set the device hostname!);MAC;type
 	interfaceEntry="$ipAddr;$deviceHostName;$macAddr;$type;$subType"
-	KEYNAME="/HOSTS/$deviceHostName.$(dnsdomainname)/MAC"; read_etcd_global
+	domainVar="$(dnsdonainname)"
+	KEYNAME="/HOSTS/$deviceHostName.$domainVar/MAC"; read_etcd_global
 	if [[ "$printvalue" == "${macAddr^^}" ]]; then
 		# The device already exists.
 		KEYNAME="/UI/HOSTS/$printvalue/inputs/"; read_etcd_prefix_global
@@ -246,9 +247,9 @@ populate_to_etcd(){
 				# This could be a state change in the device function, a new IP address or some other data.
 				# So, we update the device data without modifying the hash.
 				echo "	Device hash with this hostname is populated, but has experienced changes.  Updating.."
-				KEYNAME="/HOSTS/$deviceHostName.$(dnsdomainname)/uv_encode_cmd/inputStream"
+				KEYNAME="/HOSTS/$deviceHostName.$domainVar/uv_encode_cmd/inputStream"
 				KEYVALUE="$(base64 -w 0 <<<"$UGdeviceStreamCommand")"; write_etcd_global &
-				KEYNAME="/HOSTS/$deviceHostName.$(dnsdomainname)/uv_stream_cmd/subscribeStream"
+				KEYNAME="/HOSTS/$deviceHostName.$domainVar/uv_stream_cmd/subscribeStream"
 				KEYVALUE="$(base64 -w 0 <<<"$UGdeviceSubscribeCommand")"; write_etcd_global &
 			fi
 		done <<<"$printvalue"
@@ -260,40 +261,41 @@ populate_to_etcd(){
 		inputHash="$(sha256sum <<<"$macAddr-INPUT" | tr -d ' \t\n-')"
 		# Create an etcdctl txn
 		# Create a txn which will complete only if the generated hash doesn't exist
-		KEYDATA="mod(\"/HOSTS/$deviceHostName.$(dnsdomainname)\") = \"0\"
+		KEYDATA="mod(\"/HOSTS/$deviceHostName.$domainVar\") = \"0\"
 
-put /HOSTS/$deviceHostName.$(dnsdomainname) \"$hostHash\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/inputs/$inputHash \"$interfaceEntry\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/type \"$type\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/subType \"$subType\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/IP \"$ipAddr\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/MAC \"${macAddr^^}\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/uv_encode_cmd/inputStream \"$(base64 -w 0 <<<"$UGdeviceStreamCommand")\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/uv_stream_cmd/subscribeStream \"$(base64 -w 0 <<<"$UGdeviceSubscribeCommand")\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/control/directMode \"1\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/control/GROUP \"$initGroupHash\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/control/healthStatus \"0\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/control/wavelet_build_completed \"1\"
+put /HOSTS/$deviceHostName.$domainVar \"$hostHash\"
+put /HOSTS/$deviceHostName.$domainVar/inputs/$inputHash \"$interfaceEntry\"
+put /HOSTS/$deviceHostName.$domainVar/control/type \"$type\"
+put /HOSTS/$deviceHostName.$domainVar/subType \"$subType\"
+put /HOSTS/$deviceHostName.$domainVar/control/IP \"$ipAddr\"
+put /HOSTS/$deviceHostName.$domainVar/MAC \"${macAddr^^}\"
+put /HOSTS/$deviceHostName.$domainVar/uv_encode_cmd/inputStream \"$(base64 -w 0 <<<"$UGdeviceStreamCommand")\"
+put /HOSTS/$deviceHostName.$domainVar/uv_stream_cmd/subscribeStream \"$(base64 -w 0 <<<"$UGdeviceSubscribeCommand")\"
+put /HOSTS/$deviceHostName.$domainVar/control/directMode \"1\"
+put /HOSTS/$deviceHostName.$domainVar/control/GROUP \"$initGroupHash\"
+put /HOSTS/$deviceHostName.$domainVar/control/healthStatus \"0\"
+put /HOSTS/$deviceHostName.$domainVar/control/wavelet_build_completed \"1\"
 del DHCP
 
-put /HOSTS/$deviceHostName.$(dnsdomainname) \"$hostHash\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/inputs/$inputHash \"$interfaceEntry\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/type \"$type\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/subType \"$subType\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/IP \"$ipAddr\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/MAC \"${macAddr^^}\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/uv_encode_cmd/inputStream \"$(base64 -w 0 <<<"$UGdeviceStreamCommand")\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/uv_stream_cmd/subscribeStream \"$(base64 -w 0 <<<"$UGdeviceSubscribeCommand")\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/control/directMode \"1\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/control/GROUP \"$initGroupHash\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/control/healthStatus \"0\"
-put /HOSTS/$deviceHostName.$(dnsdomainname)/control/wavelet_build_completed \"1\"
+put /HOSTS/$deviceHostName.$domainVar \"$hostHash\"
+put /HOSTS/$deviceHostName.$domainVar/inputs/$inputHash \"$interfaceEntry\"
+put /HOSTS/$deviceHostName.$domainVar/control/type \"$type\"
+put /HOSTS/$deviceHostName.$domainVar/subType \"$subType\"
+put /HOSTS/$deviceHostName.$domainVar/control/IP \"$ipAddr\"
+put /HOSTS/$deviceHostName.$domainVar/MAC \"${macAddr^^}\"
+put /HOSTS/$deviceHostName.$domainVar/uv_encode_cmd/inputStream \"$(base64 -w 0 <<<"$UGdeviceStreamCommand")\"
+put /HOSTS/$deviceHostName.$domainVar/uv_stream_cmd/subscribeStream \"$(base64 -w 0 <<<"$UGdeviceSubscribeCommand")\"
+put /HOSTS/$deviceHostName.$domainVar/control/directMode \"1\"
+put /HOSTS/$deviceHostName.$domainVar/control/GROUP \"$initGroupHash\"
+put /HOSTS/$deviceHostName.$domainVar/control/healthStatus \"0\"
+put /HOSTS/$deviceHostName.$domainVar/control/wavelet_build_completed \"1\"
 del DHCP
 
 "
 	echo "Attempting to write $KEYDATA"
 	write_etcd_txn "$KEYDATA"
-	KEYNAME="/HOSTS/$deviceHostName.$(dnsdomainname)/control/inputUpdate"; KEYVALUE="1"; write_etcd_global &
+	KEYNAME="/HOSTS/$deviceHostName.$domainVar/control/generateConf"; KEYVALUE="1"; write_etcd_global
+	KEYNAME="/HOSTS/$deviceHostName.$domainVar/control/inputUpdate"; KEYVALUE="1"; write_etcd_global &
 	fi
 }
 

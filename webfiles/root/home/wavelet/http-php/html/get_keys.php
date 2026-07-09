@@ -96,12 +96,8 @@ function parse_hosts_and_inputs($dataArray) {
                 'inputs' => []
             ];
         }
-        if (str_contains($key, '/type')) {
-            $hosts[$hostHash]['hostType'] = $value;
-        } elseif (str_contains($key, '/hash')) {
+        if (str_contains($key, '/hash')) {
             $hosts[$hostHash]['hashID'] = $value;
-        } elseif (str_contains($key, '/IP')) {
-            $hosts[$hostHash]['hostIP'] = $value;
         } elseif (str_contains($key, '/control/')) {
             $controlParts = explode('/control/', $key);
             if (isset($controlParts[1])) {

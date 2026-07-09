@@ -471,7 +471,7 @@ event_generate_hash(){
 			esac
 			echo "		Populating host keys.."
 			# Populate host data (orchestrator takes care of UI)
-			KEYNAME="/HOSTS/$clientHostName/type"; cmd="put $KEYNAME -- $KEYVALUE";	execute_etcd_cmd "$cmd"
+			KEYNAME="/HOSTS/$clientHostName/control/type"; cmd="put $KEYNAME -- $KEYVALUE";	execute_etcd_cmd "$cmd"
 			KEYNAME="/HOSTS/$clientHostName"; KEYVALUE="$hostHash"; cmd="put $KEYNAME -- $KEYVALUE"; execute_etcd_cmd "$cmd"
 		else
 			echo -e "		/HOSTS/$clientHostName Hash value exists: $hashExists"

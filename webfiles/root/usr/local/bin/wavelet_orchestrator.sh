@@ -46,6 +46,8 @@ event_server(){
 	keyHostName="${triggerKey#*/HOSTS/}"; keyHostName="${keyHostName%%/*}"
 	hostHash=""; hostGroup=""; primaryGroup=""
 	configFileExists=false
+	# This will strip only everything past /control, is this what we want?
+	# Are we sure the orchestrator responds only to /HOSTS/$HOST/control/xxaabb?
 	control_suffix="${triggerKey#/HOSTS/"$keyHostName"/control/}"
 	control_suffix="${control_suffix##*/}"
 	case "$control_suffix" in
@@ -97,10 +99,15 @@ event_server(){
 			primaryGroup="${client_config[PRIMARY_GROUPHASH]}"
 			configFileExists=true
 		else
-			KEYNAME="/HOSTS/$keyHostName"; read_etcd_global; hostHash="$printvalue"
-			KEYNAME="/HOSTS/$keyHostName/control/GROUP"; read_etcd_global; hostGroup="$printvalue"
-			# $hostNameSys = this machine (svr), so we are reading for the primary group hash value.
-			KEYNAME="HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; primaryGroup="$printvalue"
+			if [[ "$handler_function" == "event_generate_client_conf" ]]; then
+            	# This is a new host and we are going to generate the config directly
+            	event_generate_client_conf
+            	exit 0
+            else
+            	# The host keys are in the process of being provisioned or this is an orphan key
+				echo "Config file $configFile for host does not exist yet, noop."
+				exit 0
+			fi
 		fi
 		# Sanitize hash variables
 		hostHash="${hostHash//\"/}"
@@ -112,10 +119,6 @@ event_server(){
 		primaryGroup="${primaryGroup//\"/}"
 		primaryGroup="${primaryGroup//\'/}"
 		primaryGroup="${primaryGroup//[$'\t\r\n ']/}"
-		if [[ "$configFileExists" == false ]]; then
-			# Ensure a conf file is generated for this host
-			update_host_config_full
-		fi
 		if [[ -z "$hostHash" ]]; then
 			echo "	No hostHash available!  Skipping event for $triggerKey"
 			exit 0
@@ -235,13 +238,13 @@ event_subscription_request(){
 	# Dig would be quicker than an etcd read, however the cached IP address is not always correct.
 	# This is because the host will initially populate with the wired IP address, but switches to wireless
 	# It can take some minutes to failover, resulting in the wired IP being provided to the reflector.
-	KEYNAME="/HOSTS/$keyHostName/IP"; read_etcd_global; hostIpAddress="$printvalue"
+	KEYNAME="/HOSTS/$keyHostName/control/IP"; read_etcd_global; hostIpAddress="$printvalue"
 	if [[ -z "$hostIpAddress" ]]; then
         hostIpAddress="$(dig +short "$keyHostName")"
     fi
     if valid_ipv4 "$hostIpAddress"; then
         echo "      Resolved valid IP, updating the host.."
-        KEYNAME="/HOSTS/$keyHostName/IP"; write_etcd_global &
+        KEYNAME="/HOSTS/$keyHostName/control/IP"; write_etcd_global &
     else
         echo "      Cannot resolve valid host IP address, exiting."
         exit 0
@@ -356,7 +359,7 @@ event_update_ip(){
 		echo "	ERROR! Host has $ip_count IP addresses in field: '$triggerValue'"
 		exit 1
 	fi
-	KEYNAME="/UI/HOSTS/$hostHash/IP"; KEYVALUE="$triggerValue"; write_etcd_global &
+	KEYNAME="/UI/HOSTS/$hostHash/control/IP"; KEYVALUE="$triggerValue"; write_etcd_global &
 	echo "	Updating host $keyHostName UI key: $KEYNAME to IP: $triggerValue"
 	# Update the host config file with the new IP
 	update_host_config_key "HOST_IP" "$triggerValue"
@@ -379,7 +382,7 @@ event_change_group(){
 		triggerValue="$primaryGroup"
 	fi
 	echo "	Updating host to new group environment: $triggerValue"
-	KEYNAME="/HOSTS/$keyHostName/type"; read_etcd_global; hostType="$printvalue"
+	KEYNAME="/HOSTS/$keyHostName/control/type"; read_etcd_global; hostType="$printvalue"
 	KEYNAME="/UI/GROUPS/$triggerValue"; read_etcd_prefix_list; groupKeys="$printvalue"
 	echo "	Group Keys:"
 	echo "$groupKeys"
@@ -448,8 +451,8 @@ new_host(){
 		exit 0
 	fi
 	echo "      Generating a new host entry for: $keyHostName.."
-	KEYNAME="/HOSTS/$keyHostName/IP"; read_etcd_global; hostIPAddress="$printvalue"
-	KEYNAME="/HOSTS/$keyHostName/type"; read_etcd_global; hostType="$printvalue"
+	KEYNAME="/HOSTS/$keyHostName/control/IP"; read_etcd_global; hostIPAddress="$printvalue"
+	KEYNAME="/HOSTS/$keyHostName/control/type"; read_etcd_global; hostType="$printvalue"
 	KEYNAME="/HOSTS/$keyHostName/control/label"; read_etcd_global; hostLabel="$printvalue"
 	KEYNAME="/UI/GROUPS/$hostGroup/control/sourceHash"; read_etcd_global; groupVideoSource="$printvalue"
     if ! valid_ipv4 "$hostIPAddress"; then
@@ -461,7 +464,7 @@ new_host(){
         if [[ -z "$hostIPAddress" ]]; then
             hostIPAddress="$(ping -c 1 -W 2 "$keyHostName" 2>/dev/null | grep -oP '(?<=from=)[0-9.]+')"
         fi
-        KEYNAME="/HOSTS/$keyHostName/IP"; KEYVALUE="$hostIPAddress"; write_etcd_global &
+        KEYNAME="/HOSTS/$keyHostName/control/IP"; KEYVALUE="$hostIPAddress"; write_etcd_global &
     fi
     # Here we need to generate an appropriate videoSourcePayLoad key.
     if [[ "$groupVideoSource" == "1" ]]; then
@@ -475,8 +478,8 @@ new_host(){
 
 put /UI/HOSTS/$hostHash/control/GROUP \"$hostGroup\"
 put /UI/HOSTS/$hostHash \"$keyHostName\"
-put /UI/HOSTS/$hostHash/IP \"$hostIPAddress\"
-put /UI/HOSTS/$hostHash/type \"$hostType\"
+put /UI/HOSTS/$hostHash/control/IP \"$hostIPAddress\"
+put /UI/HOSTS/$hostHash/control/type \"$hostType\"
 put /UI/HOSTS/$hostHash/control/label \"${hostLabel:-$keyHostName}\"
 put /UI/HOSTS/$hostHash/control/blankStatus \"0\"
 put /UI/HOSTS/$hostHash/control/directMode \"1\"
@@ -489,8 +492,8 @@ put /UI/HOSTS/$hostHash/control/videoSource \"$groupVideoSource\"
 
 put /UI/HOSTS/$hostHash/control/GROUP \"$hostGroup\"
 put /UI/HOSTS/$hostHash \"$keyHostName\"
-put /UI/HOSTS/$hostHash/IP \"$hostIPAddress\"
-put /UI/HOSTS/$hostHash/type \"$hostType\"
+put /UI/HOSTS/$hostHash/control/IP \"$hostIPAddress\"
+put /UI/HOSTS/$hostHash/control/type \"$hostType\"
 put /UI/HOSTS/$hostHash/control/label \"${hostLabel:-$keyHostName}\"
 put /UI/HOSTS/$hostHash/control/blankStatus \"0\"
 put /UI/HOSTS/$hostHash/control/directMode \"1\"
@@ -511,8 +514,8 @@ put /UI/HOSTS/$hostHash/control/videoSource \"$groupVideoSource\"
 
 put /UI/HOSTS/$hostHash/control/GROUP \"$hostGroup\"
 put /UI/HOSTS/$hostHash \"$keyHostName\"
-put /UI/HOSTS/$hostHash/IP \"$hostIPAddress\"
-put /UI/HOSTS/$hostHash/type \"$hostType\"
+put /UI/HOSTS/$hostHash/control/IP \"$hostIPAddress\"
+put /UI/HOSTS/$hostHash/control/type \"$hostType\"
 put /UI/HOSTS/$hostHash/control/label \"${hostLabel:-$keyHostName}\"
 put /UI/HOSTS/$hostHash/control/blankStatus \"0\"
 put /UI/HOSTS/$hostHash/control/directMode \"1\"
@@ -526,8 +529,8 @@ put /UI/HOSTS/$hostHash/control/videoSource \"$groupVideoSource\"
 
 put /UI/HOSTS/$hostHash/control/GROUP \"$hostGroup\"
 put /UI/HOSTS/$hostHash \"$keyHostName\"
-put /UI/HOSTS/$hostHash/IP \"$hostIPAddress\"
-put /UI/HOSTS/$hostHash/type \"$hostType\"
+put /UI/HOSTS/$hostHash/control/IP \"$hostIPAddress\"
+put /UI/HOSTS/$hostHash/control/type \"$hostType\"
 put /UI/HOSTS/$hostHash/control/label \"${hostLabel:-$keyHostName}\"
 put /UI/HOSTS/$hostHash/control/blankStatus \"0\"
 put /UI/HOSTS/$hostHash/control/directMode \"1\"
@@ -699,7 +702,13 @@ bluetooth_connect(){
 
 event_generate_client_conf(){
 	# This is a client distress signal notifying the server to generate a proper conf file
-	echo "	Generating conf file for misconfigured client.."
+	if [[ "$triggerValue" -eq 1 ]]; then
+		echo "	Generating conf file for a new, or misconfigured client.."
+		update_host_config_full
+		KEYNAME="/HOSTS/$keyHostName/control/generateConf"; delete_etcd_key
+	else
+		echo "	generate Conf keyvalue is not correct, noop."
+	fi
 }
 
 update_host_config_key() {
@@ -756,8 +765,8 @@ update_host_config_full() {
 	KEYNAME="/HOSTS/$keyHostName"; read_etcd_global; CLIENT_HOSTHASH="$printvalue"
 	# Input device status
 	KEYNAME="/HOSTS/$keyHostName/INPUT_DEVICE_PRESENT"; read_etcd_global; INPUT_DEVICE_PRESENT="${printvalue:-0}"
-	KEYNAME="/HOSTS/$keyHostName/IP"; read_etcd_global; HOST_IP="$printvalue"
-	KEYNAME="/HOSTS/$keyHostName/type"; read_etcd_global; HOST_TYPE="$printvalue"
+	KEYNAME="/HOSTS/$keyHostName/control/IP"; read_etcd_global; HOST_IP="$printvalue"
+	KEYNAME="/HOSTS/$keyHostName/control/type"; read_etcd_global; HOST_TYPE="$printvalue"
 	# Build the Mod configuration content
 	# Orchestrator responds to /HOSTS/$clientHostName/control/GROUP
 	KEYNAME="/HOSTS/$keyHostName/control/GROUP"; read_etcd_global; GROUP_HASH="$printvalue"

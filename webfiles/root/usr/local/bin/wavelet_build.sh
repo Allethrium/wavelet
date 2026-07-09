@@ -145,7 +145,8 @@ detect_self(){
 		done
 
 		# Detect_self in this case relies on the etcd type key
-		KEYNAME="/HOSTS/$hostNameSys/type"; read_etcd_global
+		# TODO - replace with the conf file value
+		KEYNAME="/HOSTS/$hostNameSys/control/type"; read_etcd_global
 		echo -e "Host type is: $printvalue\n"
 		# test if i'm the server
 		if [[ "$(hostname)" = *"svr"* ]]; then
@@ -227,7 +228,7 @@ put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
 put /HOSTS/$hostNameSys/control/resetStatus \"0\"
 put /HOSTS/$hostNameSys/control/revealStatus \"0\"
 put /HOSTS/$hostNameSys/control/healthStatus \"0\"
-put /HOSTS/$hostNameSys/type \"dec\"
+put /HOSTS/$hostNameSys/control/type \"dec\"
 put /HOSTS/$hostNameSys/control/videoSourceType \"$videoSourceType\"
 put /HOSTS/$hostNameSys/control/videoSourceActive \"$videoSourceActive\"
 put /HOSTS/$hostNameSys/control/videoSourceSubType \"$videoSourceSubType\"
@@ -242,7 +243,7 @@ put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
 put /HOSTS/$hostNameSys/control/resetStatus \"0\"
 put /HOSTS/$hostNameSys/control/revealStatus \"0\"
 put /HOSTS/$hostNameSys/control/healthStatus \"0\"
-put /HOSTS/$hostNameSys/type \"dec\"
+put /HOSTS/$hostNameSys/control/type \"dec\"
 put /HOSTS/$hostNameSys/control/videoSourceType \"$videoSourceType\"
 put /HOSTS/$hostNameSys/control/videoSourceActive \"$videoSourceActive\"
 put /HOSTS/$hostNameSys/control/videoSourceSubType \"$videoSourceSubType\"
@@ -265,7 +266,7 @@ put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
 put /HOSTS/$hostNameSys/control/resetStatus \"0\"
 put /HOSTS/$hostNameSys/control/revealStatus \"0\"
 put /HOSTS/$hostNameSys/control/healthStatus \"0\"
-put /HOSTS/$hostNameSys/type \"dec\"
+put /HOSTS/$hostNameSys/control/type \"dec\"
 put /HOSTS/$hostNameSys/control/videoSourceType \"$videoSourceType\"
 put /HOSTS/$hostNameSys/control/videoSourceActive \"$videoSourceActive\"
 put /HOSTS/$hostNameSys/control/videoSourceSubType \"$videoSourceSubType\"
@@ -279,7 +280,7 @@ put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
 put /HOSTS/$hostNameSys/control/resetStatus \"0\"
 put /HOSTS/$hostNameSys/control/revealStatus \"0\"
 put /HOSTS/$hostNameSys/control/healthStatus \"0\"
-put /HOSTS/$hostNameSys/type \"dec\"
+put /HOSTS/$hostNameSys/control/type \"dec\"
 put /HOSTS/$hostNameSys/control/videoSourceType \"$videoSourceType\"
 put /HOSTS/$hostNameSys/control/videoSourceActive \"$videoSourceActive\"
 put /HOSTS/$hostNameSys/control/videoSourceSubType \"$videoSourceSubType\"
@@ -345,6 +346,7 @@ put /HOSTS/$hostNameSys/control/channel-Source \"$channel-$sourceHash\"
   		fi
 	fi
 	event_connectNetwork
+	KEYNAME="/HOSTS/$hostNameSys/control/generateConf"; KEYVALUE="1"; write_etcd_global &
 	echo "	CONFIGURATION COMPLETED."
 	echo "		Launching client_controller in firstrun mode.."
 	"$WAVELET_CLIENT_CONTROLLER_MOD" "RUN"
@@ -356,8 +358,6 @@ event_encoder(){
     event_generate_hotplug
     event_connectNetwork
 	systemctl --user daemon-reload
-	# Generate Systemd notifier services for encoders
-	systemctl --user enable wavelet_client_control --now
 	# Populate encoder state keys, if the mod key has been changed more than 0 times.
 	KEYDATA="mod(\"/HOSTS/$hostNameSys\") > \"0\"
 
@@ -367,7 +367,7 @@ put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
 put /HOSTS/$hostNameSys/control/resetStatus \"0\"
 put /HOSTS/$hostNameSys/control/revealStatus \"0\"
 put /HOSTS/$hostNameSys/control/healthStatus \"0\"
-put /HOSTS/$hostNameSys/type \"enc\"
+put /HOSTS/$hostNameSys/control/type \"enc\"
 put /HOSTS/$hostNameSys/wavelet_build_completed \"1\"
 
 "
@@ -380,9 +380,9 @@ put /HOSTS/$hostNameSys/wavelet_build_completed \"1\"
 		-gravity Center -fill white label:'TRANSMITTING AS ENCODER.\nThis screen is intentionally blank.' \
 		-colorspace RGB /var/home/wavelet/config/enc_blankImage.bmp
 	fi
-	# Tag device redetect
+	# Set build_completed, request a config generation from the orchestrator and bringup client controller.
 	echo "  Encoder process complete.."
-    KEYNAME="/HOSTS/$hostNameSys/wavelet_build_completed"; KEYVALUE="1"; write_etcd_global &
+    systemctl --user enable wavelet_client_control --now &
     "$WAVELET_CLIENT_CONTROLLER_MOD" "RUN"
     "$WAVELET_DETECTV4L_MOD" "redetect"
 }
@@ -599,6 +599,7 @@ server_bootstrap(){
 	local newVersion=$((currentVersion + 1))
 	serverIPAddress="$(<"/var/home/wavelet/config/etcd_ip")"
 	# Build our initial server.conf file
+	# Note this isn't created via the orchestrator like all other hosts.
 	local configContent="/var/home/wavelet/config/$hostNameSys.conf"
 	echo "Generating svr config file.."
 	cat <<-EOF > "$configContent"
@@ -641,8 +642,8 @@ put /HOSTS/$hostNameSys/control/UIEnable \"1\"
 put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
 put /HOSTS/$hostNameSys/control/healthStatus \"0\"
 put /HOSTS/$hostNameSys/control/GROUP \"$groupHash\"
-put /HOSTS/$hostNameSys/IP \"$serverIPAddress\"
-put /HOSTS/$hostNameSys/type \"svr\"
+put /HOSTS/$hostNameSys/control/IP \"$serverIPAddress\"
+put /HOSTS/$hostNameSys/control/type \"svr\"
 
 "
 	write_etcd_txn "$KEYDATA"
@@ -651,7 +652,7 @@ put /HOSTS/$hostNameSys/type \"svr\"
 	# re-order the orchestrator so that it only starts after the server keys are fully populated.
 	systemctl --user enable wavelet_orchestrator --now
 	sleep 2
-	KEYNAME="/HOSTS/$hostNameSys/wavelet_build_completed"; KEYVALUE="1"; write_etcd_global
+	KEYNAME="/HOSTS/$hostNameSys/wavelet_build_completed"; KEYVALUE="1"; write_etcd_global &
 	# Ensure we hit the group videoSource key once to force a videoSourceConfig refresh
 	KEYNAME="/GROUPS/$groupHash/control/sourceHash"; KEYNAME="1"; write_etcd_global &
 }
@@ -1197,7 +1198,7 @@ event_connectNetwork(){
 	# We should now have a single, stable connection available for this client
     if valid_ipv4 "$ipValue"; then
     	echo -e "			IP Address is valid: $ipValue, continuing.."
-    	KEYNAME="/HOSTS/$hostNameSys/IP"; KEYVALUE="$ipValue"; write_etcd_global &
+    	KEYNAME="/HOSTS/$hostNameSys/control/IP"; KEYVALUE="$ipValue"; write_etcd_global &
     else
     	echo -e "			IP Address '$ipValue' is not valid, retrying...\n"
     	sleep .25

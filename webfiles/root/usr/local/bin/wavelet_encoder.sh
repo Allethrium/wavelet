@@ -178,7 +178,7 @@ generate_systemd_unit(){
 	# For Audio we will select pipewire here as it seems to do a decent job of finding the current device or providing a null if none.
 	audiovar="-s pipewire"
 	# If we are running an encoder, we are now (by default) running a reflector also.
-	KEYNAME="/HOSTS/$hostNameSys/IP"; read_etcd_global
+	KEYNAME="/HOSTS/$hostNameSys/control/IP"; read_etcd_global
 	destinationipv4="$printvalue"
 	# N.B This isn't the same as ethernet MTU.
 	# Revert this from 9000->1500 as an MTU of 9000 seems to be breaking now.

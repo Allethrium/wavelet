@@ -5,7 +5,7 @@
 # The client controller runs on the client devices directly.
 
 # /UI/HOSTS/$hostHash						-	the device prefix key and hostname
-# /UI/HOSTS/$hostHash/IP 					-	IP4 Addr
+# /UI/HOSTS/$hostHash/control/IP			-	IP4 Addr
 # /UI/HOSTS/$hostHash/control/blankStatus	-	function decides on what to do based off type, blanks the input/output
 # /UI/HOSTS/$hostHash/control/rebootStatus	-	reboot flag for this host
 # /UI/HOSTS/$hostHash/control/resetStatus	-	process term/restart to avoid cold reset
@@ -13,7 +13,7 @@
 # /UI/HOSTS/$hostHash/control/label 		-	changes the device pretty hostname
 # /UI/HOSTS/$hostHash/control/PROMOTE 		-	switches clients between encoders or decoders
 # /UI/HOSTS/$hostHash/hash 					-	does not change, this is the device's unique ID used to populate the webUI and identify it
-# /UI/HOSTS/$hostHash/type 					-	the device type
+# /UI/HOSTS/$hostHash/control/type			-	the device type
 # /UI/HOSTS/$hostHash/groupHash				-	the identifying hash of the device's group membership
 
 # Clients may also write to their own prefixes in /HOSTS/$hostNameSys///
@@ -431,11 +431,11 @@ event_reveal(){
 	controlPortCmd="capture.data $channelIndex"; netCat "6161" "$controlPortCmd"
 }
 event_prefix_set(){
-	# Switches the type designator under /hostLabel/$(hostname)/type
+	# Switches the type designator under /hostLabel/$(hostname)/control/type
 	# This is now checking and modifying the local host's /type key from what was set in the UI.
 		if [[ "$hostType" = "dec" ]]; then
 			echo "      I am currently a decoder, switching to an encoder"
-			KEYNAME="/HOSTS/$hostNameSys/type"; KEYVALUE="enc"; write_etcd_global
+			KEYNAME="/HOSTS/$hostNameSys/control/type"; KEYVALUE="enc"; write_etcd_global
 			# Launch detectV4l so that we generate a list of attached devices
 			"$WAVELET_DETECTV4L_MOD" "redetect"
 			# terminate existing UG decoder tasks
@@ -481,7 +481,7 @@ event_prefix_set(){
 			event_encoder
 		else
 			echo "      I am not a decoder, switching to become a decoder.."
-			KEYNAME="/HOSTS/$hostNameSys/type"; KEYVALUE="dec"; write_etcd_global
+			KEYNAME="/HOSTS/$hostNameSys/control/type"; KEYVALUE="dec"; write_etcd_global
 			remove_associated_inputs
 			# Terminate encoder processes
 			systemctl --user disable \
@@ -998,7 +998,7 @@ get_ipValue(){
 	# Validate
 	if valid_ipv4 "$ipValue"; then
 		echo -e "			IP Address is valid: $ipValue, continuing.."
-		KEYNAME="/HOSTS/$hostNameSys/IP"; KEYVALUE="$ipValue"; write_etcd_global &
+		KEYNAME="/HOSTS/$hostNameSys/control/IP"; KEYVALUE="$ipValue"; write_etcd_global &
 	else
 		echo -e "			IP Address '$ipValue' is not valid, retrying...\n"
 		sleep .25
@@ -1339,7 +1339,7 @@ run_decoder(){
 	currentIP="$(hostname -I | xargs)"
 	if [[ "$currentIP" != "$(cat $ipFile)" ]]; then
 		echo "$currentIP" > "$ipFile"
-		KEYNAME="/HOSTS/$hostNameSys/IP"; write_etcd_global &
+		KEYNAME="/HOSTS/$hostNameSys/control/IP"; write_etcd_global &
 	fi
 	# check for an already running UG systemd unit
 	if systemctl --user is-active UltraGrid.Decoder.service >/dev/null 2>&1; then
