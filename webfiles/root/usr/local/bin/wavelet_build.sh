@@ -617,6 +617,8 @@ server_bootstrap(){
 	echo -e "Generated svr config:\n\n$(cat $configContent)\n"
 	# export vars for utilization
 	source "$configContent"
+	# set to ro for everyone incl. owner.
+	chmod 0400 "$configContent"
 	# Calculate checksum
 	local checksum=$(sha256sum <"$configContent" | tr -d ' \t\n-')
 	# Encode to base64
@@ -638,8 +640,6 @@ put /HOSTS/$hostNameSys/confHash \"$checksum\"
 
 "
 	write_etcd_txn "$KEYDATA"
-	echo "	System services and configuration keys generated, starting services now.."
-	event_server
 	# re-order the orchestrator so that it only starts after the server keys are fully populated.
 	systemctl --user enable wavelet_orchestrator --now
 	sleep 2
@@ -648,6 +648,8 @@ put /HOSTS/$hostNameSys/confHash \"$checksum\"
 	KEYNAME="/HOSTS/$hostNameSys/wavelet_build_completed"; KEYVALUE="1"; write_etcd_global &
 	# Ensure we hit the group videoSource key once to force a videoSourceConfig refresh
 	KEYNAME="/GROUPS/$groupHash/control/sourceHash"; KEYNAME="1"; write_etcd_global &
+	echo "	System services and configuration keys generated, starting services now.."
+	event_server
 }
 
 # This generates a wrapper and etcd watch service, defined by:

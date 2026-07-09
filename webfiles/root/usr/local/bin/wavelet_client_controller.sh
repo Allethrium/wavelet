@@ -1814,7 +1814,6 @@ event_get_config(){
 		done <"$configFile"
 		configFileExists=true
 	fi
-
 	if [[ "$configFileExists" == "false" ]]; then
 		echo "	Config file not available, sending generateConf signal to server and waiting for config generation.."
 		KEYNAME="/HOSTS/$hostNameSys/control/generateConf"; KEYVALUE="1"; write_etcd_global &
@@ -1827,16 +1826,19 @@ event_get_config(){
 		done
 		KEYNAME="/HOSTS/$hostNameSys/conf"; read_etcd_global; confData="$(base64 -d <<<"$printvalue")"
 		KEYNAME="/HOSTS/$hostNameSys/confHash"; read_etcd_global; confHash="$printvalue"
-	fi
 
-	if [[ "$(sha256sum <<<"$confData" | tr -d ' \t\n-')" != "$confHash" ]] && [[ -n "$confHash" ]]; then
-		# This would also catch nulls
-		echo "	CLIENT_CONTROLLER: confHash does not checksum with configFile data!"
-		exit 1
-	else
-		echo "$confData" > "$configFile"
+		if [[ "$(sha256sum <<<"$confData" | tr -d ' \t\n-')" != "$confHash" ]] && [[ -n "$confHash" ]]; then
+			# This would also catch nulls
+			echo "	CLIENT_CONTROLLER: confHash does not checksum with configFile data!"
+			exit 1
+		fi
+		if [[ -z "$confData" ]]; then
+			echo "	CLIENT_CONTROLLER: No config file data"
+			return 1
+		else
+			echo "$confData" > "$configFile"
+		fi
 	fi
-
 	while IFS= read -r line; do
 		line="${line//$'\r'/}"
 		[[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
