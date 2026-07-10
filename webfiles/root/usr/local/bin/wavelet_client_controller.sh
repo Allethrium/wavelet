@@ -1219,27 +1219,26 @@ run_decoder(){
 	local streamMode; local externalArg; local activeFlag
 	local videoSourceCmd; local videoSourceType; local videoSourceSubType; local configPayload
 	blankStatus=0
-	if [[ -n "${firstRunState:-}" ]]; then
-		# Acquire the groupHash value.  This key is always written, if it is not, we have a badly broken installation.
-		echo "      Decoder first run, grabbing group $groupHash video source"
-		KEYNAME="/UI/GROUPS/$groupHash/control/sourceHash"; read_etcd_global
-		etcdValue="$printvalue"
-		if [[ -z "$etcdValue" ]]; then
-			# default to initial static splash image
-			etcdValue=1; channel=1
-			KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; KEYVALUE="$channel-$etcdValue"; write_etcd_global &
-		fi
-		# Generate a configPayLoad for first run
-		configPayload="type:static|active:0|subType:static|cmd:"
+#	if [[ -n "${firstRunState:-}" ]]; then
+#		# Acquire the groupHash value.  This key is always written, if it is not, we have a badly broken installation.
+#		echo "      Decoder first run, grabbing group $groupHash video source"
+#		KEYNAME="/UI/GROUPS/$groupHash/control/sourceHash"; read_etcd_global
+#		etcdValue="$printvalue"
+#		if [[ -z "$etcdValue" ]]; then
+#			# default to initial static splash image
+#			etcdValue=1; channel=1
+#			KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; KEYVALUE="$channel-$etcdValue"; write_etcd_global &
+#		fi
+#		# Generate a configPayLoad for first run
+#		configPayload="type:static|active:0|subType:static|cmd:"
+#	else
+	KEYNAME="/HOSTS/$hostNameSys/control/videoSourceConfig"; read_etcd_global
+	if [[ -z "$printvalue" ]]; then
+		# We have an error and need to get a proper configPayload or build it from scratch here.
+		# PLACEHOLDER:
+		configPayload="$(reconstruct_configPayload)"
 	else
-		KEYNAME="/HOSTS/$hostNameSys/control/videoSourceConfig"; read_etcd_global
-		if [[ -z "$printvalue" ]]; then
-			# We have an error and need to get a proper configPayload or build it from scratch here.
-			# PLACEHOLDER:
-			configPayload="$(reconstruct_configPayload)"
-		else
-			configPayload="$printvalue"
-		fi
+		configPayload="$printvalue"
 	fi
 
 	if [[ -z "$configPayload" ]]; then

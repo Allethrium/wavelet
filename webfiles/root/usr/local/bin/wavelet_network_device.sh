@@ -344,14 +344,14 @@ if [[ "${ETCD_WATCH_EVENT_TYPE//\"}" == "DELETE" ]]; then
 	exit 0
 fi
 
-# Load the server env conf file
-configFile="/var/home/wavelet/config/$hostNameSys.conf"
-source "$configFile"
-
 start_timer
 trap 'stop_timer "$timer_id_out"; echo "Total: ${timer_duration}s" >&2' EXIT
 
 logName="/var/home/wavelet/logs/networkDevice.log"
 hostNameSys="$(hostname)"
+# Load the server env conf file
+configFile="/var/home/wavelet/config/$hostNameSys.conf"
+source "$configFile"
+
 exec >>"$logName" 2>&1
 check_etcd_env

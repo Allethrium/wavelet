@@ -191,34 +191,16 @@ event_decoder(){
 		event_decoder_newHost
 	fi
 	# we can now source our configFile and proceed
-	# Note KEYDATA duplicate blocks correspond to if/then in etcd txn
 	source "$configFile"
-	KEYDATA="mod(\"/HOSTS/$hostNameSys\") > \"0\"
-
-put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
-put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
-put /HOSTS/$hostNameSys/control/resetStatus \"0\"
-put /HOSTS/$hostNameSys/control/revealStatus \"0\"
-put /HOSTS/$hostNameSys/control/healthStatus \"0\"
-put /HOSTS/$hostNameSys/control/type \"dec\"
-
-put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
-put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
-put /HOSTS/$hostNameSys/control/resetStatus \"0\"
-put /HOSTS/$hostNameSys/control/revealStatus \"0\"
-put /HOSTS/$hostNameSys/control/healthStatus \"0\"
-put /HOSTS/$hostNameSys/control/type \"dec\"
-
-"
 	sleep 2
 	event_client_control
-	write_etcd_txn "$KEYDATA"
-	check_clientGroupMemberShip
 	systemctl --user daemon-reload
 	systemctl --user --no-block enable wavelet_client_controller --now
+	check_clientGroupMemberShip
 	echo "	Triggering wavelet_client_controller.sh directly.."
 	"$WAVELET_CLIENT_CONTROLLER_MOD" "RUN"
 }
+
 event_decoder_newHost(){
 	# Handles an entirely new wavelet client
 	# Provision request to etcd
@@ -226,47 +208,18 @@ event_decoder_newHost(){
 		echo "	Sending provision request to server for Etcd credentials.."
 		etcd_provision_watcher; sleep 2
 		etcd_provision_request
-		# Generate control keys under our host entry, if the mod key has been changed more than 0 times.
-		# In the case of a client, the initial host key has already been generated
-		# Get the primary group
-		# Note KEYDATA duplicate blocks correspond to if/then in etcd txn
-		KEYDATA="mod(\"/HOSTS/$hostNameSys\") > \"0\"
+		# Generate initial host key request
+		# generateConf is processed by the orchestrator module.
+		KEYDATA="mod(\"/HOSTS/$hostNameSys\") = \"0\"
 
 put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
-put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
-put /HOSTS/$hostNameSys/control/resetStatus \"0\"
-put /HOSTS/$hostNameSys/control/revealStatus \"0\"
-put /HOSTS/$hostNameSys/control/healthStatus \"0\"
 put /HOSTS/$hostNameSys/control/type \"dec\"
-put /HOSTS/$hostNameSys/control/videoSourceType \"$videoSourceType\"
-put /HOSTS/$hostNameSys/control/videoSourceActive \"$videoSourceActive\"
-put /HOSTS/$hostNameSys/control/videoSourceSubType \"$videoSourceSubType\"
-put /HOSTS/$hostNameSys/control/videoSourceDirect \"$videoSourceDirect\"
-put /HOSTS/$hostNameSys/control/previousVideoSourceKey \"$sourceHash\"
-put /HOSTS/$hostNameSys/control/previousVideoSourceType \"$streamMode\"
-put /HOSTS/$hostNameSys/control/channel-Source \"$channel-$sourceHash\"
-put /HOSTS/$hostNameSys/wavelet_build_completed \"1\"
-
-put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
-put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
-put /HOSTS/$hostNameSys/control/resetStatus \"0\"
-put /HOSTS/$hostNameSys/control/revealStatus \"0\"
-put /HOSTS/$hostNameSys/control/healthStatus \"0\"
-put /HOSTS/$hostNameSys/control/type \"dec\"
-put /HOSTS/$hostNameSys/control/videoSourceType \"$videoSourceType\"
-put /HOSTS/$hostNameSys/control/videoSourceActive \"$videoSourceActive\"
-put /HOSTS/$hostNameSys/control/videoSourceSubType \"$videoSourceSubType\"
-put /HOSTS/$hostNameSys/control/videoSourceDirect \"$videoSourceDirect\"
-put /HOSTS/$hostNameSys/control/previousVideoSourceKey \"$sourceHash\"
-put /HOSTS/$hostNameSys/control/previousVideoSourceType \"$streamMode\"
-put /HOSTS/$hostNameSys/control/channel-Source \"$channel-$sourceHash\"
-put /HOSTS/$hostNameSys/wavelet_build_completed \"1\"
+put /HOSTS/$hostNameSys/control/generateConf \"1\"
 
 "
+		write_etcd_txn "$KEYDATA"
 		touch /var/home/wavelet/config/provisioned.complete
 	fi
-	# Continue to request conf generation now the client host keys are generated
-	KEYNAME="/HOSTS/$hostNameSys/control/generateConf"; write_etcd_global
 	sleep 1
 	KEYNAME="/HOSTS/$hostNameSys/confHash"; read_etcd_global; confHash="$printvalue"
 	if [[ -z "$confHash" ]]; then
@@ -288,6 +241,9 @@ put /HOSTS/$hostNameSys/wavelet_build_completed \"1\"
 		echo "$confData" > "$configFile"
 	fi
 	event_configure_static_images
+	# Initiate further configuration by calling new_host in orchestrator to populate UI keys.
+	# the client controller on this device will then pick up those key configs and start the host processes.
+	KEYNAME="/HOSTS/$hostNameSys/wavelet_build_completed"; KEYVALUE="1"; write_etcd_global &
 }
 
 event_encoder(){
@@ -299,14 +255,7 @@ event_encoder(){
 	# Populate encoder state keys, if the mod key has been changed more than 0 times.
 	KEYDATA="mod(\"/HOSTS/$hostNameSys\") > \"0\"
 
-put /HOSTS/$hostNameSys/control/blankStatus \"0\"
-put /HOSTS/$hostNameSys/control/label \"$hostNameSys\"
-put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
-put /HOSTS/$hostNameSys/control/resetStatus \"0\"
-put /HOSTS/$hostNameSys/control/revealStatus \"0\"
-put /HOSTS/$hostNameSys/control/healthStatus \"0\"
 put /HOSTS/$hostNameSys/control/type \"enc\"
-put /HOSTS/$hostNameSys/wavelet_build_completed \"1\"
 
 "
 	write_etcd_txn "$KEYDATA"

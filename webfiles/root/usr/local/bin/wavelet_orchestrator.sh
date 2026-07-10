@@ -205,7 +205,7 @@ compare_entries(){
 event_subscription_request(){
 	# This should take a subscription request from a host writing its key in /HOSTS/$hostName/reflectorRequest
 	# The key is written when the decoder launches wavelet_run in order to start a display task.
-	local hostName; local inputHash; local hostIPAddress; local KEYNAME;
+	local hostName; local inputHash; local KEYNAME;
 	local KEYVALUE; local targetHostName; local ipAddr
 #	echo "      Working on subscription request for hostname: $keyHostName"
 	inputHash=$(xargs -I {} printf "%s" {} <<< "$triggerValue")
@@ -223,14 +223,10 @@ event_subscription_request(){
 	    fi
 	done <<<"$allHostKeys"
 	# We try and get a good IP address for the host
-	# Dig would be quicker than an etcd read, however the cached IP address is not always correct.
-	# This is because the host will initially populate with the wired IP address, but switches to wireless
-	# It can take some minutes to failover, resulting in the wired IP being provided to the reflector.
-	KEYNAME="/HOSTS/$keyHostName/control/IP"; read_etcd_global; hostIpAddress="$printvalue"
-	if [[ -z "$hostIpAddress" ]]; then
-        hostIpAddress="$(dig +short "$keyHostName")"
+	if [[ -z "$hostIp" ]]; then
+        hostIp="$(dig +short "$keyHostName")"
     fi
-    if valid_ipv4 "$hostIpAddress"; then
+    if valid_ipv4 "$hostIp"; then
         echo "      Resolved valid IP, updating the host.."
         KEYNAME="/HOSTS/$keyHostName/control/IP"; write_etcd_global &
     else
@@ -248,9 +244,9 @@ event_subscription_request(){
 	    fi
 	fi
 
-	KEYNAME="/HOSTS/$targetHostName/DECODER_SUB_LIST/$keyHostName"; KEYVALUE="$hostIpAddress"; write_etcd_global &
+	KEYNAME="/HOSTS/$targetHostName/DECODER_SUB_LIST/$keyHostName"; KEYVALUE="$hostIp"; write_etcd_global &
 	KEYNAME="/HOSTS/$keyHostName/control/currentUGReflectorHost"; KEYVALUE="$targetHostName"; write_etcd_global &
-	echo "      Requesting port from reflector at $targetHostName for host $keyHostName with IP Address: $hostIpAddress"
+	echo "      Requesting port from reflector at $targetHostName for host $keyHostName with IP Address: $hostIp"
 	# Since we don't need to worry about indexing anymore, we can just forward this on to the reflector
 	# At this point, the reflector should swing into action, and be able to read the populated IP addresses directly.
 	# This is preferable to hostnames because the IP addresses as print-values-only come out as a simple list in ETCD
@@ -309,11 +305,7 @@ health_status_update(){
     # Notifies the decoder that it's errored and that the subscription attempt to the reflector failed.  Also updates UI status
     local KEYDATA
     # Perform an atomic write with an etcdctl check that the key exists and it not null included
-    KEYDATA="mod(\"/HOSTS/$keyHostName\") > \"0\"
-
-put /UI/HOSTS/$hostHash/control/healthStatus \"$triggerValue\"
-put /UI/HOSTS/$hostHash/control/lastError \"$(date +%s)\"
-put /UI/HOSTS/$hostHash/control/errorCode \"$triggerValue\"
+    KEYDATA="val(\"/HOSTS/$keyHostName\") - \"$hostHash\"
 
 put /UI/HOSTS/$hostHash/control/healthStatus \"$triggerValue\"
 put /UI/HOSTS/$hostHash/control/lastError \"$(date +%s)\"
@@ -368,14 +360,18 @@ event_encoder_ready(){
 }
 
 event_change_group(){
-	# A host has changed groups.  We need to populate the host with the group's current state to keep everything synced.
+	# A host has changed groups.
+	# We need to populate the host with the group's current state to keep everything synced.
 	if [[ -z "$triggerValue" ]]; then
 		echo "	No group hash provided!  Using primary group.."
 		KEYNAME="/GROUPS/$hostNameSys"; read_etcd_global; primaryGroup="$printvalue"
 		triggerValue="$primaryGroup"
 	fi
 	echo "	Updating host to new group environment: $triggerValue"
-	KEYNAME="/HOSTS/$keyHostName/control/type"; read_etcd_global; hostType="$printvalue"
+	if [[ -z "$hostType" ]]; then
+		KEYNAME="/HOSTS/$keyHostName/control/type"; read_etcd_global; hostType="$printvalue"
+	fi
+	# Read the group's entire keyspace and process for what we need
 	KEYNAME="/UI/GROUPS/$triggerValue"; read_etcd_prefix_list; groupKeys="$printvalue"
 	echo "	Group Keys:"
 	echo "$groupKeys"
@@ -398,30 +394,35 @@ event_change_group(){
 				groupPreviousVideoSource="$valueLine"
 				continue
 				;;
+			*/control/sourceCapable)
+				groupSourceCapable="$valueLine"
+				continue
+				;;
+			*/control/staticImage)
+				groupStaticImage="$valueLine"
+				continue
+				;;
 		esac
 	done <&3
 	exec 3<&-
+	# Determine group video source
+
 	echo -e "Group keys:\n	blank:$blankStatusValue\n	reveal:$revealStatusValue\n	sourcehash: $groupSourceHash\n previous source: $groupPreviousVideoSource"
-	# Note we are populating both UI and host keys here, less the host/control/GROUP key, which triggered this transaction.
+	# Note we are populating both UI and host keys here, less the /HOSTS/$hostname/control/GROUP key, which triggered this transaction.
 	# This is to ensure that we don't get a momentarily "flash" of group input when a host is dragged.
-	# put /UI/HOSTS/$hostHash/control/GROUP \"$triggerValue\" - unsure we want to set the UI groups option here.  That's circular..
-    KEYDATA="mod(\"/UI/HOSTS/$hostHash\") = \"0\"
+    KEYDATA="mod(\"/HOSTS/$keyHostName\") > \"0\"
 
 put /HOSTS/$keyHostName/control/blankStatus \"$blankStatusValue\"
 put /HOSTS/$keyHostName/control/revealStatus \"$revealStatusValue\"
 put /UI/HOSTS/$hostHash/control/blankStatus \"$blankStatusValue\"
 put /UI/HOSTS/$hostHash/control/revealStatus \"$revealStatusValue\"
 put /UI/HOSTS/$hostHash/control/videoSource \"$groupSourceHash\"
-
-put /HOSTS/$keyHostName/control/blankStatus \"$blankStatusValue\"
-put /HOSTS/$keyHostName/control/revealStatus \"$revealStatusValue\"
-put /UI/HOSTS/$hostHash/control/blankStatus \"$blankStatusValue\"
-put /UI/HOSTS/$hostHash/control/revealStatus \"$revealStatusValue\"
-put /UI/HOSTS/$hostHash/control/videoSource \"$groupSourceHash\"
+put /UI/HOSTS/$hostHash/control/GROUP \"$triggerValue\"
 
 "
 	write_etcd_txn "$KEYDATA" &
-	# For decoders switching groups, resolve the new group's source just like new_host() does.
+	# For decoders switching groups, resolve the new group's source.
+	# This is lighter than triggering a full group sourceHash refresh event.
 	if [[ "$hostType" != *"svr"* ]] && [[ -n "$groupSourceHash" ]]; then
 		resolve_group_source_for_host "$keyHostName" "$hostHash" "$groupSourceHash"
 	fi
@@ -430,6 +431,7 @@ put /UI/HOSTS/$hostHash/control/videoSource \"$groupSourceHash\"
 
 new_host(){
 	# Responsible for publishing a generated host into the UI.
+	# The client controller on each host will subsequently pick up the written UI keys.
 	# called via the newHost key from /HOSTS/hostname/control/newHost
     if [[ "$triggerValue" != "1" ]]; then
 		echo "	build_completed set to 0, not a new host."
@@ -445,36 +447,26 @@ new_host(){
 		exit 0
 	fi
 	# All of these keys should be populated by the config file available to the server and the host now.
-#	local configFile;
-#	configFile="/var/home/wavelet/config/$keyHostName.conf"
-#	echo "	Generating a new UI Host entries for: $keyHostName.."
-#	KEYNAME="/HOSTS/$keyHostName/control/IP"; read_etcd_global; hostIPAddress="$printvalue"
-#	KEYNAME="/HOSTS/$keyHostName/control/type"; read_etcd_global; hostType="$printvalue"
-#	KEYNAME="/HOSTS/$keyHostName/control/label"; read_etcd_global; hostLabel="$printvalue"
-#	KEYNAME="/UI/GROUPS/$hostGroup/control/sourceHash"; read_etcd_global; groupVideoSource="$printvalue"
-    if ! valid_ipv4 "$hostIPAddress"; then
+    if ! valid_ipv4 "$hostIPA"; then
     	# get the IP address of keyHostName
-    	hostIPAddress="$(dig +short "$keyHostName" 2>/dev/null)"
-        if [[ -z "$hostIPAddress" ]]; then
-            hostIPAddress="$(host "$keyHostName" 2>/dev/null | grep 'has address' | awk '{print $NF}')"
+    	hostIP="$(dig +short "$keyHostName" 2>/dev/null)"
+        if [[ -z "$hostIP" ]]; then
+            hostIP="$(host "$keyHostName" 2>/dev/null | grep 'has address' | awk '{print $NF}')"
         fi
-        if [[ -z "$hostIPAddress" ]]; then
-            hostIPAddress="$(ping -c 1 -W 2 "$keyHostName" 2>/dev/null | grep -oP '(?<=from=)[0-9.]+')"
+        if [[ -z "$hostIP" ]]; then
+            hostIP="$(ping -c 1 -W 2 "$keyHostName" 2>/dev/null | grep -oP '(?<=from=)[0-9.]+')"
         fi
-        KEYNAME="/HOSTS/$keyHostName/control/IP"; KEYVALUE="$hostIPAddress"; write_etcd_global &
-    fi
-    # Here we need to generate an appropriate videoSourcePayLoad key.
-    if [[ "$groupVideoSource" == "1" ]]; then
-    	videoSourcePayLoad="type:static|active:0|subType:static|cmd"
+        KEYNAME="/HOSTS/$keyHostName/control/IP"; KEYVALUE="$hostIPs"; write_etcd_global &
     fi
     # Build an etcd transaction - it doesn't matter if the key exists or not, we overwrite it.
     if [[ "$hostType" == *"svr"* ]]; then
     	echo "	Setting server UI Config keys.."
-    	KEYDATA="mod(\"/UI/HOSTS/$hostHash\") = \"0\"
+    	# value of /UI/HOSTS/$hostHash in this case HAS to == svr.domainname or it should fail.
+    	KEYDATA="val(\"/UI/HOSTS/$hostHash\") = \"$keyHostName\"
 
 put /UI/HOSTS/$hostHash/control/GROUP \"$hostGroup\"
 put /UI/HOSTS/$hostHash \"$keyHostName\"
-put /UI/HOSTS/$hostHash/control/IP \"$hostIPAddress\"
+put /UI/HOSTS/$hostHash/control/IP \"$hostIP\"
 put /UI/HOSTS/$hostHash/control/type \"$hostType\"
 put /UI/HOSTS/$hostHash/control/label \"${hostLabel:-$keyHostName}\"
 put /UI/HOSTS/$hostHash/control/blankStatus \"0\"
@@ -484,34 +476,16 @@ put /UI/HOSTS/$hostHash/control/revealStatus \"0\"
 put /UI/HOSTS/$hostHash/control/rebootStatus \"0\"
 put /UI/HOSTS/$hostHash/control/healthStatus \"0\"
 put /UI/HOSTS/$hostHash/control/UIEnable \"1\"
-put /UI/HOSTS/$hostHash/control/videoSource \"$groupVideoSource\"
-
-put /UI/HOSTS/$hostHash/control/GROUP \"$hostGroup\"
-put /UI/HOSTS/$hostHash \"$keyHostName\"
-put /UI/HOSTS/$hostHash/control/IP \"$hostIPAddress\"
-put /UI/HOSTS/$hostHash/control/type \"$hostType\"
-put /UI/HOSTS/$hostHash/control/label \"${hostLabel:-$keyHostName}\"
-put /UI/HOSTS/$hostHash/control/blankStatus \"0\"
-put /UI/HOSTS/$hostHash/control/directMode \"1\"
-put /UI/HOSTS/$hostHash/control/resetStatus \"0\"
-put /UI/HOSTS/$hostHash/control/revealStatus \"0\"
-put /UI/HOSTS/$hostHash/control/rebootStatus \"0\"
-put /UI/HOSTS/$hostHash/control/healthStatus \"0\"
-put /UI/HOSTS/$hostHash/control/UIEnable \"1\"
-put /UI/HOSTS/$hostHash/control/videoSource \"$groupVideoSource\"
 
 		"
     else
-    	# For decoders, resolve the group's video source and populate decoder-side keys.
-        if [[ "$hostType" != *"svr"* ]] && [[ -n "$groupVideoSource" ]]; then
-        	resolve_group_source_for_host "$keyHostName" "$hostHash" "$groupVideoSource"
-        fi
-    	echo "	Setting host UI Config keys.."
-    	KEYDATA="mod(\"/UI/HOSTS/$hostHash\") = \"0\"
+		# New standard host
+		echo "	Setting host UI Config keys.."
+		# Do not write a /UI/HOSTS/ key that already exists.  Txn will fail.
+		KEYDATA="mod(\"/UI/HOSTS/$hostHash\") = \"0\"
 
-put /UI/HOSTS/$hostHash/control/GROUP \"$hostGroup\"
 put /UI/HOSTS/$hostHash \"$keyHostName\"
-put /UI/HOSTS/$hostHash/control/IP \"$hostIPAddress\"
+put /UI/HOSTS/$hostHash/control/IP \"$hostIP\"
 put /UI/HOSTS/$hostHash/control/type \"$hostType\"
 put /UI/HOSTS/$hostHash/control/label \"${hostLabel:-$keyHostName}\"
 put /UI/HOSTS/$hostHash/control/blankStatus \"0\"
@@ -521,36 +495,20 @@ put /UI/HOSTS/$hostHash/control/revealStatus \"0\"
 put /UI/HOSTS/$hostHash/control/rebootStatus \"0\"
 put /UI/HOSTS/$hostHash/control/healthStatus \"0\"
 put /UI/HOSTS/$hostHash/control/UIEnable \"0\"
-put /UI/HOSTS/$hostHash/control/videoSourceConfig \"$videoSourcePayLoad\"
-put /UI/HOSTS/$hostHash/control/videoSource \"$groupVideoSource\"
-
 put /UI/HOSTS/$hostHash/control/GROUP \"$hostGroup\"
-put /UI/HOSTS/$hostHash \"$keyHostName\"
-put /UI/HOSTS/$hostHash/control/IP \"$hostIPAddress\"
-put /UI/HOSTS/$hostHash/control/type \"$hostType\"
-put /UI/HOSTS/$hostHash/control/label \"${hostLabel:-$keyHostName}\"
-put /UI/HOSTS/$hostHash/control/blankStatus \"0\"
-put /UI/HOSTS/$hostHash/control/directMode \"1\"
-put /UI/HOSTS/$hostHash/control/resetStatus \"0\"
-put /UI/HOSTS/$hostHash/control/revealStatus \"0\"
-put /UI/HOSTS/$hostHash/control/rebootStatus \"0\"
-put /UI/HOSTS/$hostHash/control/healthStatus \"0\"
-put /UI/HOSTS/$hostHash/control/UIEnable \"0\"
-put /UI/HOSTS/$hostHash/control/videoSourceConfig \"$videoSourcePayLoad\"
-put /UI/HOSTS/$hostHash/control/videoSource \"$groupVideoSource\"
+put /UI/HOSTS/$hostHash/newHost \"1\"
 
 		"
 	fi
+	# Note that setting the /UI/control/GROUP key will invoke the server client_controller
+	# Populated keys will be picked up by the client-side client_controller to start moving pixels.
 	write_etcd_txn "$KEYDATA"
-	# Write the new host key so the UI knows to generate this new host element
-	# Note this occurs after the host txn has fully populated other keys.
-	KEYNAME="/UI/HOSTS/$hostHash/newHost"; KEYVALUE="1"; write_etcd_global &
 	# Update input devices
     input_device_update
 }
 
-# Replicates the resolution logic from event_process_group_videoSource_hosts() but for a single new host.
 resolve_group_source_for_host(){
+	# Replicates the resolution logic from event_process_group_videoSource_hosts() but for a single new host.
 	local targetHost="$1"
 	local targetHostHash="$2"
 	local sourceHash="$3"
@@ -697,17 +655,14 @@ bluetooth_connect(){
 }
 
 event_generate_client_conf(){
-	set -x
 	# This is a client distress signal notifying the server to generate a proper conf file
 	if [[ "$triggerValue" == "True" ]] && [[ "$keyHostName" != "$hostNameSys" ]]; then
 		echo "	Generating conf file for a new client.."
-		set +x
 		update_host_config_full
 		KEYNAME="/HOSTS/$keyHostName/control/generateConf"; delete_etcd_key
 	else
 		exit 0 # noop
 	fi
-	set +x
 }
 
 update_host_config_key() {
@@ -749,7 +704,7 @@ update_host_config_key() {
 }
 
 update_host_config_full() {
-	# Updates the host config file.
+	# Updates the host config file completely.
 	# Hosts refer to this file locally in order to reduce etcd reads and other waits.
 	# Skip if this is the server host - server config is managed by bootstrap and should not be overwritten
 	if [[ "$keyHostName" == "$hostNameSys" ]] || [[ "$keyHostName" == "$hostNameSys".* ]]; then
