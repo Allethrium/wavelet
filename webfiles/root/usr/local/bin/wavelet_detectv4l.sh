@@ -435,15 +435,23 @@ detect_self(){
 		KEYNAME="/HOSTS/$hostNameSys/control/type"; read_etcd_global; HOST_TYPE="$printvalue"
 	fi
 	echo "Host type is: $HOST_TYPE\n"
-	case "${printvalue}" in
-		enc*)                                   echo -e "	I am an Encoder\n"										;	encoder_checkNetwork 1
-		;;
-		dec*)                                   echo -e "	I am a Decoder\n"										;	exit 0
-		;;
-		svr*)                                   echo -e "	I am a Server, allowing device sense to proceed.."		;	detect_method "${usbPath}"
-		;;
-		*)                                      echo -e "	This device is other, ending process\n"				;	exit 0
-		;;
+	case "$HOST_TYPE" in
+		"enc")
+			echo -e "	I am an Encoder\n"
+			encoder_checkNetwork 1
+			;;
+		"dec")
+			echo -e "	I am a Decoder\n"
+			exit 0
+			;;
+		"svr")
+		    echo -e "	I am a Server, allowing device sense to proceed.."
+		    detect_method "$usbPath"
+			;;
+		*)
+			echo -e "	This device is other, ending process\n"
+			exit 0
+			;;
 	esac
 }
 

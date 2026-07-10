@@ -28,10 +28,11 @@ parse_macaddr() {
 	ipAddr="$1"
 	echo "	Searching for pre-existing matches in system.."
 	printvalue=""
+	# Load a list of all hosts and search for this device MAC address by string match.
 	KEYNAME="/HOSTS/"; read_etcd_prefix_list; currentHosts="$printvalue"
 	while read -r line; do
 		if [[ "${line^^}" == "${2^^}" ]]; then
-			echo -e "	Found MAC already in host keys!\n"
+			echo "	Found MAC already in host keys, will not process further."
 			exit 0
 		fi
 	done <<<"$currentHosts"
@@ -177,7 +178,6 @@ event_ptz_ndiHX(){
 event_checkForSupport(){
 	# This is a more general-purpose function to check for NDI and RTSP streams, and use them if available.
 	# LibNDI should be installed on wavelet by default along with avahi mDNS (DEPENDENCY)
-	# Recently, UltraGrid and ndi-discovery-server stopped functioning in this build, so we have a fallback to IP.
 	echo "	Checking for device support.."
 	local deviceHostName
 	if [[ -z "$deviceHostName" ]]; then
@@ -227,41 +227,19 @@ populate_to_etcd(){
 	# Since we run on the server, we can populate our keys to the UI directly.
 	# Initial group is always the server group
 	local deviceResult=0
-	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; initGroupHash="$printvalue"
+	if [[ -z "$GROUP_HASH" ]]; then
+		KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; initGroupHash="$printvalue"
+	else
+		initGroupHash="$GROUP_HASH"
+	fi
 	echo "	Populating ETCD with discovery data.."
 	# Packed format $HASH -- IP;DEVICE_LABEL(attempts to set the device hostname!);MAC;type
 	interfaceEntry="$ipAddr;$deviceHostName;$macAddr;$type;$subType"
-	domainVar="$(dnsdonainname)"
-	KEYNAME="/HOSTS/$deviceHostName.$domainVar/MAC"; read_etcd_global
-	if [[ "$printvalue" == "${macAddr^^}" ]]; then
-		# The device already exists.
-		KEYNAME="/UI/HOSTS/$printvalue/inputs/"; read_etcd_prefix_global
-		while read -r line; do
-			if [[ "$line" == *"$interfaceEntry"* ]]; then
-				# If the $interfaceEntry value exists verbatim in this output, the device already exists.
-				deviceResult=1
-				echo "	Device hash with this hostname appears to be already populated with identical data."
-				break
-			else
-				# The device exists, but the strings do not match, so we update the device data
-				# This could be a state change in the device function, a new IP address or some other data.
-				# So, we update the device data without modifying the hash.
-				echo "	Device hash with this hostname is populated, but has experienced changes.  Updating.."
-				KEYNAME="/HOSTS/$deviceHostName.$domainVar/uv_encode_cmd/inputStream"
-				KEYVALUE="$(base64 -w 0 <<<"$UGdeviceStreamCommand")"; write_etcd_global &
-				KEYNAME="/HOSTS/$deviceHostName.$domainVar/uv_stream_cmd/subscribeStream"
-				KEYVALUE="$(base64 -w 0 <<<"$UGdeviceSubscribeCommand")"; write_etcd_global &
-			fi
-		done <<<"$printvalue"
-	else
-		# The device does not already exist, and we can proceed to provision it.
-		# Generate a host and input hash.
-		# These are stable on the device's mac address.
-		hostHash="$(sha256sum <<<"$macAddr-HOST" | tr -d ' \t\n-')"
-		inputHash="$(sha256sum <<<"$macAddr-INPUT" | tr -d ' \t\n-')"
-		# Create an etcdctl txn
-		# Create a txn which will complete only if the generated hash doesn't exist
-		KEYDATA="mod(\"/HOSTS/$deviceHostName.$domainVar\") = \"0\"
+	domainVar="${SERVER_HOSTNAME#*.}"
+	# Generate a host hash and input hash from the device MACaddr, making them stable.
+	hostHash="$(sha256sum <<<"$macAddr-HOST" | tr -d ' \t\n-')"
+	inputHash="$(sha256sum <<<"$macAddr-INPUT" | tr -d ' \t\n-')"
+	KEYDATA="mod(\"/HOSTS/$deviceHostName.$domainVar\") = \"0\"
 
 put /HOSTS/$deviceHostName.$domainVar \"$hostHash\"
 put /HOSTS/$deviceHostName.$domainVar/inputs/$inputHash \"$interfaceEntry\"
@@ -296,7 +274,6 @@ del DHCP
 	write_etcd_txn "$KEYDATA"
 	KEYNAME="/HOSTS/$deviceHostName.$domainVar/control/generateConf"; KEYVALUE="1"; write_etcd_global
 	KEYNAME="/HOSTS/$deviceHostName.$domainVar/control/inputUpdate"; KEYVALUE="1"; write_etcd_global &
-	fi
 }
 
 get_ndi_devices(){
@@ -366,6 +343,10 @@ if [[ "${ETCD_WATCH_EVENT_TYPE//\"}" == "DELETE" ]]; then
 	# We won't respond to key deletion events
 	exit 0
 fi
+
+# Load the server env conf file
+configFile="/var/home/wavelet/config/$hostNameSys.conf"
+source "$configFile"
 
 start_timer
 trap 'stop_timer "$timer_id_out"; echo "Total: ${timer_duration}s" >&2' EXIT

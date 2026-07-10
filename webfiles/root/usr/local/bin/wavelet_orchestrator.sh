@@ -99,7 +99,6 @@ event_server(){
 		else
 			if [[ "$handler_function" == "event_generate_client_conf" ]] && [[ "$keyHostName" != "$hostNameSys" ]]; then
             	# This is a new host and we are going to generate the config directly
-            	echo "Generating a new config file for host: $keyHostName"
             	event_generate_client_conf
             	exit 0
             else
@@ -698,14 +697,17 @@ bluetooth_connect(){
 }
 
 event_generate_client_conf(){
+	set -x
 	# This is a client distress signal notifying the server to generate a proper conf file
-	if [[ "$triggerValue" -eq 1 ]] && [[ "$keyHostName" != "$hostNameSys" ]]; then
+	if [[ "$triggerValue" == "True" ]] && [[ "$keyHostName" != "$hostNameSys" ]]; then
 		echo "	Generating conf file for a new client.."
+		set +x
 		update_host_config_full
 		KEYNAME="/HOSTS/$keyHostName/control/generateConf"; delete_etcd_key
 	else
-		echo "	generate Conf keyvalue is not correct. NOOP"
+		exit 0 # noop
 	fi
+	set +x
 }
 
 update_host_config_key() {
@@ -735,10 +737,13 @@ update_host_config_key() {
 	esac
 	local configFile="/var/home/wavelet/config/$keyHostName.conf"
 	echo "Updating conf file $configFile:"
-#	echo "$(<$configFile)"
 	# Find the key in our config file and update it
 	# sed replace the line starting with "export $configKey=" to the updated value.
-	echo "export $configKey=\"$configValue\"" >> "$configFile"
+	if grep -q "^export $configKey=" "$configFile"; then
+		sed -i "s/^export $configKey=.*/export $configKey=\"$configValue\"/" "$configFile"
+	else
+		echo "export $configKey=\"$configValue\"" >> "$configFile"
+	fi
 	# Upload the client config
 	upload_client_config
 }

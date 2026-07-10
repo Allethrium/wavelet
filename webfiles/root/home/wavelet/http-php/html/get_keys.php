@@ -89,7 +89,6 @@ function parse_hosts_and_inputs($dataArray) {
                 'labelText' => $value,
                 'type' => 'host',
                 'key' => $value,
-                'parentHashID' => null, // may remove, obsolete?
                 'controls' => [],
                 'inputs' => []
             ];

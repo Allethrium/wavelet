@@ -1799,46 +1799,12 @@ uiDisable_moveUGWindow(){
 
 event_get_config(){
 	# Load this host's env vars from the conf file using flat key-value parsing
-	# re: /UI/HOSTS/$hostHash/conf
 	configFile="/var/home/wavelet/config/$hostNameSys.conf"
 	declare -A host_config
-	if [[ -f "$configFile" ]]; then
-		while IFS= read -r line; do
-			line="${line//$'\r'/}"
-			[[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-			[[ "$line" != *=* ]] && continue
-			key="${line%%=*}"
-			value="${line#*=}"
-			host_config["$key"]="$value"
-		done <"$configFile"
-		configFileExists=true
+	if [[ ! -f "$configFile" ]]; then
+		echo "	Warning: Config file $configFile not found, using defaults."
+		return 1
 	fi
-	# Now handled via wavelet_build.sh
-#	if [[ "$configFileExists" == "false" ]]; then
-#		echo "	Config file not available, sending generateConf signal to server and waiting for config generation.."
-#		KEYNAME="/HOSTS/$hostNameSys/control/generateConf"; KEYVALUE="1"; write_etcd_global &
-#			# Wait for the config file to be generated (up to 3 seconds)
-#		waitCount=0
-#		maxWait=30
-#		while [[ ! -f "$configFile" ]] && [[ $waitCount -lt $maxWait ]]; do
-#			sleep 0.1
-#			((waitCount++))
-#		done
-#		KEYNAME="/HOSTS/$hostNameSys/conf"; read_etcd_global; confData="$(base64 -d <<<"$printvalue")"
-#		KEYNAME="/HOSTS/$hostNameSys/confHash"; read_etcd_global; confHash="$printvalue"
-#
-#		if [[ "$(sha256sum <<<"$confData" | tr -d ' \t\n-')" != "$confHash" ]] && [[ -n "$confHash" ]]; then
-#			# This would also catch nulls
-#			echo "	CLIENT_CONTROLLER: confHash does not checksum with configFile data!"
-#			exit 1
-#		fi
-#		if [[ -z "$confData" ]]; then
-#			echo "	CLIENT_CONTROLLER: No config file data"
-#			return 1
-#		else
-#			echo "$confData" > "$configFile"
-#		fi
-#	fi
 	while IFS= read -r line; do
 		line="${line//$'\r'/}"
 		[[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
