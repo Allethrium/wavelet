@@ -235,7 +235,7 @@ populate_to_etcd(){
 	echo "	Populating ETCD with discovery data.."
 	# Packed format $HASH -- IP;DEVICE_LABEL(attempts to set the device hostname!);MAC;type
 	interfaceEntry="$ipAddr;$deviceHostName;$macAddr;$type;$subType"
-	domainVar="${SERVER_HOSTNAME#*.}"
+	domainVar="$(dnsdomainname)"
 	# Generate a host hash and input hash from the device MACaddr, making them stable.
 	hostHash="$(sha256sum <<<"$macAddr-HOST" | tr -d ' \t\n-')"
 	inputHash="$(sha256sum <<<"$macAddr-INPUT" | tr -d ' \t\n-')"
