@@ -470,8 +470,7 @@ new_host(){
     # Build an etcd transaction - it doesn't matter if the key exists or not, we overwrite it.
     if [[ "$hostType" == *"svr"* ]]; then
     	echo "	Setting server UI Config keys.."
-    	# value of /UI/HOSTS/$hostHash in this case HAS to == svr.domainname or it should fail.
-    	KEYDATA="val(\"/UI/HOSTS/$hostHash\") = \"$keyHostName\"
+    	KEYDATA="mod(\"/UI/HOSTS/$hostHash\") = \"0\"
 
 put /UI/HOSTS/$hostHash/control/GROUP \"$hostGroup\"
 put /UI/HOSTS/$hostHash \"$keyHostName\"
