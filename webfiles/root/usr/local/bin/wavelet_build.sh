@@ -212,7 +212,7 @@ event_decoder_newHost(){
 		# generateConf is processed by the orchestrator module.
 		# /HOSTS/$hostNameSys must already exist
 		# The key and hash for the host is generated in the etcd_management along with access rights.
-		KEYDATA="mod(\"/HOSTS/$hostNameSys\") > \"0\"
+		KEYDATA="
 
 put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
 put /HOSTS/$hostNameSys/control/generateConf \"1\"
@@ -254,8 +254,8 @@ event_encoder(){
 	echo "   Encoder routine started.."
     event_generate_hotplug
 	systemctl --user daemon-reload
-	# Populate encoder state keys, if the mod key has been changed more than 0 times.
-	KEYDATA="mod(\"/HOSTS/$hostNameSys\") > \"0\"
+	# Populate encoder state keys
+	KEYDATA="
 
 put /HOSTS/$hostNameSys/control/type \"enc\"
 
@@ -510,7 +510,7 @@ server_bootstrap(){
 	# Encode to base64
 	local encodedConfig=$(base64 -w 0 <"$configContent")
 	# Atomic transaction to update config, checksum, and version and other keys.
-	KEYDATA="mod(\"/HOSTS/$hostNameSys\") = \"0\"
+	KEYDATA="
 
 put /HOSTS/$hostNameSys \"$hostHash\"
 put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"

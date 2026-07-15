@@ -418,7 +418,7 @@ event_change_group(){
 	echo -e "Group keys:\n	blank:$blankStatusValue\n	reveal:$revealStatusValue\n	sourcehash: $groupSourceHash\n previous source: $groupPreviousVideoSource"
 	# Note we are populating both UI and host keys here, less the /HOSTS/$hostname/control/GROUP key, which triggered this transaction.
 	# This is to ensure that we don't get a momentarily "flash" of group input when a host is dragged.
-    KEYDATA="mod(\"/HOSTS/$keyHostName\") > \"0\"
+    KEYDATA="
 
 put /HOSTS/$keyHostName/control/blankStatus \"$blankStatusValue\"
 put /HOSTS/$keyHostName/control/revealStatus \"$revealStatusValue\"
@@ -467,10 +467,10 @@ new_host(){
         fi
         KEYNAME="/HOSTS/$keyHostName/control/IP"; KEYVALUE="$hostIPs"; write_etcd_global &
     fi
-    # Build an etcd transaction - it doesn't matter if the key exists or not, we overwrite it.
+    # Build an etcd transaction
     if [[ "$hostType" == *"svr"* ]]; then
     	echo "	Setting server UI Config keys.."
-    	KEYDATA="mod(\"/UI/HOSTS/$hostHash\") = \"0\"
+    	KEYDATA="
 
 put /UI/HOSTS/$hostHash/control/GROUP \"$hostGroup\"
 put /UI/HOSTS/$hostHash \"$keyHostName\"
@@ -490,7 +490,7 @@ put /UI/HOSTS/$hostHash/control/UIEnable \"1\"
 		# New standard host
 		echo "	Setting host UI Config keys.."
 		# Do not write a /UI/HOSTS/ key that already exists.  Txn will fail.
-		KEYDATA="mod(\"/UI/HOSTS/$hostHash\") = \"0\"
+		KEYDATA="
 
 put /UI/HOSTS/$hostHash \"$keyHostName\"
 put /UI/HOSTS/$hostHash/control/IP \"$hostIP\"
@@ -789,10 +789,7 @@ upload_client_config(){
 	encodedConfig="$(base64 -w 0 <"$configFile")"
 	# Atomic transaction to update config, checksum, and version
 	# on the client side, the client_controller will activate on confHash being written and pull the new config
-	KEYDATA="mod(\"/HOSTS/$keyHostName/conf\") = \"0\"
-
-put /HOSTS/$keyHostName/conf \"$encodedConfig\"
-put /HOSTS/$keyHostName/confHash \"$checksum\"
+	KEYDATA="
 
 put /HOSTS/$keyHostName/conf \"$encodedConfig\"
 put /HOSTS/$keyHostName/confHash \"$checksum\"
