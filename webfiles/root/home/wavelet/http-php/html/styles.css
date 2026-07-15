@@ -691,8 +691,8 @@ input.openHostMenuCheckbox[type="radio"]:checked ~ .hostMenuIconToggle > .diagon
     border: var(--border-standard);
     border-radius: var(--border-radius-standard);
     background: var(--color-bg-darkest);
-    padding: 5px;
-    margin: 5px;
+    padding: 3px;
+    margin: 3px;
     color: var(--color-white);
     outline: var(--outline-standard);
     outline-offset: var(--outline-offset-standard);
@@ -713,7 +713,7 @@ input.openHostMenuCheckbox[type="radio"]:checked ~ .hostMenuIconToggle > .diagon
     flex-grow: 1;
     flex-direction: column;
     justify-items: start;
-    margin: 12px;
+    margin: 8px;
     background: var(--color-bg-dark);
 }
 
@@ -903,7 +903,7 @@ body {
     flex-direction: column;
     background: color-mix(in srgb, var(--color-bg-dark), white 5%);
     padding: var(--padding-medium);
-    margin: var(--margin-large);
+    margin: var(--margin-medium);
     border-radius: var(--border-radius-medium);
     text-transform: uppercase;
     font-size: var(--font-size-small);

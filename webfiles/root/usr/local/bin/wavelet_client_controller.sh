@@ -841,6 +841,10 @@ event_set_directMode(){
 
 # Group membership
 event_create_group(){
+	if [[ "$etcdValue" != "PLEASE" ]]; then
+		#..how rude!
+		exit 0
+	fi
 	# Generate a new group hash
 	# Check that this hash doesn't already exist (REALLY small chance of a collision but.. why not)
 	local newGroupHash; newGroupHash="$(sha256sum < /proc/sys/kernel/random/uuid | tr -d ' -')"

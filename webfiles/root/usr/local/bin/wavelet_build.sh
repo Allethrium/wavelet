@@ -532,8 +532,9 @@ put /HOSTS/$hostNameSys/confHash \"$checksum\"
 	echo "Generated ETCD TXN Data for initial server host population:"
 	echo "$KEYDATA"
 	write_etcd_txn "$KEYDATA"
-	sleep 2
+	sleep 1
 	systemctl --user enable wavelet_orchestrator --now
+	sleep 2
 	# Conf file should already be generated, so we can set the wavelet_build_completed flag
 	# This signals the orchestrator to publish the host to the UI.
 	KEYNAME="/HOSTS/$hostNameSys/wavelet_build_completed"; KEYVALUE="1"; write_etcd_global

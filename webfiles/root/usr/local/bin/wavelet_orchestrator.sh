@@ -661,7 +661,7 @@ bluetooth_connect(){
 
 event_generate_client_conf(){
 	# This is a client distress signal notifying the server to generate a proper conf file
-	if [[ "$triggerValue" == "True" ]] && [[ "$keyHostName" != "$hostNameSys" ]]; then
+	if [[ "$triggerValue" == "1" ]] && [[ "$keyHostName" != "$hostNameSys" ]]; then
 		echo "	Generating conf file for a new client.."
 		update_host_config_full
 		KEYNAME="/HOSTS/$keyHostName/control/generateConf"; delete_etcd_key
