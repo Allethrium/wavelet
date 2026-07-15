@@ -106,7 +106,7 @@ etcd_provision_request(){
 		echo "waiting for provision process to complete.."
 	done
 	# Test etcd interaction via the wrapper process
-	KEYNAME="PROV_TEST"; KEYVALUE="True"; write_etcd; sleep .5 ; read_etcd
+	KEYNAME="PROV_TEST"; KEYVALUE="True"; write_etcd; sleep 1 ; read_etcd
 	if [[ "$printvalue" = "True" ]]; then
 		echo "Client provision request completed, client username has been generated and access to appropriate keys granted."
 		touch /var/home/wavelet/config/provisioned.complete
@@ -210,8 +210,8 @@ event_decoder_newHost(){
 		etcd_provision_request
 		# Generate initial host key request
 		# generateConf is processed by the orchestrator module.
-		# /HOSTS/$hostNameSys must already exist
 		# The key and hash for the host is generated in the etcd_management along with access rights.
+		echo "	Sending configuration file generation request.."
 		KEYDATA="
 
 put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
@@ -222,12 +222,15 @@ put /HOSTS/$hostNameSys/control/generateConf \"1\"
 		touch /var/home/wavelet/config/provisioned.complete
 	fi
 	sleep 1
+	echo "	Reading configuration hash.."
 	KEYNAME="/HOSTS/$hostNameSys/confHash"; read_etcd_global; confHash="$printvalue"
 	if [[ -z "$confHash" ]]; then
 		# A single 2-second backoff retry is all that's needed here if the inital read fails.
+		echo "	No hash value yet, waiting then retrying.."
 		sleep 2
 		KEYNAME="/HOSTS/$hostNameSys/confHash"; read_etcd_global; confHash="$printvalue"
 	fi
+	echo "	Reading host configuration file.."
 	KEYNAME="/HOSTS/$hostNameSys/conf"; read_etcd_global; confData="$(base64 -d <<<"$printvalue")"
 	# Parse the sha256 hash against our conf data and source the conf file if good.
 	# As this is a brand new client, there is no reason this would fail.

@@ -456,7 +456,7 @@ new_host(){
 		exit 0
 	fi
 	# All of these keys should be populated by the config file available to the server and the host now.
-    if ! valid_ipv4 "$hostIPA"; then
+    if ! valid_ipv4 "$hostIP"; then
     	# get the IP address of keyHostName
     	hostIP="$(dig +short "$keyHostName" 2>/dev/null)"
         if [[ -z "$hostIP" ]]; then
@@ -465,7 +465,7 @@ new_host(){
         if [[ -z "$hostIP" ]]; then
             hostIP="$(ping -c 1 -W 2 "$keyHostName" 2>/dev/null | grep -oP '(?<=from=)[0-9.]+')"
         fi
-        KEYNAME="/HOSTS/$keyHostName/control/IP"; KEYVALUE="$hostIPs"; write_etcd_global &
+        KEYNAME="/HOSTS/$keyHostName/control/IP"; KEYVALUE="$hostIP"; write_etcd_global &
     fi
     # Build an etcd transaction
     if [[ "$hostType" == *"svr"* ]]; then

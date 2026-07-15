@@ -29,8 +29,8 @@ detect_self(){
 
 event_client(){
 	# retrieves git mirror tar.gz from server and extracts directly into system paths.
-	curl -s -L -o "$setupPath/wavelet_files.tar.gz" "https://svr.$(dnsdomainname):8443/ignition/wavelet_files.tar.gz" || {
-		echo "Error downloading wavelet_files.tar.gz from server!"
+	curl -s -L -o "$setupPath/wavelet_files.tar.gz" "http://$(dnsdomainname):8080/ignition/wavelet_files_update.tar.gz" || {
+		echo "Error downloading wavelet_files_update.tar.gz from server!"
 		exit 1
 	}
 	mkdir -p "$setupPath/webfiles/root"
@@ -76,13 +76,19 @@ event_server(){
 
 extract_etc(){
 	umask 022
-	cp -an "$setupPath/webfiles/root/etc/"* /etc/ 2>/dev/null || true
+	shopt -s dotglob nullglob
+	if [ -d "$setupPath/webfiles/root/etc" ]; then
+		cp -a "$setupPath/webfiles/root/etc/"* /etc/ 2>/dev/null || true
+	fi
+	shopt -u dotglob nullglob
 	echo -e "System config files setup successfully..\n"
 	rm -rf "$setupPath/webfiles/root/etc"
 }
 
 extract_home(){
-	cp -an "$setupPath/webfiles/root/home/"* /var/home/ 2>/dev/null || true
+	shopt -s dotglob nullglob
+	cp -a "$setupPath/webfiles/root/home/"* /var/home/ 2>/dev/null || true
+	shopt -u dotglob nullglob
 	chown -R wavelet:wavelet "/var/home/wavelet"
 	chown -R wavelet-root:wavelet-root "/var/home/wavelet-root"
 	chmod 0755 "/var/home/wavelet/http"
@@ -95,11 +101,15 @@ extract_usrlocalbin(){
 	# Save customized files to ensure no overwrite
 	cp /usr/local/bin/ipa_link_up.sh /var/tmp
 	umask 022
-	cp -an "$setupPath/webfiles/root/usr/local/bin/"* /usr/local/bin/
+	shopt -s dotglob nullglob
+	cp -a "$setupPath/webfiles/root/usr/local/bin/"* /usr/local/bin/
+	shopt -u dotglob nullglob
 	chmod +x "/usr/local/bin"
 	chmod 0755 /usr/local/bin/*
 	if touch "/var/wavelet_ramfs/test.txt"; then
+		shopt -s dotglob nullglob
 		cp -af /usr/local/bin/* "/var/wavelet_ramfs"
+		shopt -u dotglob nullglob
 	fi
 	echo -e "Wavelet application modules setup successfullym ramdrive updated if it exists..\n"
     rm -rf "$setupPath/webfiles/root/usr/local/bin"

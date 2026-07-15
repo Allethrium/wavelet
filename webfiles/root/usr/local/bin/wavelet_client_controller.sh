@@ -851,7 +851,6 @@ event_create_group(){
 	local BASEKEYNAME
 	BASEKEYNAME="/UI/GROUPS/$newGroupHash"
 	# Create a txn which will complete only if the generated hash doesn't exist
-	# the blocks are repeated 2x because this forms an IF;THEN pattern based off the mod("key") = "val" case.
 	KEYDATA="mod(\"$BASEKEYNAME\") = \"0\"
 
 put \"$BASEKEYNAME/control/newGroup\" \"1\"
@@ -874,7 +873,7 @@ put \"$BASEKEYNAME/control/swatchValue\" \"#0f2b39\"
 "
 	write_etcd_txn "$KEYDATA"
 	# Delete the group create request key
-	KEYNAME="/UI/control/GROUP-CREATE"; delete_etcd_key_global &
+	KEYNAME="/UI/GLOBALS/control/GROUP-CREATE"; delete_etcd_key_global &
 }
 
 event_change_group(){
