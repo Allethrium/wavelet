@@ -1747,6 +1747,12 @@ uiEnable_moveUGWindow(){
     if [[ -z "$ugId" ]]; then
         echo "	ERROR: Unable to determine window ID for UltraGrid!!"
         KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="ERR: No UltraGrid sway window ID"; write_etcd_global &
+        return 0
+    fi
+    # Verify UltraGrid window exists before issuing move commands
+    if ! swaymsg -t get_tree -s "$swaySocket" | jq -r 'recurse(.nodes[]?, .floating[]?) | select((.app_id == "uv") or (.window_properties.class == "uv")) | .id // empty' | grep -qx "$ugId"; then
+        echo "	Warning: UltraGrid window no longer exists, skipping move commands."
+        return 0
     fi
     swaymsg -s "$swaySocket" "[con_id=$ugId] floating enable, fullscreen disable"
     swaymsg -s "$swaySocket" "[con_id=$ugId] resize set $targetWidth $targetHeight"
@@ -1761,12 +1767,12 @@ uiDisable_moveUGWindow(){
     if [[ "$hostNameSys" == *"svr"* ]]; then
         echo "	This is the server, setting workspace to 1."
         workspace=1
-        noDecoderWindow=true
+        noDecoderWindow=1
     else
         echo "	This is a client, setting workspace to 2."
         workspace=2
     fi
-    if [[ "$workspace" != 1 ]] && [[ $noDecoderWindow != true ]]; then
+    if [[ "$workspace" != 1 ]] && [[ $noDecoderWindow != 1 ]]; then
         # Use cached display resolution if available
         if [[ -f "$resCacheFile" ]]; then
             displayResolution="$(cat "$resCacheFile")"
@@ -1789,6 +1795,12 @@ uiDisable_moveUGWindow(){
         if [[ -z "$ugId" ]]; then
             echo "	ERROR: Unable to determine window ID for UltraGrid!!"
             KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="ERR: No UltraGrid sway window ID"; write_etcd_global &
+            return 0
+        fi
+        # Verify UltraGrid window exists before issuing move commands
+        if ! swaymsg -t get_tree -s "$swaySocket" | jq -r 'recurse(.nodes[]?, .floating[]?) | select((.app_id == "uv") or (.window_properties.class == "uv")) | .id // empty' | grep -qx "$ugId"; then
+            echo "	Warning: UltraGrid window no longer exists, skipping move commands."
+            return 0
         fi
         echo "	Moving UltraGrid output container to workspace $workspace.."
         swaymsg -s "$swaySocket" "[con_id=$ugId] move container to workspace $workspace"

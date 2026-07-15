@@ -487,9 +487,7 @@ put /UI/HOSTS/$hostHash/control/UIEnable \"1\"
     else
 		# New standard host
 		echo "	Setting host UI Config keys.."
-		# Do not write a /UI/HOSTS/ key that already exists.  Txn will fail.
 		KEYDATA="
-put /UI/HOSTS/$hostHash \"$keyHostName\"
 put /UI/HOSTS/$hostHash/control/IP \"$hostIP\"
 put /UI/HOSTS/$hostHash/control/type \"$hostType\"
 put /UI/HOSTS/$hostHash/control/label \"${hostLabel:-$keyHostName}\"

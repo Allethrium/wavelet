@@ -380,9 +380,13 @@ generate_etcd_host_role() {
 
 	echo "	Generating /HOSTS/$clientHostName root keys and assigning prefix permissions.."
 	# Read the client's assigned hash value from event_generate_hash here
-	KEYNAME="/HOSTS/$clientHostName"; clientHash="$("$ETCDINTERACTIONMOD" 'read_etcd_global' $KEYNAME)"
+	if [[ -z "$hostHash" ]]; then
+		KEYNAME="/HOSTS/$clientHostName"; clientHash="$("$ETCDINTERACTIONMOD" 'read_etcd_global' $KEYNAME)"
+	else
+		clientHash="$hostHash"
+	fi
 	# Set up client permissions - UI commands (Read Only under own hostname)
-	VAL="$clientHostName"; KEY="/UI/HOSTS/$clientHash"; createCmd "$KEY" "$VAL"; roleCmdReadOnly "$KEY"
+	KEY="/UI/HOSTS/$clientHash"; roleCmdReadOnly "$KEY"
 	# Everyone should be able to read:
 	# globals
 	# the primary server group hash
@@ -448,18 +452,18 @@ generate_etcd_host_role() {
 event_generate_hash(){
         # Generate a hashID for the host
 		# arg is the device type I.E enc, dec, svr etc.
-		local hashType=${1}
+		local hashType="${1}"
 		echo "		Host label/pretty hostname is:	$clientHostNameShort"
 		echo "		Host persistent hostname is:	$clientHostName"
 		hostHash=$(cat /proc/sys/kernel/random/uuid | sha256sum | tr -d ' \t\n-')
 		echo -e "		Generated host hash:	$hostHash \n"
 		# Check for pre-existing keys here
 		KEYNAME="/HOSTS/$clientHostName}"; hashExists="$("$ETCDINTERACTIONMOD" 'read_etcd_global' $KEYNAME)"
-		if [[ -z "${hashExists}" || "${#hashExists}" -le 1 ]]; then
-			echo "		Generated hash value lookup provides: ${hashExists}, which is null or less than 1 char, therefore it is not valid."
+		if [[ -z "$hashExists" || "${#hashExists}" -le 1 ]]; then
+			echo "		Generated hash value lookup provides: $hashExists, which is null or less than 1 char, therefore it is not valid."
 			echo "		Populating initial device type template from hostname.."
 			# Populate what will initially be used as the label variable from the webUI
-			case "${hashType}" in
+			case "$hashType" in
 				enc*)			KEYVALUE="enc";
 				;;
 				dec*)			KEYVALUE="dec";
@@ -470,12 +474,13 @@ event_generate_hash(){
 				;;
 			esac
 			echo "		Populating host keys.."
-			# Populate host data (orchestrator takes care of UI)
+			# Populate host data (orchestrator takes care of UI, after initial prefix generation)
 			KEYNAME="/HOSTS/$clientHostName/control/type"; cmd="put $KEYNAME -- $KEYVALUE";	execute_etcd_cmd "$cmd"
 			KEYNAME="/HOSTS/$clientHostName"; KEYVALUE="$hostHash"; cmd="put $KEYNAME -- $KEYVALUE"; execute_etcd_cmd "$cmd"
+			KEYNAME="/UI/HOSTS/$hostHash"; KEYVALUE="$clientHostName"; cmd="put $KEYNAME -- $KEYVALUE"; execute_etcd_cmd "$cmd"
 		else
-			echo -e "		/HOSTS/$clientHostName Hash value exists: $hashExists"
-			echo -e "		Device already populated, taking no further action."
+			echo "		/HOSTS/$clientHostName Hash value exists: $hashExists"
+			echo "		Device already populated, taking no further action."
 		fi
 }
 
