@@ -155,7 +155,7 @@ detect_self(){
 		# Launch for host type
 		case "$HOST_TYPE" in
 			"svr") # This is fine, because a server always has etcd rights
-				echo"	I am a Server. Proceeding..."
+				echo "	I am a Server. Proceeding..."
 				event_server
 				;;
 			"enc") # An encoder must have always started as a decoder host before being promoted
@@ -398,7 +398,8 @@ nginx_quadlets(){
 	podman secret create webui-key /var/home/wavelet/.ssh/secrets/.webui.key
 	podman secret create webui-enc /var/home/wavelet/config/.webui.enc
 	# Generate a random password for redis
-	local redisPW="$(cat '/proc/sys/kernel/random/uuid' | sha256sum | tr -d ' -')"
+	local redisPW
+	redisPW="$(cat '/proc/sys/kernel/random/uuid' | sha256sum | tr -d ' -')"
 	# SED the redis.conf file with generated password
 	sed -i "s/my-redis-password/$redisPW/g" "/var/home/wavelet/config/redis.conf"
 	echo "$redisPW" | podman secret create redispw -
@@ -488,12 +489,13 @@ server_bootstrap(){
     event_checkGroups
 	KEYNAME="/GROUPS/$hostNameSys"; read_etcd_global; groupHash="$printvalue"
 	sleep 1
+	local newVersion; local encodedConfig; local checksum; locl configContent
 	currentVersion=0
 	local newVersion=$((currentVersion + 1))
 	serverIPAddress="$(<"/var/home/wavelet/config/etcd_ip")"
 	# Build our initial server.conf file
 	# Note this isn't created via the orchestrator like all other hosts.
-	local configContent="/var/home/wavelet/config/$hostNameSys.conf"
+	configContent="/var/home/wavelet/config/$hostNameSys.conf"
 	echo "Generating svr config file.."
 	cat <<-EOF > "$configContent"
 		export CLUSTER_ID="$clusterID"
@@ -507,15 +509,15 @@ server_bootstrap(){
 		export INPUT_DEVICE_PRESENT="0"
 		export MOD_REVISION="$newVersion"
 	EOF
-	echo -e "Generated svr config:\n\n$(cat $configContent)\n"
+	echo -e "Generated svr config:\n\n$(cat "$configContent")\n"
 	# export vars for utilization
 	source "$configContent"
 	# set to ro for everyone incl. owner.
 	chmod 0400 "$configContent"
 	# Calculate checksum
-	local checksum=$(sha256sum <"$configContent" | tr -d ' \t\n-')
+	checksum=$(sha256sum <"$configContent" | tr -d ' \t\n-')
 	# Encode to base64
-	local encodedConfig=$(base64 -w 0 <"$configContent")
+	encodedConfig=$(base64 -w 0 <"$configContent")
 	# Atomic transaction to update config, checksum, and version and other keys.
 	KEYDATA="
 
@@ -532,9 +534,8 @@ put /HOSTS/$hostNameSys/confHash \"$checksum\"
 
 "
 	write_etcd_txn "$KEYDATA"
-	# re-order the orchestrator so that it only starts after the server keys are fully populated.
-	systemctl --user enable wavelet_orchestrator --now
 	sleep 2
+	systemctl --user enable wavelet_orchestrator --now
 	# Conf file should already be generated, so we can set the wavelet_build_completed flag
 	# This signals the orchestrator to publish the host to the UI.
 	KEYNAME="/HOSTS/$hostNameSys/wavelet_build_completed"; KEYVALUE="1"; write_etcd_global &
