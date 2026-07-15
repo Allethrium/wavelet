@@ -258,14 +258,10 @@ event_encoder(){
     event_generate_hotplug
 	systemctl --user daemon-reload
 	# Populate encoder state keys
-	KEYDATA="
-
-put /HOSTS/$hostNameSys/control/type \"enc\"
-
-"
+	KEYNAME="/HOSTS/$hostNameSys/control/type";KEYVALUE="enc"; write_etcd_global &
 	write_etcd_txn "$KEYDATA"
 	if [[ ! -f "/var/home/wavelet/config/enc_blankImage.bmp" ]]; then
-		echo "Blank display isn't available, generating.."
+		echo "	Blank display isn't available, generating.."
 			color="rgb(.2, .2, .2, 0)"
 			backgroundcolor="rgb(.2, .2, .2, 0)"
 		magick -size 1920x1080 -pointsize 50 -background "$color" -bordercolor "$backgroundcolor" \
@@ -304,12 +300,14 @@ event_server(){
 		wavelet_reflector \
 		wavelet_init \
 		wavelet_client_controller \
-		wavelet_network_device --now --no-block
+		wavelet_network_device --now
 	# if first run, we set UIEnable to give us the UI browser on the server to assist with setup.
 	if [[ -f "/var/home/wavelet/config/server_firstrun.flag" ]]; then
+		echo "	First run, setting UIEnable flag.."
 		KEYNAME="/HOSTS/$hostNameSys/control/UIEnable"; KEYVALUE="1"; write_etcd_global &
 		rm -f "/var/home/wavelet/config/server_firstrun.flag"
 	fi
+	sleep 1
 	echo "	Running initial device detection.."
 	/bin/bash -c "$WAVELET_DETECTV4L_MOD 'redetect'"
 }
@@ -489,9 +487,9 @@ server_bootstrap(){
     event_checkGroups
 	KEYNAME="/GROUPS/$hostNameSys"; read_etcd_global; groupHash="$printvalue"
 	sleep 1
-	local newVersion; local encodedConfig; local checksum; locl configContent
+	local newVersion; local encodedConfig; local checksum; local configContent
 	currentVersion=0
-	local newVersion=$((currentVersion + 1))
+	newVersion=$((currentVersion + 1))
 	serverIPAddress="$(<"/var/home/wavelet/config/etcd_ip")"
 	# Build our initial server.conf file
 	# Note this isn't created via the orchestrator like all other hosts.
@@ -533,12 +531,15 @@ put /HOSTS/$hostNameSys/conf \"$encodedConfig\"
 put /HOSTS/$hostNameSys/confHash \"$checksum\"
 
 "
+	echo "Generated ETCD TXN Data for initial server host population:"
+	echo "$KEYDATA"
 	write_etcd_txn "$KEYDATA"
 	sleep 2
 	systemctl --user enable wavelet_orchestrator --now
 	# Conf file should already be generated, so we can set the wavelet_build_completed flag
 	# This signals the orchestrator to publish the host to the UI.
-	KEYNAME="/HOSTS/$hostNameSys/wavelet_build_completed"; KEYVALUE="1"; write_etcd_global &
+	KEYNAME="/HOSTS/$hostNameSys/wavelet_build_completed"; KEYVALUE="1"; write_etcd_global
+	sleep 1
 	# Ensure we hit the group videoSource key once to force a videoSourceConfig refresh
 	KEYNAME="/GROUPS/$groupHash/control/sourceHash"; KEYNAME="1"; write_etcd_global &
 	echo "	System services and configuration keys generated, starting services now.."
