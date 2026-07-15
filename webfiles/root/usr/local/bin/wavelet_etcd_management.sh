@@ -451,7 +451,7 @@ event_generate_hash(){
 		local hashType=${1}
 		echo "		Host label/pretty hostname is:	$clientHostNameShort"
 		echo "		Host persistent hostname is:	$clientHostName"
-		hostHash=$(cat /proc/sys/kernel/random/uuid | sha256sum | tr -d "[:space:]-")
+		hostHash=$(cat /proc/sys/kernel/random/uuid | sha256sum | tr -d ' \t\n-')
 		echo -e "		Generated host hash:	$hostHash \n"
 		# Check for pre-existing keys here
 		KEYNAME="/HOSTS/$clientHostName}"; hashExists="$("$ETCDINTERACTIONMOD" 'read_etcd_global' $KEYNAME)"
@@ -459,7 +459,7 @@ event_generate_hash(){
 			echo "		Generated hash value lookup provides: ${hashExists}, which is null or less than 1 char, therefore it is not valid."
 			echo "		Populating initial device type template from hostname.."
 			# Populate what will initially be used as the label variable from the webUI
-			case ${hashType} in
+			case "${hashType}" in
 				enc*)			KEYVALUE="enc";
 				;;
 				dec*)			KEYVALUE="dec";

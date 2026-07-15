@@ -210,10 +210,11 @@ event_decoder_newHost(){
 		etcd_provision_request
 		# Generate initial host key request
 		# generateConf is processed by the orchestrator module.
-		KEYDATA="mod(\"/HOSTS/$hostNameSys\") = \"0\"
+		# /HOSTS/$hostNameSys must already exist
+		# The key and hash for the host is generated in the etcd_management along with access rights.
+		KEYDATA="mod(\"/HOSTS/$hostNameSys\") > \"0\"
 
 put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
-put /HOSTS/$hostNameSys/control/type \"dec\"
 put /HOSTS/$hostNameSys/control/generateConf \"1\"
 
 "
@@ -223,6 +224,7 @@ put /HOSTS/$hostNameSys/control/generateConf \"1\"
 	sleep 1
 	KEYNAME="/HOSTS/$hostNameSys/confHash"; read_etcd_global; confHash="$printvalue"
 	if [[ -z "$confHash" ]]; then
+		# A single 2-second backoff retry is all that's needed here if the inital read fails.
 		sleep 2
 		KEYNAME="/HOSTS/$hostNameSys/confHash"; read_etcd_global; confHash="$printvalue"
 	fi

@@ -79,7 +79,7 @@ event_server(){
 				[[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
 				[[ "$line" != *=* ]] && continue
 				key="${line%%=*}"
-				key="${key#export *}"
+				key="${key#export }"
 				value="${line#*=}"
 				value="${value#\"}"
 				value="${value%\"}"
@@ -304,6 +304,14 @@ event_unsubscription_request(){
 health_status_update(){
     # Notifies the decoder that it's errored and that the subscription attempt to the reflector failed.  Also updates UI status
     local KEYDATA
+    if [[ -z "$keyHostName" ]] || [[ "$keyHostName" == "0" ]]; then
+        echo "health_status_update: Invalid keyHostName '$keyHostName', exiting."
+        exit 0
+    fi
+    if [[ -z "$hostHash" ]] || [[ "$hostHash" == "0" ]]; then
+		echo "health_status_update: Invalid hostHash for '$keyHostName', exiting."
+		exit 0
+    fi
     # Perform an atomic write with an etcdctl check that the key exists and it not null included
     KEYDATA="val(\"/HOSTS/$keyHostName\") - \"$hostHash\"
 
@@ -373,8 +381,8 @@ event_change_group(){
 	fi
 	# Read the group's entire keyspace and process for what we need
 	KEYNAME="/UI/GROUPS/$triggerValue"; read_etcd_prefix_list; groupKeys="$printvalue"
-	echo "	Group Keys:"
-	echo "$groupKeys"
+#	echo "	Group Keys:"
+#	echo "$groupKeys"
 	exec 3<<<"$groupKeys"
 	while read -u 3 -r keyLine && read -u 3 -r valueLine; do
 		case "$keyLine" in
@@ -443,6 +451,7 @@ new_host(){
 		KEYNAME="/GROUPS/$hostNameSys"; read_etcd_global; hostGroup="$printvalue"
 	fi
 	if [[ -z "$hostHash" ]]; then
+		# Note hostHash is not arbitrary - it's generated in etcd_management along with access roles.
 		echo "	No host hash has been generated!  Cannot continue to provision the host.."
 		exit 0
 	fi
