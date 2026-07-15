@@ -213,7 +213,6 @@ event_decoder_newHost(){
 		# The key and hash for the host is generated in the etcd_management along with access rights.
 		echo "	Sending configuration file generation request.."
 		KEYDATA="
-
 put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
 put /HOSTS/$hostNameSys/control/generateConf \"1\"
 
@@ -507,10 +506,10 @@ server_bootstrap(){
 		export INPUT_DEVICE_PRESENT="0"
 		export MOD_REVISION="$newVersion"
 	EOF
-	echo -e "Generated svr config:\n\n$(cat "$configContent")\n"
+	echo -e "	Generated svr config:\n$(cat "$configContent")\n"
 	# export vars for utilization
 	source "$configContent"
-	# set to ro for everyone incl. owner.
+	# set to ro for everyone incl. owner.  The server config is immutable.
 	chmod 0400 "$configContent"
 	# Calculate checksum
 	checksum=$(sha256sum <"$configContent" | tr -d ' \t\n-')
@@ -518,7 +517,6 @@ server_bootstrap(){
 	encodedConfig=$(base64 -w 0 <"$configContent")
 	# Atomic transaction to update config, checksum, and version and other keys.
 	KEYDATA="
-
 put /HOSTS/$hostNameSys \"$hostHash\"
 put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
 put /HOSTS/$hostNameSys/control/blankStatus \"1\"

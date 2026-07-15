@@ -419,7 +419,6 @@ event_change_group(){
 	# Note we are populating both UI and host keys here, less the /HOSTS/$hostname/control/GROUP key, which triggered this transaction.
 	# This is to ensure that we don't get a momentarily "flash" of group input when a host is dragged.
     KEYDATA="
-
 put /HOSTS/$keyHostName/control/blankStatus \"$blankStatusValue\"
 put /HOSTS/$keyHostName/control/revealStatus \"$revealStatusValue\"
 put /UI/HOSTS/$hostHash/control/blankStatus \"$blankStatusValue\"
@@ -471,7 +470,6 @@ new_host(){
     if [[ "$hostType" == *"svr"* ]]; then
     	echo "	Setting server UI Config keys.."
     	KEYDATA="
-
 put /UI/HOSTS/$hostHash/control/GROUP \"$hostGroup\"
 put /UI/HOSTS/$hostHash \"$keyHostName\"
 put /UI/HOSTS/$hostHash/control/IP \"$hostIP\"
@@ -491,7 +489,6 @@ put /UI/HOSTS/$hostHash/control/UIEnable \"1\"
 		echo "	Setting host UI Config keys.."
 		# Do not write a /UI/HOSTS/ key that already exists.  Txn will fail.
 		KEYDATA="
-
 put /UI/HOSTS/$hostHash \"$keyHostName\"
 put /UI/HOSTS/$hostHash/control/IP \"$hostIP\"
 put /UI/HOSTS/$hostHash/control/type \"$hostType\"
@@ -790,7 +787,6 @@ upload_client_config(){
 	# Atomic transaction to update config, checksum, and version
 	# on the client side, the client_controller will activate on confHash being written and pull the new config
 	KEYDATA="
-
 put /HOSTS/$keyHostName/conf \"$encodedConfig\"
 put /HOSTS/$keyHostName/confHash \"$checksum\"
 
