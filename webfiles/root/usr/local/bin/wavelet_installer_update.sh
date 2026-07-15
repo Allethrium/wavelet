@@ -66,9 +66,9 @@ event_server(){
 	cp "/var/home/wavelet/config/wavelet_decoder_keys.csv" "/var/home/wavelet/http/ignition"
 	echo "Regenerating ignition files for clients..(note; this will NOT update the customized decoder ignition (yet)"
 	echo "This is because it needs secrets and other data from the initial configuration."
-	butane --pretty --strict --files-dir /var/home/wavelet/http/ignition/ /var/home/wavelet/config/automated_installer.yml \
+	butane --pretty --files-dir /var/home/wavelet/http/ignition/ /var/home/wavelet/config/automated_installer.yml \
 	    --output automated_installer.ign
-	butane --pretty --strict --files-dir /var/home/wavelet/http/ignition/ /var/home/wavelet/config/decoder_custom.yml \
+	butane --pretty --files-dir /var/home/wavelet/http/ignition/ /var/home/wavelet/config/decoder_custom.yml \
 		--output /var/home/wavelet/http/ignition/decoder.ign
 	chmod -R 0644 /var/home/wavelet/http/ignition/* && chown -R wavelet:wavelet "/var/home/wavelet/http"
 	restorecon -R "/var/home/wavelet/http" > /dev/null
