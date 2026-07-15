@@ -305,7 +305,11 @@ event_server(){
 		wavelet_init \
 		wavelet_client_controller \
 		wavelet_network_device --now --no-block
-	touch /var/home/wavelet/config/provisioned.complete
+	# if first run, we set UIEnable to give us the UI browser on the server to assist with setup.
+	if [[ -f "/var/home/wavelet/config/server_firstrun.flag" ]]; then
+		KEYNAME="/HOSTS/$hostNameSys/control/UIEnable"; KEYVALUE="1"; write_etcd_global &
+		rm -f "/var/home/wavelet/config/server_firstrun.flag"
+	fi
 	echo "	Running initial device detection.."
 	/bin/bash -c "$WAVELET_DETECTV4L_MOD 'redetect'"
 }
@@ -518,7 +522,6 @@ server_bootstrap(){
 put /HOSTS/$hostNameSys \"$hostHash\"
 put /HOSTS/$hostNameSys/control/label \"$hostNamePretty\"
 put /HOSTS/$hostNameSys/control/blankStatus \"1\"
-put /HOSTS/$hostNameSys/control/UIEnable \"1\"
 put /HOSTS/$hostNameSys/control/rebootStatus \"0\"
 put /HOSTS/$hostNameSys/control/healthStatus \"0\"
 put /HOSTS/$hostNameSys/control/GROUP \"$groupHash\"
@@ -538,6 +541,7 @@ put /HOSTS/$hostNameSys/confHash \"$checksum\"
 	# Ensure we hit the group videoSource key once to force a videoSourceConfig refresh
 	KEYNAME="/GROUPS/$groupHash/control/sourceHash"; KEYNAME="1"; write_etcd_global &
 	echo "	System services and configuration keys generated, starting services now.."
+	touch "/var/home/wavelet/config/server_firstrun.flag"
 	event_server
 }
 

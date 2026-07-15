@@ -33,11 +33,23 @@ event_client(){
 		echo "Error downloading wavelet_files_update.tar.gz from server!"
 		exit 1
 	}
-	mkdir -p "$setupPath/webfiles/root"
-	tar xf "$setupPath/wavelet_files.tar.gz" -C "$setupPath/webfiles/root" --no-same-owner --strip-components=1
+	mkdir -p "$setupPath/webfiles"
+	tar xf "$setupPath/wavelet_files.tar.gz" -C "$setupPath/webfiles"
 
-	extract_etc && extract_home && extract_usrlocalbin
+	# Extract the .tar.xz files to their respective locations
+	tar xJf "$setupPath/webfiles/etc.tar.xz" -C / --no-same-owner --no-same-permissions 2>/dev/null || true
+	tar xJf "$setupPath/webfiles/wavelethome.tar.xz" -C / --no-same-owner --no-same-permissions 2>/dev/null || true
+	tar xJf "$setupPath/webfiles/usrlocalbin.tar.xz" -C / --no-same-owner --no-same-permissions 2>/dev/null || true
+
+	# Perform post-extraction setup
+	chown -R wavelet:wavelet "/var/home/wavelet" 2>/dev/null || true
+	chown -R wavelet-root:wavelet-root "/var/home/wavelet-root" 2>/dev/null || true
+	chmod 0755 "/var/home/wavelet/http" 2>/dev/null || true
+	chmod -R 0755 "/var/home/wavelet/http-php" 2>/dev/null || true
+	chmod 0755 /usr/local/bin/* 2>/dev/null || true
+
 	rm -rf "$setupPath/webfiles"
+	rm -f "$setupPath/wavelet_files.tar.gz"
 	exit 0
 }
 
@@ -47,8 +59,15 @@ event_server(){
 	# Generate our installer files to the http/ignition dir for client booting
 	install_wavelet_modules
 	# Perform extraction for updated wavelet files from our generated tar to update our own files
-    extract_home && extract_usrlocalbin
-    rm -rf "$setupPath/etc.tar.xz"
+    # Extract server's own files from the .tar.xz files
+    tar xJf "$setupPath/wavelethome.tar.xz" -C / --no-same-owner --no-same-permissions 2>/dev/null || true
+    tar xJf "$setupPath/usrlocalbin.tar.xz" -C / --no-same-owner --no-same-permissions 2>/dev/null || true
+    chown -R wavelet:wavelet "/var/home/wavelet" 2>/dev/null || true
+	chown -R wavelet-root:wavelet-root "/var/home/wavelet-root" 2>/dev/null || true
+	chmod 0755 "/var/home/wavelet/http" 2>/dev/null || true
+	chmod -R 0755 "/var/home/wavelet/http-php" 2>/dev/null || true
+	chmod 0755 /usr/local/bin/* 2>/dev/null || true
+    rm -rf "$setupPath/etc.tar.xz" "$setupPath/wavelethome.tar.xz" "$setupPath/usrlocalbin.tar.xz"
 	# Update with the server hostname - no other device should be doing network sense.
 	sed -i "s/hostnamegoeshere/${hostNameSys}/g" "/usr/local/bin/wavelet_network_sense.sh"
 	FILES=(
@@ -123,11 +142,15 @@ download_wavelet_git(){
   	else
 		GH_BRANCH="master"
   	fi
+  	# delete old files if they currently exist
+  	rm -rf "$setupPath/git"
   	mkdir -p "$setupPath/git"
 	if curl -s -L -o "/var/tmp/wavelet_files.tar.gz" \
 		"https://github.com/Allethrium/wavelet/archive/refs/heads/$GH_BRANCH.tar.gz"; then
 		echo "		Acquired wavelet tarball, proceeding.."
 		tar xf "/var/tmp/wavelet_files.tar.gz" -C "$setupPath/git" --no-same-owner --strip-components=1
+		echo "Setup files:"
+		ls -laht "$setupPath/git"
 		# Copy the original git tree w/ everything for client spinup.
 		cp "/var/tmp/wavelet_files.tar.gz" "/var/home/wavelet/http/ignition/"
 	else
@@ -154,8 +177,8 @@ install_wavelet_modules(){
     	"/var/home/wavelet/http/ignition/"
     # Generate our tar.gz for distribution.
     # This is the update file for already existing clients NOT the initial git archive!
-    cd "$setupPath" || exit
-    tar cf "/var/home/wavelet/http/ignition/wavelet_files_update.tar.gz" *.tar.xz
+    cd "$gitDir/webfiles" || exit
+    tar cf "/var/home/wavelet/http/ignition/wavelet_files_update.tar.gz" root/etc root/home root/usr/local/bin
 	# Perform any further customization required in our scripts, and clean up.
 	sed -i "s/!!hostnamegoeshere!!/$(hostname)/g" "/usr/local/bin/wavelet_network_sense.sh"
 	chown -R wavelet:wavelet "/var/home/wavelet/http/"
@@ -169,7 +192,7 @@ install_wavelet_modules(){
 #
 #####
 
-
+set -x
 hostNameSys=$(hostname)
 
 setupPath="/var/home/wavelet/config/setup"
