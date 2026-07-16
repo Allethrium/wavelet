@@ -106,7 +106,7 @@ function process_device(){
 
 detect_method(){
 	# Finds other devices associated with this device
-	if [[ "${function}" == "redetect" ]]; then
+	if [[ "$function" == "redetect" ]]; then
 		echo "Redetecting all potential video devices on the system!"
 		# We need to get the parent device ID, then provide it to find_siblings in the appropriate format
 		declare -A seenDevices=()
@@ -117,7 +117,6 @@ detect_method(){
 			parentDevName="$(udevadm info -p -a "${parentDev%/*}" 2>/dev/null | grep -Po '(?<=DEVNAME=).*')"
 			parentDevs+=("$parentDevName")
 		done
-
 		for parentDev in "${parentDevs[@]}"; do
 			# Find siblings for each parent device
 			process_device "$parentDev"
@@ -323,8 +322,7 @@ set_device_input() {
 	# This is the master key where the interface looks to generate a new device root node
 	# /HOSTS entry must already exist
 	BASEKEYNAME="/HOSTS/$hostNameSys"
-	KEYDATA="mod(\"$BASEKEYNAME\") > \"0\"
-
+	KEYDATA="
 put $BASEKEYNAME/inputs/$deviceHash \"$interfaceEntry\"
 put $BASEKEYNAME/inputs/devpath_lookup/$deviceHash \"$v4l_device_path\"
 put $BASEKEYNAME/inputs/hash_lookup$v4l_device_path \"$deviceHash\"
@@ -332,6 +330,8 @@ put $BASEKEYNAME/control/inputUpdate \"1\"
 put $BASEKEYNAME/INPUT_DEVICE_PRESENT \"1\"
 
 "
+	# Ensure INPUT_DEVICE_PRESENT is also available in the conf file
+	sed -i 's/export INPUT_DEVICE_PRESENT="0"/export INPUT_DEVICE_PRESENT="1"/' "$configFile"
 	write_etcd_txn "$KEYDATA"
 	set_device_cmdline
 	echo "	Populated keys into Etcd.."
@@ -340,6 +340,7 @@ put $BASEKEYNAME/INPUT_DEVICE_PRESENT \"1\"
 device_cleanup() {
 	# Check for keys not associated with an active device, and remove them
 	local output;
+	local input_devices_present=0; # <-- Initialize flag
 	KEYNAME="/HOSTS/$hostNameSys/inputs/"
 	activeInterfaceDevices=$(read_etcd_prefix_keys | sed "s|/HOSTS/$hostNameSys/inputs/||g")
 	IFS=' ' read -a interfaceLongArray <<< "$activeInterfaceDevices"
@@ -355,8 +356,9 @@ device_cleanup() {
 			output="$(udevadm info --query=env "$devNode")"
 			if [[ -n "$output" ]]; then
 				echo "	Device detected, checking strings against etcd data.."
-				if echo "$output" | grep "Integrated_Webcam_"; then
+				if echo "$output" | grep -q "SUBSYSTEM=video4linux"; then
 					echo "	Device strings found in udev output, device is present."
+					input_devices_present=1
 				else
 					echo "	Device strings are not present in udev output."
 					echo "	This means the device has changed, and entries in etcd are no longer valid."
@@ -375,20 +377,10 @@ device_cleanup() {
 			interfaceLongArray=("${interfaceLongArray[*]/$i}")
 		fi
 	done
-
-	if (( ${#interfaceLongArray[@]} == 0 )); then
-		echo -e "	Cleanup array is empty, there is no discrepancy between detected device paths and available devices in Wavelet.\n"
-		:
-	else
-		echo -e "Orphaned devices located:\n"
-		printf "%s\n" "${interfaceLongArray[@]}"
-		for i in "${interfaceLongArray[@]}"; do
-			if [ -n "$i" ]; then
-				:
-			else
-				device_key_remove "${i}"
-			fi
-		done
+	if (( input_devices_present == 0 )); then
+		echo "	No input devices available. Updating config..."
+		sed -i 's/export INPUT_DEVICE_PRESENT="1"/export INPUT_DEVICE_PRESENT="0"/' "$configFile"
+		KEYNAME="/HOSTS/$hostNameSys/INPUT_DEVICE_PRESENT"; KEYVALUE="0"; write_etcd_global &
 	fi
 }
 
@@ -490,11 +482,9 @@ device_key_remove(){
 		    echo "  We are removing the currently streaming device!  Requesting input reset to safe input.."
 	    	KEYNAME="/UI/GROUPS/$currentGroup/sourceHash"; KEYVALUE="1"; write_etcd_global &
 		fi
-
 		# With safeties done, we can continue to clean up our device keys in /HOSTS/$hostName
 		# Note delete_etcd_key takes prefix relative to client, not a global full prefix.
-		KEYDATA="mod(\"$BASEKEYNAME\") > \"0\"
-
+		KEYDATA="
 del $BASEKEYNAME/inputs/$cleanupHash --prefix
 del $BASEKEYNAME/inputs/cmd$devPath --prefix
 del $BASEKEYNAME/inputs/devpath_lookup/$cleanupHash --prefix
@@ -555,7 +545,8 @@ chown wavelet:wavelet /var/home/wavelet/logs/detectv4l.log
 hostNameSys="$(hostname)"
 
 # source conf file variables
-source "/var/home/wavelet/config/$hostNameSys.conf"
+configFile="/var/home/wavelet/config/$hostNameSys.conf"
+source "$configFile"
 
 # TODO Here get missing data if any, or proceed
 

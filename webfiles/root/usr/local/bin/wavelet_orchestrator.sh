@@ -424,7 +424,6 @@ put /HOSTS/$keyHostName/control/revealStatus \"$revealStatusValue\"
 put /UI/HOSTS/$hostHash/control/blankStatus \"$blankStatusValue\"
 put /UI/HOSTS/$hostHash/control/revealStatus \"$revealStatusValue\"
 put /UI/HOSTS/$hostHash/control/videoSource \"$groupSourceHash\"
-put /UI/HOSTS/$hostHash/control/GROUP \"$triggerValue\"
 
 "
 	write_etcd_txn "$KEYDATA" &
