@@ -275,6 +275,8 @@ put /HOSTS/$hostNameSys/control/generateConf \"1\"
 		echo "	WAVELET_BUILD: No config file data"
 		exit 1
 	else
+		# we must define configFile here
+		configFile="/var/home/wavelet/config/$hostNameSys.conf"
 		echo "Config data retrieved and validated for data integrity, injecting to config file: $configFile"
 		printf '%s' "$confData" > "$configFile"
 	fi
