@@ -239,22 +239,7 @@ populate_to_etcd(){
 	# Generate a host hash and input hash from the device MACaddr, making them stable.
 	hostHash="$(sha256sum <<<"$macAddr-HOST" | tr -d ' \t\n-')"
 	inputHash="$(sha256sum <<<"$macAddr-INPUT" | tr -d ' \t\n-')"
-	KEYDATA="mod(\"/HOSTS/$deviceHostName.$domainVar\") = \"0\"
-
-put /HOSTS/$deviceHostName.$domainVar \"$hostHash\"
-put /HOSTS/$deviceHostName.$domainVar/inputs/$inputHash \"$interfaceEntry\"
-put /HOSTS/$deviceHostName.$domainVar/control/type \"$type\"
-put /HOSTS/$deviceHostName.$domainVar/subType \"$subType\"
-put /HOSTS/$deviceHostName.$domainVar/control/IP \"$ipAddr\"
-put /HOSTS/$deviceHostName.$domainVar/MAC \"${macAddr^^}\"
-put /HOSTS/$deviceHostName.$domainVar/uv_encode_cmd/inputStream \"$(base64 -w 0 <<<"$UGdeviceStreamCommand")\"
-put /HOSTS/$deviceHostName.$domainVar/uv_stream_cmd/subscribeStream \"$(base64 -w 0 <<<"$UGdeviceSubscribeCommand")\"
-put /HOSTS/$deviceHostName.$domainVar/control/directMode \"1\"
-put /HOSTS/$deviceHostName.$domainVar/control/GROUP \"$initGroupHash\"
-put /HOSTS/$deviceHostName.$domainVar/control/healthStatus \"0\"
-put /HOSTS/$deviceHostName.$domainVar/control/wavelet_build_completed \"1\"
-del DHCP
-
+	KEYDATA="
 put /HOSTS/$deviceHostName.$domainVar \"$hostHash\"
 put /HOSTS/$deviceHostName.$domainVar/inputs/$inputHash \"$interfaceEntry\"
 put /HOSTS/$deviceHostName.$domainVar/control/type \"$type\"

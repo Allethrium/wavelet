@@ -83,6 +83,7 @@ detect_operation(){
 		"updateImage")		handler_function="regenerate_staticImage";;
 		"UIEnable")			handler_function="toggle_userInterface";;
 		"videoSource")		handler_function="wavelet_run";;
+		"confUpdate")		handler_function="update_config";;
 		*) echo "	Invalid function key: $control_suffix"; exit 0;; #noop
 	esac
 	if [[ -n "$handler_function" ]] && declare -f "$handler_function" > /dev/null; then
@@ -474,12 +475,26 @@ event_prefix_set(){
 				WantedBy=default.target
 				EOF
 			systemctl --user daemon-reload
+			# Update config file with new data
+			configKey="HOST_TYPE"
+            if grep -q "^export $configKey=" "$configFile"; then
+            	sed -i "s/^export $configKey=.*/export $configKey=\"enc\"/" "$configFile"
+            else
+            	echo "export $configKey=\"enc\"" >> "$configFile"
+            fi
 			# launch encoder process and ensure we have the proper blank image available
 			notifyID="$(notify-send -h string:x-mako-align:center "Currently Running Encoder Process")"
 			echo "$notifyID" > /var/home/wavelet/config/notifyID
 			event_encoder
 		else
 			echo "      I am not a decoder, switching to become a decoder.."
+			# Update config file with new data
+			configKey="HOST_TYPE"
+            if grep -q "^export $configKey=" "$configFile"; then
+            	sed -i "s/^export $configKey=.*/export $configKey=\"dec\"/" "$configFile"
+            else
+            	echo "export $configKey=\"dec\"" >> "$configFile"
+            fi
 			KEYNAME="/HOSTS/$hostNameSys/control/type"; KEYVALUE="dec"; write_etcd_global
 			remove_associated_inputs
 			# Terminate encoder processes
@@ -897,16 +912,22 @@ event_change_group(){
    		echo "      Group value was updated to the same value as current group membership, doing nothing."
    		exit 0
    	fi
-   	if [[ -z "$groupHash" ]]; then
-   		# Restore the host to the primary group because something went wrong.
+   	if [[ -z "$etcdValue" ]]; then
+   		# Restore the host to the primary group because something went wrong, we should get a valid groupHash here.
    		echo "		No groupHash populated, resetting to server group.."
 		KEYNAME="/GROUPS/$serverHostname"; read_etcd_global; etcdValue="$printvalue"
    		# Write the group key back and let the server orchestrator update the UI.
    	fi
    	echo "	Changing client group to hash: $etcdValue"
+   	# Will also trigger a conf update, but since the checksum should match, no issue
+   	# If it doesn't, server conf will overwrite host conf.
    	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; KEYVALUE="$etcdValue"; write_etcd_global &
-   	# TODO - update this to the wavelet.conf
-   	echo "$etcdValue" > "/var/home/wavelet/config/group.conf"
+   	configKey="GROUP_HASH"
+	if grep -q "^export $configKey=" "$configFile"; then
+		sed -i "s/^export $configKey=.*/export $configKey=\"$etcdValue\"/" "$configFile"
+	else
+		echo "export $configKey=\"$etcdValue\"" >> "$configFile"
+	fi
 }
 
 #delete a group
@@ -1006,6 +1027,13 @@ get_ipValue(){
 	# Validate
 	if valid_ipv4 "$ipValue"; then
 		echo -e "			IP Address is valid: $ipValue, continuing.."
+		# Update config file with new data
+		configKey="HOST_IP"
+        if grep -q "^export $configKey=" "$configFile"; then
+           	sed -i "s/^export $configKey=.*/export $configKey=\"$ipValue\"/" "$configFile"
+		else
+			echo "export $configKey=\"$ipValue\"" >> "$configFile"
+		fi
 		KEYNAME="/HOSTS/$hostNameSys/control/IP"; KEYVALUE="$ipValue"; write_etcd_global &
 	else
 		echo -e "			IP Address '$ipValue' is not valid, retrying...\n"
@@ -1719,6 +1747,11 @@ find_ug_con_id(){
 }
 
 uiEnable_moveUGWindow(){
+    # Moves UltraGrid window when UI gets enabled.
+    if [[ "$hostNameSys" == *"svr"* ]]; then
+        echo "	Server does not have a UG window, skipping UI window move."
+        return 0
+    fi
     local workspace; local width; local height;local targetWidth; local targetHeight; local ugId
     local displayResolution
     local resCacheFile="/var/home/wavelet/config/display_resolution.cache"
@@ -1751,7 +1784,7 @@ uiEnable_moveUGWindow(){
     height="${displayResolution#*x}"
     targetWidth=$(( width / 2 ))
     targetHeight=$(( height * 9 / 16 ))
-    echo "	Disabling fullscreen and setting window float for UltraGrid container.."
+    echo "	Disabling fullscreen and setting window float at $targetWidth x $targetHeight for UltraGrid container.."
     ugId="$(find_ug_con_id)" || return 0
     if [[ -z "$ugId" ]]; then
         echo "	ERROR: Unable to determine window ID for UltraGrid!!"
@@ -1763,10 +1796,12 @@ uiEnable_moveUGWindow(){
         echo "	Warning: UltraGrid window no longer exists, skipping move commands."
         return 0
     fi
-    swaymsg -s "$swaySocket" "[con_id=$ugId] floating enable, fullscreen disable"
+    swaymsg -s "$swaySocket" "[con_id=$ugId] floating enable"
+    swaymsg -s "$swaySocket" "[con_id=$ugId] fullscreen disable"
     swaymsg -s "$swaySocket" "[con_id=$ugId] resize set $targetWidth $targetHeight"
     echo "	Moving UltraGrid container to workspace $workspace.."
-    swaymsg -s "$swaySocket" "[con_id=$ugId] move container to workspace $workspace, move container to position 1400 0"
+    swaymsg -s "$swaySocket" "[con_id=$ugId] move container to workspace $workspace"
+    swaymsg -s "$swaySocket" "[con_id=$ugId] move position 1400 0"
 }
 
 uiDisable_moveUGWindow(){
@@ -1814,7 +1849,8 @@ uiDisable_moveUGWindow(){
         echo "	Moving UltraGrid output container to workspace $workspace.."
         swaymsg -s "$swaySocket" "[con_id=$ugId] move container to workspace $workspace"
         echo "	Resizing UltraGrid output container to fullscreen.."
-        swaymsg -s "$swaySocket" "[con_id=$ugId] floating disable, resize set $width $height"
+        swaymsg -s "$swaySocket" "[con_id=$ugId] floating disable"
+        swaymsg -s "$swaySocket" "[con_id=$ugId] resize set $width $height"
         swaymsg -s "$swaySocket" "[con_id=$ugId] fullscreen enable"
     fi
 }
@@ -1855,6 +1891,26 @@ event_get_config(){
 	hostIp="${host_config[HOST_IP]:-}"
 	inputDevicePresent="${host_config[INPUT_DEVICE_PRESENT]:-}"
 	modRevision="${host_config[MOD_REVISION]:-}"
+}
+
+update_config() {
+	# Update the host config and then clean flag
+	if [[ "$etcdValue" == 0 ]]; then
+		exit 0
+	fi
+	configTemp="$(mktemp)"
+	KEYNAME="/HOSTS/$hostNameSys/confHash"; read_etcd_global; confHash="$printvalue"
+	KEYNAME="/HOSTS/$hostNameSys/conf"; read_etcd_global; configData="$printvalue"
+	echo "$configData" > "$configTemp"
+	# test config for data integrity
+	checksum="$(sha256sum <"$configTemp" | tr -d ' \t\n-')"
+	if [[ "$confHash" != "$configData" ]]; then
+		echo "	ERR:  Config file data integrity issue!"
+		exit 0
+	else
+		# overwrite our configFile
+		echo "$configData" > "$configFile"
+	fi
 }
 
 

@@ -681,7 +681,7 @@ update_host_config_key() {
 			HOST_IP="$configValue"
 			;;
 		GROUP_HASH)
-			GROUP_HASH="$configValue"
+			GROUP_HASH="${configValue}"
 			;;
 		HOST_TYPE)
 			HOST_TYPE="$configValue"
@@ -694,7 +694,7 @@ update_host_config_key() {
 			;;
 	esac
 	local configFile="/var/home/wavelet/config/$keyHostName.conf"
-	echo "Updating conf file $configFile:"
+	echo "Updating conf file $configFile"
 	# Find the key in our config file and update it
 	# sed replace the line starting with "export $configKey=" to the updated value.
 	if grep -q "^export $configKey=" "$configFile"; then
@@ -776,6 +776,7 @@ update_host_config_full() {
 
 upload_client_config(){
 	local checksum; local encodedConfig
+	echo "Uploading client config $configFile"
 	# Handles the checksumming and actual uploading
 #	echo -e "Generated config to $configFile:\n$(<$configFile)"
 	# Calculate checksum
@@ -784,11 +785,20 @@ upload_client_config(){
 	encodedConfig="$(base64 -w 0 <"$configFile")"
 	# Atomic transaction to update config, checksum, and version
 	# on the client side, the client_controller will activate on confHash being written and pull the new config
+	# If checksum == confHash current val, fail txn as nothing changed.
+	# TODO - how does it calculate < or > for the checksum?  this could break if it doesn't enumerate correctly!
+	KEYNAME="/HOSTS/$keyHostName/confHash"; read_etcd_global; currentChecksum="$printvalue"
+	if [[ "$checksum" == "$currentChecksum" ]]; then
+		echo "	Checksum hasn't changed - noop"
+		exit 0
+	fi
 	KEYDATA="
 put /HOSTS/$keyHostName/conf \"$encodedConfig\"
 put /HOSTS/$keyHostName/confHash \"$checksum\"
+put /UI/HOSTS/$hostHash/confUpdate \"1\"
 
 "
+	echo "	Note:  FAIL means the conf does not need updating as config checksum = the current confHash value!"
 	write_etcd_txn "$KEYDATA" &
 }
 

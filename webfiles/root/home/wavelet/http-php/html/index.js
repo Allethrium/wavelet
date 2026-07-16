@@ -3250,6 +3250,21 @@ function handleGroupEvents(event) {
 					groupItem.inputButtonMap.clear();
 					document.dispatchEvent(new CustomEvent('sourceDropdownRefresh', {detail: groupItem}));
 				}
+				if (controlName === "swatchValue") {
+					// Update group element background color
+					if (groupItem.element) {
+						groupItem.element.style.backgroundColor = event.value;
+					}
+					// Update color swatch and picker
+					const picker = document.getElementById(`swatch-group-${hashID}`);
+					if (picker) {
+						picker.value = event.value;
+						const swatch = picker.parentNode;
+						if (swatch && swatch.classList.contains('color-swatch')) {
+							swatch.style.backgroundColor = event.value;
+						}
+					}
+				}
 				if (window.root && window.root.activeGroupInputsEmitter) {
 					window.root.activeGroupInputsEmitter.emit(hashID);
 				}
