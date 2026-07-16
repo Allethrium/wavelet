@@ -445,6 +445,7 @@ new_host(){
 		exit 0
 	fi
     # Check group membership
+    hostGroup=""
     if [[ -z "$hostGroup" ]]; then
 		echo "	Host is not currently a group member, adding to default server group."
 		KEYNAME="/GROUPS/$hostNameSys"; read_etcd_global; hostGroup="$printvalue"

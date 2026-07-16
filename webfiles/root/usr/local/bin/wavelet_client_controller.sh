@@ -543,19 +543,28 @@ toggle_userInterface() {
 	echo "	Checking for running UltraGrid container.."
 	local width; local height; local displayResolution; local noDecoderWindow; local workspace
 	noDecoderWindow=false
-	workspace=""
 	if [[ "$etcdValue" == 0 ]] || [[ -z "$etcdValue" ]]; then
 		echo "	Disabling UI functionality on this device.."
 		notify-send -e "UI Disabled"
 		rm -rf "/var/home/wavelet/config/webui.enabled"
 		uiDisable_moveUGWindow
-		swaymsg -s "$swaySocket" "[app_id="org.mozilla.firefox"] kill"
-		swaymsg -s "$swaySocket" workspace "$workspace"
+		swaymsg -s "$swaySocket" "[app_id="org.mozilla.firefox"] kill" 2>/dev/null
 		# Send more insistent termination signal to firefox if still running (hung etc.)
 		# pkill firefox
 	else
 		echo "	Enabling Web interface on this host.  Recommend kb/mouse as Human Interface Device!"
 		notify-send -e "UI Enabled"
+		# Determine workspace for enabling UI
+		if [[ "$hostNameSys" == *"svr"* ]]; then
+			elapsedBootTime="$(uptime | awk '{print $3}')"
+			if [[ $elapsedBootTime -lt 3 ]]; then
+				workspace=2
+			else
+				workspace=3
+			fi
+		else
+			workspace=3
+		fi
 		uiEnable_moveUGWindow
 		echo "$workspace" > "/var/home/wavelet/config/webui.enabled"
 		swaymsg -s "$swaySocket" workspace "$workspace"

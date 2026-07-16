@@ -220,17 +220,47 @@ put /HOSTS/$hostNameSys/control/generateConf \"1\"
 		write_etcd_txn "$KEYDATA"
 		touch /var/home/wavelet/config/provisioned.complete
 	fi
-	sleep 1
-	echo "	Reading configuration hash.."
-	KEYNAME="/HOSTS/$hostNameSys/confHash"; read_etcd_global; confHash="$printvalue"
-	if [[ -z "$confHash" ]]; then
-		# A single 2-second backoff retry is all that's needed here if the inital read fails.
-		echo "	No hash value yet, waiting then retrying.."
-		sleep 2
+
+	# Wait for the orchestrator to generate the config file
+	echo "	Waiting for configuration hash from server.."
+	confHash=""
+	max_retries=30
+	retry_count=0
+	while [[ -z "$confHash" && $retry_count -lt $max_retries ]]; do
 		KEYNAME="/HOSTS/$hostNameSys/confHash"; read_etcd_global; confHash="$printvalue"
+		if [[ -z "$confHash" ]]; then
+			echo "	No hash value yet, waiting then retrying.. ($((retry_count+1))/$max_retries)"
+			sleep 1
+			((retry_count++))
+		else
+			break
+		fi
+	done
+
+	if [[ -z "$confHash" ]]; then
+		echo "	WAVELET_BUILD: Timeout waiting for configuration hash from server."
+		exit 1
 	fi
+
 	echo "	Reading host configuration file.."
-	KEYNAME="/HOSTS/$hostNameSys/conf"; read_etcd_global; confData="$(base64 -d <<<"$printvalue")"
+	confData=""
+	retry_count=0
+	while [[ -z "$confData" && $retry_count -lt $max_retries ]]; do
+		KEYNAME="/HOSTS/$hostNameSys/conf"; read_etcd_global
+		confData="$(base64 -d <<<"$printvalue" 2>/dev/null)"
+		if [[ -z "$confData" ]]; then
+			echo "	No config data yet, waiting then retrying.. ($((retry_count+1))/$max_retries)"
+			sleep 1
+			((retry_count++))
+		else
+			break
+		fi
+	done
+
+	if [[ -z "$confData" ]]; then
+		echo "	WAVELET_BUILD: Timeout waiting for configuration file data from server."
+		exit 1
+	fi
 	# Parse the sha256 hash against our conf data and source the conf file if good.
 	# As this is a brand new client, there is no reason this would fail.
 	if [[ "$(sha256sum <<<"$confData" | tr -d ' \t\n-')" != "$confHash" ]] && [[ -n "$confHash" ]]; then

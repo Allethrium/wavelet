@@ -385,8 +385,6 @@ generate_etcd_host_role() {
 	else
 		clientHash="$hostHash"
 	fi
-	# Set up client permissions - UI commands (Read Only under own hostname)
-	KEY="/UI/HOSTS/$clientHash"; roleCmdReadOnly "$KEY"
 	# Everyone should be able to read:
 	# globals
 	# the primary server group hash
@@ -399,6 +397,8 @@ generate_etcd_host_role() {
 	KEY="SVR"; roleCmdReadOnly "${KEY}"
 	# The hosts should be able to read all group states and keys
 	KEY="/UI/GROUPS/"; roleCmdReadOnly "${KEY}"
+	# Hosts should be able to read their own UI prefix
+   	KEY="/UI/HOSTS/$clientHash"; roleCmdReadOnly "$KEY"
 	# Generate client password and create user
 	local PassWord; local password2; local result
 	PassWord="$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')"
