@@ -777,10 +777,7 @@ event_process_group_videoSource_hosts(){
     txnArray="$(< "$tempTxn")"
     rm -rf "$tempTxn"
     # /UI/HOSTS will always have been modified more than once, at this point.
-    KEYDATA="mod(\"/UI/HOSTS/\") = \"0\"
-
-$txnArray
-
+    KEYDATA="
 $txnArray
 
 "
@@ -1021,16 +1018,23 @@ get_ipValue(){
 wavelet_run(){
 	# Detect_self in this case relies on the etcd type key
 	case "$hostType" in
-		enc*) 					event_encoder
-		;;
-		decX.*)					echo -e  "	    I am a Decoder, but my hostname is generic.\n	An error has occurred at some point, and needs troubleshooting.\nTerminating process.\n"; exit 0
-		;;
-		dec*)					run_decoder
-		;;
-		svr*)					run_server
-		;;
-		*) 						echo -e "	    This device Hostname is not set appropriately, exiting\n"; exit 0
-		;;
+		enc*)
+			event_encoder
+			;;
+		decX.*)
+			echo -e "	    ERR: DECODER HOSTNAME NOT SET.\n	Terminating process.\n"
+			exit 0
+			;;
+		dec*)
+			run_decoder
+			;;
+		svr*)
+			run_server
+			;;
+		*)
+			echo -e "	    This device Hostname is not set appropriately, exiting\n"
+			exit 0
+			;;
 	esac
 }
 
@@ -1039,6 +1043,9 @@ run_server(){
 	if [[ "$inputDevicePresent" -eq 1 ]]; then
 		echo "	An input device is present on this server, proceeding"
 		# Is this input on this host?
+		if [[ -z "$serverHostHash" ]]; then
+			serverHostHash="$CLIENT_HOST_HASH"
+		fi
 		KEYNAME="/UI/HOSTS/$serverHostHash/inputs/"; read_etcd_prefix_keys
 		if [[ "$etcdValue" == 0 ]] || [[ "$etcdValue" == 1 ]] || [[ "$etcdValue" == 2 ]]; then
 			# The requested input device is a static.  Taking no further action
@@ -1343,13 +1350,6 @@ run_decoder(){
 	if [[ "$blankStatus" == "1" ]] && [[ "$hostNameSys" == *"svr"* ]]; then
 		# We don't want the server displaying anything unless it's specifically unblanked.
 		exit 0
-	fi
-	# Update IP
-	ipFile="/home/wavelet/config/systemIP"
-	currentIP="$(hostname -I | xargs)"
-	if [[ "$currentIP" != "$(cat $ipFile)" ]]; then
-		echo "$currentIP" > "$ipFile"
-		KEYNAME="/HOSTS/$hostNameSys/control/IP"; write_etcd_global &
 	fi
 	# check for an already running UG systemd unit
 	if systemctl --user is-active UltraGrid.Decoder.service >/dev/null 2>&1; then
@@ -1840,12 +1840,17 @@ event_get_config(){
 		host_config["$key"]="$value"
 	done <"$configFile"
 	# Populate host configuration variables from the parsed host_config array
+	echo "Array data:"
+	for i in "${host_config[@]}"; do
+		echo "$i"
+	done
 	hostHash="${host_config[CLIENT_HOSTHASH]:-}"
 	groupHash="${host_config[GROUP_HASH]:-}"
 	hostType="${host_config[HOST_TYPE]:-}"
 	serverHostname="${host_config[SERVER_HOSTNAME]:-}"
 	clusterId="${host_config[CLUSTER_ID]:-}"
 	primaryGroupHash="${host_config[PRIMARY_GROUPHASH]:-}"
+	# This isn't populating properly for some reason?
 	serverHostHash="${host_config[SERVER_HOSTHASH]:-}"
 	hostIp="${host_config[HOST_IP]:-}"
 	inputDevicePresent="${host_config[INPUT_DEVICE_PRESENT]:-}"

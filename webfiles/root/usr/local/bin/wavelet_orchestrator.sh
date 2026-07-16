@@ -313,7 +313,7 @@ health_status_update(){
 		exit 0
     fi
     # Perform an atomic write with an etcdctl check that the key exists and it not null included
-    KEYDATA="val(\"/HOSTS/$keyHostName\") - \"$hostHash\"
+    KEYDATA="val(\"/HOSTS/$keyHostName\") = \"$hostHash\"
 
 put /UI/HOSTS/$hostHash/control/healthStatus \"$triggerValue\"
 put /UI/HOSTS/$hostHash/control/lastError \"$(date +%s)\"

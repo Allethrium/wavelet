@@ -191,11 +191,12 @@ event_decoder(){
 		echo "	Decoder config file found!  Proceeding with normal startup.."
 	else
 		# We are a new host, and should be requesting conf file generation
+		echo "	Decoder config file does not exist.  Continuing host setup.."
 		event_decoder_newHost
 	fi
 	# we can now source our configFile and proceed
 	source "$configFile"
-	sleep 2
+	hostHash="$CLIENT_HOSTHASH"
 	event_client_control
 	systemctl --user daemon-reload
 	systemctl --user --no-block enable wavelet_client_controller --now
@@ -545,8 +546,6 @@ server_bootstrap(){
 	echo -e "	Generated svr config:\n$(cat "$configContent")\n"
 	# export vars for utilization
 	source "$configContent"
-	# set to ro for everyone incl. owner.  The server config is immutable.
-	chmod 0400 "$configContent"
 	# Calculate checksum
 	checksum=$(sha256sum <"$configContent" | tr -d ' \t\n-')
 	# Encode to base64

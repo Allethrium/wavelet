@@ -7,15 +7,15 @@
 # Check if the script is being sourced or executed directly
 # If executed directly, show usage and exit
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    echo "  Error: This script should be sourced by other scripts, not executed directly."
-    echo "  Usage: source $(basename "${0}")"
-    echo "  Available functions:"
-    echo "    encrypt_credential <user_context> <cred_name> <cred_value> [purpose]"
-    echo "    decrypt_credential_to_memory <user_context> <cred_name>"
-    echo "    generate_etcd_userarg <user_context> [hostname] <target user>"
-    echo "    generate_secure_systemd_service <user_context> <service_name> <etcd_key> <script> [args]"
-    echo "    cleanup_secure_storage"
-    echo "    init_secure_storage <user_context>"
+    echo "	Error: This script should be sourced by other scripts, not executed directly."
+    echo "	Usage: source $(basename "${0}")"
+    echo "	Available functions:"
+    echo "		encrypt_credential <user_context> <cred_name> <cred_value> [purpose]"
+    echo "		decrypt_credential_to_memory <user_context> <cred_name>"
+    echo "		generate_etcd_userarg <user_context> [hostname] <target user>"
+    echo "		generate_secure_systemd_service <user_context> <service_name> <etcd_key> <script> [args]"
+    echo "		cleanup_secure_storage"
+    echo "		init_secure_storage <user_context>"
     exit 1
 fi
 
