@@ -147,6 +147,8 @@ detect_self(){
 		configFile="/var/home/wavelet/config/$hostNameSys.conf"
 		if [[ -f "$configFile" ]]; then
 			source "$configFile"
+		else
+			echo "	Config file missing!  this is a new host, or an error has occurred during provisioning."
 		fi
 		if [[ -z "$HOST_TYPE" ]]; then
 			KEYNAME="/HOSTS/$hostNameSys/control/type"; read_etcd_global; HOST_TYPE="$printvalue"
@@ -183,6 +185,7 @@ event_decoder(){
 	local staticImagePath; local staticImageURL
 	local staticHashPath; local staticHashURL; local groupHash
 	local blankImagePath; local serverCheckSum; local localCheckSum
+	echo "	Looking for config file:  $configFile"
 	if [[ -f "$configFile" ]]; then
 		# Bootstrap already completed, proceed to run
 		echo "	Decoder config file found!  Proceeding with normal startup.."
@@ -272,7 +275,8 @@ put /HOSTS/$hostNameSys/control/generateConf \"1\"
 		echo "	WAVELET_BUILD: No config file data"
 		exit 1
 	else
-		echo "$confData" > "$configFile"
+		echo "Config data retrieved and validated for data integrity, injecting to config file: $configFile"
+		printf '%s' "$confData" > "$configFile"
 	fi
 	event_configure_static_images
 	# Initiate further configuration by calling new_host in orchestrator to populate UI keys.
