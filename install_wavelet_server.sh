@@ -8,71 +8,7 @@ RED="\033[0;31m"
 GREEN="\033[0;32m"
 NC="\033[0m"
 
-client_networks(){
-	echo -e "\nSystem configured to be run on a larger (client/corporate) network.\n"
-	echo -e "Please input the system's gateway IP address, subnet mask (CIDR), and your corporate DNS resolver.\n"
-	read -p "Gateway IPv4 Address: " GW
-	read -p "Subnet Mask CIDR (e.g. 24 for a /24): " SN
-	read -p "Primary DNS resolver IPv4 (e.g. 192.0.2.53): " svr_dns
-	# Validate user input
-	if ! [[ "${GW}" =~ ^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$ ]]; then
-				echo -e "Invalid Gateway IPv4 Address format. Please use the format A.B.C.D."
-				return
-	fi
-	if ! [[ "${svr_dns}" =~ ^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$ ]]; then
-			echo -e "Invalid DNS IPv4 Address format."
-			return
-	fi
-	if ! [[ "${SN}" =~ ^[0-9]+$ ]]; then
-		echo -e "Invalid Subnet Mask CIDR format. Please use only digits."
-		return
-	fi
-	if ! [[ "${SN}" -ge 16 && "${SN}" -le 32 ]]; then
-		echo -e "Subnet Mask CIDR value must be between 16 and 32."
-		return
-	fi
-	grIP="${GW}/${SN}"
-	if [[ "${SN}" -gt 28 ]]; then
-		echo -e "Subnet mask is too small for a Wavelet system, we need at least 32 host IPs to be available!"
-	elif [[ "${SN}" -lt 24 ]]; then
-		echo -e "Subnet mask seems very large - Wavelet would work best on an isolated network in authoritative mode!\n"
-	else
-		echo -e "Subnet mask selected, continuing.."
-		hostname_domain
-	fi
-	corporateMode="1"
-	# Apply gateway and subnet to ignition templates
-	sed -i "s/192.168.1.1/${GW}/g" ${INPUTFILES}
-	sed -i "s/255.255.255.0/${SN}/g" ${INPUTFILES}
-	# Remove any placeholder nameserver kernel args if present in templates
-	sed -i "s/- nameserver/d" ${INPUTFILES}
-}
-
-hostname_domain(){
-	echo -e "\n"
-	echo -e "An isolated network appliance should be labeled as per your organization's location, department, room number.\n"
-	echo -e "A non-isolated appliance should be labeled in accordance with your organizations standards.\n"
-	read -p "Please input the system's target Domain and desired fully qualified hostname: " FQDN
-	read -p "Please input the system's desired static IP address.  This is highly recommended." STATICIP
-	if [[ $STATICIP = "" ]]; then
-		echo -e "Preference for DHCP noted, we will attempt to utilize hostnames instead of IP addresses.  \n
-		Please note this will result in unreliable operation if your DHCP server is improperly configured, slow, or ever unreachable to the Wavelet system. \n"
-	else
-		echo -e "Static IP stored"
-	fi
-	# SED for 192.168.1.32 and replace with ${STATICIP} in server.ign, etcd, etc
-	INPUTFILES="server_custom.yml decoder_custom.yml"
-	sed -i "s/192.168.1.32/${STATICIP}/g" ${INPUTFILES}
-	# SED for svr.wavelet.allethrium in decoder.ign and replace with FQDN
-	sed -i "s/svr.wavelet.allethrium\/$FQDN/g" ${INPUTFILES}
-	INPUTFILES=./webfiles/root/usr/local/bin/wavelet_build.sh
-	sed -i "s/192.168.1.32/${STATICIP}/g" ${INPUTFILES}
-	# SED for svr.wavelet.allethrium and replace with ${FQDN} in server.ign, etcd, etc
-	sed -i "s/192.168.1.32/${FQDN}/g" ${INPUTFILES}
-	customization
-}
-
-# user stuff
+# User setup
 init_users_yaml() {
 	# Ensure nothing adds TABS in the cat command below, YAML won't transpile correctly without indentation being entirely spaces.
 	cat <<EOF > users_yaml
@@ -166,28 +102,21 @@ set_pw(){
 customization(){
 	echo -e "  \n	Generating ignition files with appropriate settings.."
 	INPUTFILES="server_custom.yml decoder_custom.yml"
-	touch rootpw.secure
-	touch waveletpw.secure
-	chmod 0600 ./*.secure
-	unset tmp_rootpw
-	unset tmp_waveletpw
-	# We now generate vars for our CSV key file
-	# This is much cleaner than a large ignition file
-    DOMAIN_ADMIN_PASSWORD="DomainAdminPasswordGoesHere"
-    serverHostName="svr.${domain:-wavelet.allethrium}"
-    if [[ "${developerMode}" -eq "1" ]]; then
-        # Direct ignition sed
+	DOMAIN_ADMIN_PASSWORD="DomainAdminPasswordGoesHere"
+	serverHostName="svr.${domain:-wavelet.allethrium}"
+	if [[ "${developerMode}" -eq "1" ]]; then
+		# Direct ignition sed
 		echo -e "${RED}	Injecting dev branch into files..${NC}"
 		repl="armelvil-working.tar.gz"
 		sed -i "s|master.tar.gz|${repl}|g" ${INPUTFILES}
-        developerFileName="developerMode.enabled"
-        developerFileContent="DeveloperModeEnabled - will pull from working branch"
-    else
-        developerFileContent="DeveloperModeDisabled - will pull from master branch"
- 	fi
+		developerFileName="developerMode.enabled"
+		developerFileContent="DeveloperModeEnabled - will pull from working branch"
+	else
+		developerFileContent="DeveloperModeDisabled - will pull from master branch"
+	fi
 
 	if [[ "$dev_flag" == "DEV" ]]; then
-        # Direct ignition sed
+		# Direct ignition sed
 		echo -e "${RED}	Targeting UltraGrid continuous build.${NC}"
 		if [[ "$registry" == "$svr_ip" ]]; then
             echo "	Standalone deployment selected.."
@@ -207,74 +136,84 @@ customization(){
         fi
 	else
 		echo -e "\n	${GREEN}Tracking UltraGrid release build.\n${NC}"
-		releaseVer="1.10.5"
+		releaseVer="1.10.6"
 	fi
-	echo "	Generating wavelet_keys.csv"
 	# Set default values if none
 	svr_ip="${svr_ip:-192.168.1.32}"
 	gateway="${gateway:-192.168.1.1}"
 	subnet="${subnet:-255.255.255.0}"
-	# Detect corporate mode (set by client_networks() or environment)
-	if [[ "${WAVELET_CORPORATE:-0}" == "1" || "${corporateMode:-0}" == "1" ]]; then
-		corporateMode=1
-	fi
-	if [[ "${corporateMode:-0}" == "1" ]]; then
-		resolvContent="nameserver ${svr_dns:-9.9.9.9}\\nnameserver 9.9.9.9"
-		printf "      Corporate mode: external DHCP/DNS assumed. Using DNS: %s\n" "${svr_dns:-9.9.9.9}"
-	else
-		resolvContent="nameserver ${svr_ip}\\nnameserver ${gateway}\\nnameserver 9.9.9.9"
-		printf "	Isolation mode: Wavelet provides DHCP/DNS.\n"
-	fi
-	echo "	Appending remaining keys to wavelet_keys.csv.."
+	resolvContent="nameserver ${svr_ip}\\nnameserver ${gateway}\\nnameserver 9.9.9.9"
+	printf "	Isolation mode: Wavelet provides DHCP/DNS.\n"
+
+	# wavelet.conf contains configuration data for the server in one declarative file, in one place.
+	# It should not contain passwords or privileged data, as it resides in /etc/wavelet.conf with 644 perms.
+	echo "	Generating wavelet.conf..."
+	cat > ./ignition_files/wavelet.conf <<-EOF
+DOMAIN=${domain}
+SVR_IP=${svr_ip:-192.168.1.32}
+SVR_GW=${gateway:-192.168.1.1}
+# DNS is updated during install_hardening.sh, where the domain controller is spun up.
+SVR_DNS=${svr_dns:-${svr_ip}}
+SVR_HOSTNAME=${serverHostName}
+TIME_ZONE=${timeZone:-America/New_York}
+DEVELOPER_MODE=${developerMode:-0}
+# Wifi settings for specific AP MAC (BSSID) and Name (SSID)
+ENABLE_WIFI=${enableWifi:-0}
+WIFI_SSID=${wifi_ssid:-}
+WIFI_BSSID=${wifi_bssid:-}
+# If an external registry is available, we populate here.  Implies external HTTPD server.
+DEPLOYMENT_REGISTRY=${registry}
+# This refers to the server's registry.
+REGISTRY=${registry:-${svr_ip}}
+# Usually on
+UG_BUILD_TYPE=${dev_flag:-release}
+EOF
+
+	echo "	Generating wavelet_keys.csv.."
 	# Build WiFi entries only if WiFi mode is enabled
 	wifiEntries=""
-	if [[ "${enableWifi}" == "1" ]]; then
+	if [[ "$enableWifi" == "1" ]]; then
 		echo "	Generating Wi-Fi entries.."
-		wifiEntries="file,/var/home/wavelet/config/wifi_ssid,0600,true,,,${wifi_ssid}
-file,/var/home/wavelet/config/wifi_bssid,0600,true,,,${wifi_bssid}
-file,/var/home/wavelet/config/wifi_pw,0600,true,,,${wifi_password}
-file,/var/home/wavelet-root/config/wifi_adminuser,0640,true,,,${wifi_deviceUser}
-file,/var/home/wavelet-root/config/wifi_adminpw,0640,true,,,${wifi_devicePassword}
-file,/var/home/wavelet-root/config/wifi_ipaddr,0640,true,,,${wifi_ipAddr}"
-		set_config "WIFI_MODE_ENABLED" "yes"
+		wifiEntries="	file,/var/home/wavelet-root/config/wifi_adminuser,0640,true,,,WIFI_ADMIN_USER=${wifi_deviceUser}\nWIFI_ADMIN_PW=${wifi_devicePassword}\nWIFI_IPADDR=${wifi_ipAddr}"
 	else
 		echo "	Disabling Wi-Fi mode.."
-		set_config "WIFI_MODE_ENABLED" "no"
 	fi
-cat >> ./ignition_files/wavelet_keys.csv << EOF
-file,/etc/systemd/logind.conf.d/inhibit-suspend.conf,0644,,,,[Login]\nHandleLidSwitch=ignore
-file,/var/secrets/ipaadmpw.secure,0600,true,,,${DOMAIN_ADMIN_PASSWORD:-DomainAdminPasswordGoesHere}
-${wifiEntries}
-file,/var/home/wavelet/config/networkdevice_userpass,0600,true,,,${NETWORK_DEVICE_PASSWORD:-password}
-file,/var/${developerFileName},0644,true,,,${developerFileContent}
-file,/var/timezone.txt,0600,true,,,${timeZone}
-file,/etc/resolv.conf,0644,true,,,${resolvContent}
-file,/etc/hostname,0644,true,,,${serverHostName}
-file,/var/serverhostname.txt,0644,true,,,${serverHostName}
-file,/etc/hosts,0664,true,,,127.0.0.1      localhost localhost.localdomain localhost4 localhost4.localdomain4\n::1            localhost localhost.localdomain localhost6 localhost6.localdomain6\n${svr_ip}  ${serverHostName}  ${serverHostName%%.*}
-dir,/home/wavelet/.config,0755,,wavelet,wavelet,
-dir,/home/wavelet/.config/systemd,0755,,wavelet,wavelet,
-dir,/home/wavelet/.config/systemd/user,0755,,wavelet,wavelet,
-dir,/home/wavelet/.config/systemd/user/default.target.wants,0755,,wavelet,wavelet,
-dir,/home/wavelet/config,0755,,wavelet,wavelet,
-dir,/home/wavelet/etcd,0755,,wavelet,wavelet,
-dir,/home/wavelet/.ssh/secrets,0755,,wavelet,wavelet,
-dir,/home/wavelet/config,0755,,wavelet,wavelet,
-dir,/var/containers/registry,0700,,wavelet,wavelet,
-dir,/home/wavelet/http,0755,,wavelet,wavelet,
-dir,/home/wavelet/http-php/html,0755,,wavelet,wavelet,
-dir,/home/wavelet/.local/share/containers/storage/volumes,0755,,wavelet,wavelet,
-dir,/home/wavelet/http-php/nginx,0755,,wavelet,wavelet,
-dir,/home/wavelet/http/ignition,0755,,wavelet,wavelet,
-dir,/home/wavelet-root/config,0755,,wavelet-root,wavelet-root,
-dir,/home/wavelet-root/.ssh/secrets,0755,,wavelet-root,wavelet-root,
-dir,/var/lib/tftpboot,0755,,root,root,
-dir,/etc/systemd/resolved.conf.d,0755,,,root,
-dir,/etc/ssh/ssh_config.d,0755,,,root,
-dir,/usr/local/backgrounds/sway,0755,,,root,
-dir,/var/lib/systemd/linger/wavelet,0755,,,root,
-dir,/var/lib/systemd/linger/wavelet-root,0755,,,root,
+cat > ./ignition_files/wavelet_keys.csv <<-EOF
+	type,path,mode,overwrite,owner,group,content
+	file,/etc/systemd/logind.conf.d/inhibit-suspend.conf,0644,,,,[Login]\nHandleLidSwitch=ignore
+	file,/var/secrets/ipaadmpw.secure,0600,true,,,${DOMAIN_ADMIN_PASSWORD:-DomainAdminPasswordGoesHere}
+	${wifiEntries}
+	file,/var/home/wavelet/config/networkdevice_userpass,0600,true,,,${NETWORK_DEVICE_PASSWORD:-password}
+	file,/var/${developerFileName},0644,true,,,${developerFileContent}
+	file,/var/timezone.txt,0600,true,,,${timeZone}
+	file,/etc/resolv.conf,0644,true,,,${resolvContent}
+	file,/etc/hostname,0644,true,,,${serverHostName}
+	file,/var/serverhostname.txt,0644,true,,,${serverHostName}
+	file,/etc/hosts,0664,true,,,127.0.0.1      localhost localhost.localdomain localhost4 localhost4.localdomain4\n::1            localhost localhost.localdomain localhost6 localhost6.localdomain6\n${svr_ip}  ${serverHostName}  ${serverHostName%%.*}
+	dir,/home/wavelet/.config,0755,,wavelet,wavelet,
+	dir,/home/wavelet/.config/systemd,0755,,wavelet,wavelet,
+	dir,/home/wavelet/.config/systemd/user,0755,,wavelet,wavelet,
+	dir,/home/wavelet/.config/systemd/user/default.target.wants,0755,,wavelet,wavelet,
+	dir,/home/wavelet/config,0755,,wavelet,wavelet,
+	dir,/home/wavelet/etcd,0755,,wavelet,wavelet,
+	dir,/home/wavelet/.ssh/secrets,0755,,wavelet,wavelet,
+	dir,/home/wavelet/config,0755,,wavelet,wavelet,
+	dir,/var/containers/registry,0700,,wavelet,wavelet,
+	dir,/home/wavelet/http,0755,,wavelet,wavelet,
+	dir,/home/wavelet/http-php/html,0755,,wavelet,wavelet,
+	dir,/home/wavelet/.local/share/containers/storage/volumes,0755,,wavelet,wavelet,
+	dir,/home/wavelet/http-php/nginx,0755,,wavelet,wavelet,
+	dir,/home/wavelet/http/ignition,0755,,wavelet,wavelet,
+	dir,/home/wavelet-root/config,0755,,wavelet-root,wavelet-root,
+	dir,/home/wavelet-root/.ssh/secrets,0755,,wavelet-root,wavelet-root,
+	dir,/var/lib/tftpboot,0755,,root,root,
+	dir,/etc/systemd/resolved.conf.d,0755,,,root,
+	dir,/etc/ssh/ssh_config.d,0755,,,root,
+	dir,/usr/local/backgrounds/sway,0755,,,root,
+	dir,/var/lib/systemd/linger/wavelet,0755,,,root,
+	dir,/var/lib/systemd/linger/wavelet-root,0755,,,root,
 EOF
+
 	# Customize launching kernel args, this will accelerate the bootup as NetworkManager-wait-online won't hang for 30+s
 	echo "	Applying kernel args: ip=${svr_ip}::${gateway}:${subnet}:${serverHostName}::on"
 	sed -i "s|ip=192.168.1.32::192.168.1.1:255.255.255.0:svr.wavelet.allethrium::on|ip=${svr_ip}::${gateway}:${subnet}:${serverHostName}::on|g" ${INPUTFILES}
@@ -283,68 +222,6 @@ EOF
 	  cat $file > var/generated_$file
 	done
 	echo -e "\n${GREEN} ***Customization complete, moving to injecting configurations to CoreOS images for initial installation..*** \n${NC}"
-}
-
-interactive_setup() {
-	echo -e "Is the target network configured with an active gateway, and are you prepared to deal with downloading approximately 4gb of initial files?"
-	read -p "Continue? (Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit
-	if [[ "${WAVELET_CORPORATE:-0}" == "1" ]]; then
-		echo -e "Corporate Mode requested via environment. Skipping isolated prompt and configuring for client/corporate network."
-		client_networks
-	else
-		echo -e "Will this system run on an isolated network?"
-		read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || client_networks || echo -e "${GREEN}System configured for isolated, authoritative mode." && isoMode="mode=iso"
-	fi
-	echo -e "Target UltraGrid Continuous build (best used with Developer Mode)?"
-	read -p "(Y/N): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] && dev_flag="DEV"
-
-	# WiFi mode prompt
-	echo -e "\nEnable WiFi mode? This will configure the system to connect to a WiFi access point."
-	read -p "(Y/N): " confirm
-	if [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]]; then
-		enableWifi="1"
-		echo -e "\nPlease input your WiFi configuration:"
-		read -p "WiFi SSID: " wifi_ssid
-		read -p "WiFi BSSID (MAC address, e.g. AA:BB:CC:DD:EE:FF): " wifi_bssid
-		read -p "WiFi PSK password: " wifi_password
-		read -p "WiFi Access Point IP address: " wifi_ipAddr
-		read -p "WiFi AP admin username: " wifi_deviceUser
-		read -p "WiFi AP admin password: " wifi_devicePassword
-	else
-		echo -e "\nWiFi mode disabled. The system will use wired networking."
-	fi
-
-	# domainname
-	# Iterate over the array of users and set passwords for each
-	init_users_yaml
-	# Define users, you can edit this to set more
-	users=("wavelet-root" "wavelet")
-	for user in "${users[@]}"; do
-		if [[ $(set_pw "${user}") -ne 0 ]]; then
-			echo -e "Failed to set a password for ${user}."
-			exit 1
-		else
-			echo -e "	Set password for ${user}"
-			echo -e "	Generating SSH public key for ${user}..\n"
-			ssh-keygen -t ed25519 -C "${user}@wavelet.allethrium" -f "${user}-ssh"
-#			echo -e "	Generating YAML block for user..\n"
-			cp users_yaml "${user}_yaml.yml"
-			generate_user_yaml "${user}"
-			# Now we add the user YAML block to the server ignition, preserving the tag as we go..
-#			echo -e "\nAdding generated YAML block to ignition file for ${user}..\n"
-			f2="$(<${user}_yaml.yml)"
-			input_files_arr="(${INPUTFILES})"
-			for file in "${input_files_arr[@]}"; do
-				if [ -f "$file" ]; then
-					awk -vf2="$f2" '/#ADD_USER_YAML_HERE/{print f2;print;next}1' "${file}" > tmp && mv tmp "${file}"
-#					echo -e "	YAML block for ${user} added to ignition file ${file}..\n"
-				else
-					echo "	Warning: ${file} does not exist or is inaccessible!"
-				fi
-			done
-		fi
-	done
-	customization
 }
 
 automatic_setup() {
@@ -383,9 +260,49 @@ automatic_setup() {
   customization
 }
 
+parse_config_file() {
+	local config_file="$1"
+	if [[ ! -f "$config_file" ]]; then
+		echo -e "${RED}Error: Config file $config_file not found.${NC}"
+		exit 1
+	fi
+	echo "	Parsing configuration from $config_file..."
+	while IFS='=' read -r key value; do
+		# Skip comments and empty lines
+		[[ "$key" =~ ^[[:space:]]*# ]] && continue
+		[[ -z "$key" ]] && continue
+		key=$(echo "$key" | xargs)
+		value=$(echo "$value" | xargs)
+		value="${value#\"}"
+		value="${value%\"}"
+		value="${value#\'}"
+		value="${value%\'}"
+		# Set shell variables
+		case "$key" in
+			PASSWORD) PASSWORD="$value" ;;
+			DOMAIN) domain="$value" ;;
+			SVR_IP|SERVER_IP) svr_ip="$value" ;;
+			SVR_GW|SERVER_GATEWAY) svr_gw="$value" ;;
+			SVR_DNS|SERVER_DNS) svr_dns="$value" ;;
+			TIME_ZONE|TIMEZONE) timeZone="$value" ;;
+			DEVELOPER_MODE|DEV_MODE) developerMode="$value" ;;
+			ENABLE_WIFI) enableWifi="$value" ;;
+			WIFI_SSID) wifi_ssid="$value" ;;
+			WIFI_BSSID) wifi_bssid="$value" ;;
+			WIFI_PASSWORD) wifi_password="$value" ;;
+			WIFI_DEVICE_USER) wifi_deviceUser="$value" ;;
+			WIFI_DEVICE_PASSWORD) wifi_devicePassword="$value" ;;
+			WIFI_IP_ADDR) wifi_ipAddr="$value" ;;
+			CORPORATE_MODE) corporateMode="$value" ;;
+			REGISTRY|LOCAL_REGISTRY) registry="$value" ;;
+			PATCH_MODE) patchMode="$value" ;;
+			UG_BUILD_TYPE|UGDEV) dev_flag="DEV" ;;
+		esac
+	done < "$config_file"
+}
+
 print_help(){
 	echo -e "Initial wavelet install help prompts:"
-	echo -e "Lab Mode: -l, --lab\nEnables a streamlined automatic setup for quicker testing"
 	echo -e "Developer Mode: -d, --dev\nPulls from development branch on git."
 	echo -e "-ugd=, --ugdev, --ugcontinuous=\nTargets the continuous build of UltraGrid for newer and possibly less stable features."
 	echo -e "-p=, --pass=,--password=\nSets the wavelet-root password"
@@ -398,7 +315,8 @@ print_help(){
 	echo -e "-6=, --ip6subnet=\nDefines the target IP6 subnet in CIDR notation (I.E 2001:db8:1:2::/64)"
 	echo -e "-ip=, --serverip=\nDefines the server static IP4 address (I.E 192.168.0.2)"	
 	echo -e "-g=, --servergateway=\nDefines the server static IP4 gateway (I.E 192.168.0.1)"	
-	echo -e "-dns=, --serverdns=\nDefines the server DNS forwarder (I.E 192.168.0.53)"	
+	echo -e "-dns=, --serverdns=\nDefines the server DNS forwarder (I.E 192.168.0.53)"
+	echo -e "-c=, --config=\nDefines a configuration file instead of commandline parameters"
 	exit 0
 }
 
@@ -428,24 +346,24 @@ get_publicinterface(){
 		echo "No default IPv4 route found. Cannot determine public interface."
 		exit 1
 	fi
-  iface=$(echo "$iface_route" | awk '{print $5}')
+	iface=$(echo "$iface_route" | awk '{print $5}')
 	ip="$(nmcli -t -f IP4.ADDRESS dev show $iface | awk -F: '{print $2}' |cut -d'/' -f1 )"
 }
 
 download_wavelet_git(){
 	# Runs only if we are using LAN Deployment
 	if [[ "${developerMode}" -eq "1" ]]; then
-    GH_BRANCH="armelvil-working"
-  else
-    GH_BRANCH="master"
-  fi
+    	GH_BRANCH="armelvil-working"
+	else
+    	GH_BRANCH="master"
+	fi
 	if curl -s -L -o "$HOME/.config/var/www/$GH_BRANCH.tar.gz" \
 		"https://github.com/Allethrium/wavelet/archive/refs/heads/$GH_BRANCH.tar.gz"; then
-			echo "	Acquired wavelet tarball, proceeding.."
+		echo "	Acquired wavelet tarball, proceeding.."
 	else
-			echo "	Error downloading wavelet tarball!  aborting!"
-			echo "	Please check this user's write permissions to ~/.config/var/www"
-			exit 1
+		echo "	Error downloading wavelet tarball!  aborting!"
+		echo "	Please check this user's write permissions to ~/.config/var/www"
+		exit 1
 	fi
 }
 
@@ -502,6 +420,44 @@ check_and_update_ultragrid_continuous(){
 }
 
 
+parse_config_file() {
+	local config_file="$1"
+	if [[ ! -f "$config_file" ]]; then
+		echo -e "${RED}Error: Config file $config_file not found.${NC}"
+		exit 1
+	fi
+	echo "	Parsing configuration from $config_file..."
+	while IFS='=' read -r key value; do
+		[[ "$key" =~ ^[[:space:]]*# ]] && continue
+		[[ -z "$key" ]] && continue
+		key=$(echo "$key" | xargs)
+		value=$(echo "$value" | xargs)
+		value="${value#\"}"
+		value="${value%\"}"
+		value="${value#\'}"
+		value="${value%\'}"
+		case "$key" in
+			PASSWORD) PASSWORD="$value" ;;
+			DOMAIN) domain="$value" ;;
+			SVR_IP|SERVER_IP) svr_ip="$value" ;;
+			SVR_GW|SERVER_GATEWAY) svr_gw="$value" ;;
+			SVR_DNS|SERVER_DNS) svr_dns="$value" ;;
+			TIME_ZONE|TIMEZONE) timeZone="$value" ;;
+			DEVELOPER_MODE|DEV_MODE) developerMode="$value" ;;
+			ENABLE_WIFI) enableWifi="$value" ;;
+			WIFI_SSID) wifi_ssid="$value" ;;
+			WIFI_BSSID) wifi_bssid="$value" ;;
+			WIFI_PASSWORD) wifi_password="$value" ;;
+			WIFI_DEVICE_USER) wifi_deviceUser="$value" ;;
+			WIFI_DEVICE_PASSWORD) wifi_devicePassword="$value" ;;
+			WIFI_IP_ADDR) wifi_ipAddr="$value" ;;
+			REGISTRY|LOCAL_REGISTRY) registry="$value" ;;
+			PATCH_MODE) patchMode="$value" ;;
+			UG_BUILD_TYPE|UGDEV) dev_flag="DEV" ;;
+		esac
+	done < "$config_file"
+}
+
 ####
 #
 # Main
@@ -510,6 +466,7 @@ check_and_update_ultragrid_continuous(){
 
 
 waveletdir="$(pwd)"
+# We generally want stdout here instead of a log.
 #exec >$waveletdir/logs/server_bootstrap.log 2>&1
 secActive=0
 echo "	Input Args: "; echo "	${*}"
@@ -518,9 +475,6 @@ timeZone=""
 for i in "$@"
 	do
 		case $i in
-			-l|--lab)
-				echo "Labmode enabled, skipping prompts.  Please ensure your commandline contains all necessary arguments!"; labMode="True";
-				;;
 			-d|--dev)
 				echo -e "${RED}Dev mode enabled, switching git tree to working branch${NC}"	;	developerMode="1"
 				;;
@@ -528,7 +482,7 @@ for i in "$@"
 				print_help;	exit 0
 				;;
 			-p=*|--password=*|--pass=*)
-				PASSWORD=${i#*=}; echo -e "Password defined for BOTH user accounts in labmode as: ${PASSWORD}";
+				PASSWORD=${i#*=}; echo -e "Password defined for BOTH user accounts as: ${PASSWORD}";
 				;;
 			-ws=*|--wifissid=*)
 				wifi_ssid=${i#*=}; echo -e "WiFi SSID defined as: ${wifi_ssid}";
@@ -579,6 +533,9 @@ for i in "$@"
             -t=*|--timezone=*)
             	timeZone=${i#*=}; echo -e "Timezone set to $timeZone (default to America/New_York if empty)";
             	;;
+			-c=*|--config=*)
+				configFile=${i#*=}; echo -e "Extracting configuration from defined config file: ${configFile}"
+				;;
 			*)
 				echo "bad input argument: $i";
 				;;
@@ -587,15 +544,26 @@ done
 if [[ -z "$timeZone" ]]; then
 	timeZone="America/New_York"
 fi
-requiredOptions=("PASSWORD" "domain" "svr_gw")
-for opt in "${requiredOptions[@]}"; do
-	echo "Required option $opt set!"
-	if [[ -z "${!opt}" ]]; then
-		echo -e "\n\n${RED} ERROR:	The install option '$opt' must be defined!
-		\n	Aborting installation, as process will fail without these data.${NC}\n\n"
-		exit 1
-	fi
-done
+
+if [[ -z "$configFile" ]]; then
+	requiredOptions=("PASSWORD" "domain" "svr_gw")
+else
+	# Parse the configFile for all options
+	parse_config_file "$configFile"
+	requiredOptions=() # Options already set via config file
+fi
+
+# Test for required options from either the configFile or direct args.
+if [[ ${#requiredOptions[@]} -gt 0 ]]; then
+	for opt in "${requiredOptions[@]}"; do
+		echo "Required option $opt set!"
+		if [[ -z "${!opt}" ]]; then
+			echo -e "\n\n${RED} ERROR:	The install option '$opt' must be defined!
+			\n	Aborting installation, as process will fail without these data.${NC}\n\n"
+			exit 1
+		fi
+	done
+fi
 
 if [[ $domain == *".local" ]]; then
 	echo -e "\n${RED}.local TLD domain is reserved for mDNS, please select another domain or subdomain, preferably one from your organization's domain"
@@ -612,48 +580,52 @@ rm -rf "${HOME}"/Downloads/wavelet_server.iso
 rm -rf "${HOME}"/Downloads/wavelet_decoder.iso
 
 if [[ -n "$registry" ]]; then
-  echo "	We have defined a local registry for faster setup.  Wavelet will pull OCI layers from this registry."
-  echo "	NOTE:  The registry must be accessible from the wavelet subnet until the server is provisioned."
-  # We would verify the registry format here to ensure it's a valid type, script will break if not valid format
-  # These get an IP from the local interface, useful in automation later
-  #get_publicinterface
-  validate_ip_port "$registry"
-  INPUTFILES="server_custom.yml decoder_custom.yml"
-  rm -f ignition_files/wavelet_keys.csv
-  echo "type,path,mode,overwrite,owner,group,content" >> ignition_files/wavelet_keys.csv
-  echo "file,/var/wavelet_registry.txt,0644,true,,,${registry}" >> ignition_files/wavelet_keys.csv
-  echo "file,/var/wavelet_registry_hostname.txt,0644,true,,,${ip} $(hostname)"  >> ignition_files/wavelet_keys.csv
-  echo "file,/var/httpd_lan.txt,0644,true,,,${registry}:8080"  >> ignition_files/wavelet_keys.csv
-  sed -i "s|192.168.1.32:5000|$registry|g" $INPUTFILES
-  sed -i "s|192.168.1.32:8080|${registry%%:*}:8080|g" $INPUTFILES
-  sed -i "s|https://github.com/Allethrium/wavelet/archive/refs/heads/master.tar.gz|http://${registry%%:*}:8080/master.tar.gz|g" $INPUTFILES
-  # Set UltraGrid to local LAN server, which ought to have both builds if build_registry.sh worked as it should.
-  sed -i "s|https://github.com/CESNET/UltraGrid/releases/download/v1.10.5/UltraGrid-1.10.5-x86_64.AppImage|http://${registry%%:*}:8080/UltraGrid-1.10.5-x86_64.AppImage|g" $INPUTFILES
-  download_wavelet_git
+	# TODO - update for conf file.
+	echo "	We have defined a local registry for faster setup.  Wavelet will pull OCI layers from this registry."
+	echo "	NOTE:  The registry must be accessible from the wavelet subnet until the server is provisioned."
+	# We would verify the registry format here to ensure it's a valid type, script will break if not valid format
+	# These get an IP from the local interface, useful in automation later
+	#get_publicinterface
+	validate_ip_port "$registry"
+	INPUTFILES="server_custom.yml decoder_custom.yml"
+	rm -f ignition_files/wavelet_keys.csv
+	echo "type,path,mode,overwrite,owner,group,content" >> ignition_files/wavelet_keys.csv
+	echo "file,/var/wavelet_registry.txt,0644,true,,,${registry}" >> ignition_files/wavelet_keys.csv
+	echo "file,/var/wavelet_registry_hostname.txt,0644,true,,,${ip} $(hostname)"  >> ignition_files/wavelet_keys.csv
+	echo "file,/var/httpd_lan.txt,0644,true,,,${registry}:8080"  >> ignition_files/wavelet_keys.csv
+	sed -i "s|192.168.1.32:5000|$registry|g" $INPUTFILES
+	sed -i "s|192.168.1.32:8080|${registry%%:*}:8080|g" $INPUTFILES
+	sed -i "s|https://github.com/Allethrium/wavelet/archive/refs/heads/master.tar.gz|http://${registry%%:*}:8080/master.tar.gz|g" $INPUTFILES
+	# Set UltraGrid to local LAN server, which ought to have both builds if build_registry.sh worked as it should.
+	sed -i "s|https://github.com/CESNET/UltraGrid/releases/download/v1.10.5/UltraGrid-1.10.5-x86_64.AppImage|http://${registry%%:*}:8080/UltraGrid-1.10.5-x86_64.AppImage|g" $INPUTFILES
+	download_wavelet_git
 else
-  echo "  Local registry option not defined, running standalone setup.."
-  registry="${svr_ip}"
-  INPUTFILES="server_custom.yml decoder_custom.yml"
-  rm -f ignition_files/wavelet_keys.csv
-  # We still set the registry values, however they are always going to be the wavelet server IP in this case.
-  echo "type,path,mode,overwrite,owner,group,content" >> ignition_files/wavelet_keys.csv
-  echo "file,/var/wavelet_registry.txt,0644,true,,,${registry}" >> ignition_files/wavelet_keys.csv
-  echo "file,/var/wavelet_registry_hostname.txt,0644,true,,,${ip} svr.$domain"  >> ignition_files/wavelet_keys.csv
-  echo "file,/var/httpd_lan.txt,0644,true,,,${httpd_lan:-192.168.1.32:8080}"  >> ignition_files/wavelet_keys.csv
-  sed -i "s|192.168.1.32:5000|$registry|g" $INPUTFILES
-  sed -i "s|192.168.1.32:8080|${registry%%:*}:8080|g" $INPUTFILES
-  # Note the nameserver must later be removed because it will interfere with DNS during spinup
-  echo "    Setting nameserver to gateway 9.9.9.9 for simple DNS resolution during initial setup.."
-  sed -i "s|#nameserver|- nameserver=9.9.9.9|g" $INPUTFILES
+	echo "  Local registry option not defined, running standalone setup.."
+	# TODO - use conf file now as far as possible.
+	registry="$svr_ip"
+	INPUTFILES="server_custom.yml decoder_custom.yml"
+	rm -f ignition_files/wavelet_keys.csv
+	# We still set the registry values, however they are always going to be the wavelet server IP in this case.
+	echo "type,path,mode,overwrite,owner,group,content" >> ignition_files/wavelet_keys.csv
+	echo "file,/var/wavelet_registry.txt,0644,true,,,${registry}" >> ignition_files/wavelet_keys.csv
+  	echo "file,/var/wavelet_registry_hostname.txt,0644,true,,,${ip} svr.$domain"  >> ignition_files/wavelet_keys.csv
+	echo "file,/var/httpd_lan.txt,0644,true,,,${httpd_lan:-192.168.1.32:8080}"  >> ignition_files/wavelet_keys.csv
+	sed -i "s|192.168.1.32:5000|$registry|g" $INPUTFILES
+	sed -i "s|192.168.1.32:8080|${registry%%:*}:8080|g" $INPUTFILES
+	# Note the nameserver must later be removed because it will interfere with DNS during spinup
+	echo "    Setting nameserver to gateway 9.9.9.9 for simple DNS resolution during initial setup.."
+	sed -i "s|#nameserver|- nameserver=9.9.9.9|g" $INPUTFILES
 fi
 
 echo "	Dev mode is now enabled by default due to the need for running a patched UltraGrid AppImage.."
 dev_flag="DEV";
 
-if [[ ${labMode} == "True" ]]; then
+if [[ ${labMode} == "True" ]] || [[ -n "$configFile" ]]; then
 	automatic_setup
 else
-	interactive_setup
+	echo -e "${RED}Error: Lab mode (--lab) or a configuration file (--config=<file>) must be provided.${NC}"
+	print_help
+	exit 1
 fi
 
 echo "	Removing old ignition files and cleaning up.."

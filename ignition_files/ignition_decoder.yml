@@ -70,6 +70,11 @@ storage:
       overwrite: true
       contents:
         local: wavelet_decoder_keys.csv
+    # The conf file, which provides most system configuration data.
+    - path: /etc/wavelet.conf
+      mode: 0644
+      contents:
+        local: wavelet.conf
     # Satisfy bootc/rpm-ostree JSON parser requirement to pull from registry
     - path: /etc/ostree/auth.json
       mode: 0644

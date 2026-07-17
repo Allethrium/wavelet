@@ -70,11 +70,16 @@ storage:
       overwrite: true
       contents:
         local: automated_coreos_deployment.sh
-    # The key file, which replaces most of the ignition entries
+    # The key file, which replaces most of the files:storage ignition entries
     - path: /var/wavelet_keys.csv
       mode: 0600
       contents:
        local: wavelet_keys.csv
+    # The conf file, which provides most system configuration data.
+    - path: /etc/wavelet.conf
+      mode: 0644
+      contents:
+        local: wavelet.conf
     # Satisfy bootc/rpm-ostree JSON parser requirement to pull from registry
     - path: /etc/ostree/auth.json
       mode: 0644

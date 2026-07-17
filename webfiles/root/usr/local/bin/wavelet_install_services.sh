@@ -362,6 +362,8 @@ generate_decoder_ignition(){
 	svr_ip="$(hostname -i)"
 	httpd_lan="$svr_ip:8080"
 	serverHostName="$(hostname)"
+	# TODO - these should be in the conf file now.
+	# TODO - wavelet_decoder_keys.csv should poyentially also be conf file keys instead
 	wifi_ssid="$(cat /var/home/wavelet/config/wifi_ssid)"
 	wifi_bssid="$(cat /var/home/wavelet/config/wifi_bssid)"
 	wifi_password="$(cat /var/home/wavelet/config/wifi_pw)"
@@ -369,34 +371,34 @@ generate_decoder_ignition(){
 	etcd_ip="$(cat /var/home/wavelet/config/etcd_ip)"
 	# Ensure the CA is available for injection into the decoder.ign
 	cp /etc/ipa/ca.crt /var/home/wavelet/config/
-	cat >> /var/home/wavelet/config/wavelet_decoder_keys.csv << EOF
-type,path,mode,overwrite,owner,group,content
-file,/var/wavelet_registry.txt,0644,true,,,$svr_ip
-file,/var/wavelet_registry_hostname.txt,0644,true,,,$svr_ip svr.$domain
-file,/var/httpd_lan.txt,0644,true,,,${httpd_lan:-192.168.1.32:8080}
-file,/var/serverhostname.txt,0644,true,,,$serverHostName
-file,/var/home/wavelet/config/serverhostname.txt,0644,true,,,$serverHostName
-file,/etc/systemd/logind.conf.d/inhibit-suspend.conf,0644,,,[Login]\nHandleLidSwitch=ignore
-file,/etc/zincati/config.d/90-disable-auto-updates.toml,0644,,,[updates]\nenabled = false
-file,/etc/hosts,0664,true,,,127.0.0.1	localhost localhost.localdomain localhost4 localhost4.localdomain4\n::1	localhost localhost.localdomain localhost6 localhost6.localdomain6\n$svr_ip	$serverHostName	${serverHostName%%.*}
-file,/var/home/wavelet/config/wifi_ssid,0600,true,,,${wifi_ssid:-wavelet_wifi}
-file,/var/home/wavelet/config/wifi_bssid,0600,true,,,${wifi_bssid:-00:00:00:00:00}
-file,/var/home/wavelet/config/wifi_pw,0600,true,,,${wifi_password:-wavelet-wifi-psk-password}
-file,/var/home/wavelet/config/DC1_ip,0600,true,,,$dc1_ip
-file,/var/home/wavelet/config/dc1_host_entry,0600,true,,,$dc1_ip dc1.$domain dc1
-file,/var/home/wavelet/config/etcd_ip,0600,true,,,$etcd_ip
-dir,/home/wavelet/config,0755,,wavelet,wavelet,
-dir,/home/wavelet/.ssh/secrets,0755,,wavelet,wavelet,
-dir,/home/wavelet/.config,0755,,wavelet,wavelet,
-dir,/home/wavelet/.config/systemd,0755,,wavelet,wavelet,
-dir,/home/wavelet/.config/systemd/user,0755,,wavelet,wavelet,
-dir,/home/wavelet/.config/systemd/user/default.target.wants,0755,,wavelet,wavelet,
-dir,/home/wavelet-root/.ssh/secrets,0755,,wavelet-root,wavelet-root,
-dir,/home/wavelet-root/config,0755,,wavelet-root,wavelet-root,
-dir,/etc/systemd/resolved.conf.d,0755,,,root,
-dir,/var/lib/systemd/linger/wavelet,0755,,,root,
-dir,/var/lib/systemd/linger/wavelet-root,0755,,,root,
-EOF
+	cat > /var/home/wavelet/config/wavelet_decoder_keys.csv <<-EOF
+		type,path,mode,overwrite,owner,group,content
+		file,/var/wavelet_registry.txt,0644,true,,,$svr_ip
+		file,/var/wavelet_registry_hostname.txt,0644,true,,,$svr_ip svr.$domain
+		file,/var/httpd_lan.txt,0644,true,,,${httpd_lan:-192.168.1.32:8080}
+		file,/var/serverhostname.txt,0644,true,,,$serverHostName
+		file,/var/home/wavelet/config/serverhostname.txt,0644,true,,,$serverHostName
+		file,/etc/systemd/logind.conf.d/inhibit-suspend.conf,0644,,,[Login]\nHandleLidSwitch=ignore
+		file,/etc/zincati/config.d/90-disable-auto-updates.toml,0644,,,[updates]\nenabled = false
+		file,/etc/hosts,0664,true,,,127.0.0.1	localhost localhost.localdomain localhost4 localhost4.localdomain4\n::1	localhost localhost.localdomain localhost6 localhost6.localdomain6\n$svr_ip	$serverHostName	${serverHostName%%.*}
+		file,/var/home/wavelet/config/wifi_ssid,0600,true,,,${wifi_ssid:-wavelet_wifi}
+		file,/var/home/wavelet/config/wifi_bssid,0600,true,,,${wifi_bssid:-00:00:00:00:00}
+		file,/var/home/wavelet/config/wifi_pw,0600,true,,,${wifi_password:-wavelet-wifi-psk-password}
+		file,/var/home/wavelet/config/DC1_ip,0600,true,,,$dc1_ip
+		file,/var/home/wavelet/config/dc1_host_entry,0600,true,,,$dc1_ip dc1.$domain dc1
+		file,/var/home/wavelet/config/etcd_ip,0600,true,,,$etcd_ip
+		dir,/home/wavelet/config,0755,,wavelet,wavelet,
+		dir,/home/wavelet/.ssh/secrets,0755,,wavelet,wavelet,
+		dir,/home/wavelet/.config,0755,,wavelet,wavelet,
+		dir,/home/wavelet/.config/systemd,0755,,wavelet,wavelet,
+		dir,/home/wavelet/.config/systemd/user,0755,,wavelet,wavelet,
+		dir,/home/wavelet/.config/systemd/user/default.target.wants,0755,,wavelet,wavelet,
+		dir,/home/wavelet-root/.ssh/secrets,0755,,wavelet-root,wavelet-root,
+		dir,/home/wavelet-root/config,0755,,wavelet-root,wavelet-root,
+		dir,/etc/systemd/resolved.conf.d,0755,,,root,
+		dir,/var/lib/systemd/linger/wavelet,0755,,,root,
+		dir,/var/lib/systemd/linger/wavelet-root,0755,,,root,
+	EOF
 	echo -e "  \nRegenerating decoder.ign with enrollment and provision credentials.."
 	sed -i "s|#hostname#|$(dnsdomainname)|g" /var/home/wavelet/config/decoder_custom.yml
 	# Embed the expected SHA512 hash of the wavelet archive.  wavelet_installer_update should alter this value on new git pulls.
