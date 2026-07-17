@@ -6,6 +6,25 @@
 # If a server, we go on to wavelet_install_services
 # If a client, we go on to wavelet_install_client
 
+# Source the wavelet configuration helper functions
+if [[ -f /etc/wavelet/wavelet_config.sh ]]; then
+    source /etc/wavelet/wavelet_config.sh
+else
+    # Fallback to loading config directly
+    if [[ -f /etc/wavelet/wavelet.conf ]]; then
+        while IFS='=' read -r key value; do
+            [[ "$key" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "$key" ]] && continue
+            key=$(echo "$key" | xargs)
+            value=$(echo "$value" | xargs)
+            value="${value#\"}"
+            value="${value%\"}"
+            value="${value#\'}"
+            value="${value%\'}"
+            export "$key=$value"
+        done < /etc/wavelet/wavelet.conf
+    fi
+fi
 
 RED="\033[0;31m"
 GREEN="\033[0;32m"
@@ -406,7 +425,7 @@ rpm_ostree_ARM(){
 	# We are building ARM version here, so the containerfile would specify arm-specific libraries for multiple proprietary platforms.  
 	# Unless panfrost made some major progress on mainline hw video acceleration..
 	# ..this would need A LOT of work (just look at Armbian)
-	if [[ -f /var/arm_support.flag ]]; then
+	if is_flag_enabled "ARM_SUPPORT_ENABLED"; then
 		echo -e "ARM support is enabled, building ARM OCI overlay and downloading additional UltraGrid build..\n"
 	else
 		echo -e "ARM support is NOT enabled, and we are running on an ARM device.  Exiting.\n"; exit 1
@@ -416,9 +435,9 @@ rpm_ostree_ARM(){
 	-v=/home/wavelet/containerfiles:/mount:z \
 	-f /home/wavelet/containerfiles/Containerfile.arm.coreos.overlay.client
 	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay_arm_client
-	touch /var/rpm-ostree-overlay.complete
-	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
-	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+	set_state_flag "RPM_OSTREE_OVERLAY_COMPLETE" "yes"
+	set_state_flag "RPM_OSTREE_OVERLAY_RPMFUSION_REPO_COMPLETE" "yes"
+	set_state_flag "RPM_OSTREE_OVERLAY_RPMFUSION_PKGS_COMPLETE" "yes"
 	# N.B can only use --compress with dir: transport method. zstd would be pretty cool, no? 
 	podman push localhost:5000/coreos_overlay_surface "$oci_registry"/coreos_overlay_arm_client --tls-verify=false
 }
@@ -431,9 +450,9 @@ rpm_ostree_RISCV(){
 	-v=/home/wavelet/containerfiles:/mount:z \
 	-f /home/wavelet/containerfiles/Containerfile.RISCV.coreos.overlay.client
 	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay_RISCV_client
-	touch /var/rpm-ostree-overlay.complete
-	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
-	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+	set_state_flag "RPM_OSTREE_OVERLAY_COMPLETE" "yes"
+	set_state_flag "RPM_OSTREE_OVERLAY_RPMFUSION_REPO_COMPLETE" "yes"
+	set_state_flag "RPM_OSTREE_OVERLAY_RPMFUSION_PKGS_COMPLETE" "yes"
 	# N.B can only use --compress with dir: transport method. zstd would be pretty cool, no? 
 	podman push localhost:5000/coreos_overlay_surface "$oci_registry"/coreos_overlay_RISCV_client --tls-verify=false
 }
@@ -485,9 +504,9 @@ rpm_overlay_install_server(){
 	# bootc now errors on fsetxattr(security.selinux): Invalid argument
 	# bootc switch --transport registry "$storage/coreos_overlay_server"
 	rpm-ostree rebase --experimental "ostree-unverified-image:registry:$storage/coreos_overlay_server"
-	touch "/var/rpm-ostree-overlay.complete"
-	touch "/var/rpm-ostree-overlay.rpmfusion.repo.complete"
-	touch "/var/rpm-ostree-overlay.rpmfusion.pkgs.complete"
+	set_state_flag "RPM_OSTREE_OVERLAY_COMPLETE" "yes"
+	set_state_flag "RPM_OSTREE_OVERLAY_RPMFUSION_REPO_COMPLETE" "yes"
+	set_state_flag "RPM_OSTREE_OVERLAY_RPMFUSION_PKGS_COMPLETE" "yes"
 }
 
 rpm_overlay_install_client(){
@@ -510,7 +529,10 @@ rpm_overlay_install_client(){
 	echo "	Pulling from $serverHostName/coreos_overlay_client"
 #	bootc switch --transport registry "$serverHostName/coreos_overlay_client"
 	rpm-ostree rebase --experimental "ostree-unverified-image:registry:$serverHostName/coreos_overlay_client"
-	touch /var/{rpm-ostree-overlay.complete,rpm-ostree-overlay.rpmfusion.repo.complete,rpm-ostree-overlay.rpmfusion.pkgs.complete,rpm-ostree-overlay.dev.pkgs.complete}
+	set_state_flag "RPM_OSTREE_OVERLAY_COMPLETE" "yes"
+	set_state_flag "RPM_OSTREE_OVERLAY_RPMFUSION_REPO_COMPLETE" "yes"
+	set_state_flag "RPM_OSTREE_OVERLAY_RPMFUSION_PKGS_COMPLETE" "yes"
+	set_state_flag "RPM_OSTREE_OVERLAY_DEV_PKGS_COMPLETE" "yes"
 	echo "RPM package updates completed, finishing installer task.."
 	echo "Generating client install service systemd entry.."
 	cat > "/etc/systemd/system/wavelet_install_client.service" <<-EOF
@@ -529,7 +551,7 @@ rpm_overlay_install_client(){
 		WantedBy=multi-user.target
 	EOF
 	echo -e "Client install service will run on next reboot to populate wavelet modules and configure networking."
-	touch "/var/firstboot.complete.target"
+	set_state_flag "FIRSTBOOT_COMPLETE" "yes"
 	systemctl daemon-reload
 	systemctl enable wavelet_install_client.service
 	# Final step in the FIRST boot.

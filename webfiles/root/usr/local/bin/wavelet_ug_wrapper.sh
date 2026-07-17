@@ -51,7 +51,7 @@ start_ultragrid(){
 	# In UI Mode, top-left, in normal mode, fullscreen.
 	# Note that the UG_ARGUMENTS parsed from the client controller are also different here
     timeout=5
-    rm -f /var/home/wavelet/config/errorState.flag
+    set_config "UG_ERROR_STATE" "no"
     "$binaryPath" "${UG_ARGUMENTS[@]}" > /var/home/wavelet/logs/ugDirect.log 2>&1 &
     UG_PID=$!
     if [[ -z "$swaySocket" ]]; then
@@ -145,7 +145,7 @@ inputError(){
 			generate_errorDisplay "ERR: $1"
 			echo -e "\033[32m	Experiencing +15s of error: $1!\033[0m" | systemd-cat -t "UltraGrid"
 		elif (( "$timer_elapsed" > 10 )); then
-			echo "$errorCase" > /var/home/wavelet/config/errorState.flag
+			set_config "UG_ERROR_STATE" "$errorCase"
 			echo -e "\033[32m	Experiencing error: $1!\033[0m" | systemd-cat -t "UltraGrid"
 			decoder_checkSubscription
 			send_keepalive
@@ -156,7 +156,7 @@ inputError(){
 		fi
 	fi
 	if (( badCounter > 50 )); then
-		echo "BURST_ERROR" > /var/home/wavelet/config/errorState.flag
+		set_config "UG_ERROR_STATE" "BURST_ERROR"
 		generate_errorDisplay "ERR: ERROR BURST DETECTED"
 		send_keepalive
 	fi
@@ -236,7 +236,7 @@ process_fecData(){
 
 reset_error_state(){
     echo "Resetting error state — stability detected" | systemd-cat -t "UltraGrid"
-    rm -f /var/home/wavelet/config/errorState.flag
+    set_config "UG_ERROR_STATE" "no"
     badCounter=0
     goodCounter=0
     badSwitchCounter=0
@@ -260,7 +260,7 @@ reset_error_state(){
 exec >>/var/home/wavelet/logs/UltraGrid.log 2>&1
 UG_ARGUMENTS=("$@")
 UG_PID=0
-UG_RESTARTING="/var/home/wavelet/config/ug_restarting.flag"
+set_config "UG_RESTARTING" "no"
 SWAYIMG_PID=0
 swaySocket=""
 NC_PID=0
@@ -294,12 +294,12 @@ while IFS= read -r line <&3; do
     	reset_timer_elapsed="$(get_timer_elapsed "badReset")"
     	if (( "$reset_timer_elapsed" > 30 )); then
     		badCounter=0
-    		rm -rf /var/home/wavelet/config/errorState.flag
+    		set_config "UG_ERROR_STATE" "no"
     		echo "Error counter reset - 30s of stability" | systemd-cat -t "UltraGrid"
     	fi
     fi
 	if [[ "$goodCounter" -gt 100 ]]; then
-		if [[ -f "/var/home/wavelet/config/errorState.flag" ]]; then
+		if [[ "$(get_config "UG_ERROR_STATE")" != "no" ]]; then
 			echo "Noting system stability is good" | systemd-cat -t "UltraGrid"
 			KEYNAME="/HOSTS/$(hostname)/control/healthStatus"; KEYVALUE="OK: "; write_etcd_global &
 			reset_error_state
@@ -338,9 +338,9 @@ while IFS= read -r line <&3; do
 			;;
 		*WARNING:*Selected*capture*card*was*not*found/)
 			echo -e "\033[33m	UltraGrid is unable to start with bad command line!\033[0m" | systemd-cat -t "UltraGrid"
-			echo "UG_BAD_CMDLINE" > /var/home/wavelet/config/errorState.flag
+			set_config "UG_ERROR_STATE" "UG_BAD_CMDLINE"
 			generate_errorDisplay "FTL: BAD ULTRAGRID COMMAND LINE"
-			echo "1" > "$UG_RESTARTING"
+			set_config "UG_RESTARTING" "yes"
 			exit 1
 			;;
 		*\[ug_input\]*Dropping*frame!)

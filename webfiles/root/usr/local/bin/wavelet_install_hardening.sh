@@ -1,6 +1,26 @@
 #!/bin/bash
 #	This module is concerned with implementing a freeIPA IdM and associated DHCP services
 
+# Source the wavelet configuration helper functions
+if [[ -f /etc/wavelet/wavelet_config.sh ]]; then
+    source /etc/wavelet/wavelet_config.sh
+else
+    # Fallback to loading config directly
+    if [[ -f /etc/wavelet/wavelet.conf ]]; then
+        while IFS='=' read -r key value; do
+            [[ "$key" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "$key" ]] && continue
+            key=$(echo "$key" | xargs)
+            value=$(echo "$value" | xargs)
+            value="${value#\"}"
+            value="${value%\"}"
+            value="${value#\'}"
+            value="${value%\'}"
+            export "$key=$value"
+        done < /etc/wavelet/wavelet.conf
+    fi
+fi
+
 # Add our attempt at a password security solution here
 source /usr/local/bin/wavelet_secure_credentials.sh
 
@@ -31,7 +51,7 @@ event_server(){
 	configure_idm
 	# We need to configure SELinux policy permanent -P to allow containers to read the cert bundle package
 	setsebool -P container_read_certs 1
-	if [[ -f /var/server.domain.enrollment.complete ]]; then
+	if is_state_flag_set "SERVER_DOMAIN_ENROLLMENT_COMPLETE"; then
 		echo -e "	Domain enrollment is complete, proceeding to configure certificates and service principals.." \
 		  >> /var/home/wavelet/logs/hardening.log
 		sleep 1
@@ -504,7 +524,7 @@ install_server_security_layer(){
 	wait_for_line "INFO Client configuration complete."
 	#podman exec freeipa_server ldapmodify -x -D "cn=admin" -W  -f pwmod.ldif
 	# Ideally here, we could use REST calls w/ Unleashed to add our new CA to the AP
-	touch /var/server.domain.enrollment.complete
+	set_state_flag "SERVER_DOMAIN_ENROLLMENT_COMPLETE" "yes"
 }
 
 ipa_dns_tsig(){

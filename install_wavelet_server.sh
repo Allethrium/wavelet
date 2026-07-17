@@ -219,18 +219,15 @@ customization(){
 		corporateMode=1
 	fi
 	if [[ "${corporateMode:-0}" == "1" ]]; then
-		modeFilePath="/var/corporateMode.enabled"
 		resolvContent="nameserver ${svr_dns:-9.9.9.9}\\nnameserver 9.9.9.9"
 		printf "      Corporate mode: external DHCP/DNS assumed. Using DNS: %s\n" "${svr_dns:-9.9.9.9}"
 	else
-		modeFilePath="/var/isolationMode.enabled"
 		resolvContent="nameserver ${svr_ip}\\nnameserver ${gateway}\\nnameserver 9.9.9.9"
 		printf "	Isolation mode: Wavelet provides DHCP/DNS.\n"
 	fi
 	echo "	Appending remaining keys to wavelet_keys.csv.."
 	# Build WiFi entries only if WiFi mode is enabled
 	wifiEntries=""
-	noWifiFlag=""
 	if [[ "${enableWifi}" == "1" ]]; then
 		echo "	Generating Wi-Fi entries.."
 		wifiEntries="file,/var/home/wavelet/config/wifi_ssid,0600,true,,,${wifi_ssid}
@@ -239,15 +236,14 @@ file,/var/home/wavelet/config/wifi_pw,0600,true,,,${wifi_password}
 file,/var/home/wavelet-root/config/wifi_adminuser,0640,true,,,${wifi_deviceUser}
 file,/var/home/wavelet-root/config/wifi_adminpw,0640,true,,,${wifi_devicePassword}
 file,/var/home/wavelet-root/config/wifi_ipaddr,0640,true,,,${wifi_ipAddr}"
+		set_config "WIFI_MODE_ENABLED" "yes"
 	else
-		echo "	Generating no-Wi-Fi flag.."
-		noWifiFlag="file,/var/no.wifi,0644,true,,,true"
+		echo "	Disabling Wi-Fi mode.."
+		set_config "WIFI_MODE_ENABLED" "no"
 	fi
 cat >> ./ignition_files/wavelet_keys.csv << EOF
-file,${modeFilePath},0644,,,,enabled
 file,/etc/systemd/logind.conf.d/inhibit-suspend.conf,0644,,,,[Login]\nHandleLidSwitch=ignore
 file,/var/secrets/ipaadmpw.secure,0600,true,,,${DOMAIN_ADMIN_PASSWORD:-DomainAdminPasswordGoesHere}
-${noWifiFlag}
 ${wifiEntries}
 file,/var/home/wavelet/config/networkdevice_userpass,0600,true,,,${NETWORK_DEVICE_PASSWORD:-password}
 file,/var/${developerFileName},0644,true,,,${developerFileContent}

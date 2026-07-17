@@ -163,7 +163,7 @@ generate_etcd_core_users(){
 	sed -i '/^\[Container\]/a Secret=dhcpUser,type=env,target=dhcpUser' /etc/containers/systemd/kea.container
 	systemctl daemon-reload && systemctl restart kea.service
 	# Create a flag to tell us etcd auth is enabled, and remove the etcd provision flag from /var/
-	touch /var/home/wavelet/config/etcd_auth.enabled
+	set_state_flag "ETCD_AUTH_ENABLED" "yes"
 	rm -rf /var/server.etcd.provision
 	chown -R wavelet-root:wavelet-root /var/home/wavelet-root; chown -R wavelet:wavelet /var/home/wavelet
 	unset PassWord
@@ -535,7 +535,7 @@ client_provision_get_data() {
 		etcdctl --user PROV:$provPW del "/PROV/FACTOR2"
 		etcdctl --user PROV:$provPW del "/PROV/RESPONSE"
 		echo "  Provisioning process completed. Client ready for etcd access.." >> /var/home/wavelet/logs/etcdlog.log
-		touch /var/home/wavelet/config/provisioned.rq.complete
+		set_state_flag "CLIENT_PROVISION_RQ_COMPLETE" "yes"
 		exit 0
 	else
 		echo "  Client test unsuccessful! Please see logs." >> /var/home/wavelet/logs/etcdlog.log

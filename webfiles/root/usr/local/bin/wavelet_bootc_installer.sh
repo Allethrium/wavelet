@@ -3,6 +3,9 @@
 # Then extracts the downloaded tar files to their appropriate directories.  Should be one of the first things to run on initial boot.
 # All wavelet modules, including the web server code, are deployed on all devices, however only the server has the web servers enabled.
 
+# Source wavelet configuration
+source /etc/wavelet/wavelet_config.sh
+
 
 detect_self(){
 systemctl --user daemon-reload
@@ -148,9 +151,9 @@ rpm_ostree_install(){
 	RUN (mkdir -p /lib/modules/$KERNEL_VERSION && (ln -t /lib/modules/$KERNEL_VERSION /usr/src/kernels/$KERNEL_VERSION)) && (dnf install -y desktopvideo.rpm)
 	" > Containerfile
 	podman build --build-arg DKMS_KERNEL_VERSION=${DKMS_KERNEL_VERSION}
-	touch /var/rpm-ostree-overlay.complete
-	touch /var/rpm-ostree-overlay.rpmfusion.repo.complete
-	touch /var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+	set_state_flag "RPM_OSTREE_OVERLAY_COMPLETE" "yes"
+	set_state_flag "RPM_OSTREE_OVERLAY_RPMFUSION_REPO_COMPLETE" "yes"
+	set_state_flag "RPM_OSTREE_OVERLAY_RPMFUSION_PKGS_COMPLETE" "yes"
 
 	podman run --rm --privileged -v /dev:/dev -v /var/lib/containers:/var/lib/containers -v /:/target \
              --pid=host --security-opt label=type:unconfined_t \

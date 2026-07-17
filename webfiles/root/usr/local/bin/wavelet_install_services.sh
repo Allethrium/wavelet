@@ -3,6 +3,26 @@
 # It then proceeds to configure dependencies, then reboots
 # Most of the wavelet modules and directory configuration incl. permissions that doesn't fit elsewhere is also handled here
 
+# Source the wavelet configuration helper functions
+if [[ -f /etc/wavelet/wavelet_config.sh ]]; then
+    source /etc/wavelet/wavelet_config.sh
+else
+    # Fallback to loading config directly
+    if [[ -f /etc/wavelet/wavelet.conf ]]; then
+        while IFS='=' read -r key value; do
+            [[ "$key" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "$key" ]] && continue
+            key=$(echo "$key" | xargs)
+            value=$(echo "$value" | xargs)
+            value="${value#\"}"
+            value="${value%\"}"
+            value="${value#\'}"
+            value="${value%\'}"
+            export "$key=$value"
+        done < /etc/wavelet/wavelet.conf
+    fi
+fi
+
 install_ug_depends(){
 	# This is lifted from the UltraGrid project with a couple of tweaks for CoreOS/my purposes
 	# Needs to run as root after the second reboot, since it requires some of the coreos overlay features to be available.
@@ -45,7 +65,7 @@ install_ug_depends(){
 	#install_libaja
 	#install_cineform
 	#install_live555
-	touch /var/ug_depends.complete
+	set_state_flag "UG_DEPENDS_COMPLETE" "yes"
 	cd /var/home/wavelet/setup || return
 }
 
@@ -159,7 +179,7 @@ pull_coreos_files() {
 		fi
 	fi
 	echo "	Pulled files: kernel=${kernel##*/} rootfs=${rootfs##*/} initrd=${initrd##*/}"
-	touch "/var/iso_download_complete"
+	set_state_flag "ISO_DOWNLOAD_COMPLETE" "yes"
 }
 
 generate_coreos_image() {
@@ -356,7 +376,6 @@ file,/var/wavelet_registry_hostname.txt,0644,true,,,$svr_ip svr.$domain
 file,/var/httpd_lan.txt,0644,true,,,${httpd_lan:-192.168.1.32:8080}
 file,/var/serverhostname.txt,0644,true,,,$serverHostName
 file,/var/home/wavelet/config/serverhostname.txt,0644,true,,,$serverHostName
-file,/var/isolationMode.enabled,0644,,,enabled
 file,/etc/systemd/logind.conf.d/inhibit-suspend.conf,0644,,,[Login]\nHandleLidSwitch=ignore
 file,/etc/zincati/config.d/90-disable-auto-updates.toml,0644,,,[updates]\nenabled = false
 file,/etc/hosts,0664,true,,,127.0.0.1	localhost localhost.localdomain localhost4 localhost4.localdomain4\n::1	localhost localhost.localdomain localhost6 localhost6.localdomain6\n$svr_ip	$serverHostName	${serverHostName%%.*}
@@ -432,11 +451,12 @@ EOF
 	ausearch -c '(gssproxy)' --raw | audit2allow -M my-gssproxy
 	semodule -X 300 -i my-gssproxy.pp
 	systemctl enable gssproxy.service --now
-	touch /var/no.wifi
+	# no.wifi is a mode flag, set via configuration
+	set_config "WIFI_MODE_ENABLED" "no"
 	systemctl enable avahi-daemon
 	systemctl enable avahi-daemon.service --now
 	/usr/local/bin/wavelet_system_optimize.sh
-	touch /var/server.etcd.provision
+	set_state_flag "SERVER_ETCD_PROVISION" "yes"
 	echo -e " Dependencies Installation completed..\n"
 	systemctl set-default graphical.target
 }
@@ -555,12 +575,12 @@ wait
 echo "	Regenerating decoder ignition files and keys.."
 generate_decoder_ignition
 
-touch /var/wavelet_depends.complete
+set_state_flag "WAVELET_DEPENDS_COMPLETE" "yes"
 # These two steps require the subshell processes to have completed
 cp /etc/ipa/ca.crt /var/home/wavelet/http/ignition
 chown kea:root /var/lib/tftpboot/$localFile
 
-if [[ -f /var/pxe.complete ]]; then
+if is_state_flag_set "PXE_COMPLETE"; then
 	exit 0
 fi
 
@@ -574,7 +594,7 @@ chown -R kea:root /var/lib/tftpboot
 find /var/home/wavelet/http/ -type f -print0 | xargs -0 chmod 644
 find /var/home/wavelet/http-php/ -type f -print0 | xargs -0 chmod 644
 echo -e "	PXE bootable images completed and populated in http serverdir, client provisioning should now be available..\n"
-touch /var/pxe.complete
+set_state_flag "PXE_COMPLETE" "yes"
 # Clean up
 rm -rf /var/home/wavelet/pxe
 

@@ -153,7 +153,7 @@ done
 if [[ "$printvalue" == "1" ]]; then
 	# This will trigger a source update refresh, so if we were the encoder, we will start our process.
 	# Otherwise, nothing should have been affected.
-	touch /var/home/wavelet/config/inputPersist.flag
+	set_config "INPUT_PERSIST_ENABLED" "yes"
 	KEYNAME="/UI/GROUPS/$groupHash/control/sourceHash"; read_etcd_global
 	if [[ -n "$printvalue" ]]; then
 		echo "    Input persistence is enabled, ensuring sourceHash is reset to: $printvalue"
@@ -164,7 +164,7 @@ if [[ "$printvalue" == "1" ]]; then
 	fi
 else
 	echo "    Input persistence is not enabled, starting with the static image input.."
-	rm /var/home/wavelet/config/inputPersist.flag
+	set_config "INPUT_PERSIST_ENABLED" "no"
 	event_init_staticImage
 	event_setKeys
 fi

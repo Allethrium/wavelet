@@ -4,6 +4,26 @@
 #	Joining the domain
 #	Provisioning services, so that it can talk to etcd and the DC.
 
+# Source the wavelet configuration helper functions
+if [[ -f /etc/wavelet/wavelet_config.sh ]]; then
+    source /etc/wavelet/wavelet_config.sh
+else
+    # Fallback to loading config directly
+    if [[ -f /etc/wavelet/wavelet.conf ]]; then
+        while IFS='=' read -r key value; do
+            [[ "$key" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "$key" ]] && continue
+            key=$(echo "$key" | xargs)
+            value=$(echo "$value" | xargs)
+            value="${value#\"}"
+            value="${value%\"}"
+            value="${value#\'}"
+            value="${value%\'}"
+            export "$key=$value"
+        done < /etc/wavelet/wavelet.conf
+    fi
+fi
+
 
 check_resolved() {
     if systemctl is-active --quiet systemd-resolved; then
@@ -179,7 +199,8 @@ request_otp_phase2(){
 		systemctl disable etcd_enroll_watcher.service --now && systemctl daemon-reload
 		shred "/var/run/etcd_otp_value" && rm -rf "/var/run/etcd_otp_value"
 		shred "/var/root/secrets/enrollpw" && rm -rf "/var/root/secrets/enrollpw"
-		touch "/var/domain_join.complete"
+		# Domain join completion is tracked by the presence of the file, but we don't need a state flag for this
+		# as it's an intermediate step, not a final installation state
 	else
 		echo "	Domain join failed, cannot continue with certificate requests"
 		exit 1
@@ -196,11 +217,6 @@ install_security_layer(){
 	reconfigure_dns
 	# If DNS isn't working, we have bigger problems.
 	request_otp
-	if [[ ! -f "/var/domain_join.complete" ]]; then
-	  echo "  Domain join flag is not present!  Failing here!"
-	  echo "  ERROR   - Domain join failure!" | systemd-cat -u wavelet
-	  exit 1
-	fi
 	# Now that IPA is up and running, we can run a getcert request and install our EAP-TLS certificate
 	# Note that for this certificate profile:
 	# IPA should NOT require any special permissions beyond being a domain member to acquire this cert.
@@ -422,7 +438,7 @@ echo "	Extracted AppImage contents available in /usr/local/bin/ultragrid/squashf
 
 # Disable self so we don't run again on the next boot.
 systemctl set-default graphical.target
-touch /var/client_install.complete
+set_state_flag "CLIENT_INSTALL_COMPLETE" "yes"
 generate_wavelet_userspace_services
 systemctl --user -M wavelet@ daemon-reload
 

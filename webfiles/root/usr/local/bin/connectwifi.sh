@@ -3,6 +3,27 @@
 
 # Attempts to find and join a Wavelet network if it's available
 # Typically called from wavelet_build after the display manager has launched
+
+# Source the wavelet configuration helper functions
+if [[ -f /etc/wavelet/wavelet_config.sh ]]; then
+    source /etc/wavelet/wavelet_config.sh
+else
+    # Fallback to loading config directly
+    if [[ -f /etc/wavelet/wavelet.conf ]]; then
+        while IFS='=' read -r key value; do
+            [[ "$key" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "$key" ]] && continue
+            key=$(echo "$key" | xargs)
+            value=$(echo "$value" | xargs)
+            value="${value#\"}"
+            value="${value%\"}"
+            value="${value#\'}"
+            value="${value%\'}"
+            export "$key=$value"
+        done < /etc/wavelet/wavelet.conf
+    fi
+fi
+
 if [[ -f /var/wavelet_ramfs/etcd_interaction_hooks.sh ]]; then
   source /var/wavelet_ramfs/etcd_interaction_hooks.sh
 else
@@ -30,7 +51,7 @@ connectwifi(){
 	else
 		# Recreate the network
 		echo "	An error has occurred, attempting to repopulate the wifi connection.."
-		if [[ -f /var/prod.security.enabled ]]; then
+		if is_flag_enabled "PROD_SECURITY_ENABLED"; then
 			connectwifi_enterprise
 		else
 			connectwifi_psk
@@ -199,8 +220,8 @@ detect_disable_ethernet(){
         exit 0
     fi
     # Check for a manual no-wifi flag as set in the installer
-	if [[ -f "/var/no.wifi" ]]; then
-		echo -e "	The /var/no.wifi flag is set.  Please remove this file if this host should utilize wireless connectivity."
+	if is_flag_disabled "WIFI_MODE_ENABLED"; then
+		echo -e "	The WIFI_MODE_ENABLED flag is disabled.  Please enable this if this host should utilize wireless connectivity."
 		exit 0
 	else
 		nmcli con down "$ethernet_activeUUID"
@@ -244,8 +265,8 @@ if [[ $(hostname) = *"svr"* ]]; then
 	exit 0
 fi
 
-if [[ -f /var/no.wifi ]]; then
-	echo -e "	The /var/no.wifi flag is set.  Please remove this file if this host should utilize wireless connectivity."
+if is_flag_disabled "WIFI_MODE_ENABLED"; then
+	echo -e "	The WIFI_MODE_ENABLED flag is disabled.  Please enable this if this host should utilize wireless connectivity."
 	exit 0
 fi
 
