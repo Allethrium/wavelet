@@ -564,6 +564,9 @@ toggle_userInterface() {
 		rm -rf "/var/home/wavelet/config/webui.enabled"
 		uiDisable_moveUGWindow
 		swaymsg -s "$swaySocket" "[app_id="org.mozilla.firefox"] kill" 2>/dev/null
+		# We always revert to workspace 1 if disabling UI.
+		# On the server, this will be the log window, on a client, the UG output window.
+		swaymsg -s "$swaySocket" "workspace 1"
 		# Send more insistent termination signal to firefox if still running (hung etc.)
 		# pkill firefox
 	else
@@ -582,7 +585,7 @@ toggle_userInterface() {
 		fi
 		uiEnable_moveUGWindow
 		echo "$workspace" > "/var/home/wavelet/config/webui.enabled"
-		swaymsg -s "$swaySocket" workspace "$workspace"
+		swaymsg -s "$swaySocket" "workspace $workspace"
 		swaymsg -s "$swaySocket" exec "/usr/bin/firefox" https://"$(cat /var/home/wavelet/config/serverhostname.txt)"
 	fi
 }
@@ -1760,10 +1763,10 @@ uiEnable_moveUGWindow(){
         elapsedBootTime="$(uptime | awk '{print $3}')"
         if [[ $elapsedBootTime -lt 3 ]]; then
             sleep 4
-            workspace=2
+            workspace=1
         fi
     else
-        workspace=3
+        workspace=2
     fi
     # Use cached display resolution if available
     if [[ -f "$resCacheFile" ]]; then
@@ -1852,6 +1855,8 @@ uiDisable_moveUGWindow(){
         swaymsg -s "$swaySocket" "[con_id=$ugId] floating disable"
         swaymsg -s "$swaySocket" "[con_id=$ugId] resize set $width $height"
         swaymsg -s "$swaySocket" "[con_id=$ugId] fullscreen enable"
+        # Switch sway back to workspace
+        swaymsg -s "$swaySocket" "workspace $workspace"
     fi
 }
 

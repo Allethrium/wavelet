@@ -1116,7 +1116,7 @@ event_connectNetwork(){
 				ipValue="${wirelessCIDRValue%/*}"
 				;;
 		esac
-	done < <(nmcli -t -f NAME,TYPE,UUID con show --active)
+	done < <(nmcli -t -f NAME,TYPE,UUID con show)
 	# Attempts to list and connect a wavelet Wi-Fi connection
 	# Note that the wavelet user has NetworkManager permissions via configured polkit rules
 	if [[ -f "/var/no.wifi" ]]; then
@@ -1139,6 +1139,7 @@ event_connectNetwork(){
 	fi
 
 	wifiSSID="$(cat /var/home/wavelet/config/wifi_ssid)"
+	# Note on a client, the hostname is always appended to the wifi SSID for the connection ID.
 	if [[ -n "$wirelessUUID" ]]; then
 		echo "	Found WiFi connection, proceeding.."
 	else

@@ -81,7 +81,7 @@ connectwifi_psk(){
 			"${cmd[@]}"
 		fi
 			echo -e "	Continuing to connect for three more tries..\n"
-			cmd=(nmcli dev wifi connect "${networkssid}" hidden yes password "$wifipassword" bssid "$wifibssid")
+			cmd=(nmcli dev wifi connect "$networkssid" hidden yes password "$wifipassword" bssid "$wifibssid")
 			"${cmd[@]}"; sleep 2; "${cmd[@]}"; sleep 2; "${cmd[@]}"
 	fi
 }
@@ -206,7 +206,7 @@ detect_disable_ethernet(){
 		nmcli con down "$ethernet_activeUUID"
 		nmcli con mod "$ethernet_activeUUID" connection.autoconnect no
 		echo "	The primary ethernet connection with UUID $ethernet_activeUUID has been disabled."
-		echo -e "	To re-enable, you can use:\n		nmcli con up $ethernet_activeUUID\n	Or:\n		nmtui\nFor a gui interface."
+		echo -e "	To re-enable, you can use:\n	nmcli con up $ethernet_activeUUID\n	Or:\n	nmtui\n	For a gui interface."
 	fi
 }
 
