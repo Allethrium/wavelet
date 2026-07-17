@@ -53,52 +53,6 @@ generate_user_yaml(){
 	sed -i "s|USERHOMEDIR|$name|" "${user_yaml}"
 }
 
-set_pw(){
-	local attempts=3
-	local success=0
-	local user=$1
-	local tmp_pw=""
-	while [[ ${success} -ne 1 ]] && [[ ${attempts} -gt 0 ]]; do
-		echo -e >&2 "			${GREEN}Remaining attempts: ${attempts}${NC}"
-		read -srp "		Please input a password for ${user}:$(echo $'\n	-')" tmp_pw
-		if [[ "${tmp_pw}" == "" ]]; then
-			echo -e >&2 "		Password may not be empty."
-			if [[ ${attempts} -eq 0 ]]; then
-				echo -e "		${RED}Maximum attempts exceeded, exiting.${NC}"
-				success=0
-				break 1
-			fi
-			((attempts--))
-			continue
-		fi
-		local matchattempts=3
-		while [[ ${success} -ne 1 ]] && [[ ${matchattempts} -gt 0 ]]; do
-			read -srp "`echo $'\n'`	Please input the password again to verify for ${user}:$(echo $'\n	-')" tmp_pw2
-			if [[ "${tmp_pw}" == "${tmp_pw2}" ]]; then
-				echo -e >&2 "`echo $'\n-------->'`		${GREEN}Passwords match!  Continuing..${NC}"
-				mkpasswd --method=yescrypt "${tmp_pw}" > "${user}.pw.secure"
-				success=1
-				break 2
-			else
-				echo -e >&2 "\n		Passwords do not match! Trying again..\n"
-				((matchattempts--))
-				echo -e >&2 "			${RED}Remaining attempts: ${matchattempts}${NC}"
-				if [[ ${success} -ne 1 ]] && [[ ${matchattempts} -eq 0 ]]; then
-					echo -e >&2 "		${RED}Maximum attempts exceeded.  Please start again to set this user's password.${NC}"
-					success=0
-				fi
-			fi
-		done # Inner loop
-	done # Outer loop
-	if [[ $success == 1 ]]; then
-		echo "0"
-		exit 0
-	else
-		echo "1"
-		exit 1
-	fi
-}
-
 customization(){
 	echo -e "  \n	Generating ignition files with appropriate settings.."
 	INPUTFILES="server_custom.yml decoder_custom.yml"
@@ -174,7 +128,7 @@ EOF
 	wifiEntries=""
 	if [[ "$enableWifi" == "1" ]]; then
 		echo "	Generating Wi-Fi entries.."
-		wifiEntries="	file,/var/home/wavelet-root/config/wifi_adminuser,0640,true,,,WIFI_ADMIN_USER=${wifi_deviceUser}\nWIFI_ADMIN_PW=${wifi_devicePassword}\nWIFI_IPADDR=${wifi_ipAddr}"
+		wifiEntries="file,/var/home/wavelet-root/config/wifi_adminuser,0640,true,,,WIFI_ADMIN_USER=${wifi_deviceUser}\nWIFI_ADMIN_PW=${wifi_devicePassword}\nWIFI_IPADDR=${wifi_ipAddr}"
 	else
 		echo "	Disabling Wi-Fi mode.."
 	fi
@@ -183,7 +137,6 @@ cat > ./ignition_files/wavelet_keys.csv <<-EOF
 	file,/etc/systemd/logind.conf.d/inhibit-suspend.conf,0644,,,,[Login]\nHandleLidSwitch=ignore
 	file,/var/secrets/ipaadmpw.secure,0600,true,,,${DOMAIN_ADMIN_PASSWORD:-DomainAdminPasswordGoesHere}
 	${wifiEntries}
-	file,/var/home/wavelet/config/networkdevice_userpass,0600,true,,,${NETWORK_DEVICE_PASSWORD:-password}
 	file,/var/${developerFileName},0644,true,,,${developerFileContent}
 	file,/var/timezone.txt,0600,true,,,${timeZone}
 	file,/etc/resolv.conf,0644,true,,,${resolvContent}
@@ -197,7 +150,6 @@ cat > ./ignition_files/wavelet_keys.csv <<-EOF
 	dir,/home/wavelet/config,0755,,wavelet,wavelet,
 	dir,/home/wavelet/etcd,0755,,wavelet,wavelet,
 	dir,/home/wavelet/.ssh/secrets,0755,,wavelet,wavelet,
-	dir,/home/wavelet/config,0755,,wavelet,wavelet,
 	dir,/var/containers/registry,0700,,wavelet,wavelet,
 	dir,/home/wavelet/http,0755,,wavelet,wavelet,
 	dir,/home/wavelet/http-php/html,0755,,wavelet,wavelet,
@@ -258,47 +210,6 @@ automatic_setup() {
 	fi
 
   customization
-}
-
-parse_config_file() {
-	local config_file="$1"
-	if [[ ! -f "$config_file" ]]; then
-		echo -e "${RED}Error: Config file $config_file not found.${NC}"
-		exit 1
-	fi
-	echo "	Parsing configuration from $config_file..."
-	while IFS='=' read -r key value; do
-		# Skip comments and empty lines
-		[[ "$key" =~ ^[[:space:]]*# ]] && continue
-		[[ -z "$key" ]] && continue
-		key=$(echo "$key" | xargs)
-		value=$(echo "$value" | xargs)
-		value="${value#\"}"
-		value="${value%\"}"
-		value="${value#\'}"
-		value="${value%\'}"
-		# Set shell variables
-		case "$key" in
-			PASSWORD) PASSWORD="$value" ;;
-			DOMAIN) domain="$value" ;;
-			SVR_IP|SERVER_IP) svr_ip="$value" ;;
-			SVR_GW|SERVER_GATEWAY) svr_gw="$value" ;;
-			SVR_DNS|SERVER_DNS) svr_dns="$value" ;;
-			TIME_ZONE|TIMEZONE) timeZone="$value" ;;
-			DEVELOPER_MODE|DEV_MODE) developerMode="$value" ;;
-			ENABLE_WIFI) enableWifi="$value" ;;
-			WIFI_SSID) wifi_ssid="$value" ;;
-			WIFI_BSSID) wifi_bssid="$value" ;;
-			WIFI_PASSWORD) wifi_password="$value" ;;
-			WIFI_DEVICE_USER) wifi_deviceUser="$value" ;;
-			WIFI_DEVICE_PASSWORD) wifi_devicePassword="$value" ;;
-			WIFI_IP_ADDR) wifi_ipAddr="$value" ;;
-			CORPORATE_MODE) corporateMode="$value" ;;
-			REGISTRY|LOCAL_REGISTRY) registry="$value" ;;
-			PATCH_MODE) patchMode="$value" ;;
-			UG_BUILD_TYPE|UGDEV) dev_flag="DEV" ;;
-		esac
-	done < "$config_file"
 }
 
 print_help(){
@@ -418,7 +329,6 @@ check_and_update_ultragrid_continuous(){
 	echo "$remote_sha256" > "$ug_cached_checksum"
 	echo -e "	${GREEN}	UltraGrid continuous build updated successfully.${NC}"
 }
-
 
 parse_config_file() {
 	local config_file="$1"
@@ -580,19 +490,15 @@ rm -rf "${HOME}"/Downloads/wavelet_server.iso
 rm -rf "${HOME}"/Downloads/wavelet_decoder.iso
 
 if [[ -n "$registry" ]]; then
-	# TODO - update for conf file.
 	echo "	We have defined a local registry for faster setup.  Wavelet will pull OCI layers from this registry."
 	echo "	NOTE:  The registry must be accessible from the wavelet subnet until the server is provisioned."
 	# We would verify the registry format here to ensure it's a valid type, script will break if not valid format
 	# These get an IP from the local interface, useful in automation later
-	#get_publicinterface
+	get_publicinterface
 	validate_ip_port "$registry"
 	INPUTFILES="server_custom.yml decoder_custom.yml"
 	rm -f ignition_files/wavelet_keys.csv
 	echo "type,path,mode,overwrite,owner,group,content" >> ignition_files/wavelet_keys.csv
-	echo "file,/var/wavelet_registry.txt,0644,true,,,${registry}" >> ignition_files/wavelet_keys.csv
-	echo "file,/var/wavelet_registry_hostname.txt,0644,true,,,${ip} $(hostname)"  >> ignition_files/wavelet_keys.csv
-	echo "file,/var/httpd_lan.txt,0644,true,,,${registry}:8080"  >> ignition_files/wavelet_keys.csv
 	sed -i "s|192.168.1.32:5000|$registry|g" $INPUTFILES
 	sed -i "s|192.168.1.32:8080|${registry%%:*}:8080|g" $INPUTFILES
 	sed -i "s|https://github.com/Allethrium/wavelet/archive/refs/heads/master.tar.gz|http://${registry%%:*}:8080/master.tar.gz|g" $INPUTFILES
@@ -605,11 +511,7 @@ else
 	registry="$svr_ip"
 	INPUTFILES="server_custom.yml decoder_custom.yml"
 	rm -f ignition_files/wavelet_keys.csv
-	# We still set the registry values, however they are always going to be the wavelet server IP in this case.
 	echo "type,path,mode,overwrite,owner,group,content" >> ignition_files/wavelet_keys.csv
-	echo "file,/var/wavelet_registry.txt,0644,true,,,${registry}" >> ignition_files/wavelet_keys.csv
-  	echo "file,/var/wavelet_registry_hostname.txt,0644,true,,,${ip} svr.$domain"  >> ignition_files/wavelet_keys.csv
-	echo "file,/var/httpd_lan.txt,0644,true,,,${httpd_lan:-192.168.1.32:8080}"  >> ignition_files/wavelet_keys.csv
 	sed -i "s|192.168.1.32:5000|$registry|g" $INPUTFILES
 	sed -i "s|192.168.1.32:8080|${registry%%:*}:8080|g" $INPUTFILES
 	# Note the nameserver must later be removed because it will interfere with DNS during spinup
@@ -620,7 +522,7 @@ fi
 echo "	Dev mode is now enabled by default due to the need for running a patched UltraGrid AppImage.."
 dev_flag="DEV";
 
-if [[ ${labMode} == "True" ]] || [[ -n "$configFile" ]]; then
+if [[ -n "$configFile" ]]; then
 	automatic_setup
 else
 	echo -e "${RED}Error: Lab mode (--lab) or a configuration file (--config=<file>) must be provided.${NC}"

@@ -6,22 +6,6 @@
 # If a server, we go on to wavelet_install_services
 # If a client, we go on to wavelet_install_client
 
-# Fallback to loading config directly
-if [[ -f /etc/wavelet/wavelet.conf ]]; then
-	while IFS='=' read -r key value; do
-		[[ "$key" =~ ^[[:space:]]*# ]] && continue
-		[[ -z "$key" ]] && continue
-			key=$(echo "$key" | xargs)
-			value=$(echo "$value" | xargs)
-			value="${value#\"}"
-			value="${value%\"}"
-			value="${value#\'}"
-			value="${value%\'}"
-			export "$key=$value"
-	done < /etc/wavelet/wavelet.conf
-fi
-
-
 RED="\033[0;31m"
 GREEN="\033[0;32m"
 NC="\033[0m"
@@ -54,11 +38,11 @@ event_decoder(){
 			echo -e "AMD64 architecture, running base install..\n"
 			rpm_overlay_install_client
 			;;
-		"arm")
+		"aarch64")
 			echo -e "aarch64 architecture, switching to ARM ostree.."
 			rpm_ostree_ARM
 			;;
-		"riscV")
+		"riscv64")
 			echo -e "RISC-V architecture, switching to RISCV ostree.."
 			rpm_ostree_RISCV
 			;;
@@ -103,7 +87,7 @@ event_server(){
 	# Make etcd datadir and copy nonsecure yaml to conf file, and update with server IP address.
 	mkdir -p "/var/lib/etcd-data"
 	# Enable config
-	echo "${SVR_IP:-$ip}" > "/var/home/wavelet/config/etcd_ip"
+	echo "${SVR_IP:-$(hostname -I | xargs)}" > "/var/home/wavelet/config/etcd_ip"
 	# Generate and enable systemd units
 	# Therefore, they will start on next boot, run, and disable themselves
 	cat > "/etc/systemd/system/wavelet_install_depends.service" <<-EOF
@@ -118,7 +102,7 @@ event_server(){
 		ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_services.sh'
 		ExecStartPost=systemctl disable wavelet_install_depends.service
 		[Install]
-		WantedBy=multi-user.target"
+		WantedBy=multi-user.target
 	EOF
 		echo -e "Generating systemd unit for security layer.."
 	cat > "/etc/systemd/system/wavelet_install_hardening.service" <<-EOF
@@ -133,19 +117,18 @@ event_server(){
 		ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_hardening.sh'
 		ExecStartPost=systemctl disable wavelet_install_hardening.service
 		[Install]
-		WantedBy=multi-user.target"
+		WantedBy=multi-user.target
 	EOF
 	# RPM Ostree and container infra setup
 	# We will check for an external registry first, and build local images only if it does not exist.
 	echo "OCI Container image setup"
-	get_ipValue
 	# First we check and generate our registry value
 	check_registry
 	setup_registry_quadlet
 	pull_registry_images
 	# Pull these images in serial as they are heavy
 	pull_overlay "coreos_overlay_client" --tls-verify=false
-	podman tag coreos_overlay_client "$hostNameSys/coreos_overlay_client"
+	podman tag coreos_overlay_client:latest "$hostNameSys/coreos_overlay_client"
 	podman push --tls-verify=false "$hostNameSys/coreos_overlay_client" "$hostNameSys:5000/coreos_overlay_client"
 	touch /var/install.installing
 	rpm_overlay_install_server
@@ -159,7 +142,7 @@ event_server(){
 	local waveletFiles_sha512
 	# Perform some other server-specific tasks:
 	# Copy wavelet_files to the webserver and generate the expected sha512 hash value.
-	mv "/var/$packageTarball" "/var/home/wavelet/http/ignition/wavelet_files.tar.gz"
+	cp "/var/$packageTarball" "/var/home/wavelet/http/ignition/wavelet_files.tar.gz"
 	cp "/usr/local/bin/wavelet_install_packages.sh" "/var/home/wavelet/http/ignition/"
 	waveletFiles_sha512="$(sha512sum <"/var/home/wavelet/http/ignition/wavelet_files.tar.gz" | cut -d ' ' -f 1)"
 	echo "$waveletFiles_sha512" > /var/secrets/waveletFiles_sha512.txt
@@ -171,36 +154,11 @@ event_server(){
 	systemctl reboot -f
 }
 
-get_ipValue(){
-	# Gets the current IP address for this host
-	nmcli_get=$(nmcli -t -f AUTOCONNECT,UUID con | grep 'yes')
-	IPVALUE=$(nmcli -f 'IP4.ADDRESS' con show --active uuid "${nmcli_get##*yes:}" | awk '{ print $2 }')
-	if [[ "${IPVALUE%/*}" == "" ]]; then
-			# sleep for five seconds, then call yourself again
-			echo -e "\nIP Address is null, sleeping and calling function again\n"
-			sleep 5
-			get_ipValue
-		else
-			echo -e "\nIP Address is not null, testing for validity..\n"
-			valid_ipv4() {
-				local ip=$1 regex='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
-				if [[ $ip =~ $regex ]]; then
-					echo "IP Address is valid, continuing.."
-					return 0
-				else
-					echo "IP Address is not valid, sleeping and calling function again"
-					get_ipValue
-				fi
-			}
-			valid_ipv4 "${IPVALUE%/*}"
-	fi
-}
-
 setup_registry_quadlet(){
-  # This sets up our local wavelet server registry
+	# This sets up our local wavelet server registry
 	cat > "/etc/containers/systemd/registry.container" <<-EOF
 		[Unit]
-		Description=Wavelet container registry
+        Description=Wavelet container registry
 		After=network-online.target
 		Wants=network-online.target
 
@@ -283,7 +241,7 @@ pull_registry_images() {
   local counter=0
   local timeout=180  # 3 minute timeout for each operation
   local max_retries=2  # 1 retry before failing
-
+  local sourceList=()
   if [[ "$externalReg" == "0" ]]; then
     echo "Pulling container images from internet sources.."
     local tls=""
@@ -397,69 +355,14 @@ export_container_image(){
 	fi
 }
 
-rpm_overlay_install() {
-	# Parse input options
-	echo "Parsing input options: "; echo "${@}"
-	for arg in "$@"; do
-		echo -e "Argument is: ${arg}"
-		case ${arg} in
-			"--generic")
-				# TODO - assumes an intel Xe-based system which is most of what we have to lab upon.
-				echo -e "Called standard config, using generic containerfile\n"
-				containerFile="Containerfile.coreos.overlay.client"
-				;;
-			"--nvidia")
-				# TODO - we don't have any appropriate hardware yet for this.
-				echo -e "Using nvidia containerfile\n"
-				containerFile="Containerfile.coreos.overlay.client.nvidia"
-				;;
-			"--amd")
-				# TODO - we don't have any appropriate hardware yet for this.
-				echo -e "Using AMD containerfile\n"
-				containerFile="Containerfile.coreos.overlay.client.amd"
-				;;
-			*)
-				echo -e "Called with invalid argument, exiting.\n" && exit 0
-				;;
-		esac
-	done
-	echo -e "\n${GREEN}Customization completed, finishing installer task and checking for extended support..\n${NC}"
-}
-
 rpm_ostree_ARM(){
-	# We are building ARM version here, so the containerfile would specify arm-specific libraries for multiple proprietary platforms.  
-	# Unless panfrost made some major progress on mainline hw video acceleration..
-	# ..this would need A LOT of work (just look at Armbian)
-	if is_flag_enabled "ARM_SUPPORT_ENABLED"; then
-		echo -e "ARM support is enabled, building ARM OCI overlay and downloading additional UltraGrid build..\n"
-	else
-		echo -e "ARM support is NOT enabled, and we are running on an ARM device.  Exiting.\n"; exit 1
-	fi
-	podman build -t localhost/coreos_overlay \
-	--build-arg DKMS_KERNEL_VERSION="${DKMS_KERNEL_VERSION}" \
-	-v=/home/wavelet/containerfiles:/mount:z \
-	-f /home/wavelet/containerfiles/Containerfile.arm.coreos.overlay.client
-	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay_arm_client
-	set_state_flag "RPM_OSTREE_OVERLAY_COMPLETE" "yes"
-	set_state_flag "RPM_OSTREE_OVERLAY_RPMFUSION_REPO_COMPLETE" "yes"
-	set_state_flag "RPM_OSTREE_OVERLAY_RPMFUSION_PKGS_COMPLETE" "yes"
-	# N.B can only use --compress with dir: transport method. zstd would be pretty cool, no? 
-	podman push localhost:5000/coreos_overlay_surface "$oci_registry"/coreos_overlay_arm_client --tls-verify=false
+	echo "not yet implemented"
+	exit 0
 }
 
 rpm_ostree_RISCV(){
-	# We are building RISCV version here, so the containerfile would specify libraries for RISC-V target platforms.
-	# This would need A LOT of work...
-	podman build -t localhost/coreos_overlay \
-	--build-arg DKMS_KERNEL_VERSION="${DKMS_KERNEL_VERSION}" \
-	-v=/home/wavelet/containerfiles:/mount:z \
-	-f /home/wavelet/containerfiles/Containerfile.RISCV.coreos.overlay.client
-	podman tag localhost/coreos_overlay localhost:5000/coreos_overlay_RISCV_client
-	set_state_flag "RPM_OSTREE_OVERLAY_COMPLETE" "yes"
-	set_state_flag "RPM_OSTREE_OVERLAY_RPMFUSION_REPO_COMPLETE" "yes"
-	set_state_flag "RPM_OSTREE_OVERLAY_RPMFUSION_PKGS_COMPLETE" "yes"
-	# N.B can only use --compress with dir: transport method. zstd would be pretty cool, no? 
-	podman push localhost:5000/coreos_overlay_surface "$oci_registry"/coreos_overlay_RISCV_client --tls-verify=false
+	echo "not yet implemented"
+	exit 0
 }
 
 pull_overlay(){
@@ -493,27 +396,23 @@ pull_overlay(){
 
 rpm_overlay_install_server(){
 	echo "Rebasing server to OCI container image"
-	# Rebase to the OCI layer we just copied (or built)
-	# When externalReg=0, images are built locally as localhost/* and not pushed to registry
-	if [[ "$externalReg" == "0" ]]; then
-		storage="localhost"
-	else
-		storage="$oci_registry"
-	fi
 	echo "	Current rpm-ostree status:"
 	rpm-ostree status
 	echo "	Current bootc status: "
 	bootc status
-	echo "	Current ENV:"
-	env
-	# bootc now errors on fsetxattr(security.selinux): Invalid argument
-	# bootc switch --transport registry "$storage/coreos_overlay_server"
-	rpm-ostree rebase --experimental "ostree-unverified-image:registry:$storage/coreos_overlay_server"
+	if [[ "$externalReg" == "0" ]]; then
+		echo "	Rebasing from local containers-storage..."
+		rpm-ostree rebase --experimental "ostree-unverified-image:containers-storage:localhost/coreos_overlay_server:latest"
+	else
+		storage="$oci_registry"
+		echo "	Rebasing from registry: $storage..."
+		rpm-ostree rebase --experimental "ostree-unverified-image:registry:$storage/coreos_overlay_server"
+	fi
 }
 
 rpm_overlay_install_client(){
 	# Pulls the client overlay and installs it.  For obvious reasons, client only.
-	serverHostName="$(grep -E '^DOMAIN=' /etc/wavelet/wavelet.conf 2>/dev/null | cut -d'=' -f2 | sed 's/^/svr./' || echo "svr.$domain")"
+	serverHostName="$(grep -E '^DOMAIN=' /etc/wavelet/wavelet.conf 2>/dev/null | cut -d'=' -f2 | sed 's/^/svr./' || echo "svr.$DOMAIN")"
 	serverIPAddress="$(grep -E '^SVR_IP=' /etc/wavelet/wavelet.conf 2>/dev/null | cut -d'=' -f2)"
 	oci_registry="$serverIPAddress:5000"
 	echo "Installing via container and applying as ostree overlay.."
@@ -541,10 +440,12 @@ rpm_overlay_install_client(){
 		ConditionPathExists=!/var/client_install.complete
 		Wants=network-online.target
 		After=multi-user.target network-online.target
+
 		[Service]
 		Type=oneshot
 		ExecStartPre=/usr/bin/bash -c 'sleep 3'
 		ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_client.sh'
+
 		[Install]
 		WantedBy=multi-user.target
 	EOF
@@ -563,6 +464,11 @@ install_packages(){
 	# Arg is always the name of the wavelet archive, set from ignition systemd declaration
 	echo -e "Installing packages and additional files.."
 	/usr/bin/mkdir -p /var/wavelet_root
+	if [[ ! -f "/var/$1" ]]; then
+		echo "ERROR:  File /var/$1 does not exist!"
+		exit 1
+	fi
+
 	/usr/bin/tar -xf "/var/$1" --strip-components=3 -C /var/wavelet_root --overwrite
 	/usr/bin/cp -r /var/wavelet_root/etc/* /etc/
 	/usr/bin/cp -r /var/wavelet_root/usr/local/bin/* /usr/local/bin/
@@ -577,7 +483,7 @@ install_packages(){
 	# Note we want to preserve the tabs in the polkit rules for readability
 	if [[ "$1" == *"decoder" ]]; then
 		echo "	Adding client-specific rules.."
-		cat >> "/etc/polkit-1/rules.d/1339-wavelet-hostname.rules" <<EOF
+		cat > "/etc/polkit-1/rules.d/1339-wavelet-hostname.rules" <<EOF
 polkit.addRule(function(action, subject) {
 	if ((action.id == \"org.freedesktop.systemd1.manage-units\" &&
 	subject.user == \"wavelet\")) {
@@ -596,7 +502,7 @@ polkit.addRule(function(action, subject) {
 });
 EOF
 		chmod 0644 "/etc/polkit-1/rules.d/1339-wavelet-hostname.rules"
-		cat >> "/etc/polkit-1/rules.d/1340-wavelet-screencast.rules" <<EOF
+		cat > "/etc/polkit-1/rules.d/1340-wavelet-screencast.rules" <<EOF
 polkit.addRule(function(action, subject) {
 	if ((action.id == "org.freedesktop.systemd1.manage-units" &&
 	subject.user == "wavelet")) {
@@ -612,7 +518,7 @@ polkit.addRule(function(action, subject) {
 });
 EOF
 		chmod 0644 "/etc/polkit-1/rules.d/1340-wavelet-screencast.rules"
-		cat >> "/etc/polkit-1/rules.d/49-wavelet-hostnamectl.rules" << EOF
+		cat > "/etc/polkit-1/rules.d/49-wavelet-hostnamectl.rules" << EOF
 polkit.addRule(function(action, subject) {
 	if (action.id == \"org.freedesktop.hostname1.set-static-hostname\") {
 		if (subject.user == \"wavelet\") {
@@ -623,7 +529,7 @@ polkit.addRule(function(action, subject) {
 });
 EOF
 		chmod 0644 "/etc/polkit-1/rules.d/49-wavelet-hostnamectl.rules"
-		cat >> "/etc/polkit-1/rules.d/1336-systemd-getty.rules" << EOF
+		cat > "/etc/polkit-1/rules.d/1336-systemd-getty.rules" << EOF
 polkit.addRule(function(action, subject) {
 	if ((action.id == "org.freedesktop.systemd1.manage-units" &&
 	subject.user == "wavelet")) {
@@ -646,7 +552,7 @@ EOF
 	fi
 
 	# Common rules and polkit files
-	cat >> "/etc/polkit-1/rules.d/9337-wavelet.rules" << EOF
+	cat > "/etc/polkit-1/rules.d/9337-wavelet.rules" << EOF
 polkit.addRule(function(action, subject) {
 	if ((action.id == "org.freedesktop.systemd1.manage-units" &&
 		subject.user == "wavelet-root")) {
@@ -666,7 +572,7 @@ polkit.addRule(function(action, subject) {
 EOF
 	chmod 0644 "/etc/polkit-1/rules.d/9337-wavelet.rules"
 
-	cat >> "/etc/polkit-1/rules.d/1338-wavelet-wifi.rules" << EOF
+	cat > "/etc/polkit-1/rules.d/1338-wavelet-wifi.rules" << EOF
 polkit.addRule(function(action, subject) {
   if (( action.id == "org.freedesktop.NetworkManager.wifi.scan" ||
 	action.id == "org.freedesktop.NetworkManager.settings.modify.hostname" ||
@@ -685,26 +591,26 @@ polkit.addRule(function(action, subject) {
 });
 EOF
 	chmod 0644 "/etc/polkit-1/rules.d/1338-wavelet-wifi.rules"
-
 	cat > "/etc/polkit-1/rules.d/51-systemd-resolved.rules" <<EOF
 polkit.addRule(function(action, subject) {
   if ((action.id == "org.freedesktop.resolve1") &&
 	subject.user == "wavelet") {
 	  return polkit.Result.YES;
 	}
-});" > /etc/polkit-1/rules.d/51-systemd-resolved.rules
-  chmod 0644 /etc/polkit-1/rules.d/51-systemd-resolved.rules
-
-  echo -e "polkit.addRule(function(action, subject) {
+});
+EOF
+	chmod 0644 "/etc/polkit-1/rules.d/51-systemd-resolved.rules"
+	cat > "/etc/polkit-1/rules.d/51-reboot.rules" <<EOF
+polkit.addRule(function(action, subject) {
   if ((action.id == "org.freedesktop.reboot" &&
 	subject.user == "wavelet")) {
 	  return polkit.Result.YES;
 	}
 });
 EOF
-	chmod 0644 "/etc/polkit-1/rules.d/51-systemd-resolved.rules"
+	chmod 0644 "/etc/polkit-1/rules.d/51-reboot.rules"
 	# USB detection rule
-	cat >> "/etc/udev/rules.d/80-wavelet-encoder.rules" << EOF
+	cat > "/etc/udev/rules.d/80-wavelet-encoder.rules" << EOF
 ACTION=="add", SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}==":0e*:*", \
     TAG+="systemd", ENV{UDEV_DB_RAN_ALREADY}!="1", \
     ENV{SYSTEMD_USER_WANTS}+="wavelet_detectv4l@%E{DEVNAME}.service", ENV{UDEV_DB_RAN_ALREADY}="1"
@@ -741,7 +647,7 @@ EOF
 	EOF
 	echo "" > "/etc/modprobe.d/i915.conf"
 	chmod 0644 "/etc/modprobe.d/i915.conf"
-	cat >> "/etc/sysctl.d/90-sysrq.conf" <<-EOF
+	cat > "/etc/sysctl.d/90-sysrq.conf" <<-EOF
 		# As per UG Team
 		# Increase the read-buffer space allocatable
 		net.ipv4.tcp_mem = 1000000 2000000 83886080
@@ -788,19 +694,22 @@ EOF
 		vm.dirty_expire_centisecs = 1500
 	EOF
 	# This makes using etcdctl for troubleshooting somewhat less painful
-	echo -e "#!/bin/bash
-export ETCDCTL_ENDPOINTS=\"https://$(hostname):2379\"
-export ETCDCTL_CACERT=\"/etc/ipa/ca.crt\"" > "/etc/profile.d/etcdctl.sh"
-  chmod 0644 "/etc/sysctl.d/90-sysrq.conf"
-  chmod 0644 "/etc/ssh/sshd_config.d/20-enable-passwords.conf"
-  mkdir -p /usr/local/backgrounds/sway/
-  /usr/bin/cp "/var/wavelet_root/usr/local/backgrounds/sway/wavelet_test.png" "/usr/local/backgrounds/sway/"
-  chmod 0644 "/usr/local/backgrounds/sway/wavelet_test.png"
-  /usr/bin/chmod 0755 "/usr/local/bin"
-  /usr/bin/chown wavelet:wavelet "/home/wavelet"
-  /usr/bin/chown wavelet-root:wavelet-root "/home/wavelet-root"
-  # Add empty rdma files to suppress startup warnings
-  touch /etc/rdma/modules/{infiniband.conf,rdma.conf,roce.conf}
+	cat > "/etc/profile.d/etcdctl.sh" <<-EOF
+		#!/bin/bash
+		export ETCDCTL_ENDPOINTS=\"https://$(hostname):2379\"
+		export ETCDCTL_CACERT=\"/etc/ipa/ca.crt\"
+	EOF
+	chmod 0644 "/etc/profile.d/etcdctl.sh"
+	chmod 0644 "/etc/sysctl.d/90-sysrq.conf"
+	chmod 0644 "/etc/ssh/sshd_config.d/20-enable-passwords.conf"
+	mkdir -p /usr/local/backgrounds/sway/
+	/usr/bin/cp "/var/wavelet_root/usr/local/backgrounds/sway/wavelet_test.png" "/usr/local/backgrounds/sway/"
+	chmod 0644 "/usr/local/backgrounds/sway/wavelet_test.png"
+	/usr/bin/chmod 0755 "/usr/local/bin"
+	/usr/bin/chown wavelet:wavelet "/var/home/wavelet"
+	/usr/bin/chown wavelet-root:wavelet-root "/var/home/wavelet-root"
+	# Add empty rdma files to suppress startup warnings
+	touch /etc/rdma/modules/{infiniband.conf,rdma.conf,roce.conf}
 }
 
 generate_files(){
@@ -824,27 +733,6 @@ generate_files(){
 }
 
 
-
-is_flag_enabled(){
-	local flag_name="$1"
-	local flag_name_lower
-	flag_name_lower=$(echo "$flag_name" | tr 'A-Z' 'a-z')
-
-	if [[ -f /etc/wavelet/wavelet.conf ]]; then
-		local val
-		val=$(grep -E "^${flag_name}=" /etc/wavelet/wavelet.conf 2>/dev/null | head -n1 | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//;s/["'"'"']//g')
-		if [[ "$val" == "yes" ]] || [[ "$val" == "true" ]] || [[ "$val" == "1" ]]; then
-			return 0
-		fi
-		val=$(grep -E "^${flag_name_lower}=" /etc/wavelet/wavelet.conf 2>/dev/null | head -n1 | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//;s/["'"'"']//g')
-		if [[ "$val" == "yes" ]] || [[ "$val" == "true" ]] || [[ "$val" == "1" ]]; then
-			return 0
-		fi
-	fi
-	return 1
-}
-
-
 #####
 #
 # Main
@@ -856,9 +744,21 @@ mkdir -p /var/home/wavelet/logs
 exec >/var/home/wavelet/logs/installer.log 2>&1
 systemctl disable zincati.service --now
 hostNameSys="$(hostname)"
-# Get the primary IP address
-ip="$(hostname -I | cut -d " " -f 1)"
-
+# Sources the following:
+source "/etc/wavelet.conf"
+#DOMAIN
+#SVR_IP
+#SVR_GW
+#SVR_DNS
+#SVR_HOSTNAME
+#TIME_ZONE
+#DEVELOPER_MODE
+#ENABLE_WIFI
+#WIFI_SSID
+#WIFI_BSSID
+#DEPLOYMENT_REGISTRY
+#REGISTRY
+#UG_BUILD_TYPE
 # Set timezone correctly for locale
 echo "Setting timezone to appropriate locale."
 echo "Please ensure other devices (switch, AP, network video sources) are correctly set to either use NTP for the server."
@@ -869,11 +769,6 @@ timedatectl set-timezone "$timeZone"
 echo "Processing inline file generation.."
 generate_files "$2"
 
-# Extract wavelet files from the included tar
-echo "Extracting wavelet packages.."
-touch /var/install.configuring
-install_packages "$1"
-
 # Create directories for wavelet configuration
 echo "Creating additional directories.."
 mkdir -p /etc/wavelet
@@ -883,8 +778,8 @@ echo "Getting available repository data.."
 # This is the LAN deployment registry (from config file)
 registry="${DEPLOYMENT_REGISTRY:-${REGISTRY}}"
 # This is the LOCAL registry on THIS server
-packageTarball="$1"
-chown -R wavelet:wavelet /var/home/wavelet
+local_registry="${SVR_HOSTNAME}"
+
 rpm-ostree initramfs --enable
 # Systemd early unit to set plymouth theme next boot
 # This is failable so it won't generate error messages and is guaranteed to only try once.
@@ -908,4 +803,11 @@ EOF
 
 systemctl daemon-reload
 systemctl enable set-plymouth-theme.service
+
+# Defines the git tarball we use to populate /usr/local/bin with our modules
+# Extract wavelet files from the included tar
+echo "Extracting wavelet packages.."
+install_packages "$1"
+chown -R wavelet:wavelet /var/home/wavelet
+
 detect_self
