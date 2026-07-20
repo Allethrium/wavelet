@@ -34,7 +34,6 @@ export_container_image(){
 }
 
 build_container_image(){
-	set -x
     local imageTarget="$1"
     local containerFile="$2"
     local env="$3"
@@ -54,7 +53,6 @@ build_container_image(){
         echo -e "${RED}		Failed to build $imageTarget${NC}"
         return 1
     fi
-    set +x
 }
 
 pull_registry_images(){
@@ -485,6 +483,7 @@ check_firewall_ports() {
 # Main
 #
 #####
+
 
 waveletdir=$(pwd)
 mkdir -p "$waveletdir/logs"

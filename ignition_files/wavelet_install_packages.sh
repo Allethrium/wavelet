@@ -53,7 +53,7 @@ event_decoder(){
 }
 
 event_clientHostName(){
-	if [[ "$(hostname)" == "decX.$(dnsdomainname)" ]]; then
+	if [[ "$(hostname)" == "decX.$DOMAIN" ]]; then
 		echo -e "	I am a Decoder, and my hostname needs to be randomized. \n"
 	else
 		echo -e "	This device Hostname is not set appropriately, exiting \n"
@@ -82,12 +82,10 @@ event_server(){
 	# I haven't had access to another platform with video hardware support + enough number crunching power to do the task.
 	# Get, or generate RPM overlay
 	# Set my pretty hostname
-	hostnamectl set-hostname "$(hostname)" --pretty
+	hostnamectl set-hostname "$SVR_HOSTNAME" --pretty
 
 	# Make etcd datadir and copy nonsecure yaml to conf file, and update with server IP address.
 	mkdir -p "/var/lib/etcd-data"
-	# Enable config
-	echo "${SVR_IP:-$(hostname -I | xargs)}" > "/var/home/wavelet/config/etcd_ip"
 	# Generate and enable systemd units
 	# Therefore, they will start on next boot, run, and disable themselves
 	cat > "/etc/systemd/system/wavelet_install_services.service" <<-EOF
@@ -184,7 +182,7 @@ setup_registry_quadlet(){
 	mkdir -p /var/containers/registry
 	systemctl daemon-reload && systemctl start registry.service
 	sleep 5
-	if curl -s "http://$(hostname):5000/v2"; then
+	if curl -s "http://$SVR_HOSTNAME:5000/v2"; then
 		echo "Registry running, continuing.."
 	else
 		echo "Registry down!  Cannot continue!"
@@ -206,31 +204,31 @@ check_registry(){
 		# We can now use bootc, defining the lan or server registries.
 		cat > /etc/containers/registries.conf.d/11-lan.conf <<- EOF
 			[[registry]]
-			prefix = "lan.$(dnsdomainname)"
-			location = "${registry}:5000"
+			prefix = "lan.$DOMAIN"
+			location = "${DEPLOYMENT_REGISTRY}:5000"
 			gpg-verify = false
 			insecure = true
 		EOF
 		cat > /etc/containers/registries.conf.d/10-wavelet.conf <<- EOF
 			[[registry]]
-			prefix = "svr.$(dnsdomainname)"
-			location = "${registry}:5000"
+			prefix = "svr.$DOMAIN"
+			location = "${REGISTRY}:5000"
 			insecure = true
 		EOF
-		oci_registry="lan.$(dnsdomainname)"
+		oci_registry="lan.$DOMAIN"
 		externalReg=1
 		# It is easier to perform the registry podman pull here to save us an if test
 		podman pull --tls-verify=false "$oci_registry/registry"
 		echo "Pulling OCI client image from external registry to local registry, oci_registry set to: $oci_registry"
 		echo "Container images will be pulled from external registry"
 	else
-		oci_registry="svr.$(dnsdomainname)"
+		oci_registry="svr.$DOMAIN"
 		externalReg=0
 		podman pull "docker.io/library/registry"
 		echo "Registry IP and server IP match, generating OCI images locally, oci_registry set to: $oci_registry"
 		echo "Container images will be pulled from internet."
 		count=0
-		DKMS_KERNEL_VERSION=$(uname -r)
+		DKMS_KERNEL_VERSION="$(uname -r)"
 		# Export implied in build function
 		build_container_image "coreos_overlay_client" "Containerfile.coreos.overlay.client"
 		build_container_image "coreos_overlay_server" "Containerfile.coreos.overlay.server"
@@ -344,7 +342,7 @@ build_container_image(){
 export_container_image(){
 	local imageTarget="$1"
 	local registry_hostname
-	registry_hostname=$(hostname -f)
+	registry_hostname=$SVR_HOSTNAME
 	local registry_url="$registry_hostname:5000"
 	echo -e "\n	Exporting $imageTarget to registry $registry_url"
 	if podman push --format oci --tls-verify=false \
@@ -400,20 +398,20 @@ pull_overlay(){
 
 rpm_overlay_install_server(){
 	echo "Rebasing server to OCI container image"
-	echo "	Current rpm-ostree status:"
+	echo -e "\n	Current rpm-ostree status:"
 	rpm-ostree status
-	echo "	Current bootc status: "
+	echo -e "\n	Current bootc status: "
 	bootc status
 	# Bug note - as of FCOS 20260621, bootc switch performs correctly and ostree rebase appears depreciated
 	if [[ "$externalReg" == "0" ]]; then
 		echo "	Rebasing from local containers-storage..."
-		bootc switch --transport registry "$storage/coreos_overlay_server:latest"
-#		rpm-ostree rebase --experimental "ostree-unverified-image:containers-storage:localhost/coreos_overlay_server:latest"
+#		bootc switch --transport containers-storage "$storage/coreos_overlay_server:latest"
+		rpm-ostree rebase --experimental "ostree-unverified-image:containers-storage:localhost/coreos_overlay_server:latest"
 	else
 		storage="$oci_registry"
 		echo "	Rebasing from registry: $storage..."
-		bootc switch --transport registry "$storage/coreos_overlay_server:latest"
-#		rpm-ostree rebase --experimental "ostree-unverified-image:registry:$storage/coreos_overlay_server"
+#		bootc switch --transport registry "$storage/coreos_overlay_server:latest"
+		rpm-ostree rebase --experimental "ostree-unverified-image:registry:$storage/coreos_overlay_server"
 	fi
 }
 
@@ -430,7 +428,7 @@ rpm_overlay_install_client(){
 	echo "$serverIPAddress $serverHostName" > /etc/hosts
 	cat > /etc/containers/registries.conf.d/10-wavelet.conf <<- EOF
 		[[registry]]
-		prefix = "svr.$(dnsdomainname)"
+		prefix = "svr.$DOMAIN"
 		location = "${oci_registry}"
 		insecure = true
 	EOF
@@ -703,7 +701,7 @@ EOF
 	# This makes using etcdctl for troubleshooting somewhat less painful
 	cat > "/etc/profile.d/etcdctl.sh" <<-EOF
 		#!/bin/bash
-		export ETCDCTL_ENDPOINTS=\"https://$(hostname):2379\"
+		export ETCDCTL_ENDPOINTS=\"https://$SVR_HOSTNAME:2379\"
 		export ETCDCTL_CACERT=\"/etc/ipa/ca.crt\"
 	EOF
 	chmod 0644 "/etc/profile.d/etcdctl.sh"

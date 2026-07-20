@@ -112,8 +112,8 @@ DEVELOPER_MODE=${developerMode:-0}
 ENABLE_WIFI=${enableWifi:-0}
 WIFI_SSID=${wifi_ssid:-}
 WIFI_BSSID=${wifi_bssid:-}
-# If an external registry is available, we populate here.  Implies external HTTPD server.
-DEPLOYMENT_REGISTRY=${registry}
+# If an external registry is available, we populate here.  Implies external HTTPD server on port 8080 also.
+DEPLOYMENT_REGISTRY=${DEPLOYMENT_REGISTRY}
 # This refers to the server's registry.
 REGISTRY=${svr_ip:-192.168.1.32}
 # Usually on
@@ -248,12 +248,12 @@ get_publicinterface(){
 	# Tries to get the active network interface, may sometimes get it wrong.
 	iface_route="$(ip -4 route show default | sort -nk1,1 | head -n1)"
 	if [[ -z "$iface_route" ]]; then
-		echo "No default IPv4 route found. Cannot determine public interface."
+		echo "	No default IPv4 route found. Cannot determine public interface."
 		exit 1
 	fi
 	iface=$(echo "$iface_route" | awk '{print $5}')
 	ip="$(nmcli -t -f IP4.ADDRESS dev show $iface | awk -F: '{print $2}' |cut -d'/' -f1 )"
-	echo "Main interface IP Address: $ip"
+	echo "	Main interface IP Address: $ip"
 }
 
 download_wavelet_git(){
@@ -356,7 +356,7 @@ parse_config_file() {
 			WIFI_DEVICE_USER) wifi_deviceUser="$value" ;;
 			WIFI_DEVICE_PASSWORD) wifi_devicePassword="$value" ;;
 			WIFI_IP_ADDR) wifi_ipAddr="$value" ;;
-			REGISTRY|LOCAL_REGISTRY) registry="$value" ;;
+			DEPLOYMENT_REGISTRY) DEPLOYMENT_REGISTRY="$value" ;;
 			PATCH_MODE) patchMode="$value" ;;
 			UG_BUILD_TYPE|UGDEV) dev_flag="DEV" ;;
 		esac
@@ -387,19 +387,19 @@ for i in "$@"
 				print_help;	exit 0
 				;;
 			-p=*|--password=*|--pass=*)
-				PASSWORD=${i#*=}; echo -e "Password defined for BOTH user accounts as: ${PASSWORD}";
+				PASSWORD=${i#*=}; echo -e "	Password defined for BOTH user accounts as: ${PASSWORD}";
 				;;
 			-ws=*|--wifissid=*)
-				wifi_ssid=${i#*=}; echo -e "WiFi SSID defined as: ${wifi_ssid}";
+				wifi_ssid=${i#*=}; echo -e "	WiFi SSID defined as: ${wifi_ssid}";
 				;;
 			-wb=*|--wifibssid=*)
-				wifi_bssid=${i#*=}; echo -e "WiFi BSSID/MAC defined as: ${wifi_bssid}";
+				wifi_bssid=${i#*=}; echo -e "	WiFi BSSID/MAC defined as: ${wifi_bssid}";
 				;;
 			-wip=*|--wifiapip=*)
-				wifi_ipAddr=${i#*=}; echo -e "WiFi Access Point IP defined as: ${wifi_ipAddr}"
+				wifi_ipAddr=${i#*=}; echo -e "	WiFi Access Point IP defined as: ${wifi_ipAddr}"
 				;;
 			-wp=*|--wifipass=*)
-				wifi_password=${i#*=}; echo -e "WiFi WPA PSK defined as: ${wifi_password} (will have no effect with Security layer active!)";
+				wifi_password=${i#*=}; echo -e "	WiFi WPA PSK defined as: ${wifi_password} (will have no effect with Security layer active!)";
 				;;
 			-wap=*|--wifiappass=*)
 				wifi_devicePassword=${i#*=}; echo -e "WiFi AP Password: ${wifi_devicePassword}";
@@ -408,38 +408,38 @@ for i in "$@"
 				wifi_deviceUser=${i#*=}; echo -e "WiFi AP User: ${wifi_deviceUser}";
 				;;
 			-enablewifi)
-				enableWifi="1"; echo -e "WiFi mode enabled. WiFi parameters will be written to ignition files.";
+				enableWifi="1"; echo -e "	WiFi mode enabled. WiFi parameters will be written to ignition files.";
 				;;
 			-domain=*)	domain=${i#*=}; echo -e "Target domain: ${domain}";
 				;;
 			-ugd|--ugdev|--ugcontinuous)	dev_flag="DEV";
 				;;
 			-4=*|--ip4subnet=*)
-				ip4=${i#*=}; echo -e "WIP! IPv4 Subnet (CIDR) defined as: ${ip4}";
+				ip4=${i#*=}; echo -e "	WIP! IPv4 Subnet (CIDR) defined as: ${ip4}";
 				;;
 			-6=*|--ipv6subnet=*)
-				ip6=${i#*=}; echo -e "WIP! IPv6 Subnet fefined as: ${ip6}";
+				ip6=${i#*=}; echo -e "	WIP! IPv6 Subnet fefined as: ${ip6}";
 				;;
 			-ip=*|--serverip=*)
-				svr_ip=${i#*=}; echo -e "WIP! Server Static IPv4 defined as ${svr_ip}}";
+				svr_ip=${i#*=}; echo -e "	WIP! Server Static IPv4 defined as ${svr_ip}}";
 				;;
 			-g=*|--servergateway=*)
-				svr_gw=${i#*=}; echo -e "WIP! Server IPv4 gateway defined as ${svr_gw}";
+				svr_gw=${i#*=}; echo -e "	WIP! Server IPv4 gateway defined as ${svr_gw}";
 				;;
 			-dns=*|--serverdns=*)
-				svr_dns=${i#*=}; echo -e "WIP! Server IPv4 dns defined as ${svr_dns}";
+				svr_dns=${i#*=}; echo -e "	WIP! Server IPv4 dns defined as ${svr_dns}";
 				;;
      	    -reg=*|--localregistry=*)
-				registry=${i#*=}; echo -e "Local registry defined as IP ${registry}";
+				registry=${i#*=}; echo -e "	Local registry defined as IP ${registry}";
 				;;
             -b|--patched)
-            	patchMode="ON"; echo -e "Pulling from patched UG branch";
+            	patchMode="ON"; echo -e "	Pulling from patched UG branch";
             	;;
             -t=*|--timezone=*)
-            	timeZone=${i#*=}; echo -e "Timezone set to $timeZone (default to America/New_York if empty)";
+            	timeZone=${i#*=}; echo -e "	Timezone set to $timeZone (default to America/New_York if empty)";
             	;;
 			-c=*|--config=*)
-				configFile=${i#*=}; echo -e "Extracting configuration from defined config file: ${configFile}"
+				configFile=${i#*=}; echo -e "	Extracting configuration from defined config file: ${configFile}"
 				;;
 			*)
 				echo "bad input argument: $i";
@@ -484,33 +484,32 @@ cp ignition_files/ignition_decoder.yml ./decoder_custom.yml
 rm -rf "${HOME}"/Downloads/wavelet_server.iso
 rm -rf "${HOME}"/Downloads/wavelet_decoder.iso
 
-if [[ -n "$registry" ]]; then
+if [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
 	echo "	We have defined a local registry for faster setup.  Wavelet will pull OCI layers from this registry."
 	echo "	NOTE:  The registry must be accessible from the wavelet subnet until the server is provisioned."
 	# We would verify the registry format here to ensure it's a valid type, script will break if not valid format
 	# These get an IP from the local interface, useful in automation later
 	get_publicinterface
-	validate_ip_port "$registry"
+	validate_ip_port "$DEPLOYMENT_REGISTRY"
 	INPUTFILES="server_custom.yml decoder_custom.yml"
 	rm -f ignition_files/wavelet_keys.csv
 	echo "type,path,mode,overwrite,owner,group,content" >> ignition_files/wavelet_keys.csv
-	sed -i "s|192.168.1.32:5000|$registry|g" $INPUTFILES
-	sed -i "s|192.168.1.32:8080|${registry%%:*}:8080|g" $INPUTFILES
-	sed -i "s|https://github.com/Allethrium/wavelet/archive/refs/heads/master.tar.gz|http://${registry%%:*}:8080/master.tar.gz|g" $INPUTFILES
+	sed -i "s|192.168.1.32:5000|$DEPLOYMENT_REGISTRY|g" $INPUTFILES
+	sed -i "s|192.168.1.32:8080|${DEPLOYMENT_REGISTRY%%:*}:8080|g" $INPUTFILES
+	sed -i "s|https://github.com/Allethrium/wavelet/archive/refs/heads/master.tar.gz|http://${DEPLOYMENT_REGISTRY%%:*}:8080/master.tar.gz|g" $INPUTFILES
 	# Set UltraGrid to local LAN server, which ought to have both builds if build_registry.sh worked as it should.
-	sed -i "s|https://github.com/CESNET/UltraGrid/releases/download/v1.10.5/UltraGrid-1.10.5-x86_64.AppImage|http://${registry%%:*}:8080/UltraGrid-1.10.5-x86_64.AppImage|g" $INPUTFILES
+	sed -i "s|https://github.com/CESNET/UltraGrid/releases/download/v1.10.5/UltraGrid-1.10.5-x86_64.AppImage|http://${DEPLOYMENT_REGISTRY%%:*}:8080/UltraGrid-1.10.5-x86_64.AppImage|g" $INPUTFILES
 	download_wavelet_git
 else
-	echo "  Local registry option not defined, running standalone setup.."
-	# TODO - use conf file now as far as possible.
-	registry="$svr_ip"
+	echo "	Local registry option not defined, running standalone setup.."
+	registry="$SVR_IP"
 	INPUTFILES="server_custom.yml decoder_custom.yml"
 	rm -f ignition_files/wavelet_keys.csv
 	echo "type,path,mode,overwrite,owner,group,content" >> ignition_files/wavelet_keys.csv
 	sed -i "s|192.168.1.32:5000|$registry|g" $INPUTFILES
 	sed -i "s|192.168.1.32:8080|${registry%%:*}:8080|g" $INPUTFILES
 	# Note the nameserver must later be removed because it will interfere with DNS during spinup
-	echo "    Setting nameserver to gateway 9.9.9.9 for simple DNS resolution during initial setup.."
+	echo "	Setting nameserver to gateway 9.9.9.9 for simple DNS resolution during initial setup.."
 	sed -i "s|#nameserver|- nameserver=9.9.9.9|g" $INPUTFILES
 fi
 
