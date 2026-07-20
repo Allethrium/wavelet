@@ -1,0 +1,132 @@
+// Static mock data for the demo UI, mirroring demo_mock_data.json (used by
+// get_keys.php when running through a web server). This .js copy exists so
+// the page can be opened directly from disk (file://) with no server at
+// all — fetchData() in index.js uses window.DEMO_MOCK_DATA directly when
+// it's present, instead of calling fetch().
+window.DEMO_MOCK_DATA = {
+    "groups": [
+        {
+            "hashID": "1",
+            "type": "group",
+            "key": "1",
+            "controls": {
+                "label": "Main Stage",
+                "audioStatus": "1",
+                "blankStatus": "0",
+                "bannerStatus": "0",
+                "bannerContent": "DEFAULT",
+                "livestreamStatus": "0",
+                "livestreamURL": "",
+                "livestreamKey": "",
+                "persistInput": "0",
+                "rebootStatus": "0",
+                "resetStatus": "0",
+                "revealStatus": "0",
+                "swatchValue": "#0f2b39",
+                "sourceHash": "1:1001",
+                "activeCodec": "H264",
+                "isPrimary": "1",
+                "chainedToGroup": ""
+            }
+        },
+        {
+            "hashID": "2",
+            "type": "group",
+            "key": "2",
+            "controls": {
+                "label": "Lobby Display",
+                "audioStatus": "0",
+                "blankStatus": "0",
+                "bannerStatus": "1",
+                "bannerContent": "WELCOME",
+                "livestreamStatus": "0",
+                "livestreamURL": "",
+                "livestreamKey": "",
+                "persistInput": "0",
+                "rebootStatus": "0",
+                "resetStatus": "0",
+                "revealStatus": "0",
+                "swatchValue": "#08507c",
+                "sourceHash": "2:1002",
+                "activeCodec": "H265",
+                "isPrimary": "0",
+                "chainedToGroup": ""
+            }
+        }
+    ],
+    "hosts": [
+        {
+            "hashID": "101",
+            "labelText": "Stage-DEC-01",
+            "type": "host",
+            "key": "101",
+            "hostIP": "192.168.10.21",
+            "hostType": "DEC",
+            "controls": {
+                "label": "Stage-DEC-01",
+                "blankStatus": "0",
+                "rebootStatus": "0",
+                "resetStatus": "0",
+                "revealStatus": "0",
+                "healthStatus": "0",
+                "GROUP": "1",
+                "directMode": "1",
+                "UIEnable": "1",
+                "screencastCapable": "0",
+                "promote": "0"
+            },
+            "inputs": [
+                {
+                    "hashID": "1001",
+                    "keyFull": "Stage-DEC-01;HDMI Capture;/dev/video0;host",
+                    "labelText": "HDMI Capture",
+                    "type": "input",
+                    "subType": "host",
+                    "parentHashID": "101",
+                    "isActive": false
+                }
+            ]
+        },
+        {
+            "hashID": "102",
+            "labelText": "Lobby-DEC-01",
+            "type": "host",
+            "key": "102",
+            "hostIP": "192.168.10.22",
+            "hostType": "DEC",
+            "controls": {
+                "label": "Lobby-DEC-01",
+                "blankStatus": "0",
+                "rebootStatus": "0",
+                "resetStatus": "0",
+                "revealStatus": "0",
+                "healthStatus": "1",
+                "GROUP": "2",
+                "directMode": "1",
+                "UIEnable": "1",
+                "screencastCapable": "0",
+                "promote": "0"
+            },
+            "inputs": [
+                {
+                    "hashID": "1002",
+                    "keyFull": "Lobby-DEC-01;NDI Feed;00:11:22:33:44;NDI",
+                    "labelText": "NDI Feed",
+                    "type": "input",
+                    "subType": "NDI",
+                    "parentHashID": "102",
+                    "isActive": false
+                }
+            ]
+        }
+    ],
+    "globals": {
+        "CONTROLS": {
+            "lowInformationMode": "0"
+        },
+        "CODECS": {
+            "H264": "libx264 -crf 23 -preset veryfast",
+            "H265": "libx265 -crf 28 -preset veryfast"
+        }
+    }
+};
