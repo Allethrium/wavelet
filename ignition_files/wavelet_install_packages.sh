@@ -126,13 +126,13 @@ event_server(){
 	pull_overlay "coreos_overlay_client" --tls-verify=false
 	podman tag coreos_overlay_client:latest "$hostNameSys/coreos_overlay_client"
 	podman push --tls-verify=false "$hostNameSys/coreos_overlay_client" "$hostNameSys:5000/coreos_overlay_client"
-	rpm_overlay_install_server
-	# wavelet_pxe_install.service will complete the root portion of the server spinup
-	systemctl enable wavelet_install_services.service
 	# Remove nameserver karg if it exists
 	if rpm-ostree kargs | grep -q 'nameserver'; then
 	  rpm-ostree kargs --delete nameserver
 	fi
+	rpm_overlay_install_server
+	# wavelet_pxe_install.service will complete the root portion of the server spinup
+	systemctl enable wavelet_install_services.service
 	local waveletFiles_sha512
 	# Perform some other server-specific tasks:
 	# Copy wavelet_files to the webserver and generate the expected sha512 hash value.
@@ -152,8 +152,17 @@ event_server(){
 	chown -R root:wavelet-root /var/secrets
 	chmod 0750 /var/secrets; chmod 0640 /var/secrets/*
 	set_ethernet_mtu
+	# ── DIAGNOSTICS: final state check before reboot ──
+	echo "=== PRE-REBOOT DIAGNOSTIC: rpm-ostree status ==="
+	rpm-ostree status --json 2>&1
+	echo "=== PRE-REBOOT DIAGNOSTIC: ostree admin status ==="
+	ostree admin status 2>&1
+	echo "=== PRE-REBOOT DIAGNOSTIC: /boot/loader/entries ==="
+	cat /boot/loader/entries/*.conf 2>&1
+	echo "=== END PRE-REBOOT DIAGNOSTICS ==="
+	sync
 	echo "Installation completed, restarting server.."
-	systemctl reboot -f
+	systemctl reboot
 }
 
 setup_registry_quadlet(){
@@ -413,6 +422,20 @@ rpm_overlay_install_server(){
 #		bootc switch --transport registry "$storage/coreos_overlay_server:latest"
 		rpm-ostree rebase --experimental "ostree-unverified-image:registry:$storage/coreos_overlay_server"
 	fi
+
+	# ── DIAGNOSTICS: capture staged deployment state immediately after rebase ──
+	echo "=== POST-REBASE DIAGNOSTIC: rpm-ostree status ==="
+	rpm-ostree status --json 2>&1
+	echo "=== POST-REBASE DIAGNOSTIC: bootc status ==="
+	bootc status 2>&1
+	echo "=== POST-REBASE DIAGNOSTIC: ostree admin status ==="
+	ostree admin status 2>&1
+	echo "=== POST-REBASE DIAGNOSTIC: staged deployment origin ==="
+	ostree admin status --print-current-dir 2>&1 || true
+	echo "=== POST-REBASE DIAGNOSTIC: /boot/loader/entries ==="
+	ls -la /boot/loader/entries/ 2>&1
+	cat /boot/loader/entries/*.conf 2>&1
+	echo "=== END DIAGNOSTICS ==="
 }
 
 rpm_overlay_install_client(){
@@ -782,10 +805,7 @@ chown wavelet:wavelet /var/log/wavelet
 echo "Getting available repository data.."
 # This is the LAN deployment registry (from config file)
 registry="${DEPLOYMENT_REGISTRY:-${REGISTRY}}"
-# This is the LOCAL registry on THIS server
-local_registry="${SVR_HOSTNAME}"
 
-rpm-ostree initramfs --enable
 # Systemd early unit to set plymouth theme next boot
 # This is failable so it won't generate error messages and is guaranteed to only try once.
 cat > "/etc/systemd/system/set-plymouth-theme.service" <<-EOF
