@@ -130,7 +130,6 @@ event_server(){
 	pull_overlay "coreos_overlay_client" --tls-verify=false
 	podman tag coreos_overlay_client:latest "$hostNameSys/coreos_overlay_client"
 	podman push --tls-verify=false "$hostNameSys/coreos_overlay_client" "$hostNameSys:5000/coreos_overlay_client"
-	touch /var/install.installing
 	rpm_overlay_install_server
 	# wavelet_install_ug_depends.service will then run, and force enable wavelet_install_pxe.service
 	# wavelet_pxe_install.service will complete the root portion of the server spinup
@@ -142,6 +141,14 @@ event_server(){
 	local waveletFiles_sha512
 	# Perform some other server-specific tasks:
 	# Copy wavelet_files to the webserver and generate the expected sha512 hash value.
+	# Determine tarball filename from git branch
+	local packageTarball
+	if [[ "$DEVELOPER_MODE" -eq 1 ]]; then
+		packageTarball="armelvil-working.tar.gz"
+	else
+		packageTarbell="master.tar.gz"
+	fi
+	# Destination is always wavelet_files.tar.gz
 	cp "/var/$packageTarball" "/var/home/wavelet/http/ignition/wavelet_files.tar.gz"
 	cp "/usr/local/bin/wavelet_install_packages.sh" "/var/home/wavelet/http/ignition/"
 	waveletFiles_sha512="$(sha512sum <"/var/home/wavelet/http/ignition/wavelet_files.tar.gz" | cut -d ' ' -f 1)"

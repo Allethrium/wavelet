@@ -137,7 +137,7 @@ extract_usrlocalbin(){
 
 download_wavelet_git(){
 	# Runs only if we are using non-LAN Deployment, or we are updating the server
-	if [[ -f "/var/developerMode.enabled" ]]; then
+	if [[ "$DEVELOPER_MODE" -eq 1 ]]; then
     	GH_BRANCH="armelvil-working"
   	else
 		GH_BRANCH="master"
@@ -195,6 +195,7 @@ install_wavelet_modules(){
 set -x
 hostNameSys=$(hostname)
 
+source "/etc/wavelet.conf"
 setupPath="/var/home/wavelet/config/setup"
 mkdir -p "$setupPath"
 

@@ -137,11 +137,8 @@ cat > ./ignition_files/wavelet_keys.csv <<-EOF
 	file,/etc/systemd/logind.conf.d/inhibit-suspend.conf,0644,,,,[Login]\nHandleLidSwitch=ignore
 	file,/var/secrets/ipaadmpw.secure,0600,true,,,${DOMAIN_ADMIN_PASSWORD:-DomainAdminPasswordGoesHere}
 	${wifiEntries}
-	file,/var/${developerFileName},0644,true,,,${developerFileContent}
-	file,/var/timezone.txt,0600,true,,,${timeZone}
 	file,/etc/resolv.conf,0644,true,,,${resolvContent}
 	file,/etc/hostname,0644,true,,,${serverHostName}
-	file,/var/serverhostname.txt,0644,true,,,${serverHostName}
 	file,/etc/hosts,0664,true,,,127.0.0.1      localhost localhost.localdomain localhost4 localhost4.localdomain4\n::1            localhost localhost.localdomain localhost6 localhost6.localdomain6\n${svr_ip}  ${serverHostName}  ${serverHostName%%.*}
 	dir,/home/wavelet/.config,0755,,wavelet,wavelet,
 	dir,/home/wavelet/.config/systemd,0755,,wavelet,wavelet,
