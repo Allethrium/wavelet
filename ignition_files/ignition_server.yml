@@ -119,10 +119,12 @@ systemd:
         Wants=network-online.target
         # Also wait for NM-wait-online so the static IP is actually up
         After=network-online.target NetworkManager-wait-online.service
+        
         [Service]
         Type=oneshot
         ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_packages.sh "master.tar.gz" "/var/wavelet_keys.csv"'
         ExecStartPost=-systemctl reboot
+        
         [Install]
         WantedBy=multi-user.target
     # Reboot service
@@ -131,8 +133,10 @@ systemd:
       contents: |
           [Unit]
           Description=Daily Reboot
+        
           [Timer]
           OnCalendar=*-*-* 06:00:00
+        
           [Install]
           WantedBy=timers.target
     # Reboot service timer
@@ -140,6 +144,7 @@ systemd:
       contents: |
           [Unit]
           Description=Daily Reboot
+        
           [Service]
           Type=simple
           ExecStart=/usr/bin/systemctl --force reboot
@@ -159,7 +164,7 @@ systemd:
             [Unit]
             Description=Wait for wavelet packages to install before starting autologin
             After=wavelet_installer.service
-            ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+
             [Service]
             # Override Execstart in main unit
             ExecStart=            

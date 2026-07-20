@@ -4,23 +4,8 @@
 # Most of the wavelet modules and directory configuration incl. permissions that doesn't fit elsewhere is also handled here
 
 # Source the wavelet configuration helper functions
-if [[ -f /etc/wavelet/wavelet_config.sh ]]; then
-    source /etc/wavelet/wavelet_config.sh
-else
-    # Fallback to loading config directly
-    if [[ -f /etc/wavelet/wavelet.conf ]]; then
-        while IFS='=' read -r key value; do
-            [[ "$key" =~ ^[[:space:]]*# ]] && continue
-            [[ -z "$key" ]] && continue
-            key=$(echo "$key" | xargs)
-            value=$(echo "$value" | xargs)
-            value="${value#\"}"
-            value="${value%\"}"
-            value="${value#\'}"
-            value="${value%\'}"
-            export "$key=$value"
-        done < /etc/wavelet/wavelet.conf
-    fi
+if [[ -f /etc/wavelet.conf ]]; then
+    source /etc/wavelet.conf
 fi
 
 install_ug_depends(){
@@ -71,8 +56,8 @@ install_ug_depends(){
 
 etcd_create_roles(){
 	# Certificates should already be generated from wavelet_install_hardening
-	sed -i "s|svrIP|$(hostname -i)|g" /etc/etcd.yaml.conf
-	sed -i "s|svrHostName|$(hostname)|g" /etc/etcd.yaml.conf
+	sed -i "s|svrIP|$SVR_IP|g" /etc/etcd.yaml.conf
+	sed -i "s|svrHostName|$SVR_HOSTNAME|g" /etc/etcd.yaml.conf
 	mv /etc/etcd.yaml.conf /etc/etcd/etcd.conf
 	until systemctl start etcd-quadlet.service; do
 		sleep 1
@@ -88,15 +73,16 @@ generate_tftpboot() {
 	# The Containerfile will generate an output direct to /var/lib/tftpboot with a populated set of UEFI secure boot files.
 	# Note that the shim may only load if the client host's BIOS/EFI is set to OS:Other -
 	# the shim may not work with the microsoft defaults on some machines without complaints.
-	httpdIP="$(cat /var/httpd_lan.txt)"
-	if [[ "${httpdIP%%:*}" != "$(hostname -i)" ]]; then
+	if [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
 		echo "	Pulling prebuilt container image from LAN registry server.."
-		if podman run --tls-verify=false --privileged --security-opt label=disable -v /var/lib:/tmp/ "$registry:5000/tftpboot"; then
+		if podman run --tls-verify=false --privileged --security-opt label=disable -v /var/lib:/tmp/ "$DEPLOYMENT_REGISTRY:5000/tftpboot"; then
 			echo "	TFTPboot directory generated! Continuing.."
 		else
+			echo "	ERR:  issue pulling container.  Attempting to build tftpboot container image and execute locally.."
 			generate_tftpboot
 		fi
 	else
+		echo "	Building tftpboot container image and executing.."
 		if podman build --tag tftpboot -f /home/wavelet/containerfiles/Containerfile.tftpboot; then
 			podman run --privileged --security-opt label=disable -v /var/lib:/tmp/ "tftpboot"
 		else
@@ -113,12 +99,11 @@ generate_tftpboot() {
 pull_coreos_files() {
 	# Check for a local LAN HTTPD server first (pattern will be ip:port)
 	dir="/var/home/wavelet/setup"
-	httpdIP="$(cat /var/httpd_lan.txt)"
 	mkdir -p /var/home/wavelet/http/pxe
-	if [[ "${httpdIP%%:*}" != "$(hostname -i)" ]]; then
-		echo "	Running external httpd initialization server, pulling from LAN source: $httpdIP"
+	if [[ "$SVR_HOSTNAME" != "$(hostname)" ]]; then
+		echo "	Running external httpd initialization server, pulling from LAN source: $SVR_HOSTNAME"
 		# Get httpd contents
-		result="$(curl -s "http://$httpdIP/" | sed -n 's/.*href="\([^"]*\)".*/\1/p' | grep -E '\.[^/]+$')"
+		result="$(curl -s "http://$SVR_HOSTNAME/" | sed -n 's/.*href="\([^"]*\)".*/\1/p' | grep -E '\.[^/]+$')"
 		# Generate our file candidate list
 		declare -a files=()
 		kernel=""; rootfs=""; initrd=""
@@ -136,13 +121,13 @@ pull_coreos_files() {
 		done <<<"$result"
 		pids=()
 		for file in "${files[@]}"; do
-			echo "	Downloading http://$httpdIP/$file"
+			echo "	Downloading http://$SVR_HOSTNAME/$file"
 			rm -rf "$dir/${file##*/}"
 			(
 				until curl -f \
 				-o "$dir/$(basename "$file")" \
 				--retry 3 --retry-delay 1 \
-				"http://$httpdIP/$file"; do
+				"http://$SVR_HOSTNAME/$file"; do
 					sleep .1;
 				done
 				cp "$dir/${file##*/}" "/var/home/wavelet/http/pxe/" &
@@ -193,11 +178,6 @@ generate_coreos_image() {
 	# Pull coreOS PXE
 	attempt=0
 	pull_coreos_files
-	# Move yml for automated installer and generate ignition file for initial client boot,
-	# then COPY it back as a compiled ignition file
-	if [[ -f automated_installer.yml ]]; then
-		echo "	Automated installer YAML already exists!"
-	fi
 	cp /var/home/wavelet/config/automated_installer.yml ./
 	butane --pretty --files-dir ./ automated_installer.yml --output automated_installer.ign
 	cp ./automated_installer.ign /var/home/wavelet/http/ignition/automated_installer.ign
@@ -215,7 +195,7 @@ generate_coreos_image() {
 	#		automated_installer.yml (FCCT/Butane YML config for initial boot)
 	#		automated_coreos_deployment.sh (HDD Detection script)
 	#		decoder.ign (should be pre-provisioned from initial setup script prior to installing the server)
-	configURL="http://$(hostname):8080/ignition/automated_installer.ign"
+	configURL="http://$SVR_HOSTNAME:8080/ignition/automated_installer.ign"
 	# The boot process now calls an initial coreOS Live image
 	# This has an automation process burned in with a custom ignition file.
 	# The enrollment and provision passwords are random
@@ -225,7 +205,7 @@ generate_coreos_image() {
 	# Because we are working (very) locally, and not passing secrets at this point, it isn't so much of a big deal.
 	coreOShttpEntry="menuentry  'Decoder FCOS V.${coreosVersion} HTTP live boot' --class fedora --class gnu-linux --class gnu --class os {
 echo -e '\nLoading CoreOS kernel...'
-linuxefi (http,$(hostname):8080)/pxe/${kernel##*/} coreos.live.rootfs_url=http://$(hostname):8080/pxe/${rootfs##*/} ignition.firstboot ignition.platform.id=metal ignition.config.url=${configURL}
+linuxefi (http,$(hostname):8080)/pxe/${kernel##*/} coreos.live.rootfs_url=http://$SVR_HOSTNAME:8080/pxe/${rootfs##*/} ignition.firstboot ignition.platform.id=metal ignition.config.url=${configURL}
 echo 'Loading Fedora CoreOS initial ramdisk...'
 initrdefi (http,$(hostname):8080)/pxe/${initrd##*/}
 echo 'Booting Fedora CoreOS...'
@@ -242,7 +222,7 @@ LABEL pxeboot
 KERNEL ${kernel##*/}
 INITRD ${initrd##*/},${rootfs##*/}
 APPEND coreos.inst.ignition.config.url=${configURL}
-IPAPPEND 2" > /var/lib/tftpboot/pxelinux.cfg/default
+IPAPPEND 2" > "/var/lib/tftpboot/pxelinux.cfg/default"
 	# Generate grub.cfg (for UEFI)
 	echo -e "
 function load_video {
@@ -264,8 +244,6 @@ menuentry 'Reboot' {
     reboot
 }
 ${coreOShttpEntry}
-${coreOStftpEntry}
-${coreOSbootCEntry}
 # Legacy PXE (Syslinux) fallback
 menuentry 'Legacy PXE (Syslinux)' {
     insmod pxelinux
@@ -281,12 +259,13 @@ menuentry 'Legacy PXE (Syslinux)' {
 }
 
 generate_bootc_image() {
+	# TODO - Develop full bootc container image now that it seems to be stabilizing 2H 2026
 	local bootc_image_name="decoder-bootc-${coreosVersion:-latest}"
-	sudo podman build \
+	podman build \
 		--tag "$bootc_image_name" \
 		-f /home/wavelet/containerfiles/Containerfile.bootc-decoder \
 		/home/wavelet/containerfiles/
-	sudo podman run --rm -it --privileged \
+	podman run --rm -it --privileged \
 		-v "$(pwd)":/output \
 		-v /var/lib/containers/storage:/var/lib/containers/storage \
 		registry.redhat.io/rhel9/bootc-image-builder:latest \
@@ -294,18 +273,18 @@ generate_bootc_image() {
 		--with-plymouth \
 		--with-bootloader-entry \
 		"$bootc_image_name"
-	mkdir -p /home/wavelet/http/pxe/bootc /var/lib/tftpboot/bootc
-	cp /output/*.efi /home/wavelet/http/pxe/bootc/
-	cp /output/vmlinuz /output/initramfs.img /var/lib/tftpboot/bootc/
+	mkdir -p "/home/wavelet/http/pxe/bootc" "/var/lib/tftpboot/bootc"
+	cp /output/*.efi "/home/wavelet/http/pxe/bootc/"
+	cp /output/vmlinuz /output/initramfs.img "/var/lib/tftpboot/bootc/"
     coreOSbootCEntry="menuentry 'Decoder BootC V.${coreosVersion} PXE' --class fedora --class gnu-linux {
 echo 'Loading BootC kernel...'
-linuxefi (http,\$(hostname):8080)/pxe/bootc/vmlinuz \
-	bootc.install.image=${registry}:5000/bootc-decoder:latest \
+linuxefi (http,$SVR_HOSTNAME:8080)/pxe/bootc/vmlinuz \
+	bootc.install.image=${REGISTRY}:5000/bootc-decoder:latest \
 	bootc.install.pxe \
 	bootc.install.pxe.kernel-args=console=tty0 \
 	ignition.firstboot ignition.platform.id=metal
 echo 'Loading BootC initramfs...'
-initrdefi (http,\$(hostname):8080)/pxe/bootc/initramfs.img
+initrdefi (http,$SVR_HOSTNAME:8080)/pxe/bootc/initramfs.img
 }"
 }
 
@@ -329,8 +308,8 @@ generate_wavelet_userspace_services(){
 		ExecStart=${targetFile}
 
 		[Install]
-		WantedBy=sway-session.target"
-		EOF
+		WantedBy=sway-session.target
+	EOF
 	chown wavelet:wavelet "$file"; chmod 0644 "$file"
 	file="/home/wavelet/.config/systemd/user/wavelet_init.service"
 	targetFile=""
@@ -351,42 +330,21 @@ generate_wavelet_userspace_services(){
 
 		[Install]
 		WantedBy=sway-session.target
-		EOF
+	EOF
   chown wavelet:wavelet "$file"; chmod 0644 "$file"
 }
 
 generate_decoder_ignition(){
 	# Generates the decoder ignition with wavelet_decoder_keys.csv
 	# Populate vars for use below
-	domain="$(dnsdomainname)"
-	svr_ip="$(hostname -i)"
-	httpd_lan="$svr_ip:8080"
-	serverHostName="$(hostname)"
 	# TODO - these should be in the conf file now.
-	# TODO - wavelet_decoder_keys.csv should poyentially also be conf file keys instead
-	wifi_ssid="$(cat /var/home/wavelet/config/wifi_ssid)"
-	wifi_bssid="$(cat /var/home/wavelet/config/wifi_bssid)"
-	wifi_password="$(cat /var/home/wavelet/config/wifi_pw)"
-	dc1_ip="$(cat /var/home/wavelet/config/DC1_ip)"
-	etcd_ip="$(cat /var/home/wavelet/config/etcd_ip)"
 	# Ensure the CA is available for injection into the decoder.ign
-	cp /etc/ipa/ca.crt /var/home/wavelet/config/
+	cp "/etc/ipa/ca.crt" "/var/home/wavelet/config/"
 	cat > /var/home/wavelet/config/wavelet_decoder_keys.csv <<-EOF
 		type,path,mode,overwrite,owner,group,content
-		file,/var/wavelet_registry.txt,0644,true,,,$svr_ip
-		file,/var/wavelet_registry_hostname.txt,0644,true,,,$svr_ip svr.$domain
-		file,/var/httpd_lan.txt,0644,true,,,${httpd_lan:-192.168.1.32:8080}
-		file,/var/serverhostname.txt,0644,true,,,$serverHostName
-		file,/var/home/wavelet/config/serverhostname.txt,0644,true,,,$serverHostName
 		file,/etc/systemd/logind.conf.d/inhibit-suspend.conf,0644,,,[Login]\nHandleLidSwitch=ignore
 		file,/etc/zincati/config.d/90-disable-auto-updates.toml,0644,,,[updates]\nenabled = false
-		file,/etc/hosts,0664,true,,,127.0.0.1	localhost localhost.localdomain localhost4 localhost4.localdomain4\n::1	localhost localhost.localdomain localhost6 localhost6.localdomain6\n$svr_ip	$serverHostName	${serverHostName%%.*}
-		file,/var/home/wavelet/config/wifi_ssid,0600,true,,,${wifi_ssid:-wavelet_wifi}
-		file,/var/home/wavelet/config/wifi_bssid,0600,true,,,${wifi_bssid:-00:00:00:00:00}
-		file,/var/home/wavelet/config/wifi_pw,0600,true,,,${wifi_password:-wavelet-wifi-psk-password}
-		file,/var/home/wavelet/config/DC1_ip,0600,true,,,$dc1_ip
-		file,/var/home/wavelet/config/dc1_host_entry,0600,true,,,$dc1_ip dc1.$domain dc1
-		file,/var/home/wavelet/config/etcd_ip,0600,true,,,$etcd_ip
+		file,/etc/hosts,0664,true,,,127.0.0.1	localhost localhost.localdomain localhost4 localhost4.localdomain4\n::1	localhost localhost.localdomain localhost6 localhost6.localdomain6\n$SVR_IP	$SVR_HOSTNAME	${SVR_HOSTNAME%%.*}
 		dir,/home/wavelet/config,0755,,wavelet,wavelet,
 		dir,/home/wavelet/.ssh/secrets,0755,,wavelet,wavelet,
 		dir,/home/wavelet/.config,0755,,wavelet,wavelet,
@@ -400,20 +358,20 @@ generate_decoder_ignition(){
 		dir,/var/lib/systemd/linger/wavelet-root,0755,,,root,
 	EOF
 	echo -e "  \nRegenerating decoder.ign with enrollment and provision credentials.."
-	sed -i "s|#hostname#|$(dnsdomainname)|g" /var/home/wavelet/config/decoder_custom.yml
+	sed -i "s|#hostname#|$DOMAIN|g" /var/home/wavelet/config/decoder_custom.yml
 	# Embed the expected SHA512 hash of the wavelet archive.  wavelet_installer_update should alter this value on new git pulls.
 	#sed -i "s|#waveletFilesVerificationHash|sha512-$(cat /var/secrets/waveletFiles_sha512.txt)|g" /var/home/wavelet/config/decoder_custom.yml
-	butane --pretty --files-dir /var/home/wavelet/config/ /var/home/wavelet/config/decoder_custom.yml \
-		--output /var/home/wavelet/http/ignition/decoder.ign
-	cp /home/wavelet/config/automated_coreos_deployment.sh /var/home/wavelet/http/ignition/
-	chown -R wavelet:wavelet /var/home/wavelet/http
+	butane --pretty --files-dir "/var/home/wavelet/config/" "/var/home/wavelet/config/decoder_custom.yml" \
+		--output "/var/home/wavelet/http/ignition/decoder.ign"
+	cp "/home/wavelet/config/automated_coreos_deployment.sh" "/var/home/wavelet/http/ignition/"
+	chown -R wavelet:wavelet "/var/home/wavelet/http"
 }
 
 coreos_systemd_fix(){
 	# Fix AVAHI, otherwise NDI won't function correctly
 	# https://www.linuxfromscratch.org/blfs/view/svn/basicnet/avahi.html
-	mkdir -p /var/lib/avahi/services && mkdir -p /run/avahi-daemon
-	cat > /etc/dbus-1/system.d/org.freedesktop.avahi.conf << EOF
+	mkdir -p "/var/lib/avahi/services" && mkdir -p "/run/avahi-daemon"
+	cat > "/etc/dbus-1/system.d/org.freedesktop.avahi.conf" << EOF
 <!DOCTYPE busconfig PUBLIC
 		  "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
 		  "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
@@ -471,12 +429,12 @@ EOF
 #####
 
 
-exec >/var/home/wavelet/logs/services.log 2>&1
+exec >"/var/home/wavelet/logs/services.log" 2>&1
 
 # Set server hostname for network sense.  
-sed -i "s|hostnamegoeshere|\"$(hostname)\"|g" /usr/local/bin/wavelet_network_sense.sh
+sed -i "s|hostnamegoeshere|\"$(hostname)\"|g" "/usr/local/bin/wavelet_network_sense.sh"
 ip="$(hostname -I | cut -d " " -f 1)"
-mkdir -p /var/home/wavelet/setup
+mkdir -p "/var/home/wavelet/setup"
 
 if vim --help; then
 	echo "  Packages are available, Container overlay succeeded, continuing to install dependencies.."
@@ -497,26 +455,25 @@ systemctl disable firewalld.service --now
 install_ug_depends
 
 echo "  Setting wavelet homedir permissions.."
-chmod g+s /var/home/wavelet
-setfacl -dm u:wavelet:rwx /var/home/wavelet
-setfacl -dm g:wavelet:rwx /var/home/wavelet
-setfacl -dm o::rx /var/home/wavelet
+chmod g+s "/var/home/wavelet"
+setfacl -dm u:wavelet:rwx "/var/home/wavelet"
+setfacl -dm g:wavelet:rwx "/var/home/wavelet"
+setfacl -dm o::rx "/var/home/wavelet"
 
 # We setup etcd core roles from root, since the etcd root pw should be accessible only from that user.
 # We need to create logging files for these accounts.
-mkdir -p /var/home/root/logs
-mkdir -p /var/home/wavelet-root/logs
-chown -R wavelet-root:wavelet-root /var/home/wavelet-root/
+mkdir -p "/var/home/root/logs"
+mkdir -p "/var/home/wavelet-root/logs"
+chown -R wavelet-root:wavelet-root "/var/home/wavelet-root/"
 
 # Generate TFTPBOOT folder along with appropriate entries for our populated boot options
 # We can run this in a parallel subshell as it's independent of the hardening process
-registry="$(cat /var/wavelet_registry.txt)"
 (
 	echo "	Generating PXE and UEFI/HTTPS Boot infrastructure in subshell.."
-	mkdir -p /var/lib/tftpboot/pxelinux.cfg
-	mkdir -p /var/home/wavelet/http/pxe/pxelinux.cfg/
-	mkdir -p /var/home/wavelet/pxe && cd /var/home/wavelet/pxe || return
-	mkdir -p /var/lib/tftpboot
+	mkdir -p "/var/lib/tftpboot/pxelinux.cfg"
+	mkdir -p "/var/home/wavelet/http/pxe/pxelinux.cfg/"
+	mkdir -p "/var/home/wavelet/pxe" && cd "/var/home/wavelet/pxe" || return
+	mkdir -p "/var/lib/tftpboot"
 	chmod +x {/var/home/wavelet/pxe,/var/home/wavelet/http,/var/home/wavelet/http/pxe}
 	generate_tftpboot
 	generate_coreos_image
@@ -526,9 +483,8 @@ registry="$(cat /var/wavelet_registry.txt)"
 	# Restore SElinux contexts or we will get an AVC denial when DHCP attempts to serve tftp requests
 	restorecon -Rv /var/lib/tftpboot
 	# Copy EFI files to http pxe
-	cp -R /var/lib/tftpboot/* /var/home/wavelet/http/pxe &
-	cp /var/home/wavelet/config/etcd_ip /var/home/wavelet/http/ignition
-	echo "$(hostname)" > /var/home/wavelet/http/ignition/serverhostname.txt
+	cp -R /var/lib/tftpboot/* "/var/home/wavelet/http/pxe"
+	cp "/etc/wavelet.conf" "/var/home/wavelet/http/ignition/wavelet.conf"
 	coreos_systemd_fix
 	chown -R wavelet:wavelet /var/home/wavelet/http
 ) &
@@ -537,12 +493,8 @@ registry="$(cat /var/wavelet_registry.txt)"
 	# Setup Domain Controller, PKI and provision service principals
 	echo "  Calling hardening module to install security layer in subshell.."
 	/usr/local/bin/wavelet_install_hardening.sh > /dev/null 2>&1
-	if [[ -f /etc/pki/tls/certs/etcd.crt ]]; then
+	if [[ -f "/etc/pki/tls/certs/etcd.crt" ]]; then
 		echo "  ETCD Certificate available, continuing to generate ETCD users and roles.."
-		# Generate the serverhostname.txt file for etcd_interaction to reference.
-		echo "$(hostname)" > /var/serverhostname.txt
-		cp /var/serverhostname.txt /var/home/wavelet/config/
-		chown wavelet:wavelet /var/home/wavelet/config/serverhostname.txt && chmod 644 /var/serverhostname.txt
 		etcd_create_roles
 	else
 		echo "  Etcd cert not available, DC provisioning has encountered an error!"
@@ -559,12 +511,8 @@ registry="$(cat /var/wavelet_registry.txt)"
 	# RADIUS seems to have some issues unless manually restarted
 	machinectl shell wavelet-root@ "$(which bash)" \
 		-c "systemctl --user restart freeradius.service"
-	if [[ -f /etc/pki/tls/certs/etcd.crt ]]; then
+	if [[ -f "/etc/pki/tls/certs/etcd.crt" ]]; then
 		echo "	ETCD Certificate available, continuing to generate ETCD users and roles.."
-		# Generate the serverhostname.txt file for etcd_interaction to reference.
-		echo "$(hostname)" > /var/serverhostname.txt && \
-		cp /var/serverhostname.txt /var/home/wavelet/config/
-		chown wavelet:wavelet /var/home/wavelet/config/serverhostname.txt && chmod 644 /var/serverhostname.txt
 		etcd_create_roles
 	else
 		echo "	Etcd cert not available, DC provisioning has encountered an error!"
@@ -579,39 +527,37 @@ generate_decoder_ignition
 
 set_state_flag "WAVELET_DEPENDS_COMPLETE" "yes"
 # These two steps require the subshell processes to have completed
-cp /etc/ipa/ca.crt /var/home/wavelet/http/ignition
-chown kea:root /var/lib/tftpboot/$localFile
+cp "/etc/ipa/ca.crt" "/var/home/wavelet/http/ignition"
 
 if is_state_flag_set "PXE_COMPLETE"; then
 	exit 0
 fi
 
 # Ensure the wavelet user owns the http folder, and set +x and read perms on http folder and subfolders
-chmod -R 0755 /var/home/wavelet/http
-chown -R wavelet /var/home/wavelet/
-chown -R wavelet-root /var/home/wavelet-root
-chown -R kea:root /var/lib/tftpboot
-chown -R kea:root /var/lib/tftpboot
+chmod -R 0755 "/var/home/wavelet/http"
+chown -R wavelet "/var/home/wavelet/"
+chown -R wavelet-root "/var/home/wavelet-root"
+chown -R kea:root "/var/lib/tftpboot"
 # Remove executable bit from all FILES in http (folders need +x for apache to traverse them)
-find /var/home/wavelet/http/ -type f -print0 | xargs -0 chmod 644
-find /var/home/wavelet/http-php/ -type f -print0 | xargs -0 chmod 644
+find "/var/home/wavelet/http/" -type f -print0 | xargs -0 chmod 644
+find "/var/home/wavelet/http-php/" -type f -print0 | xargs -0 chmod 644
 echo -e "	PXE bootable images completed and populated in http serverdir, client provisioning should now be available..\n"
 set_state_flag "PXE_COMPLETE" "yes"
 # Clean up
-rm -rf /var/home/wavelet/pxe
+rm -rf "/var/home/wavelet/pxe"
 
 # Generate base layer virus checking and ensure everything is up to date
 freshclam
 # Rkhunter doesn't expect proper coreos directories so that might be more problematic here.  The propupd function would be nice, however.
 
 # Generate UltraGrid squashfs dir so we don't need to worry about FUSE for some uses (reflector/hd-rum-translator)
-mkdir -p /usr/local/bin/ultragrid && cd /usr/local/bin/ultragrid
+mkdir -p "/usr/local/bin/ultragrid" && cd "/usr/local/bin/ultragrid"
 /usr/local/bin/UltraGrid.AppImage --appimage-extract
 echo "	Extracted AppImage contents available in /usr/local/bin/ultragrid/squashfs-root/"
 echo "	to invoke call the AppRun binary from this location or the /var/wavelet_ramfs dir"
 
 # Generate the persistent ramdisk
-mkdir -p /var/wavelet_ramfs
+mkdir -p "/var/wavelet_ramfs"
 cat > "/etc/systemd/system/var-wavelet_ramfs.mount" <<-EOF
 	[Unit]
 	Description=Wavelet system ramdisk (tmpfs) for UltraGrid binaries
@@ -633,7 +579,7 @@ cat > "/etc/systemd/system/var-wavelet_ramfs.mount" <<-EOF
 
 	[Install]
 	WantedBy=multi-user.target
-	EOF
+EOF
 # Smaller ramfs mount for the wavelet user (wrapper files)
 cat > "/etc/systemd/system/var-home-wavelet-ramfs.mount" <<-EOF
 	[Unit]
@@ -649,7 +595,7 @@ cat > "/etc/systemd/system/var-home-wavelet-ramfs.mount" <<-EOF
 
 	[Install]
 	WantedBy=multi-user.target
-	EOF
+EOF
 cat > "/etc/systemd/system/wavelet_copyfiles.service" <<-EOF
 	[Unit]
 	Description=Copies binaries from /usr/local/bin to ramdisk
@@ -661,7 +607,7 @@ cat > "/etc/systemd/system/wavelet_copyfiles.service" <<-EOF
 
 	[Install]
 	WantedBy=multi-user.target
-	EOF
+EOF
 systemctl daemon-reload
 systemctl enable --now var-wavelet_ramfs.mount var-home-wavelet-ramfs.mount wavelet_copyfiles.service
 

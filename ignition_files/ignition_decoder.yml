@@ -129,10 +129,12 @@ systemd:
         ConditionFirstBoot=yes
         Wants=network-online.target
         After=network-online.target
+        
         [Service]
         Type=oneshot
         ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_packages.sh "wavelet_files.tar.gz" "/var/wavelet_decoder_keys.csv"'
         ExecStartPost=-systemctl reboot
+        
         [Install]
         WantedBy=multi-user.target
     # Reboot service
@@ -150,6 +152,7 @@ systemd:
       contents: |
           [Unit]
           Description=Daily Reboot
+        
           [Service]
           Type=simple
           ExecStart=/usr/bin/systemctl --force reboot
@@ -179,7 +182,7 @@ systemd:
             [Unit]
             Description=Wait for wavelet packages to install before starting autologin
             After=wavelet_installer.service
-            ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
+
             [Service]
             # Override Execstart in main unit
             ExecStart=            

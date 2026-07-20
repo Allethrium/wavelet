@@ -90,17 +90,16 @@ event_server(){
 	echo "${SVR_IP:-$(hostname -I | xargs)}" > "/var/home/wavelet/config/etcd_ip"
 	# Generate and enable systemd units
 	# Therefore, they will start on next boot, run, and disable themselves
-	cat > "/etc/systemd/system/wavelet_install_depends.service" <<-EOF
+	cat > "/etc/systemd/system/wavelet_install_services.service" <<-EOF
 		[Unit]
 		Description=Install Server additional services
-		ConditionPathExists=/var/rpm-ostree-overlay.rpmfusion.pkgs.complete
-		ConditionPathExists=!/var/pxe.complete
 		After=multi-user.target
 
 		[Service]
 		Type=oneshot
 		ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_services.sh'
-		ExecStartPost=systemctl disable wavelet_install_depends.service
+		ExecStartPost=systemctl disable wavelet_install_services.service
+
 		[Install]
 		WantedBy=multi-user.target
 	EOF
@@ -108,14 +107,13 @@ event_server(){
 	cat > "/etc/systemd/system/wavelet_install_hardening.service" <<-EOF
 		[Unit]
 		Description=Install Security Layer
-		ConditionPathExists=/var/prod.security.enabled
-		ConditionPathExists=/var/wavelet_depends.complete
 		After=multi-user.target
 
 		[Service]
 		Type=oneshot
 		ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_hardening.sh'
 		ExecStartPost=systemctl disable wavelet_install_hardening.service
+
 		[Install]
 		WantedBy=multi-user.target
 	EOF
@@ -131,9 +129,8 @@ event_server(){
 	podman tag coreos_overlay_client:latest "$hostNameSys/coreos_overlay_client"
 	podman push --tls-verify=false "$hostNameSys/coreos_overlay_client" "$hostNameSys:5000/coreos_overlay_client"
 	rpm_overlay_install_server
-	# wavelet_install_ug_depends.service will then run, and force enable wavelet_install_pxe.service
 	# wavelet_pxe_install.service will complete the root portion of the server spinup
-	systemctl enable wavelet_install_depends.service
+	systemctl enable wavelet_install_services.service
 	# Remove nameserver karg if it exists
 	if rpm-ostree kargs | grep -q 'nameserver'; then
 	  rpm-ostree kargs --delete nameserver
@@ -146,7 +143,7 @@ event_server(){
 	if [[ "$DEVELOPER_MODE" -eq 1 ]]; then
 		packageTarball="armelvil-working.tar.gz"
 	else
-		packageTarbell="master.tar.gz"
+		packageTarball="master.tar.gz"
 	fi
 	# Destination is always wavelet_files.tar.gz
 	cp "/var/$packageTarball" "/var/home/wavelet/http/ignition/wavelet_files.tar.gz"
@@ -407,13 +404,16 @@ rpm_overlay_install_server(){
 	rpm-ostree status
 	echo "	Current bootc status: "
 	bootc status
+	# Bug note - as of FCOS 20260621, bootc switch performs correctly and ostree rebase appears depreciated
 	if [[ "$externalReg" == "0" ]]; then
 		echo "	Rebasing from local containers-storage..."
-		rpm-ostree rebase --experimental "ostree-unverified-image:containers-storage:localhost/coreos_overlay_server:latest"
+		bootc switch --transport registry "$storage/coreos_overlay_server:latest"
+#		rpm-ostree rebase --experimental "ostree-unverified-image:containers-storage:localhost/coreos_overlay_server:latest"
 	else
 		storage="$oci_registry"
 		echo "	Rebasing from registry: $storage..."
-		rpm-ostree rebase --experimental "ostree-unverified-image:registry:$storage/coreos_overlay_server"
+		bootc switch --transport registry "$storage/coreos_overlay_server:latest"
+#		rpm-ostree rebase --experimental "ostree-unverified-image:registry:$storage/coreos_overlay_server"
 	fi
 }
 

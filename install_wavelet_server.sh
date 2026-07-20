@@ -23,10 +23,11 @@ EOF
 }
 
 generate_user_yaml(){
-	local name=$1
-	local password_hash="$(cat ${user}.pw.secure)"
-	local ssh_authorized_keys=$(cat ${name}-ssh.pub)
-	local user_yaml="${name}_yaml.yml"
+	local name; local password_hash; local ssh_authorized_keys
+	name=$1
+	password_hash="$(cat "${user}.pw.secure")"
+	ssh_authorized_keys="$(cat "${name}-ssh.pub")"
+	user_yaml="${name}_yaml.yml"
 	if [[ "${name}" = "wavelet-root" ]]; then
 #		echo -e "\n	wavelet-root user, setting UID to 9337"
 		uid="9337"
@@ -58,15 +59,11 @@ customization(){
 	INPUTFILES="server_custom.yml decoder_custom.yml"
 	DOMAIN_ADMIN_PASSWORD="DomainAdminPasswordGoesHere"
 	serverHostName="svr.${domain:-wavelet.allethrium}"
-	if [[ "${developerMode}" -eq "1" ]]; then
+	if [[ "$developerMode" -eq "1" ]]; then
 		# Direct ignition sed
 		echo -e "${RED}	Injecting dev branch into files..${NC}"
 		repl="armelvil-working.tar.gz"
 		sed -i "s|master.tar.gz|${repl}|g" ${INPUTFILES}
-		developerFileName="developerMode.enabled"
-		developerFileContent="DeveloperModeEnabled - will pull from working branch"
-	else
-		developerFileContent="DeveloperModeDisabled - will pull from master branch"
 	fi
 
 	if [[ "$dev_flag" == "DEV" ]]; then
@@ -118,7 +115,7 @@ WIFI_BSSID=${wifi_bssid:-}
 # If an external registry is available, we populate here.  Implies external HTTPD server.
 DEPLOYMENT_REGISTRY=${registry}
 # This refers to the server's registry.
-REGISTRY=${registry:-${svr_ip}}
+REGISTRY=${svr_ip:-192.168.1.32}
 # Usually on
 UG_BUILD_TYPE=${dev_flag:-release}
 EOF
@@ -187,7 +184,7 @@ automatic_setup() {
 		cp users_yaml "${user}_yaml.yml"
 		generate_user_yaml "${user}"
 #		echo -e "	Adding generated YAML block to ignition file for ${user}.."
-		f2="$(<${user}_yaml.yml)"
+		f2="$(<"${user}_yaml.yml")"
 		input_files_arr=(${INPUTFILES})
 		for file in "${input_files_arr[@]}"; do
 			if [ -f "$file" ]; then
@@ -256,6 +253,7 @@ get_publicinterface(){
 	fi
 	iface=$(echo "$iface_route" | awk '{print $5}')
 	ip="$(nmcli -t -f IP4.ADDRESS dev show $iface | awk -F: '{print $2}' |cut -d'/' -f1 )"
+	echo "Main interface IP Address: $ip"
 }
 
 download_wavelet_git(){
@@ -535,4 +533,4 @@ rm -rf users_yaml dev.flag
 rm -rf *.yml
 echo -e "${GREEN}	Calling coreos_installer.sh to generate ISO images."
 echo -e "	You will need to burn the generated server ISO to USB/SD cards for initial boot.${NC}"
-./coreos_installer.sh "${developerMode}" "${isoMode}"
+./coreos_installer.sh "${developerMode}"

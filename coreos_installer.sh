@@ -57,4 +57,5 @@ coreos-installer iso customize \
 echo "	Done, please note customized yml and transpiled files will remain in the /ignition_files/ folder for inspection and debugging purposes."
 # removes generated user YAML blocks to keep everything clean
 #rm -rf ./*.yml
-echo -e "\n 	Image(s) generated,\n	If this is initial setup please burn wavelet_server.iso to a USB stick and boot to continue setup..\n"
+echo -e "\n 	Image(s) generated,\n	If this is initial setup,  please write wavelet_server.iso to a suitable boot media."
+echo "	You may then proceed to launch installation by booting from it on your target machine."
