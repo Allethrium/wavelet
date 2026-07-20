@@ -98,11 +98,12 @@ generate_tftpboot() {
 pull_coreos_files() {
 	# Copy coreos ISO files from the server (or download from internet sources)
 	dir="/var/home/wavelet/setup"
-	mkdir -p /var/home/wavelet/http/pxe
+	mkdir -p "/var/home/wavelet/http/pxe"
 	if [[ -n $DEPLOYMENT_REGISTRY ]]; then
 		echo "	Running external httpd initialization server, pulling from LAN source: $DEPLOYMENT_REGISTRY"
 		# Get httpd contents
-		result="$(curl -s "http://$DEPLOYMENT_REGISTRY:8080/" | sed -n 's/.*href="\([^"]*\)".*/\1/p' | grep -E '\.[^/]+$')"
+		HTTPD_SERVER="$http://$DEPLOYMENT_REGISTRY:8080"
+		result="$(curl -s "$HTTPD_SERVER" | sed -n 's/.*href="\([^"]*\)".*/\1/p' | grep -E '\.[^/]+$')"
 		# Generate our file candidate list
 		declare -a files=()
 		kernel=""; rootfs=""; initrd=""
@@ -120,13 +121,13 @@ pull_coreos_files() {
 		done <<<"$result"
 		pids=()
 		for file in "${files[@]}"; do
-			echo "	Downloading http://$DEPLOYMENT_REGISTRY/$file"
+			echo "	Downloading: $HTTPD_SERVER/$file"
 			rm -rf "$dir/${file##*/}"
 			(
 				until curl -f \
 				-o "$dir/$(basename "$file")" \
 				--retry 3 --retry-delay 1 \
-				"http://$DEPLOYMENT_REGISTRY/$file"; do
+				"$HTTPD_SERVER/$file"; do
 					sleep .1;
 				done
 				cp "$dir/${file##*/}" "/var/home/wavelet/http/pxe/" &

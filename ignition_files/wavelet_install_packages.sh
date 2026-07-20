@@ -147,21 +147,21 @@ event_server(){
 	cp "/var/$packageTarball" "/var/home/wavelet/http/ignition/wavelet_files.tar.gz"
 	cp "/usr/local/bin/wavelet_install_packages.sh" "/var/home/wavelet/http/ignition/"
 	waveletFiles_sha512="$(sha512sum <"/var/home/wavelet/http/ignition/wavelet_files.tar.gz" | cut -d ' ' -f 1)"
-	echo "$waveletFiles_sha512" > /var/secrets/waveletFiles_sha512.txt
+	echo "$waveletFiles_sha512" > "/var/secrets/waveletFiles_sha512.txt"
 	# Ensure only root and wavelet-root can read the secrets dir
-	chown -R root:wavelet-root /var/secrets
-	chmod 0750 /var/secrets; chmod 0640 /var/secrets/*
+	chown -R root:wavelet-root "/var/secrets"
+	chmod 0750 "/var/secrets"; chmod 0640 /var/secrets/*
 	set_ethernet_mtu
-	# ── DIAGNOSTICS: final state check before reboot ──
-	echo "=== PRE-REBOOT DIAGNOSTIC: rpm-ostree status ==="
-	rpm-ostree status --json 2>&1
-	echo "=== PRE-REBOOT DIAGNOSTIC: ostree admin status ==="
-	ostree admin status 2>&1
-	echo "=== PRE-REBOOT DIAGNOSTIC: /boot/loader/entries ==="
-	cat /boot/loader/entries/*.conf 2>&1
-	echo "=== END PRE-REBOOT DIAGNOSTICS ==="
-	sync
-	echo "Installation completed, restarting server.."
+#	# ── DIAGNOSTICS: final state check before reboot ──
+#	echo "=== PRE-REBOOT DIAGNOSTIC: rpm-ostree status ==="
+#	rpm-ostree status --json 2>&1
+#	echo "=== PRE-REBOOT DIAGNOSTIC: ostree admin status ==="
+#	ostree admin status 2>&1
+#	echo "=== PRE-REBOOT DIAGNOSTIC: /boot/loader/entries ==="
+#	cat /boot/loader/entries/*.conf 2>&1
+#	echo "=== END PRE-REBOOT DIAGNOSTICS ==="
+#	sync
+#	echo "Installation completed, restarting server.."
 	systemctl reboot
 }
 
@@ -188,7 +188,7 @@ setup_registry_quadlet(){
 		[Install]
 		WantedBy=multi-user.target
 	EOF
-	mkdir -p /var/containers/registry
+	mkdir -p "/var/containers/registry"
 	systemctl daemon-reload && systemctl start registry.service
 	sleep 5
 	if curl -s "http://$SVR_HOSTNAME:5000/v2"; then
@@ -237,7 +237,6 @@ check_registry(){
 		echo "Registry IP and server IP match, generating OCI images locally, oci_registry set to: $oci_registry"
 		echo "Container images will be pulled from internet."
 		count=0
-		DKMS_KERNEL_VERSION="$(uname -r)"
 		# Export implied in build function
 		build_container_image "coreos_overlay_client" "Containerfile.coreos.overlay.client"
 		build_container_image "coreos_overlay_server" "Containerfile.coreos.overlay.server"
@@ -422,20 +421,20 @@ rpm_overlay_install_server(){
 #		bootc switch --transport registry "$storage/coreos_overlay_server:latest"
 		rpm-ostree rebase --experimental "ostree-unverified-image:registry:$storage/coreos_overlay_server"
 	fi
-
-	# ── DIAGNOSTICS: capture staged deployment state immediately after rebase ──
-	echo "=== POST-REBASE DIAGNOSTIC: rpm-ostree status ==="
-	rpm-ostree status --json 2>&1
-	echo "=== POST-REBASE DIAGNOSTIC: bootc status ==="
-	bootc status 2>&1
-	echo "=== POST-REBASE DIAGNOSTIC: ostree admin status ==="
-	ostree admin status 2>&1
-	echo "=== POST-REBASE DIAGNOSTIC: staged deployment origin ==="
-	ostree admin status --print-current-dir 2>&1 || true
-	echo "=== POST-REBASE DIAGNOSTIC: /boot/loader/entries ==="
-	ls -la /boot/loader/entries/ 2>&1
-	cat /boot/loader/entries/*.conf 2>&1
-	echo "=== END DIAGNOSTICS ==="
+	rpm-ostree initramfs enable
+#	# ── DIAGNOSTICS: capture staged deployment state immediately after rebase ──
+#	echo "=== POST-REBASE DIAGNOSTIC: rpm-ostree status ==="
+#	rpm-ostree status --json 2>&1
+#	echo "=== POST-REBASE DIAGNOSTIC: bootc status ==="
+#	bootc status 2>&1
+#	echo "=== POST-REBASE DIAGNOSTIC: ostree admin status ==="
+#	ostree admin status 2>&1
+#	echo "=== POST-REBASE DIAGNOSTIC: staged deployment origin ==="
+#	ostree admin status --print-current-dir 2>&1 || true
+#	echo "=== POST-REBASE DIAGNOSTIC: /boot/loader/entries ==="
+#	ls -la /boot/loader/entries/ 2>&1
+#	cat /boot/loader/entries/*.conf 2>&1
+#	echo "=== END DIAGNOSTICS ==="
 }
 
 rpm_overlay_install_client(){
