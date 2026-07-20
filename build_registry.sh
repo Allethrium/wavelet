@@ -18,10 +18,10 @@ export_container_image(){
     if podman tag "localhost/$imageTarget" "$registry_addr/$imageTarget:latest"; then
         if podman push --format oci --tls-verify=false "localhost/$imageTarget" "$registry_url/$imageTarget:latest"; then
             echo -e "${GREEN}		Successfully pushed $imageTarget${NC}"
-            # Clean up only intermediate <none> images, and untag the localhost tags
-            podman image prune -f >/dev/null 2>&1
-            # Don't want to untag encase the script fails
-            #podman untag "localhost/$imageTarget"
+            # Remove local localhost/ image to avoid doubling storage in local podman storage
+            # since the registry now holds the image
+            podman rmi -f "localhost/${imageTarget}:latest" >/dev/null 2>&1 || \
+            podman rmi -f "localhost/$imageTarget" >/dev/null 2>&1 || true
             return 0
         else
             echo -e "${RED}		Failed to push $imageTarget${NC}"
@@ -34,12 +34,14 @@ export_container_image(){
 }
 
 build_container_image(){
+	set -x
     local imageTarget="$1"
     local containerFile="$2"
     local env="$3"
     echo -e "\n	Building container: $imageTarget"
     # Build
     if podman build -t "localhost/$imageTarget" \
+    	--security-opt label=disable \
         ${env:+--env "$env"} \
         -v="$waveletdir/webfiles/root/home/wavelet/containerfiles:/mount:z" \
         -f "$waveletdir/webfiles/root/home/wavelet/containerfiles/$containerFile" \
@@ -52,6 +54,7 @@ build_container_image(){
         echo -e "${RED}		Failed to build $imageTarget${NC}"
         return 1
     fi
+    set +x
 }
 
 pull_registry_images(){
@@ -60,10 +63,10 @@ pull_registry_images(){
 	# The process saves bandwidth and having to download gbs of container images every test
 	# this could be adapted to an enterprise registry for scale deployments
 	local registry_addr
-	registry_addr=$(hostname -f)
+	registry_addr="$(hostname -f)"
 	local registry_url="$registry_addr:5000"
 	podman image prune -f >/dev/null 2>&1
-	podman untag localhost/$imageTarget
+	podman untag "localhost/$imageTarget"
 	sourceList=()
   	sourceList+=("quay.io/coreos/etcd:v3.6.4")
 	sourceList+=("quay.io/coreos/coreos-installer:release")

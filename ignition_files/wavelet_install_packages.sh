@@ -322,7 +322,7 @@ build_container_image(){
 	echo -e "\n	Building container: $imageTarget"
 	# Build
 	count=$((count + 1 ))
-	if podman build -t "localhost/$imageTarget" \
+	if podman build --security-opt label=disable -t "localhost/$imageTarget" \
 		${env:+--env "$env"} \
 		-v="/var/home/wavelet/containerfiles:/mount:z" \
 		-f "/var/home/wavelet/containerfiles/${containerFile}" \
