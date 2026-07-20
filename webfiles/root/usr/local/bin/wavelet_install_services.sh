@@ -50,7 +50,6 @@ install_ug_depends(){
 	#install_libaja
 	#install_cineform
 	#install_live555
-	set_state_flag "UG_DEPENDS_COMPLETE" "yes"
 	cd /var/home/wavelet/setup || return
 }
 
@@ -97,13 +96,13 @@ generate_tftpboot() {
 }
 
 pull_coreos_files() {
-	# Check for a local LAN HTTPD server first (pattern will be ip:port)
+	# Copy coreos ISO files from the server (or download from internet sources)
 	dir="/var/home/wavelet/setup"
 	mkdir -p /var/home/wavelet/http/pxe
-	if [[ "$SVR_HOSTNAME" != "$(hostname)" ]]; then
-		echo "	Running external httpd initialization server, pulling from LAN source: $SVR_HOSTNAME"
+	if [[ -n $DEPLOYMENT_REGISTRY ]]; then
+		echo "	Running external httpd initialization server, pulling from LAN source: $DEPLOYMENT_REGISTRY"
 		# Get httpd contents
-		result="$(curl -s "http://$SVR_HOSTNAME/" | sed -n 's/.*href="\([^"]*\)".*/\1/p' | grep -E '\.[^/]+$')"
+		result="$(curl -s "http://$DEPLOYMENT_REGISTRY:8080/" | sed -n 's/.*href="\([^"]*\)".*/\1/p' | grep -E '\.[^/]+$')"
 		# Generate our file candidate list
 		declare -a files=()
 		kernel=""; rootfs=""; initrd=""
@@ -121,13 +120,13 @@ pull_coreos_files() {
 		done <<<"$result"
 		pids=()
 		for file in "${files[@]}"; do
-			echo "	Downloading http://$SVR_HOSTNAME/$file"
+			echo "	Downloading http://$DEPLOYMENT_REGISTRY/$file"
 			rm -rf "$dir/${file##*/}"
 			(
 				until curl -f \
 				-o "$dir/$(basename "$file")" \
 				--retry 3 --retry-delay 1 \
-				"http://$SVR_HOSTNAME/$file"; do
+				"http://$DEPLOYMENT_REGISTRY/$file"; do
 					sleep .1;
 				done
 				cp "$dir/${file##*/}" "/var/home/wavelet/http/pxe/" &
@@ -164,7 +163,6 @@ pull_coreos_files() {
 		fi
 	fi
 	echo "	Pulled files: kernel=${kernel##*/} rootfs=${rootfs##*/} initrd=${initrd##*/}"
-	set_state_flag "ISO_DOWNLOAD_COMPLETE" "yes"
 }
 
 generate_coreos_image() {
@@ -416,7 +414,6 @@ EOF
 	systemctl enable avahi-daemon
 	systemctl enable avahi-daemon.service --now
 	/usr/local/bin/wavelet_system_optimize.sh
-	set_state_flag "SERVER_ETCD_PROVISION" "yes"
 	echo -e " Dependencies Installation completed..\n"
 	systemctl set-default graphical.target
 }
@@ -525,7 +522,6 @@ wait
 echo "	Regenerating decoder ignition files and keys.."
 generate_decoder_ignition
 
-set_state_flag "WAVELET_DEPENDS_COMPLETE" "yes"
 # These two steps require the subshell processes to have completed
 cp "/etc/ipa/ca.crt" "/var/home/wavelet/http/ignition"
 
@@ -542,7 +538,6 @@ chown -R kea:root "/var/lib/tftpboot"
 find "/var/home/wavelet/http/" -type f -print0 | xargs -0 chmod 644
 find "/var/home/wavelet/http-php/" -type f -print0 | xargs -0 chmod 644
 echo -e "	PXE bootable images completed and populated in http serverdir, client provisioning should now be available..\n"
-set_state_flag "PXE_COMPLETE" "yes"
 # Clean up
 rm -rf "/var/home/wavelet/pxe"
 
