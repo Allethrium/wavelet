@@ -102,7 +102,7 @@ pull_coreos_files() {
 	if [[ -n $DEPLOYMENT_REGISTRY ]]; then
 		echo "	Running external httpd initialization server, pulling from LAN source: $DEPLOYMENT_REGISTRY"
 		# Get httpd contents
-		HTTPD_SERVER="$http://$DEPLOYMENT_REGISTRY:8080"
+		HTTPD_SERVER="http://$DEPLOYMENT_REGISTRY:8080"
 		result="$(curl -s "$HTTPD_SERVER" | sed -n 's/.*href="\([^"]*\)".*/\1/p' | grep -E '\.[^/]+$')"
 		# Generate our file candidate list
 		declare -a files=()
