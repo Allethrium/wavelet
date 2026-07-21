@@ -8,18 +8,26 @@
 # This containerfile aims to build all dependencies for Wavelet in a container for client systems.  It's the "base layer"
 # To be applied as an ostree rebase
 
-# For now we must lock to FC 43, because the RPMfusion repos for FFMPEG 8 break NDI.
-# Working: https://mirror.fcix.net/rpmfusion/free/fedora/updates/43/x86_64/repoview/ffmpeg.html 7.1.4-1
-# Broken: https://mirror.fcix.net/rpmfusion/free/fedora/updates/44/x86_64/repoview/ffmpeg.html 8.1.2-1
-# Stable known-good version: 43.20260301.3.1
-# This version still requires the override-remove of nfs-utils-coreos
-FROM quay.io/fedora/fedora-coreos:43.20260301.3.1
+## FCOS 44 notes:
+## FCOS 44 does not require the override-remove of nfs-utils-coreos like FCOS 43 did.
 
-# Step 1: Configure repos and install packages that don't conflict with Fedora defaults
-RUN rm /etc/yum.repos.d/fedora-cisco-openh264.repo
-RUN rpm-ostree override remove nfs-utils-coreos --install nfs-utils && \
-    curl -o /etc/yum.repos.d/swayfx.repo https://copr.fedorainfracloud.org/coprs/swayfx/swayfx/repo/fedora-43/swayfx-swayfx-fedora-43.repo && \
-    rpm-ostree install -y -A \
+FROM quay.io/fedora/fedora-coreos:stable
+
+# Adjust args as appropriate (build_registry.sh should modify them dynamically)
+ARG FFMPEG_VERSION=7.1.4
+ARG DEPLOYMENT_HTTPD=192.168.1.200
+ARG FCOS_VERSION=44
+
+# Configure repos, override ffmpeg with custom 7.1.4 build to prevent rpmfusion ffmpeg 8.1 from being installed, and install all dependencies in a single layer
+RUN rm -f /etc/yum.repos.d/fedora-cisco-openh264.repo && \
+    curl -o /etc/yum.repos.d/swayfx.repo https://copr.fedorainfracloud.org/coprs/swayfx/swayfx/repo/fedora-${FCOS_VERSION}/swayfx-swayfx-fedora-${FCOS_VERSION}.repo && \
+    rpm-ostree install -y \
+            https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${FCOS_VERSION}.noarch.rpm \
+            https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FCOS_VERSION}.noarch.rpm && \
+    rpm-ostree override replace \
+        "http://${DEPLOYMENT_HTTPD}:8080/rpms/ffmpeg-${FFMPEG_VERSION}-1.fc${FCOS_VERSION}.x86_64.rpm" \
+        "http://${DEPLOYMENT_HTTPD}:8080/rpms/ffmpeg-libs-${FFMPEG_VERSION}-1.fc${FCOS_VERSION}.x86_64.rpm"
+RUN rpm-ostree install -y -A \
         wget fontawesome-fonts wl-clipboard nnn mako swayfx swayimg bemenu rofi-wayland lxsession nfs-utils \
         xwayland-run waybar chrony foot vim powerline powerline-fonts vim-powerline greetd \
         NetworkManager-wifi iw wireless-regdb wpa_supplicant nfs-utils \
@@ -38,20 +46,9 @@ RUN rpm-ostree override remove nfs-utils-coreos --install nfs-utils && \
         fastfetch btop mesa-libOpenCL srt srt-libs pipewire-utils usbutils \
         plymouth plymouth-system-theme plymouth-theme-fade-in plymouth-theme-spinfinity \
         plymouth-plugin-script plymouth-scripts \
-        rkhunter clamav clamd clamav-freshclam firefox
-# Step 2: Install rpmfusion repos, then replace Fedora's free ffmpeg with rpmfusion version
-RUN rpm-ostree install -y -A \
-        https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
-        https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
-RUN rpm-ostree override remove \
-        libavcodec-free libavfilter-free libavformat-free libavutil-free \
-        ffmpeg-free \
-        libpostproc-free \
-        libswresample-free libswscale-free libavdevice-free && \
-    rpm-ostree install -y -A \
-        ffmpeg ffmpeg-libs intel-media-driver libheif-freeworld \
-        libndi-sdk ndi-sdk ndi-sdk-documentation \
+        rkhunter clamav clamd clamav-freshclam firefox \
+        intel-media-driver libndi-sdk ndi-sdk ndi-sdk-documentation \
         libva-intel-driver vlc \
-        gstreamer1-plugin-libav gstreamer1-plugins-bad-free-extras \
-        gstreamer1-plugins-bad-freeworld gstreamer1-plugins-ugly && \
+        gstreamer1-plugin-libav gstreamer1-plugins-bad-freeworld \
+        libheif-freeworld && \
     ostree container commit

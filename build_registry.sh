@@ -20,8 +20,6 @@ export_container_image(){
             echo -e "${GREEN}		Successfully pushed $imageTarget${NC}"
             # Remove local localhost/ image to avoid doubling storage in local podman storage
             # since the registry now holds the image
-            podman rmi -f "localhost/${imageTarget}:latest" >/dev/null 2>&1 || \
-            podman rmi -f "localhost/$imageTarget" >/dev/null 2>&1 || true
             return 0
         else
             echo -e "${RED}		Failed to push $imageTarget${NC}"
@@ -37,11 +35,20 @@ build_container_image(){
     local imageTarget="$1"
     local containerFile="$2"
     local env="$3"
+    # Prepare --env arguments
+    local podman_env_args=()
+    if [[ -n "$env" ]]; then
+        for e in $env; do
+            podman_env_args+=("--env" "$e")
+        done
+    fi
     echo -e "\n	Building container: $imageTarget"
     # Build
+	#   	--security-opt label=disable \
     if podman build -t "localhost/$imageTarget" \
     	--security-opt label=disable \
-        ${env:+--env "$env"} \
+    	--network=host \
+        "${podman_env_args[@]}" \
         -v="$waveletdir/webfiles/root/home/wavelet/containerfiles:/mount:z" \
         -f "$waveletdir/webfiles/root/home/wavelet/containerfiles/$containerFile" \
         >> "$waveletdir/logs/build_registry_$imageTarget.log" 2>&1; then
@@ -64,7 +71,7 @@ pull_registry_images(){
 	registry_addr="$(hostname -f)"
 	local registry_url="$registry_addr:5000"
 	podman image prune -f >/dev/null 2>&1
-	podman untag "localhost/$imageTarget"
+#	podman untag "localhost/$imageTarget"
 	sourceList=()
   	sourceList+=("quay.io/coreos/etcd:v3.6.4")
 	sourceList+=("quay.io/coreos/coreos-installer:release")
@@ -274,7 +281,7 @@ WantedBy=default.target" > ~/.config/containers/systemd/httpd.container
 		--rm \
 		-v .:/data -w /data \
 		"$REGISTRY_REF" download -f pxe
-	cd "$waveletdir"
+	cd "$waveletdir" || return
 }
 
 get_registry_reference(){
@@ -293,10 +300,10 @@ get_registry_reference(){
 get_registry_for_push(){
     local registry_addr
 	# Use hostname command to get proper hostname
-	registry_addr=$(hostname)
+	registry_addr="$(hostname)"
 	# Fallback to non lo if hostname fails
 	if ! ping -c 1 "$registry_addr" &>/dev/null; then
-		registry_addr=$(hostname -I | awk '{print $1}')
+		registry_addr="$(hostname -I | awk '{print $1}')"
 	fi
     # Quick connectivity test
 	if curl -q "http://$(hostname -f):5000/v2"; then
@@ -311,89 +318,44 @@ get_registry_for_push(){
 	fi
 }
 
-read_packages_csv(){
-	local csv_file="$waveletdir/rpmbuild/packages.csv"
-	local packages_list=()
-	# Read CSV file (skip header line)
-	while IFS=',' read -r pkg_name git_url version enabled description; do
-		# Skip header line and commented lines
-		if [[ "$pkg_name" == "package_name" || "$pkg_name" =~ ^#.*$ || -z "$pkg_name" ]]; then
-			continue
-		fi
-		# Only include enabled packages
-		if [[ "$enabled" == "true" ]]; then
-			packages_list+=("$pkg_name|$git_url|$version|$description")
-			echo "Found enabled package: $pkg_name"
-		else
-			echo "Skipping disabled package: $pkg_name"
-		fi
-	done < "$csv_file"
-	printf '%s\n' "${packages_list[@]}"
-}
-
-build_packages(){
-	# Build RPM package inside the container build environment
-	echo -e "${GREEN}Starting package build process...${NC}"
-	mkdir -p "$waveletdir/rpmbuild"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
-	build_container_image "rpmbuild" "Containerfile.rpmbuild"
-	local packages_array=()
-	mapfile -t packages_array < <(read_packages_csv)
-	if [[ ${#packages_array[@]} -eq 0 ]]; then
-		echo -e "${RED}No enabled packages found in CSV file${NC}"
-		return 1
-	fi
-	echo -e "${GREEN}Found ${#packages_array[@]} enabled packages to build${NC}"
-	# Build each package or specific package if provided as argument
-	if [[ -n "$1" && -n "$2" ]]; then
-		# Single package build mode (for manual builds)
-		local pkg_name="$2"
-		local git_url="$1"
-		echo -e "${GREEN}Building specific package: $pkg_name from $git_url${NC}"
-		build_single_package "$git_url" "$pkg_name"
-	else
-		# Build all enabled packages from CSV
-		for package_info in "${packages_array[@]}"; do
-			IFS='|' read -r pkg_name git_url version description <<< "$package_info"
-			echo -e "${GREEN}Building package: $pkg_name (v$version)${NC}"
-			echo -e "  Description: $description"
-			build_single_package "$git_url" "$pkg_name" "$version"
-		done
-	fi
-	setup_rpm_repository
-
-	echo -e "${GREEN}Package building complete!${NC}"
-}
-
-build_single_package(){
-	local git_url="$1"
-	local pkg_name="$2"
-	local version="${3:-1.0.0}"
-	# Check if spec file exists
-	if [[ ! -f "$waveletdir/rpmbuild/SPECS/${pkg_name}.spec" ]]; then
-		echo -e "${RED}Warning: No spec file found for: $pkg_name at $waveletdir/rpmbuild/SPECS/${pkg_name}.spec${NC}"
-		echo -e "Skipping $pkg_name..."
-		return 1
-	fi
-	# Build RPM using container
-	echo "Building RPM for $pkg_name (version $version)..."
-	if podman run --rm \
-		-e GIT="$git_url" \
-		-e PKG="$pkg_name" \
-		-e VER="$version" \
-		-v "$waveletdir/rpmbuild/SPECS:/root/rpmbuild/SPECS:z" \
-		-v "$waveletdir/rpmbuild/SOURCES:/root/rpmbuild/SOURCES:z" \
-		-v "$waveletdir/rpmbuild/RPMS:/root/rpmbuild/RPMS:z" \
-		-v "$waveletdir/rpmbuild/SRPMS:/root/rpmbuild/SRPMS:z" \
-		-v "$waveletdir/rpmbuild/BUILD:/root/rpmbuild/BUILD:z" \
-		-v "$waveletdir/rpmbuild/BUILDROOT:/root/rpmbuild/BUILDROOT:z" \
-		localhost/rpmbuild:latest \
-		>> "$waveletdir/logs/build_registry.log"; then
-		echo -e "${GREEN}	Successfully built $pkg_name${NC}"
-		return 0
-	else
-		echo -e "${RED}	Failed to build $pkg_name - check build_registry.log for details${NC}"
-		return 1
-	fi
+build_ffmpeg_rpm(){
+    local ffmpeg_dir="$waveletdir/webfiles/root/home/wavelet/containerfiles"
+    local output_dir="$HOME/.config/var/www/rpms"
+    local containerfile="Containerfile.build-ffmpeg-$ffmpeg_version"
+    local image_name="ffmpeg-builder"
+    echo -e "\n${GREEN}Building FFmpeg $ffmpeg_version RPM...${NC}"
+    mkdir -p "$output_dir"
+    # Build the builder image
+    #         --security-opt label=disable \
+    if ! podman build \
+        -t "localhost/$image_name" \
+        -f "$ffmpeg_dir/$containerfile" \
+        "$ffmpeg_dir" \
+        >> "$waveletdir/logs/build_registry_ffmpeg.log" 2>&1; then
+        echo -e "${RED}Failed to build FFmpeg builder image — check build_registry_ffmpeg.log${NC}"
+        return 1
+    fi
+    # The containerfile already copies RPMs to /output/rpms inside the image.
+    # Create a container from the image, copy the /output/rpms directory to the host, then remove the container.
+    local container_name="ffmpeg-builder-run"
+    if ! podman create --name "$container_name" --security-opt label=disable "localhost/$image_name" >> "$waveletdir/logs/build_registry_ffmpeg.log" 2>&1; then
+        echo -e "${RED}Failed to create FFmpeg builder container — check build_registry_ffmpeg.log${NC}"
+        podman rmi -f "localhost/$image_name" >/dev/null 2>&1 || true
+        return 1
+    fi
+    if ! podman cp "$container_name:/output/rpms/." "$output_dir" >> "$waveletdir/logs/build_registry_ffmpeg.log" 2>&1; then
+        echo -e "${RED}Failed to copy FFmpeg RPMs from container — check build_registry_ffmpeg.log${NC}"
+        podman rm -f "$container_name" >/dev/null 2>&1
+        podman rmi -f "localhost/$image_name" >/dev/null 2>&1 || true
+        return 1
+    fi
+    # Clean up the container and the builder image
+    podman rm -f "$container_name" >/dev/null 2>&1
+    podman rmi -f "localhost/$image_name" >/dev/null 2>&1 || true
+    # List copied RPMs for verification
+    echo -e "${GREEN}Copied RPMs to $output_dir:${NC}"
+    ls -la "$output_dir"/*.rpm 2>/dev/null || echo "No RPMs found in $output_dir"
+    echo -e "${GREEN}FFmpeg RPMs available at http://$(hostname -f):8080/rpms/${NC}"
 }
 
 setup_rpm_repository(){
@@ -464,11 +426,6 @@ insecure = true" > ~/.config/containers/systemd/registry/registry.conf.d/01-loca
 		configure_registry
 	fi
 }
-build_container_layer(){
-	until build_container_image "$1" "$2";do
-		build_container_layer "$1" "$2"
-	done
-}
 
 check_firewall_ports() {
     echo "Firewall ports needed (run as root or use ufw/firewall-cmd as user):"
@@ -477,6 +434,23 @@ check_firewall_ports() {
     echo "  8443/tcp     - HTTPD (https)"
     echo "  5355/udp     - LLMNR/DNS-SD"
 }
+
+detect_fcos_version(){
+    local fcos_image="quay.io/fedora/fedora-coreos:latest"
+    # Pull the image if not present
+    podman pull "$fcos_image" >/dev/null 2>&1
+    # Try to get the version from /etc/os-release by running a container
+    local fcos_version
+    fcos_version=$(podman run --rm "$fcos_image" cat /etc/os-release 2>/dev/null | grep ^VERSION_ID= | cut -d= -f2 | tr -d '"' || echo "44")
+    # Ensure it's just the major version number (e.g., "44" from "44.20240101.3.0" or "44")
+    fcos_version="${fcos_version%%.*}"
+    if [[ -z "$fcos_version" || ! "$fcos_version" =~ ^[0-9]+$ ]]; then
+        echo "44"
+        fcos_version="44"
+    fi
+    echo "$fcos_version"
+}
+
 
 #####
 #
@@ -487,7 +461,7 @@ check_firewall_ports() {
 
 waveletdir=$(pwd)
 mkdir -p "$waveletdir/logs"
-exec >$waveletdir/logs/build_registry.log 2>&1
+exec >"$waveletdir/logs/build_registry.log" 2>&1
 #if [[ "$EUID" -ne 0 ]]; then
 #  	echo "	This script must be run with root access"
 #  	exit 1
@@ -533,10 +507,30 @@ configure_httpd
 # Registry seems problematic unless restarted twice?
 systemctl --user restart registry.service
 
+# Detect FCOS version from the latest FCOS image
+FCOS_VERSION=$(detect_fcos_version)
 
-build_container_layer "coreos_overlay_client" "Containerfile.coreos.overlay.client"
-build_container_layer "coreos_overlay_server" "Containerfile.coreos.overlay.server"
+# Build the FFMPEG 7.1.4 package
+# ffmpeg_version currently @ 7.1.4 until NDI compatibility/ABI issues resolved with 8.1
+ffmpeg_version="7.1.4"
 
+# Check if FFmpeg RPMs already exist to avoid needlessly rebuilding
+output_dir="$HOME/.config/var/www/rpms"
+# Use shell globbing to check for existing RPMs
+shopt -s nullglob
+ffmpeg_rpms=("$output_dir"/ffmpeg-${ffmpeg_version}-*.fc${FCOS_VERSION}.x86_64.rpm)
+ffmpeg_libs_rpms=("$output_dir"/ffmpeg-libs-${ffmpeg_version}-*.fc${FCOS_VERSION}.x86_64.rpm)
+if [[ ${#ffmpeg_rpms[@]} -gt 0 && ${#ffmpeg_libs_rpms[@]} -gt 0 ]]; then
+    echo -e "${GREEN}FFmpeg $ffmpeg_version RPMs already exist in $output_dir, skipping build.${NC}"
+else
+    build_ffmpeg_rpm
+fi
+
+# Build the OCI container layers for the client, then utilize that as a base for the server layer.
+build_container_image "coreos_overlay_client" "Containerfile.coreos.overlay.client"
+build_container_image "coreos_overlay_server" "Containerfile.coreos.overlay.server"
+
+# Build additional container images.  Many of these had to be from-scratch due to limitations in the official containers.
 build_container_image "tftpd" "Containerfile.tftpd"
 build_container_image "tftpboot" "Containerfile.tftpboot"
 build_container_image "isc-kea" "Containerfile.isc-kea"

@@ -5,7 +5,7 @@
 #   1. podman build -f Containerfile.coreos.overlay.client -t coreos_overlay_client .
 #   2. podman build -f Containerfile.coreos.overlay.server -t coreos_overlay_server .
 
-FROM coreos_overlay_client AS server
+FROM containers-storage:localhost/coreos_overlay_client:latest AS server
 
 RUN rpm-ostree install -y -A \
         expect avahi-tools tcpdump nmap \

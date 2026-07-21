@@ -1,0 +1,99 @@
+# Build FFmpeg 7.1.4 RPM — libavcodec backend for UltraGrid on FCOS 44
+#
+# Bump FFMPEG_VERSION for new 7.1.x patch releases only.
+# Codec feature set is controlled by FFMPEG_BUILD_OPTIONS passed to rpmbuild.
+#
+# Available --with flags (see ffmpeg-7.1.spec header for full list):
+#   --with svtav1   --with vmaf   --with placebo
+#   --with amr      --with codec2
+#
+# Available --without flags:
+#   --without vaapi   --without vdpau   --without vpx
+#   --without opus    --without jxl     --without zimg
+
+FROM fedora:44
+
+ARG FFMPEG_VERSION=7.1.4
+ARG FFMPEG_BUILD_OPTIONS="--with svtav1 --with vmaf"
+
+# RPM Fusion free — needed for x264-devel, x265-devel
+RUN dnf install -y \
+        https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-44.noarch.rpm \
+    && dnf clean all
+
+# Build dependencies — trimmed to codec/hwaccel surface only (no X11/frei0r)
+RUN dnf install -y \
+        rpm-build \
+        dnf-plugins-core \
+        gcc \
+        gcc-c++ \
+        make \
+        nasm \
+        yasm \
+        pkgconfig \
+        bzip2-devel \
+        freetype-devel \
+        fontconfig-devel \
+        fribidi-devel \
+        libass-devel \
+        libjpeg-turbo-devel \
+        libpng-devel \
+        librsvg2-devel \
+        libtheora-devel \
+        libvorbis-devel \
+        libwebp-devel \
+        lame-devel \
+        speex-devel \
+        twolame-devel \
+        openjpeg2-devel \
+        libaom-devel \
+        x264-devel \
+        x265-devel \
+        rubberband-devel \
+        zlib-devel \
+        libdrm-devel \
+        libglvnd-devel \
+        mesa-libGL-devel \
+        libva-devel \
+        libvdpau-devel \
+        libvpx-devel \
+        opus-devel \
+        libjxl-devel \
+        zimg-devel \
+        svt-av1-devel \
+        libvmaf-devel \
+        libplacebo-devel \
+        opencore-amr-devel \
+        vo-amrwbenc-devel \
+        codec2-devel \
+        python3 \
+    && dnf clean all
+
+ENV RPM_BUILD_DIR=/root/rpmbuild
+RUN mkdir -p ${RPM_BUILD_DIR}/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+
+WORKDIR /workspace
+
+# Pinned upstream tarball — ffmpeg.org retains all versioned releases permanently
+RUN curl -fL --retry 5 --retry-delay 3 \
+        -o ${RPM_BUILD_DIR}/SOURCES/ffmpeg-${FFMPEG_VERSION}.tar.xz \
+        https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz
+
+# Vendored spec — zero external spec dependencies
+COPY /spec/ffmpeg-7.1.spec ${RPM_BUILD_DIR}/SPECS/ffmpeg.spec
+
+# Remove invalid configure options for FFmpeg 7.1+ (frei0r, x11grab, xv were removed/changed)
+RUN sed -i -e 's/--disable-frei0r //g' -e 's/--disable-x11grab //g' -e 's/--disable-xv //g' ${RPM_BUILD_DIR}/SPECS/ffmpeg.spec
+
+RUN rpmbuild -ba \
+        --define "_topdir ${RPM_BUILD_DIR}" \
+        --define "version ${FFMPEG_VERSION}" \
+        ${FFMPEG_BUILD_OPTIONS} \
+        ${RPM_BUILD_DIR}/SPECS/ffmpeg.spec
+
+RUN mkdir -p /output/rpms \
+    && find ${RPM_BUILD_DIR}/RPMS -name "*.rpm" -exec cp {} /output/rpms/ \; \
+    && find ${RPM_BUILD_DIR}/SRPMS -name "*.rpm" -exec cp {} /output/rpms/ \;
+
+WORKDIR /output/rpms
+CMD ["ls", "-lh", "/output/rpms"]
