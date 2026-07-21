@@ -51,7 +51,6 @@ start_ultragrid(){
 	# In UI Mode, top-left, in normal mode, fullscreen.
 	# Note that the UG_ARGUMENTS parsed from the client controller are also different here
     timeout=5
-    set_config "UG_ERROR_STATE" "no"
     "$binaryPath" "${UG_ARGUMENTS[@]}" > /var/home/wavelet/logs/ugDirect.log 2>&1 &
     UG_PID=$!
     if [[ -z "$swaySocket" ]]; then
@@ -138,14 +137,14 @@ inputError(){
 		if (( "$timer_elapsed" > 30 )); then
            	echo -e "\033[32m	Error: $1 exceeds 30 seconds!  Terminating process!\033[0m" | systemd-cat -t "UltraGrid"
            	# Serious > 30second error, we let the watchdog kill the process
-			echo "1" > "$UG_RESTARTING"
+			sed -i "s/^UG_RESTARTING=.*/UG_RESTARTING=1/" /etc/wavelet/wavelet.conf
 			exit 1
 		elif (( "$timer_elapsed" > 15 )); then
 			send_keepalive
 			generate_errorDisplay "ERR: $1"
 			echo -e "\033[32m	Experiencing +15s of error: $1!\033[0m" | systemd-cat -t "UltraGrid"
 		elif (( "$timer_elapsed" > 10 )); then
-			set_config "UG_ERROR_STATE" "$errorCase"
+			sed -i "s/^UG_ERROR_STATE=.*/UG_ERROR_STATE=$errorCase/" /etc/wavelet/wavelet.conf
 			echo -e "\033[32m	Experiencing error: $1!\033[0m" | systemd-cat -t "UltraGrid"
 			decoder_checkSubscription
 			send_keepalive
@@ -156,7 +155,7 @@ inputError(){
 		fi
 	fi
 	if (( badCounter > 50 )); then
-		set_config "UG_ERROR_STATE" "BURST_ERROR"
+		sed -i "s/^UG_ERROR_STATE=.*/UG_ERROR_STATE=BURST_ERROR/" /etc/wavelet/wavelet.conf
 		generate_errorDisplay "ERR: ERROR BURST DETECTED"
 		send_keepalive
 	fi
@@ -188,7 +187,7 @@ decoder_checkSubscription(){
 				# 400 Bad Request, means the channelIndex wasn't valid,.
 				# Don't send keepalive and let decoder process regenerate ug servicefile.
 				echo "	ERROR: supplied channel index invalid, allowing systemd unit regeneration."
-				echo "1" > "$UG_RESTARTING"
+				sed -i "s/^UG_RESTARTING=.*/UG_RESTARTING=1/" /etc/wavelet/wavelet.conf
 				exit 1
 			fi
 		else
@@ -236,7 +235,7 @@ process_fecData(){
 
 reset_error_state(){
     echo "Resetting error state — stability detected" | systemd-cat -t "UltraGrid"
-    set_config "UG_ERROR_STATE" "no"
+    sed -i "s/^UG_ERROR_STATE=.*/UG_ERROR_STATE=0/" /etc/wavelet/wavelet.conf
     badCounter=0
     goodCounter=0
     badSwitchCounter=0
@@ -257,10 +256,9 @@ reset_error_state(){
 
 
 #set -m
-exec >>/var/home/wavelet/logs/UltraGrid.log 2>&1
+exec >> "/var/home/wavelet/logs/UltraGrid.log" 2>&1
 UG_ARGUMENTS=("$@")
 UG_PID=0
-set_config "UG_RESTARTING" "no"
 SWAYIMG_PID=0
 swaySocket=""
 NC_PID=0
@@ -270,6 +268,7 @@ sampleCounter=0
 badSwitchCounter=0
 declare -gA error_timers
 
+UG_RESTARTING="$(mktemp)"
 trap 'handle_signal SIGINT'  SIGINT
 trap 'handle_signal SIGTERM' SIGTERM
 trap 'handle_signal SIGUSR1' SIGUSR1
@@ -294,17 +293,14 @@ while IFS= read -r line <&3; do
     	reset_timer_elapsed="$(get_timer_elapsed "badReset")"
     	if (( "$reset_timer_elapsed" > 30 )); then
     		badCounter=0
-    		set_config "UG_ERROR_STATE" "no"
     		echo "Error counter reset - 30s of stability" | systemd-cat -t "UltraGrid"
     	fi
     fi
 	if [[ "$goodCounter" -gt 100 ]]; then
-		if [[ "$(get_config "UG_ERROR_STATE")" != "no" ]]; then
-			echo "Noting system stability is good" | systemd-cat -t "UltraGrid"
-			KEYNAME="/HOSTS/$(hostname)/control/healthStatus"; KEYVALUE="OK: "; write_etcd_global &
-			reset_error_state
-			goodCounter=0
-		fi
+		echo "Noting system stability is good" | systemd-cat -t "UltraGrid"
+		KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="OK: "; write_etcd_global &
+		reset_error_state
+		goodCounter=0
 	fi
 #	echo -e "Good Counter: $goodCounter\nBad Counter: $badCounter"
 	case "$line" in
@@ -338,9 +334,8 @@ while IFS= read -r line <&3; do
 			;;
 		*WARNING:*Selected*capture*card*was*not*found/)
 			echo -e "\033[33m	UltraGrid is unable to start with bad command line!\033[0m" | systemd-cat -t "UltraGrid"
-			set_config "UG_ERROR_STATE" "UG_BAD_CMDLINE"
+			KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE=" ERR: UG_BAD_CMDLINE"
 			generate_errorDisplay "FTL: BAD ULTRAGRID COMMAND LINE"
-			set_config "UG_RESTARTING" "yes"
 			exit 1
 			;;
 		*\[ug_input\]*Dropping*frame!)

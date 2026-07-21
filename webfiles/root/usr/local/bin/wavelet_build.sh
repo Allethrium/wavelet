@@ -4,25 +4,9 @@
 # The service is called each logon from Sway, checks to see if already built, then calls other scripts as required.
 
 # Source the wavelet configuration helper functions
-if [[ -f /etc/wavelet/wavelet_config.sh ]]; then
-    source /etc/wavelet/wavelet_config.sh
-else
-    # Fallback to loading config directly
-    if [[ -f /etc/wavelet/wavelet.conf ]]; then
-        while IFS='=' read -r key value; do
-            [[ "$key" =~ ^[[:space:]]*# ]] && continue
-            [[ -z "$key" ]] && continue
-            key=$(echo "$key" | xargs)
-            value=$(echo "$value" | xargs)
-            value="${value#\"}"
-            value="${value%\"}"
-            value="${value#\'}"
-            value="${value%\'}"
-            export "$key=$value"
-        done < /etc/wavelet/wavelet.conf
-    fi
+if [[ -f "/etc/wavelet.conf" ]]; then
+    source "/etc/wavelet.conf"
 fi
-
 
 # Check and define module paths
 
@@ -121,7 +105,7 @@ etcd_provision_request(){
 	"$ETCDMANAGEMENTMOD" "client_provision_get_data"
 	sleep 2
 	# Wait for etcd_interaction to perform its task and write the done flag
-	while ! is_state_flag_set "CLIENT_PROVISION_RQ_COMPLETE"; do
+	while ! grep -q "^CLIENT_PROVISION_RQ_COMPLETE=yes\|^CLIENT_PROVISION_RQ_COMPLETE=true" /etc/wavelet.conf; do
 		sleep .1
 		echo "waiting for provision process to complete.."
 	done
@@ -129,7 +113,7 @@ etcd_provision_request(){
 	KEYNAME="PROV_TEST"; KEYVALUE="True"; write_etcd; sleep 1 ; read_etcd
 	if [[ "$printvalue" = "True" ]]; then
 		echo "Client provision request completed, client username has been generated and access to appropriate keys granted."
-		set_state_flag "CLIENT_PROVISION_COMPLETE" "yes"
+		echo "CLIENT_PROVISION_COMPLETE=1" >> "/etc/wavelet.conf"
 		# We shred the etcd provision credential, as it's no longer needed
 		shred /var/home/wavelet/config/provisionpw && rm -rf /var/home/wavelet/config/provisionpw
 	else
@@ -144,7 +128,7 @@ detect_self(){
 	systemctl --user enable foot-server.socket --now
 	# We need a network connection first.
 	event_connectNetwork
-	if is_state_flag_set "CLIENT_PROVISION_COMPLETE"; then
+	if grep -q "^CLIENT_PROVISION_COMPLETE=yes\|^CLIENT_PROVISION_COMPLETE=true" /etc/wavelet.conf; then
 		echo "Provisioning completed, detecting self via etcd.."
 		# We must get a ping from the server before continuing
 		# since we are already provisioned, a wifi connection by default is available
@@ -228,7 +212,7 @@ event_decoder(){
 event_decoder_newHost(){
 	# Handles an entirely new wavelet client
 	# Provision request to etcd
-	if ! is_state_flag_set "CLIENT_PROVISION_COMPLETE"; then
+	if ! grep -q "^CLIENT_PROVISION_COMPLETE=yes\|^CLIENT_PROVISION_COMPLETE=true" /etc/wavelet.conf; then
 		echo "	Sending provision request to server for Etcd credentials.."
 		etcd_provision_watcher; sleep 2
 		etcd_provision_request
@@ -242,7 +226,7 @@ put /HOSTS/$hostNameSys/control/generateConf \"1\"
 
 "
 		write_etcd_txn "$KEYDATA"
-		set_state_flag "CLIENT_PROVISION_COMPLETE" "yes"
+		sed -i "s/^CLIENT_PROVISION_COMPLETE=.*/CLIENT_PROVISION_COMPLETE=yes/" /etc/wavelet.conf
 	fi
 
 	# Wait for the orchestrator to generate the config file
@@ -333,7 +317,7 @@ event_encoder(){
 
 event_server(){
 	# Responsible for generating the wavelet-specific userspace services that form the appliance core
-	if is_state_flag_set "PXE_COMPLETE"; then
+	if grep -q "^PXE_COMPLETE=yes\|^PXE_COMPLETE=true" /etc/wavelet.conf; then
 		echo "	PXE service up and running, continuing.."
 	else
 		echo "	PXE boot service has not completed setup.  Please check logs."
@@ -358,10 +342,10 @@ event_server(){
 		wavelet_client_controller \
 		wavelet_network_device --now
 	# if first run, we set UIEnable to give us the UI browser on the server to assist with setup.
-	if is_state_flag_set "SERVER_FIRSTRUN_FLAG"; then
+	if grep -q "^SERVER_FIRSTRUN_FLAG=yes\|^SERVER_FIRSTRUN_FLAG=true" /etc/wavelet.conf; then
 		echo "	First run, setting UIEnable flag.."
 		KEYNAME="/HOSTS/$hostNameSys/control/UIEnable"; KEYVALUE="1"; write_etcd_global &
-		set_state_flag "SERVER_FIRSTRUN_FLAG" "no"
+		sed -i "s/^SERVER_FIRSTRUN_FLAG=.*/SERVER_FIRSTRUN_FLAG=no/" /etc/wavelet.conf
 	fi
 	sleep 1
 	echo "	Running initial device detection.."
@@ -486,11 +470,11 @@ nginx_quadlets(){
 }
 
 server_bootstrap(){
-# Bootstraps the server processes including Apache HTTP server for distribution files, and the web interface NGINX/PHP pod
-	until is_state_flag_set "UG_DEPENDS_COMPLETE"; do
+	# Bootstraps the server processes including Apache HTTP server for distribution files, and the web interface NGINX/PHP pod
+	until grep -q "^UG_DEPENDS_COMPLETE=yes\|^UG_DEPENDS_COMPLETE=true" /etc/wavelet.conf; do
 		sleep .1
 	done
-	if [[ -f "/var/home/wavelet/server_bootstrap_completed" ]]; then
+	if [[ "$SERVER_BOOTSTRAP_COMPLETE" == 1 ]]; then
 		echo -e "	Server bootstrap has already been completed, exiting..\n"
 		return 0
 	fi
@@ -597,7 +581,7 @@ put /HOSTS/$hostNameSys/confHash \"$checksum\"
 	# Ensure we hit the group videoSource key once to force a videoSourceConfig refresh
 	KEYNAME="/GROUPS/$groupHash/control/sourceHash"; KEYNAME="1"; write_etcd_global &
 	echo "	System services and configuration keys generated, starting services now.."
-	set_state_flag "SERVER_FIRSTRUN_FLAG" "yes"
+	sed -i "s/^SERVER_FIRSTRUN_FLAG=.*/SERVER_FIRSTRUN_FLAG=yes/" /etc/wavelet.conf
 	event_server
 }
 
@@ -1139,8 +1123,8 @@ event_connectNetwork(){
 	done < <(nmcli -t -f NAME,TYPE,UUID con show)
 	# Attempts to list and connect a wavelet Wi-Fi connection
 	# Note that the wavelet user has NetworkManager permissions via configured polkit rules
-	if is_flag_disabled "WIFI_MODE_ENABLED"; then
-		echo "	Wi-FI has been disabled for this host.  Set WIFI_MODE_ENABLED=yes in /etc/wavelet/wavelet.conf to enable this feature."
+	if [[ "$hostNameSys" == "$SVR_HOSTNAME" ]] || [[ $ENABLE_WIFI != 1 ]]; then
+		echo "	Wi-FI has been disabled for this host.  Set WIFI_MODE_ENABLED=1 in /etc/wavelet/wavelet.conf to enable this feature."
 		return 0
 	else
 		# Disable ethernet

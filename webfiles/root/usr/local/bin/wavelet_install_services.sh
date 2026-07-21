@@ -3,15 +3,15 @@
 # It then proceeds to configure dependencies, then reboots
 # Most of the wavelet modules and directory configuration incl. permissions that doesn't fit elsewhere is also handled here
 
-# Source the wavelet configuration helper functions
-if [[ -f /etc/wavelet.conf ]]; then
-    source /etc/wavelet.conf
+# Source the wavelet configuration
+if [[ -f "/etc/wavelet.conf" ]]; then
+    source "/etc/wavelet.conf"
 fi
 
 install_ug_depends(){
 	# This is lifted from the UltraGrid project with a couple of tweaks for CoreOS/my purposes
 	# Needs to run as root after the second reboot, since it requires some of the coreos overlay features to be available.
-	cd /var/home/wavelet/setup || return
+	cd "/var/home/wavelet/setup" || return
 	install_cineform(){
 		# CineForm SDK
 		git clone https://github.com/gopro/cineform-sdk
@@ -21,7 +21,7 @@ install_ug_depends(){
 		cmake -DBUILD_TOOLS=OFF
 		cmake --build . --parallel "$(nproc)"
 		cmake --install .
-		cd /var/home/wavelet/setup || return
+		cd "/var/home/wavelet/setup" || return
 	}
 	install_libaja(){
 		#Install libAJA Library
@@ -35,17 +35,17 @@ install_ug_depends(){
 		cmake --build libajantv2/build --config Release -j "$(nproc)" && \
 		sleep 2 && \
 		sudo cmake --install libajantv2/build
-		cd /var/home/wavelet/setup || return
+		cd "/var/home/wavelet/setup" || return
 	}
 	install_live555(){
 		# Live555
 		git clone https://github.com/xanview/live555/; cd live555 || return
 		# Ensure DNO_STD_LIB is set otherwise compilation will fail
-		sed -i 's|-D_FILE_OFFSET_BITS=64 -fPIC|-D_FILE_OFFSET_BITS=64 -fPIC -DNO_STD_LIB|g' /var/home/wavelet/setup/live555/config.linux-with-shared-libraries
+		sed -i 's|-D_FILE_OFFSET_BITS=64 -fPIC|-D_FILE_OFFSET_BITS=64 -fPIC -DNO_STD_LIB|g' "/var/home/wavelet/setup/live555/config.linux-with-shared-libraries"
 		./genMakefiles linux-with-shared-libraries
 		make -j "$(nproc)"
 		make install
-		cd /var/home/wavelet/setup || return
+		cd "/var/home/wavelet/setup" || return
 	}
 	#install_libaja
 	#install_cineform
@@ -100,9 +100,9 @@ pull_coreos_files() {
 	dir="/var/home/wavelet/setup"
 	mkdir -p "/var/home/wavelet/http/pxe"
 	if [[ -n $DEPLOYMENT_REGISTRY ]]; then
-		echo "	Running external httpd initialization server, pulling from LAN source: $DEPLOYMENT_REGISTRY"
 		# Get httpd contents
 		HTTPD_SERVER="http://$DEPLOYMENT_REGISTRY:8080"
+		echo "	Running external httpd initialization server, pulling from LAN source: $HTTPD_SERVER"
 		result="$(curl -s "$HTTPD_SERVER" | sed -n 's/.*href="\([^"]*\)".*/\1/p' | grep -E '\.[^/]+$')"
 		# Generate our file candidate list
 		declare -a files=()
@@ -213,17 +213,18 @@ echo 'Booting Fedora CoreOS...'
 
 configure_tftpboot(){
     # Generate pxelinux config (for BIOS/legacy)
-    echo -e "
-DEFAULT pxeboot
-PROMPT 0
-TIMEOUT 150
-LABEL pxeboot
-KERNEL ${kernel##*/}
-INITRD ${initrd##*/},${rootfs##*/}
-APPEND coreos.inst.ignition.config.url=${configURL}
-IPAPPEND 2" > "/var/lib/tftpboot/pxelinux.cfg/default"
+    cat > "/var/lib/tftpboot/pxelinux.cfg/default" <<-EOF
+		DEFAULT pxeboot
+		PROMPT 0
+		TIMEOUT 150
+		LABEL pxeboot
+		KERNEL ${kernel##*/}
+		INITRD ${initrd##*/},${rootfs##*/}
+		APPEND coreos.inst.ignition.config.url=${configURL}
+		IPAPPEND 2
+	EOF
 	# Generate grub.cfg (for UEFI)
-	echo -e "
+	cat > "/var/lib/tftpboot/grub.cfg" <<EOF
 function load_video {
     insmod all_video
 }
@@ -248,13 +249,13 @@ menuentry 'Legacy PXE (Syslinux)' {
     insmod pxelinux
     pxelinux
 }
-" > /var/lib/tftpboot/grub.cfg
+EOF
 	# Ensure correct files exist in the tftpboot rootdir
 	cp /var/lib/tftpboot/EFI/fedora/{grubx64.efi,grubia32.efi,mmx64.efi,shimx64.efi,shim.efi} /var/lib/tftpboot/
     # Copy configs to HTTP server
-    cp /var/lib/tftpboot/grub.cfg /var/home/wavelet/http/pxe/
-    cp /var/lib/tftpboot/EFI/fedora/{grubx64.efi,grubia32.efi,mmx64.efi,shimx64.efi,shim.efi} /var/home/wavelet/http/pxe/
-    cp /var/lib/tftpboot/pxelinux.cfg/default /var/home/wavelet/http/pxe/pxelinux.cfg/
+    cp /var/lib/tftpboot/grub.cfg "/var/home/wavelet/http/pxe/"
+    cp /var/lib/tftpboot/EFI/fedora/{grubx64.efi,grubia32.efi,mmx64.efi,shimx64.efi,shim.efi} "/var/home/wavelet/http/pxe/"
+    cp "/var/lib/tftpboot/pxelinux.cfg/default" "/var/home/wavelet/http/pxe/pxelinux.cfg/"
 }
 
 generate_bootc_image() {
@@ -335,8 +336,6 @@ generate_wavelet_userspace_services(){
 
 generate_decoder_ignition(){
 	# Generates the decoder ignition with wavelet_decoder_keys.csv
-	# Populate vars for use below
-	# TODO - these should be in the conf file now.
 	# Ensure the CA is available for injection into the decoder.ign
 	cp "/etc/ipa/ca.crt" "/var/home/wavelet/config/"
 	cat > /var/home/wavelet/config/wavelet_decoder_keys.csv <<-EOF
@@ -411,10 +410,8 @@ EOF
 	semodule -X 300 -i my-gssproxy.pp
 	systemctl enable gssproxy.service --now
 	# no.wifi is a mode flag, set via configuration
-	set_config "WIFI_MODE_ENABLED" "no"
 	systemctl enable avahi-daemon
 	systemctl enable avahi-daemon.service --now
-	/usr/local/bin/wavelet_system_optimize.sh
 	echo -e " Dependencies Installation completed..\n"
 	systemctl set-default graphical.target
 }
@@ -441,11 +438,16 @@ else
 	exit 1
 fi
 
+if grep -q "^PXE_COMPLETE=yes\|^PXE_COMPLETE=true" /etc/wavelet/wavelet.conf; then
+	exit 0
+fi
+
 # Enable entropy daemon for quicker CA generation during hardening
 # Haveged is installed in the client layer, so is available on all wavelet devices.
 systemctl enable haveged --now
 
-# Firewalld is installed from.. somewhere as a dependency.  Disable (for now until performance testing, because a firewall would be nice)
+# Firewalld is installed from.. somewhere as a dependency.
+# Disable (for now until performance testing, because a firewall would be nice)
 systemctl disable firewalld.service --now
 
 # Wavelet modules are now preprovisioned on both the server and clients, and processed in the installer script
@@ -525,10 +527,6 @@ generate_decoder_ignition
 
 # These two steps require the subshell processes to have completed
 cp "/etc/ipa/ca.crt" "/var/home/wavelet/http/ignition"
-
-if is_state_flag_set "PXE_COMPLETE"; then
-	exit 0
-fi
 
 # Ensure the wavelet user owns the http folder, and set +x and read perms on http folder and subfolders
 chmod -R 0755 "/var/home/wavelet/http"

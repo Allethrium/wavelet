@@ -1,12 +1,7 @@
 #!/bin/bash
 #	This module is concerned with implementing a freeIPA IdM and associated DHCP services
 
-# Source the wavelet configuration helper functions
-if [[ -f "/etc/wavelet.conf" ]]; then
-    source "/etc/wavelet.conf"
-else
-	echo "	ERR: /etc/wavelet.conf missing!  Configuration data not available!"
-fi
+
 
 # Add our attempt at a password security solution here
 source "/usr/local/bin/wavelet_secure_credentials.sh"
@@ -33,7 +28,7 @@ event_server(){
 	configure_idm
 	# We need to configure SELinux policy permanent -P to allow containers to read the cert bundle package
 	setsebool -P container_read_certs 1
-	if is_state_flag_set "SERVER_DOMAIN_ENROLLMENT_COMPLETE"; then
+	if grep -q "^SERVER_DOMAIN_ENROLLMENT_COMPLETE=yes\|^SERVER_DOMAIN_ENROLLMENT_COMPLETE=true" /etc/wavelet/wavelet.conf; then
 		echo "	Domain enrollment is complete, proceeding to configure certificates and service principals.." >> "$logName"
 		sleep 1
 		# Create a watcher service to keep certs up to date
@@ -498,7 +493,7 @@ install_server_security_layer(){
 	wait_for_line "INFO Client configuration complete."
 	#podman exec freeipa_server ldapmodify -x -D "cn=admin" -W  -f pwmod.ldif
 	# Ideally here, we could use REST calls w/ Unleashed to add our new CA to the AP
-	set_state_flag "SERVER_DOMAIN_ENROLLMENT_COMPLETE" "yes"
+	echo "SERVER_DOMAIN_ENROLLMENT_COMPLETE=yes" >> /etc/wavelet/wavelet.conf
 }
 
 ipa_dns_tsig(){
@@ -1203,8 +1198,8 @@ configure_firewall(){
 
 
 # Note we have two logs, as sensitive secrets are handled in this script.
-logName="/var/roothome/log/hardening.log"
-#debugLogName="/var/roothome/log/hardening_debug.log"
+logName="/var/roothome/logs/hardening.log"
+#debugLogName="/var/roothome/logs/hardening_debug.log"
 
 exec > "$logName" 2>&1
 hostNameSys="$SVR_HOSTNAME"

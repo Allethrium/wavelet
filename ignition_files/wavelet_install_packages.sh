@@ -102,19 +102,6 @@ event_server(){
 		WantedBy=multi-user.target
 	EOF
 		echo -e "Generating systemd unit for security layer.."
-	cat > "/etc/systemd/system/wavelet_install_hardening.service" <<-EOF
-		[Unit]
-		Description=Install Security Layer
-		After=multi-user.target
-
-		[Service]
-		Type=oneshot
-		ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_hardening.sh'
-		ExecStartPost=systemctl disable wavelet_install_hardening.service
-
-		[Install]
-		WantedBy=multi-user.target
-	EOF
 	# RPM Ostree and container infra setup
 	# We will check for an external registry first, and build local images only if it does not exist.
 	echo "OCI Container image setup"

@@ -1964,6 +1964,6 @@ case "$@" in
 		detect_operation;;
 	*RUN*)
 		firstRunState="true"
-		touch /var/home/wavelet/config/firstrun_token
+		touch "/var/home/wavelet/config/firstrun_token"
 		wavelet_run;; # This is the initial encoder setup so we must ensure videoSource is set
 esac

@@ -4,25 +4,7 @@
 #	Joining the domain
 #	Provisioning services, so that it can talk to etcd and the DC.
 
-# Source the wavelet configuration helper functions
-if [[ -f /etc/wavelet/wavelet_config.sh ]]; then
-    source /etc/wavelet/wavelet_config.sh
-else
-    # Fallback to loading config directly
-    if [[ -f /etc/wavelet/wavelet.conf ]]; then
-        while IFS='=' read -r key value; do
-            [[ "$key" =~ ^[[:space:]]*# ]] && continue
-            [[ -z "$key" ]] && continue
-            key=$(echo "$key" | xargs)
-            value=$(echo "$value" | xargs)
-            value="${value#\"}"
-            value="${value%\"}"
-            value="${value#\'}"
-            value="${value%\'}"
-            export "$key=$value"
-        done < /etc/wavelet/wavelet.conf
-    fi
-fi
+
 
 
 check_resolved() {
@@ -438,7 +420,7 @@ echo "	Extracted AppImage contents available in /usr/local/bin/ultragrid/squashf
 
 # Disable self so we don't run again on the next boot.
 systemctl set-default graphical.target
-set_state_flag "CLIENT_INSTALL_COMPLETE" "yes"
+echo "CLIENT_INSTALL_COMPLETE=yes" >> /etc/wavelet/wavelet.conf
 generate_wavelet_userspace_services
 systemctl --user -M wavelet@ daemon-reload
 

@@ -135,7 +135,7 @@ generate_errorDisplay(){
 		"WAVELET ERROR" "$1" &
 	notifyPID=$!
 	KEYNAME="/HOSTS/$(hostname)/controls/healthStatus"; KEYVALUE="$1"; write_etcd_global
-	while [[ "$(get_config "UG_ERROR_STATE")" != "no" ]]; do
+	while grep -q "^UG_ERROR_STATE=" /etc/wavelet/wavelet.conf; do
 		sleep .5
 	done
 	kill "$notifyPID" 2>/dev/null || true

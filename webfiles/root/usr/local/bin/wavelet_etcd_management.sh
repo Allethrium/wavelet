@@ -163,7 +163,7 @@ generate_etcd_core_users(){
 	sed -i '/^\[Container\]/a Secret=dhcpUser,type=env,target=dhcpUser' /etc/containers/systemd/kea.container
 	systemctl daemon-reload && systemctl restart kea.service
 	# Create a flag to tell us etcd auth is enabled, and remove the etcd provision flag from /var/
-	set_state_flag "ETCD_AUTH_ENABLED" "yes"
+	echo "ETCD_AUTH_ENABLED=yes" >> /var/wavelet.conf
 	rm -rf /var/server.etcd.provision
 	chown -R wavelet-root:wavelet-root /var/home/wavelet-root; chown -R wavelet:wavelet /var/home/wavelet
 	unset PassWord
@@ -524,22 +524,22 @@ client_provision_get_data() {
 		-in /var/home/wavelet/config/.${credName}.enc -d)"
 	clientArg="--user ${credName}:${password1}"
 	# Test write and read
-	etcdctl ${clientArg} put "/HOSTS/${hostNameSys}/Client_test" -- "True"
-	output="$(etcdctl ${clientArg} get /HOSTS/${hostNameSys}/Client_test --print-value-only)"
+	etcdctl "$clientArg" put "/HOSTS/${hostNameSys}/Client_test" -- "True"
+	output="$(etcdctl $clientArg get /HOSTS/${hostNameSys}/Client_test --print-value-only)"
 
-	if [[ "${output}" == "True" ]]; then
-		echo "  Client test successful!" >> /var/home/wavelet/logs/etcdlog.log
+	if [[ "$output" == "True" ]]; then
+		echo "  Client test successful!" >> "/var/home/wavelet/logs/etcdlog.log"
 		# Clean up provisioning keys
-		echo "  Cleaning provision keys.." >> /var/home/wavelet/logs/etcdlog.log
+		echo "  Cleaning provision keys.." >> "/var/home/wavelet/logs/etcdlog.log"
 		etcdctl --user PROV:$provPW del "/PROV/CRYPT"
 		etcdctl --user PROV:$provPW del "/PROV/FACTOR2"
 		etcdctl --user PROV:$provPW del "/PROV/RESPONSE"
-		echo "  Provisioning process completed. Client ready for etcd access.." >> /var/home/wavelet/logs/etcdlog.log
-		set_state_flag "CLIENT_PROVISION_RQ_COMPLETE" "yes"
+		echo "  Provisioning process completed. Client ready for etcd access.." >> "/var/home/wavelet/logs/etcdlog.log"
+		echo "CLIENT_PROVISION_RQ_COMPLETE=yes" >> "/etc/wavelet.conf"
 		exit 0
 	else
-		echo "  Client test unsuccessful! Please see logs." >> /var/home/wavelet/logs/etcdlog.log
-		echo "  We got back: ${output}" >> /var/home/wavelet/logs/etcdlog.log
+		echo "  Client test unsuccessful! Please see logs." >> "/var/home/wavelet/logs/etcdlog.log"
+		echo "  We got back: $output" >> "/var/home/wavelet/logs/etcdlog.log"
 		exit 1
 	fi
 }

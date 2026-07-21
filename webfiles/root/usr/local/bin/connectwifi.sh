@@ -5,23 +5,8 @@
 # Typically called from wavelet_build after the display manager has launched
 
 # Source the wavelet configuration helper functions
-if [[ -f /etc/wavelet/wavelet_config.sh ]]; then
-    source /etc/wavelet/wavelet_config.sh
-else
-    # Fallback to loading config directly
-    if [[ -f /etc/wavelet/wavelet.conf ]]; then
-        while IFS='=' read -r key value; do
-            [[ "$key" =~ ^[[:space:]]*# ]] && continue
-            [[ -z "$key" ]] && continue
-            key=$(echo "$key" | xargs)
-            value=$(echo "$value" | xargs)
-            value="${value#\"}"
-            value="${value%\"}"
-            value="${value#\'}"
-            value="${value%\'}"
-            export "$key=$value"
-        done < /etc/wavelet/wavelet.conf
-    fi
+if [[ -f "/etc/wavelet.conf" ]]; then
+    source "/etc/wavelet.conf"
 fi
 
 if [[ -f /var/wavelet_ramfs/etcd_interaction_hooks.sh ]]; then
@@ -33,8 +18,8 @@ fi
 
 get_full_bssid(){
 	sleep 2
-	wifibssid=$(nmcli -f BSSID device wifi | grep "${wifi_ap_mac^^}" | head -n 1 | xargs)
-	echo "${wifibssid}"
+	WIFI_BSSID=$(nmcli -f BSSID device wifi | grep "${WIFI_BSSID^^}" | head -n 1 | xargs)
+	echo "$WIFI_BSSID"
 }
 
 connectwifi(){
@@ -43,52 +28,45 @@ connectwifi(){
 		# Spit out a list of wifi networks so we have something to refer to
 		nmcli con show
 	fi
-
 	# Attempt to connect to the configured wifi before proceeding
-	if nmcli con up "$(cat /var/home/wavelet/config/wifi_ssid)"; then
+	if nmcli con up "$WIFI_SSID"; then
 		echo "	Configured connection established, exiting."
 		exit 0
 	else
 		# Recreate the network
-		echo "	An error has occurred, attempting to repopulate the wifi connection.."
-		if is_flag_enabled "PROD_SECURITY_ENABLED"; then
-			connectwifi_enterprise
-		else
-			connectwifi_psk
-		fi
+		# We now only support WPA2/3-ENT
+		connectwifi_enterprise
 	fi
 }
 
 connectwifi_psk(){
-	networkssid=$(cat /var/home/wavelet/config/wifi_ssid)
-	wifipassword=$(cat /var/home/wavelet/config/wifi_pw)
-	wifi_ap_mac=$(cat /var/home/wavelet/config/wifi_bssid)
+	# Obsolete
 	ifname=$(nmcli dev show | grep wifi -B1 | head -n 1 | awk '{print $2}')
-	# Keep scanning until we get a match on wifi_ap_mac
-	until get_full_bssid | grep -m 1 "${wifi_ap_mac^^}"; do
+	# Keep scanning until we get a match on the BSSID
+	until get_full_bssid | grep -m 1 "${WIFI_BSSID^^}"; do
 		nmcli dev wifi rescan
 	done
 	# We need to do this once more, or the variable isn't populated.
-	wifibssid=$(get_full_bssid)
+	FULL_WIFI_BSSID=$(get_full_bssid)
 	nmcli con show
-	echo -e "	Found WiFi BSSID match! It is: $wifibssid\n"
+	echo -e "	Found WiFi BSSID match! It is: $FULL_WIFI_BSSID\n"
 
 	# Remove any old connection UUID's with the same name
-	nmcli con del "$networkssid"
+	nmcli con del "$WIFI_SSID"
 	# Create new connection
-	response=$(nmcli connection add type wifi con-name "$networkssid" ifname "$ifname" ssid "$networkssid")
+	response=$(nmcli connection add type wifi con-name "$WIFI_SSID" ifname "$ifname" ssid "$WIFI_SSID")
 	currentuuid=$(echo "$response" | awk '{print $3}' | sed 's|(||g' | sed 's|)||g')
 	echo "	Created Wavelet network connection with UUID: $currentuuid"
 	echo -e "	Available network connections:\n$(nmcli con show)"
 	for connection in $(nmcli -g NAME con show); do
-		if [[ "$connection" == "$networkssid" ]]; then
+		if [[ "$connection" == "$WIFI_SSID" ]]; then
 			echo "	${connection} is a wavelet-configured WiFi connection, proceeding.."
 			uuid=$(nmcli -g connection.uuid con show "$connection")
 			echo -e "	connection is the active UUID of:${uuid}\nConfiguring and setting as ON"
 			nmcli -g connection.uuid con mod "$uuid" wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$wifipassword"
 			nmcli -g connection.uuid con mod "$uuid" connection.autoconnect yes
 			nmcli -g connection.uuid con up "$uuid"
-			echo "${uuid}" > "/var/home/wavelet/config/wifi.$networkssid.key"
+			echo "${uuid}" > "/var/home/wavelet/config/wifi.$WIFI_SSID.key"
 		fi
 	done		
 
@@ -98,11 +76,11 @@ connectwifi_psk(){
 	else
 		if [[ $? = *"Error: bssid argument is missing"* ]]; then
 			echo -e "	SSID is broadcast, retrying without BSSID argument..\n"
-			cmd=(nmcli dev wifi connect "$networkssid" password "$wifipassword")
+			cmd=(nmcli dev wifi connect "$WIFI_SSID" password "$wifipassword")
 			"${cmd[@]}"
 		fi
 			echo -e "	Continuing to connect for three more tries..\n"
-			cmd=(nmcli dev wifi connect "$networkssid" hidden yes password "$wifipassword" bssid "$wifibssid")
+			cmd=(nmcli dev wifi connect "$WIFI_SSID" hidden yes password "$wifipassword" bssid "$wifibssid")
 			"${cmd[@]}"; sleep 2; "${cmd[@]}"; sleep 2; "${cmd[@]}"
 	fi
 }
@@ -110,18 +88,16 @@ connectwifi_psk(){
 connectwifi_enterprise(){   
 	# This should spawn on client spinup
 	# The generated connection should be managable from the user account via the policykit rules.
-	clientCertificateName="eaptls-client-$(hostname).crt"
-	clientKeyName="eaptls-client-$(hostname).key"
-	if [ ! -f "/etc/pki/tls/certs/$clientCertificateName" ] || [ ! -f "/etc/pki/tls/private/$clientKeyName" ]; then
+	clientCertificateName="eaptls-client-$hostNameSys.crt"
+	clientKeyName="eaptls-client-$hostNameSys.key"
+	if [[ ! -f "/etc/pki/tls/certs/$clientCertificateName" ]] || [[ ! -f "/etc/pki/tls/private/$clientKeyName" ]]; then
     	echo "  ERROR: Missing client certificates. Please ensure 802.1x certificates were issued."
     	return 1
 	fi
-	networkssid="$(cat /var/home/wavelet/config/wifi_ssid)"
-	wifi_ap_mac="$(cat /var/home/wavelet/config/wifi_bssid)"
-	# Keep scanning until we get a match on wifi_ap_mac
+	# Keep scanning until we get a match on our partial BSSID
 	attempt=0
 	max_attempts=60
-	until get_full_bssid | grep -m 1 "${wifi_ap_mac^^}" || [ $attempt -ge $max_attempts ]; do
+	until get_full_bssid | grep -m 1 "${WIFI_BSSID^^}" || [ $attempt -ge $max_attempts ]; do
 	  echo "  Scanning for WiFi network (attempt $((++attempt))/$max_attempts)..."
 		nmcli dev wifi rescan
 		sleep 5
@@ -132,14 +108,14 @@ connectwifi_enterprise(){
 	fi
 
 	# We need to do this once more, or the variable isn't populated.
-	wifibssid="$(get_full_bssid)"
-	echo "	WiFi AP BSSID located: $wifibssid"
+	FULL_WIFI_BSSID="$(get_full_bssid)"
+	echo "	WiFi AP BSSID located: $FULL_WIFI_BSSID"
 	ifname="$(nmcli dev show | grep wifi -B1 | head -n 1 | awk '{print $2}')"
 	if [ -z "$ifname" ]; then
     	echo "ERROR: No WiFi interface detected"
     	return 1
 	fi
-	conn_id="${networkssid}_${hostNameSys}"
+	conn_id="${WIFI_SSID}_${hostNameSys}"
 	uuid="$(cat /proc/sys/kernel/random/uuid)"
 
 	# Remove any existing connection with the same name
@@ -150,7 +126,7 @@ connectwifi_enterprise(){
 	file="/etc/NetworkManager/system-connections/wavelet-8021x.nmconnection"
 	cat > "$file" << EOF
 [connection]
-id=${networkssid}_${hostNameSys}
+id=${WIFI_SSID}_${hostNameSys}
 uuid=$(cat /proc/sys/kernel/random/uuid)
 type=wifi
 interface-name=${ifname}
@@ -161,7 +137,7 @@ wait-activation-delay=30
 
 [wifi]
 mode=infrastructure
-ssid=$networkssid
+ssid=$WIFI_SSID
 powersave=2
 
 [wifi-security]
@@ -220,7 +196,8 @@ detect_disable_ethernet(){
         exit 0
     fi
     # Check for a manual no-wifi flag as set in the installer
-	if is_flag_disabled "WIFI_MODE_ENABLED"; then
+    flag_value=$(grep "^${WIFI_MODE_ENABLED}=" /etc/wavelet/wavelet.conf | cut -d'=' -f2 | tr -d '\r')
+	if [[ "$flag_value" == 1 ]]; then
 		echo -e "	The WIFI_MODE_ENABLED flag is disabled.  Please enable this if this host should utilize wireless connectivity."
 		exit 0
 	else
@@ -246,39 +223,39 @@ set_ethernet_mtu(){
 
 
 logName="/var/home/wavelet/logs/connectwifi.log"
-if [[ -e $logName || -L $logName ]] ; then
+if [[ -e "$logName" || -L "$logName" ]] ; then
 	i=0
-	while [[ -e $logName-$i || -L $logName-$i ]] ; do
+	while [[ -e "$logName-$i" || -L "$logName-$i" ]] ; do
 		(( i++ ))
 	done
-	logName=$logName-$i
+	logName="$logName-$i"
 fi
-exec >${logName} 2>&1
+exec >"${logName}" 2>&1
 
 # In this case we only want the non-fqdn
 hostNameSys="$(hostname -s)"
 
-if [[ $(hostname) = *"svr"* ]]; then
-	echo -e "	This script enables wifi and disables other networking devices.  It is highly recommended to have the server running on a wired link."
-	echo -e "	If you want to run the server via a WiFi connection, this should be configured and enabled manually via nmtui or nmcli."
-	echo -e "	Performance will likely suffer as a result."
+if [[ "$hostNameSys" = *"svr"* ]]; then
+	echo "	This script enables wifi and disables other networking devices.  It is highly recommended to have the server running on a wired link."
+	echo "	If you want to run the server via a WiFi connection, this should be configured and enabled manually via nmtui or nmcli."
+	echo "	Performance will likely suffer as a result."
 	exit 0
 fi
 
-if is_flag_disabled "WIFI_MODE_ENABLED"; then
-	echo -e "	The WIFI_MODE_ENABLED flag is disabled.  Please enable this if this host should utilize wireless connectivity."
+if [[ "$ENABLE_WIFI" == 1 ]]; then
+	echo "	The WIFI_MODE_ENABLED flag is disabled.  Please enable this if this host should utilize wireless connectivity."
 	exit 0
 fi
 
 # Ensure wifi radio is on
 nmcli r wifi on
 
-if [[ $1 == *"E"* ]]; then
-	echo -e "	Module run with -E flag, ethernet connection will remain enabled"
+if [[ "$1" == *"E"* ]]; then
+	echo "	Module run with -E flag, ethernet connection will remain enabled"
 	set_ethernet_mtu
 	connectwifi_enterprise
 else
-	echo -e "	No flags with module call, disabling ethernet connection."
+	echo "	No flags with module call, disabling ethernet connection."
 	connectwifi_enterprise
 fi
 
