@@ -422,14 +422,14 @@ configure_idm(){
 	# Port 953 needed for dynamic DNS updates
 	# Run iplink_up.sh to activate the generated shim to that we can talk to the container from the server
 	# Note we are using the tagged local image, because we don't have certificates yet we can't use the registry.
-	podman pull "$hostNameSys:5000/freeipa-server"
+	podman pull "$hostNameSys/freeipa-server"
 	cat > "/etc/containers/systemd/freeipa.container" <<-EOF
 		[Container]
 		Image=%H/freeipa-server:latest
 		ContainerName=freeipa_server
 		Volume=/var/freeipa-data:/data:z
 		HostName=dc1.$DOMAIN
-		IP=\"${IPAServerHostIP}\"
+		IP=${IPAServerHostIP}
 		Network=ipa_ipvlan
 		ReadOnly=true
 		DNS=127.0.0.1
@@ -440,7 +440,7 @@ configure_idm(){
 		Restart=always
 		RestartSec=5
 		TimeoutStartSec=600
-		ExecStartPost=-/usr/bin/bash -c \"/usr/local/bin/ipa_link_up.sh\"
+		ExecStartPost=-/usr/bin/bash -c "/usr/local/bin/ipa_link_up.sh"
 
 		[Install]
 		WantedBy=multi-user.target
@@ -543,7 +543,7 @@ wait_for_line(){
 	echo -e "			Waiting for match: $1" >> "$logName"
 	inactivity_seconds=5
 	while true; do
-		if inotifywait -e modify "$file" --timeout "$inactivity_seconds" > /dev/null; then
+		if inotifywait -q -e modify "$file" --timeout "$inactivity_seconds" > /dev/null; then
 			last_mod_time="$(date -r "$file" +%s)"
 		else
 			current_time="$(date +%s)"
