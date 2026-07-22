@@ -19,6 +19,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     exit 1
 fi
 
+# Source settings
+# TODO - reduce etcd calls based on data that are available from wavelet.conf now.
+source "/etc/wavelet.conf"
+
 lookup_context(){
     local user="${1:-}"
     if [[ -z "$user" ]]; then
@@ -72,7 +76,9 @@ encrypt_credential() {
   local user_home="$homedir"
   local secrets_dir="${homedir}/.ssh/secrets"
   local config_dir="${homedir}/config"
-  local log_file="/root/logs/wavelet_credentials.log"
+  local log_file="${homedir}/logs/wavelet_credentials.log"
+  # Ensure log directory exists
+  mkdir -p "${homedir}/logs"
   echo "  Encrypting credential '${credential_name}' for ${user_context}" >> "${log_file}"
   # Create directories with proper permissions
   if [[ ! -d "${secrets_dir}" ]]; then
@@ -248,9 +254,8 @@ generate_etcd_userarg() {
 
 create_secure_etcd_wrapper() {
 	# Additional args may specify a different etcd user
-	log_file="$HOME/logs/secure_creds.log"
 	local user_context; local homedir; local service_name; local etcd_key; local script_to_run;
-	local additional_args; local user_home; local wrapper_script
+	local additional_args; local user_home; local wrapper_script; local log_file
 	user_context="$1"
 	service_name="$2"
 	etcd_key="$3"
@@ -258,6 +263,9 @@ create_secure_etcd_wrapper() {
 	additional_args="${5:-}"
 	homedir="$(lookup_context "$user_context")"
 	user_home="$homedir"
+	# Ensure log directory exists
+	mkdir -p "${homedir}/logs"
+	log_file="${homedir}/logs/secure_creds.log"
 	echo "Called with:" >> "$log_file"
 	echo "	user_context = $user_context" >> "$log_file"
 	echo "	homedir = $homedir" >> "$log_file"
@@ -303,7 +311,7 @@ create_secure_etcd_wrapper() {
 				echo "Failed to generate etcd credentials" >&2
 				exit 1
 			fi
-			export ETCDCTL_ENDPOINTS="https://$(cat /var/serverhostname.txt):2379"
+			export ETCDCTL_ENDPOINTS="https://${SVR_HOSTNAME}:2379"
 			export ETCDCTL_CACERT="/etc/ipa/ca.crt"
 			export ADDITIONAL_ARGS
 			exec etcdctl watch \$ETCD_KEY --prefix -w simple -- /usr/bin/bash -c "\$SCRIPT_TO_RUN \$ADDITIONAL_ARGS"
@@ -316,8 +324,7 @@ create_secure_etcd_wrapper() {
 
 generate_secure_systemd_service() {
 	# We need to ensure we are not using the keyname for our systemD service name
-	log_file="$HOME/logs/wavelet_serviceGen.log"
-	local user_context; local service_name; local etcd_key; local script_to_run; local additional_args
+	local user_context; local service_name; local etcd_key; local script_to_run; local additional_args; local log_file
 	for arg in "$@"; do
 		case "$arg" in
 			user=*)
@@ -338,6 +345,9 @@ generate_secure_systemd_service() {
 		esac
 	done
 	homedir="$(lookup_context "$user_context")"
+	# Ensure log directory exists
+	mkdir -p "${homedir}/logs"
+	log_file="${homedir}/logs/wavelet_serviceGen.log"
 	# We don't want a complex etcd key as the service name
 	if [[ "$service_name" == "${etcd_key,,}" ]]; then
 		service_name="${script_to_run,,}"

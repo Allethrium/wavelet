@@ -287,8 +287,10 @@ WantedBy=sway-session.target" > "$file"
 ####
 
 
+source "/etc/wavelet.conf"
+
 # Single initialization block - all variables populated here once
-ETCDENDPOINT="https://$(cat /var/serverhostname.txt):2379"
+ETCDENDPOINT="https://$SVR_HOSTNAME:2379"
 ETCDCTL_CACERT="/var/home/wavelet/config/ca.crt"
 hostNameSys="$(hostname -f)"
 
@@ -425,7 +427,6 @@ generate_wavelet_userspace_services
 systemctl --user -M wavelet@ daemon-reload
 
 # We need to copy the serverhostname and provision credentials to wavelet for ETCD provisioning
-cp /var/serverhostname.txt /var/home/wavelet/config
 cp /var/root/secrets/provisionpw /var/home/wavelet/config
 chown -R wavelet:wavelet /var/home/wavelet
 

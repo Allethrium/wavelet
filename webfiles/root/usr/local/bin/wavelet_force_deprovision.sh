@@ -22,6 +22,7 @@ else
 	ETCD_CREDENTIALS_MOD="/usr/local/bin/wavelet_secure_credentials.sh"
 fi
 
+source "/etc/wavelet.conf"
 
 # This task runs inside of the root user context
 # Therefore it somewhat replicates the functions of the orchestrator
@@ -112,7 +113,7 @@ destroy_host_role() {
 	mkdir -p "/var/home/$user/logs"
 	mkdir -p "/var/home/$user/config"
 	# Get user arguments from secure credentials (will fail if run without etcd root user)
-	export ETCDCTL_ENDPOINTS="https://$(cat /var/serverhostname.txt):2379"
+	export ETCDCTL_ENDPOINTS="https://$SVR_HOSTNAME:2379"
 	export ETCDCTL_CACERT="/etc/ipa/ca.crt"
 	generate_etcd_userarg "user=wavelet-root" "extraargs=root"
 	if [[ "$ETCDCTL_USER" != "root" ]]; then

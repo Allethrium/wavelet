@@ -25,11 +25,15 @@ else
 	ETCDINTERACTIONMOD="/usr/local/bin/etcd_interaction_hooks.sh"
 fi
 
+# Source settings
+# TODO - reduce etcd calls based on data that are available from wavelet.conf now.
+source "/etc/wavelet.conf"
+
 #Etcd Interaction global variables
-ETCDENDPOINT="https://$(cat /var/serverhostname.txt):2379"
+ETCDENDPOINT="https://$SVR_HOSTNAME:2379"
 if [[ -z "$ETCDENDPOINT" ]]; then
 	# populate from waveletdir because we didn't have read access to the root copy
-	ETCDENDPOINT="https://$(cat /var/home/wavelet/config/serverhostname.txt):2379"
+	ETCDENDPOINT="https://$SVR_HOSTNAME:2379"
 fi
 
 certificateAuthorityFile="/etc/ipa/ca.crt"
@@ -329,7 +333,7 @@ generate_etcd_host_role() {
 	mkdir -p /var/home/"${user}"/config
 	# Get user arguments from secure credentials (will fail if run without etcd root user)
 	generate_etcd_userarg "user=wavelet-root" "extraargs=root"
-	export ETCDCTL_ENDPOINTS="https://$(cat /var/serverhostname.txt):2379"
+	export ETCDCTL_ENDPOINTS="https://$SVR_HOSTNAME:2379"
 	export ETCDCTL_CACERT="/etc/ipa/ca.crt"
 	if [[ $? -ne 0 ]]; then
 		echo "	Failed to get secure etcd credentials" >> "/var/home/${user}/logs/etcdlog.log"

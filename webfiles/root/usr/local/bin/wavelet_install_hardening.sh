@@ -401,7 +401,6 @@ configure_idm(){
 		-v /var/freeipa-data:/data:Z \
 		--tls-verify=false \
 		"$hostNameSys/freeipa-server:latest" ipa-server-install -q -U < "/var/freeipa-data/ipa-server-install-options"
-
 	# Wait for server install to complete
 	file="/var/freeipa-data/var/log/ipaserver-install.log" >> "$logName"
 	while [[ ! -f "$file" ]]; do
@@ -409,10 +408,8 @@ configure_idm(){
 	done
 	echo "	Waiting for server installation to complete.." >> "$logName"
 	wait_for_line "INFO The ipa-server-install command was successful"
-
 	# Make sure the INSTALL container has been stopped and destroyed!
 	podman rm freeipa_dc1_install -f
-
 	# Generate named ACL
 	echo -e "acl \"wavelet_network\" {\n127.0.0.1;\n$currentSubnet;\n};" >> "/var/freeipa-data/etc/named/ipa-ext.conf"
 	echo -e "allow-recursion { wavelet_network; };\nallow-query-cache { wavelet_network; };" >> "/var/freeipa-data/etc/named/ipa-options-ext.conf"
@@ -465,7 +462,6 @@ install_server_security_layer(){
 	# Directory manager and Admin credential are the same.  We probably want to alter this.
 	cat /var/secrets/ipaadmpw.secure > /var/secrets/ipadmpw.secure
 	administratorPassword="$(cat /var/secrets/ipaadmpw.secure)"
-
 	# The preferred method would be to run the ipa-client in a container
 	# I found the documentation on this to leave something to be desired.
 	# We run bare metal on the overlay after solving an nfs-utils issue and manually generating some directories.
@@ -485,14 +481,17 @@ install_server_security_layer(){
 #	output="$(dig _ldap._tcp.wavelet.allethrium)"
 	echo "	Attempting IPA Client installation.."
 	# We must NOT use --enable-dns-updates here, as the ipa-client seems to prefer the ipvlan shim to the real NIC
+	# Run ipa-client-install and capture output to a file we can monitor
 	ipa-client-install --unattended --principal=admin --password="${administratorPassword}" \
-	--ssh-trust-dns --ip-address="${clientIpAddress%/*}" &
+	--ssh-trust-dns --ip-address="${clientIpAddress%/*}" > "/var/log/ipaclient-install.log" 2>&1 &
 	# Use inotify to wait for the file to exist instead of busy waiting
 	file="/var/log/ipaclient-install.log"
-	inotifywait -q -e create "$file"
-	echo -e "\n\n	IPA client log file created, continuing.." >> "$logName"
+	# Ensure the log file exists
+	touch "$file"
+	inotifywait -q -e modify "$file" --timeout 300 > /dev/null || true
+	echo -e "\n\n	IPA client installation log being processed, continuing.." >> "$logName"
 	# Now tail the file until we find success pattern
-	wait_for_line "INFO Client configuration complete."
+	wait_for_line "Client configuration complete."
 	#podman exec freeipa_server ldapmodify -x -D "cn=admin" -W  -f pwmod.ldif
 	# Ideally here, we could use REST calls w/ Unleashed to add our new CA to the AP
 	echo "SERVER_DOMAIN_ENROLLMENT_COMPLETE=yes" >> /etc/wavelet.conf
@@ -530,8 +529,9 @@ key \"KEA-DHCP\" {
 	ipa dnszone-mod "${DOMAIN^^}." --allow-sync-ptr=TRUE
 	# Because of our very weird virtual/host setup, we need to manually add the server DNS record and reverse;
 	ipa dnsrecord-add "$DOMAIN." "$(hostname -s)" --a-rec "$SVR_IP"
-	ipa dnszone-add --name-from-ip "$IPAServerHostIP"
-	printf "%s\n" "$clientIpAddress" | ipa dnszone-add --name-from-ip
+	# Add reverse DNS zone for the IPA server subnet (e.g., 1.168.192.in-addr.arpa. for 192.168.1.x)
+	local reverseZone="1.168.192.in-addr.arpa."
+	ipa dnszone-add "$reverseZone" --network="${childSubnetNetworkAddr}${childSubnetRangeStart}/28" || true
 	# Restart ipa service so that the modified ipa-ext.conf is loaded for named
 	systemctl restart freeipa.service
 	sleep 5
@@ -745,17 +745,19 @@ configure_freeipa_8021x(){
  	# Note - tutorial/blog shows 1.2 and IPA generates .2 - check if this is important
  	# Delete policyset.set.2 and append to replace it with
  	sed -i '/policyset\.serverCertSet\.2/,+2d' ca802_1xCert.txt
- 	echo "policyset.set.2.constraint.class_id=validityConstraintImpl
-policyset.set.2.constraint.name=Validity Constraint
-policyset.set.2.constraint.params.rangeUnit=day
-policyset.set.2.constraint.params.range=3650
-policyset.set.2.constraint.params.notBeforeGracePeriod=3650
-policyset.set.2.constraint.params.notBeforeCheck=true
-policyset.set.2.constraint.params.notAfterCheck=true
-policyset.set.2.default.class_id=validityDefaultImpl
-policyset.set.2.default.name=Validity Default
-policyset.set.2.default.params.range=3650
-policyset.set.2.default.params.startTime=0" >> ca802_1xCert.txt
+ 	cat >> "ca802_1xCert.txt" <<-EOF
+		policyset.set.2.constraint.class_id=validityConstraintImpl
+		policyset.set.2.constraint.name=Validity Constraint
+		policyset.set.2.constraint.params.rangeUnit=day
+		policyset.set.2.constraint.params.range=3650
+		policyset.set.2.constraint.params.notBeforeGracePeriod=3650
+		policyset.set.2.constraint.params.notBeforeCheck=true
+		policyset.set.2.constraint.params.notAfterCheck=true
+		policyset.set.2.default.class_id=validityDefaultImpl
+		policyset.set.2.default.name=Validity Default
+		policyset.set.2.default.params.range=3650
+		policyset.set.2.default.params.startTime=0"
+	EOF
 	# Remove 1024 bit keys from the keyParameters list
 	sed -i 's/policyset.set1.3.constraint.params.keyParameters=1024,2048,3072,4096,8192/policyset.set1.3.constraint.params.keyParameters=2048,3072,4096,8192/g' ca802_1xCert.txt
 	# Set certificate key usage OID's to clientAuth,Eap-Over-LAN
@@ -818,32 +820,56 @@ configure_wavelet_ap(){
 	echo "		Configuring WiFi Access point certificates.."
 	local wifi_ap_block; local wifi_ap_ip; local wifi_ap_mac; local wifi_adminUser; local wifi_adminPass
 	local cookie_file; local supportedVendorMAC; local macPrefixListFile
-	wifi_ap_ip="$(cat /var/home/wavelet-root/config/wifi_ipaddr)"
-	wifi_ap_mac="$(arp "$wifi_ap_ip" | tail -n 1 | awk '{print $3}')"
+	local wifi_config_dir="/var/home/wavelet-root/config"
+	# Check if WiFi config directory and required files exist
+	if [[ ! -d "$wifi_config_dir" ]]; then
+		echo "		WiFi configuration directory $wifi_config_dir does not exist. Skipping AP configuration." >> "$logName"
+		return 0
+	fi
+	wifi_ap_ip="$(cat "${wifi_config_dir}/wifi_ipaddr" 2>/dev/null)"
+	if [[ -z "$wifi_ap_ip" ]]; then
+		echo "		WiFi AP IP address not specified in ${wifi_config_dir}/wifi_ipaddr. Skipping AP configuration." >> "$logName"
+		return 0
+	fi
+	wifi_ap_mac="$(arp "$wifi_ap_ip" 2>/dev/null | tail -n 1 | awk '{print $3}')"
+	if [[ -z "$wifi_ap_mac" || "$wifi_ap_mac" == "Incomplete" ]]; then
+		echo "		Could not resolve MAC address for WiFi AP IP $wifi_ap_ip. Skipping AP configuration." >> "$logName"
+		return 0
+	fi
 	wifi_ap_block="$(echo "$wifi_ap_mac" | tr '-' ':' | cut -d ":" -f1-3)"
-	wifi_adminUser="$(cat /var/home/wavelet-root/config/wifi_adminuser)"
-	wifi_adminPass="$(cat /var/home/wavelet-root/config/wifi_adminpw)"
+	wifi_adminUser="$(cat "${wifi_config_dir}/wifi_adminuser" 2>/dev/null)"
+	wifi_adminPass="$(cat "${wifi_config_dir}/wifi_adminpw" 2>/dev/null)"
+	if [[ -z "$wifi_adminUser" || -z "$wifi_adminPass" ]]; then
+		echo "		WiFi AP admin credentials not fully specified in ${wifi_config_dir}/. Skipping AP configuration." >> "$logName"
+		return 0
+	fi
 	# Right now, there's no purpose in this file as we only support Ruckus Unleashed.
-#	macPrefixListFile="/var/home/wavelet-root/config/supportedVendorMAC"
+	macPrefixListFile="${wifi_config_dir}/supportedVendorMAC"
 	cookie_file="$(mktemp)"
 	supportedVendorMAC=false
-	while IFS= read -r prefix; do
-    	# Skip empty lines
-    	if [[ -z "$prefix" ]]; then
-	        continue
-	    fi
-	    # Check if the wifi_ap_mac starts with the current prefix
-	    if [[ "$wifi_ap_block" == "$prefix"* ]]; then
-	        supportedVendorMAC=true
-	        break
-	    fi
-	done < "$macPrefixListFile"
+	# Check if macPrefixListFile exists and has content
+	if [[ -f "$macPrefixListFile" && -s "$macPrefixListFile" ]]; then
+		while IFS= read -r prefix; do
+	    	# Skip empty lines
+	    	if [[ -z "$prefix" ]]; then
+		        continue
+		    fi
+		    # Check if the wifi_ap_mac starts with the current prefix
+		    if [[ "$wifi_ap_block" == "$prefix"* ]]; then
+		        supportedVendorMAC=true
+		        break
+		    fi
+		done < "$macPrefixListFile"
+	else
+		# If no macPrefixListFile, assume supported (Ruckus Unleashed is the only supported vendor)
+		supportedVendorMAC=true
+	fi
 	if [[ ! "$supportedVendorMAC" ]]; then
 	    echo "		The provided Wireless Access Point MAC address does not match Wavelet's supported vendor list." \
 	        >> "$logName"
 	    echo "		Wavelet will be unable to automatically generate and sign the device certificate, so this must be done manually!" \
 	        >> "$logName"
-	    return
+	    return 0
 	fi
 	# This code was copied and (slightly) adapted from:
 	# https://github.com/acmesh-official/acme.sh/blob/master/deploy/ruckus.sh
@@ -880,13 +906,11 @@ configure_wavelet_ap(){
 		echo "		Access point hostname is not populated!  Cannot continue."
 		return 1
 	fi
-
 	# Set up FreeIPA entries
 	# These would be needed for a CSR, so we leave them in.
 	kinit admin < "/var/secrets/ipaadmpw.secure"
 	ipa host-add "$apFQDN" --force
 	ipa service-add "WiFi-AP/$apFQDN" --force
-
 	# The CA is all that's required for the AP to be able to open a TLS connection w/ RADIUS
 	addCaSuccess="$(curl -k -b "$cookie_file" "$base_url/_upload.jsp?request_type=xhr" \
       -H "X-CSRF-Token: $loginResponse" \
@@ -924,7 +948,6 @@ upload_ca_to_ap(){
 	wifi_adminUser="$2"
 	wifi_adminPass="$3"
 	cookie_file="$(mktemp)"
-
 	# Establish session and get CSRF token
 	login_url="$(curl https://"$wifi_ap_ip" -k -s -L -o /dev/null -w '%{url_effective}')"
 	base_url=$(dirname "$login_url")
