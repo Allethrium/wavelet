@@ -15,40 +15,41 @@ FROM quay.io/fedora/fedora-coreos:stable
 
 # Adjust args as appropriate (build_registry.sh should modify them dynamically)
 ARG FFMPEG_VERSION=7.1.4
-ARG DEPLOYMENT_HTTPD=192.168.1.200
 ARG FCOS_VERSION=44
 
-# Configure repos, override ffmpeg with custom 7.1.4 build to prevent rpmfusion ffmpeg 8.1 from being installed, and install all dependencies in a single layer
+# Copy local FFmpeg RPMs
+COPY rpms/ffmpeg-${FFMPEG_VERSION}-*.fc${FCOS_VERSION}.x86_64.rpm /tmp/ffmpeg.rpm
+COPY rpms/ffmpeg-libs-${FFMPEG_VERSION}-*.fc${FCOS_VERSION}.x86_64.rpm /tmp/ffmpeg-libs.rpm
+
+# Configure repos, override ffmpeg with custom 7.1.4 build to prevent rpmfusion ffmpeg 8.1 from being installed, and install all dependencies in a single transaction
 RUN rm -f /etc/yum.repos.d/fedora-cisco-openh264.repo && \
     curl -o /etc/yum.repos.d/swayfx.repo https://copr.fedorainfracloud.org/coprs/swayfx/swayfx/repo/fedora-${FCOS_VERSION}/swayfx-swayfx-fedora-${FCOS_VERSION}.repo && \
     rpm-ostree install -y \
             https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${FCOS_VERSION}.noarch.rpm \
-            https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FCOS_VERSION}.noarch.rpm && \
-    rpm-ostree override replace \
-        "http://${DEPLOYMENT_HTTPD}:8080/rpms/ffmpeg-${FFMPEG_VERSION}-1.fc${FCOS_VERSION}.x86_64.rpm" \
-        "http://${DEPLOYMENT_HTTPD}:8080/rpms/ffmpeg-libs-${FFMPEG_VERSION}-1.fc${FCOS_VERSION}.x86_64.rpm"
-RUN rpm-ostree install -y -A \
-        wget fontawesome-fonts wl-clipboard nnn mako swayfx swayimg bemenu rofi-wayland lxsession nfs-utils \
-        xwayland-run waybar chrony foot vim powerline powerline-fonts vim-powerline greetd \
-        NetworkManager-wifi iw wireless-regdb wpa_supplicant nfs-utils \
-        avahi nss-mdns rdma freeipa-client haveged rng-tools \
-        iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch intel-audio-firmware intel-gpu-firmware intel-vsc-firmware \
-        alsa-firmware alsa-sof-firmware realtek-firmware \
-        etcd sha \
-        libv4l v4l-utils pipewire-v4l2 pipewire-gstreamer pulseaudio-utils ImageMagick \
-        mesa-dri-drivers mesa-vulkan-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
-        alsa-lib pipewire-alsa alsa-plugins-speex bluez-tools nmap-ncat \
-        tuned realtime-tests rtkit jo linuxptp linuxptp-selinux \
-        intel-gpu-tools intel-compute-runtime intel-gmmlib intel-opencl \
-        intel-level-zero libvpl \
-        libva libva-utils libva-v4l2-request libvdpau \
-        oneVPL-intel-gpu oneapi-level-zero opencl-headers mpv libsrtp \
-        fastfetch btop mesa-libOpenCL srt srt-libs pipewire-utils usbutils \
-        plymouth plymouth-system-theme plymouth-theme-fade-in plymouth-theme-spinfinity \
-        plymouth-plugin-script plymouth-scripts \
-        rkhunter clamav clamd clamav-freshclam firefox \
-        intel-media-driver libndi-sdk ndi-sdk ndi-sdk-documentation \
-        libva-intel-driver vlc \
-        gstreamer1-plugin-libav gstreamer1-plugins-bad-freeworld \
-        libheif-freeworld && \
+            https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FCOS_VERSION}.noarch.rpm \
+            --override-replace=/tmp/ffmpeg.rpm \
+            --override-replace=/tmp/ffmpeg-libs.rpm \
+            wget fontawesome-fonts wl-clipboard nnn mako swayfx swayimg bemenu rofi-wayland lxsession nfs-utils \
+            xwayland-run waybar chrony foot vim powerline powerline-fonts vim-powerline greetd \
+            NetworkManager-wifi iw wireless-regdb wpa_supplicant nfs-utils \
+            avahi nss-mdns rdma freeipa-client haveged rng-tools \
+            iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch intel-audio-firmware intel-gpu-firmware intel-vsc-firmware \
+            alsa-firmware alsa-sof-firmware realtek-firmware \
+            etcd sha \
+            libv4l v4l-utils pipewire-v4l2 pipewire-gstreamer pulseaudio-utils ImageMagick \
+            mesa-dri-drivers mesa-vulkan-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
+            alsa-lib pipewire-alsa alsa-plugins-speex bluez-tools nmap-ncat \
+            tuned realtime-tests rtkit jo linuxptp linuxptp-selinux \
+            intel-gpu-tools intel-compute-runtime intel-gmmlib intel-opencl \
+            intel-level-zero libvpl \
+            libva libva-utils libva-v4l2-request libvdpau \
+            oneVPL-intel-gpu oneapi-level-zero opencl-headers mpv libsrtp \
+            fastfetch btop mesa-libOpenCL srt srt-libs pipewire-utils usbutils \
+            plymouth plymouth-system-theme plymouth-theme-fade-in plymouth-theme-spinfinity \
+            plymouth-plugin-script plymouth-scripts \
+            rkhunter clamav clamd clamav-freshclam firefox \
+            intel-media-driver libndi-sdk ndi-sdk ndi-sdk-documentation \
+            libva-intel-driver vlc \
+            gstreamer1-plugin-libav gstreamer1-plugins-bad-freeworld \
+            libheif-freeworld && \
     ostree container commit

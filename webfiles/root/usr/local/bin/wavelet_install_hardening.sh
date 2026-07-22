@@ -5,6 +5,8 @@
 
 # Add our attempt at a password security solution here
 source "/usr/local/bin/wavelet_secure_credentials.sh"
+# Source our conf file
+source "/etc/wavelet.conf"
 
 # 	Wavelet's security model is simple;
 #	*	Central FreeIPA IdM to handle machine accounts, service principals and certificates
@@ -28,7 +30,7 @@ event_server(){
 	configure_idm
 	# We need to configure SELinux policy permanent -P to allow containers to read the cert bundle package
 	setsebool -P container_read_certs 1
-	if grep -q "^SERVER_DOMAIN_ENROLLMENT_COMPLETE=yes\|^SERVER_DOMAIN_ENROLLMENT_COMPLETE=true" /etc/wavelet/wavelet.conf; then
+	if grep -q "^SERVER_DOMAIN_ENROLLMENT_COMPLETE=yes\|^SERVER_DOMAIN_ENROLLMENT_COMPLETE=true" /etc/wavelet.conf; then
 		echo "	Domain enrollment is complete, proceeding to configure certificates and service principals.." >> "$logName"
 		sleep 1
 		# Create a watcher service to keep certs up to date
@@ -493,7 +495,7 @@ install_server_security_layer(){
 	wait_for_line "INFO Client configuration complete."
 	#podman exec freeipa_server ldapmodify -x -D "cn=admin" -W  -f pwmod.ldif
 	# Ideally here, we could use REST calls w/ Unleashed to add our new CA to the AP
-	echo "SERVER_DOMAIN_ENROLLMENT_COMPLETE=yes" >> /etc/wavelet/wavelet.conf
+	echo "SERVER_DOMAIN_ENROLLMENT_COMPLETE=yes" >> /etc/wavelet.conf
 }
 
 ipa_dns_tsig(){

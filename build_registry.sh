@@ -436,16 +436,15 @@ check_firewall_ports() {
 }
 
 detect_fcos_version(){
-    local fcos_image="quay.io/fedora/fedora-coreos:latest"
+    local fcos_image="quay.io/fedora/fedora-coreos:stable"
     # Pull the image if not present
     podman pull "$fcos_image" >/dev/null 2>&1
     # Try to get the version from /etc/os-release by running a container
     local fcos_version
-    fcos_version=$(podman run --rm "$fcos_image" cat /etc/os-release 2>/dev/null | grep ^VERSION_ID= | cut -d= -f2 | tr -d '"' || echo "44")
+    fcos_version=$(podman run --rm "$fcos_image" cat /etc/os-release 2>/dev/null | grep ^VERSION_ID= | cut -d= -f2 | tr -d '"')
     # Ensure it's just the major version number (e.g., "44" from "44.20240101.3.0" or "44")
     fcos_version="${fcos_version%%.*}"
     if [[ -z "$fcos_version" || ! "$fcos_version" =~ ^[0-9]+$ ]]; then
-        echo "44"
         fcos_version="44"
     fi
     echo "$fcos_version"
@@ -516,15 +515,20 @@ ffmpeg_version="7.1.4"
 
 # Check if FFmpeg RPMs already exist to avoid needlessly rebuilding
 output_dir="$HOME/.config/var/www/rpms"
-# Use shell globbing to check for existing RPMs
-shopt -s nullglob
-ffmpeg_rpms=("$output_dir"/ffmpeg-${ffmpeg_version}-*.fc${FCOS_VERSION}.x86_64.rpm)
-ffmpeg_libs_rpms=("$output_dir"/ffmpeg-libs-${ffmpeg_version}-*.fc${FCOS_VERSION}.x86_64.rpm)
-if [[ ${#ffmpeg_rpms[@]} -gt 0 && ${#ffmpeg_libs_rpms[@]} -gt 0 ]]; then
+
+echo "FCOS Version: $FCOS_VERSION"
+echo "ffmpeg version: $ffmpeg_version"
+if [[ -f "$output_dir/ffmpeg-$ffmpeg_version-1.fc$FCOS_VERSION.x86_64.rpm" ]] && [[ -f "$output_dir/ffmpeg-libs-$ffmpeg_version-1.fc$FCOS_VERSION.x86_64.rpm" ]]; then
     echo -e "${GREEN}FFmpeg $ffmpeg_version RPMs already exist in $output_dir, skipping build.${NC}"
 else
     build_ffmpeg_rpm
 fi
+
+# Copy FFmpeg RPMs to containerfiles build context for local override
+ffmpeg_rpms_dir="$waveletdir/webfiles/root/home/wavelet/containerfiles/rpms"
+mkdir -p "$ffmpeg_rpms_dir"
+cp "$output_dir"/ffmpeg-${ffmpeg_version}-*.fc${FCOS_VERSION}.x86_64.rpm "$ffmpeg_rpms_dir/" 2>/dev/null || true
+cp "$output_dir"/ffmpeg-libs-${ffmpeg_version}-*.fc${FCOS_VERSION}.x86_64.rpm "$ffmpeg_rpms_dir/" 2>/dev/null || true
 
 # Build the OCI container layers for the client, then utilize that as a base for the server layer.
 build_container_image "coreos_overlay_client" "Containerfile.coreos.overlay.client"
