@@ -487,7 +487,8 @@ chown -R wavelet-root:wavelet-root "/var/home/wavelet-root/"
 	cp "/etc/wavelet.conf" "/var/home/wavelet/http/ignition/wavelet.conf"
 	coreos_systemd_fix
 	chown -R wavelet:wavelet "/var/home/wavelet/http"
-	echo "PXE_COMPLETE=yes" >> "/etc/wavelet.conf"
+	echo "Setting PXE_COMPLETE=1 flag in wavelet.conf.."
+	echo "PXE_COMPLETE=1" >> "/etc/wavelet.conf"
 ) &
 
 (

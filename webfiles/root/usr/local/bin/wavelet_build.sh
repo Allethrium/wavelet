@@ -317,20 +317,20 @@ event_encoder(){
 
 event_server(){
 	# Responsible for generating the wavelet-specific userspace services that form the appliance core
-	if grep -q "^PXE_COMPLETE=yes\|^PXE_COMPLETE=true" /etc/wavelet.conf; then
+	# Source conf file
+	source "/var/home/wavelet/config/$(hostname).conf"
+	if [[ "$PXE_COMPLETE" == 1 ]]; then
 		echo "	PXE service up and running, continuing.."
 	else
 		echo "	PXE boot service has not completed setup.  Please check logs."
 		exit 1
 	fi
-	if [[ -f "/var/home/wavelet/server_bootstrap_completed" ]]; then
+	if [[ "$SVR_BOOTSTRAP_COMPLETE" == 1 ]]; then
 		echo "	Server bootstrap completed, continuing"
 	else
 		echo "	Server bootstrap not completed"
 		server_bootstrap
 	fi
-	# Source conf file
-	source "/var/home/wavelet/config/$(hostname).conf"
 	# Tag device redetect
 	echo -e "\n	System services and configuration keys generated, starting services now.."
 	systemctl --user daemon-reload
@@ -342,10 +342,10 @@ event_server(){
 		wavelet_client_controller \
 		wavelet_network_device --now
 	# if first run, we set UIEnable to give us the UI browser on the server to assist with setup.
-	if grep -q "^SERVER_FIRSTRUN_FLAG=yes\|^SERVER_FIRSTRUN_FLAG=true" /etc/wavelet.conf; then
+	if [[ "$SVR_FIRSTRUN" == 1 ]]; then
 		echo "	First run, setting UIEnable flag.."
 		KEYNAME="/HOSTS/$hostNameSys/control/UIEnable"; KEYVALUE="1"; write_etcd_global &
-		sed -i "s/^SERVER_FIRSTRUN_FLAG=.*/SERVER_FIRSTRUN_FLAG=no/" /etc/wavelet.conf
+		sed -i "/^SERVER_FIRSTRUN_FLAG=/d" "/etc/wavelet.conf"
 	fi
 	sleep 1
 	echo "	Running initial device detection.."
