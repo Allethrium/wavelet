@@ -133,7 +133,7 @@ set_userArg() {
 	  >> "/var/home/${user}/logs/etcdlog.log"
 	exit 1
   fi
-  ETCDCTL_ENDPOINTS="https://$(cat /var/home/wavelet/config/serverhostname.txt):2379"
+  ETCDCTL_ENDPOINTS="https://$SVR_HOSTNAME:2379"
   ETCDCTL_CACERT="/etc/ipa/ca.crt"
   export ETCDCTL_ENDPOINTS; export ETCDCTL_CACERT
   echo "  Running in user context: ${current_user_context}" >> "/var/home/${user}/logs/etcdlog.log"

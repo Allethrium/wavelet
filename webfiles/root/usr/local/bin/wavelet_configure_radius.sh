@@ -6,6 +6,8 @@
 # Client generates a client certificate for a requestor during the etcd key provision process (when it is still on wired)
 # Runs under wavelet-root exclusively
 
+source "/etc/wavelet.conf"
+
 build_containerfile(){
 	# We limit to Fedora 42 as there is a bug with Freeradius and OpenSSL on the latest version 43.
 	containerFile="/var/home/wavelet-root/config/Containerfile.radius"
@@ -26,8 +28,8 @@ EOF
 configure_radius(){
 	# Build RADIUS container
 	# If LAN deployment, the container should already be available in the server's registry
-	cd /var/home/wavelet-root/config || exit 1
-	output="$(curl https://$(hostname):5000/v2/_catalog)"
+	cd "/var/home/wavelet-root/config" || exit 1
+	output="$(curl https://$SVR_HOSTNAME:5000/v2/_catalog)"
 
 	if [[ "$output" == *"radiusd"* ]]; then
 		echo "	Found expected container in registry catalog.."
@@ -36,7 +38,7 @@ configure_radius(){
 		build_containerfile
 	fi
 
-	podman run -d -v /var/home/wavelet-root/config:/var/tmp:z "$(hostname)/radiusd" cp -R /etc/raddb/ /var/tmp
+	podman run -d -v /var/home/wavelet-root/config:/var/tmp:z "$SVR_HOSTNAME/radiusd" cp -R /etc/raddb/ /var/tmp
 	# Now that we have a full skeleton of RADIUS configuration files, we copy our templates in
 	echo -e "\n\n	Copying RADIUS configuration files from git, as user: $(whoami)"
 	sudo cp -R /var/wavelet_root/home/wavelet-root/config/radius/ /var/home/wavelet-root/config/; sudo chown -R wavelet-root:wavelet-root /var/home/wavelet-root
@@ -52,61 +54,63 @@ configure_radius(){
 
 	# We must modify the CAdir so it points to our IPA CA
 	# shellcheck disable=SC2016
-	sed -i 's|cadir   = ${confdir}/certs|cadir   = /etc/ipa|g' /var/home/wavelet-root/config/raddb/radiusd.conf
+	sed -i 's|cadir   = ${confdir}/certs|cadir   = /etc/ipa|g' "/var/home/wavelet-root/config/raddb/radiusd.conf"
 	# now the container complains once again of permissions, this is likely the same problem between the container subuser/host user mismatch that keeps occurring when I try this.
 	# seems a shame I can't get server services running from user account, but it's probably like that for a reason..
 	# we should probably move the call for this spinup to root
 
 	echo "	Generating RADIUS quadlet.."
-	mkdir -p /home/wavelet-root/.config/containers/systemd/
+	mkdir -p "/home/wavelet-root/.config/containers/systemd/"
 	# Note the ExecStartPre directive, which checks for freeIPA's ACME service responder before starting.
-	echo -e "[Unit]
-Description=FreeRADIUS Quadlet
-After=network.target freeipa.service
+	cat > "/home/wavelet-root/.config/containers/systemd/freeradius.container" <<-EOF
+		[Unit]
+		Description=FreeRADIUS Quadlet
+		After=network.target freeipa.service
 
-[Container]
-ContainerName=freeradius
-Image=%H/radiusd
-Network=pasta
-PublishPort=192.168.1.32:1813:1813/udp
-PublishPort=192.168.1.32:1812:1812/udp
-PublishPort=192.168.1.32:2083:2083/tcp
-# RADIUS Config directory
-Volume=/var/home/wavelet-root/config/raddb/:/etc/raddb:z
-# CA
-Volume=/etc/ipa/ca.crt:/etc/ipa/ca.crt:ro
-Exec=radiusd -fxx -l stdout
+		[Container]
+		ContainerName=freeradius
+		Image=%H/radiusd
+		Network=pasta
+		PublishPort=192.168.1.32:1813:1813/udp
+		PublishPort=192.168.1.32:1812:1812/udp
+		PublishPort=192.168.1.32:2083:2083/tcp
+		# RADIUS Config directory
+		Volume=/var/home/wavelet-root/config/raddb/:/etc/raddb:z
+		# CA
+		Volume=/etc/ipa/ca.crt:/etc/ipa/ca.crt:ro
+		Exec=radiusd -fxx -l stdout
 
-[Service]
-ExecStartPre=/bin/bash -c 'until curl -ksf https://192.168.1.227:8443/acme/ >/dev/null 2>&1; do sleep 3; done'
-Restart=always
-RestartSec=5
+		[Service]
+		ExecStartPre=/bin/bash -c 'until curl -ksf https://192.168.1.227:8443/acme/ >/dev/null 2>&1; do sleep 3; done'
+		Restart=always
+		RestartSec=5
 
-[Install]
-# Start by default on boot
-WantedBy=multi-user.target default.target
-" > /home/wavelet-root/.config/containers/systemd/freeradius.container
+		[Install]
+		# Start by default on boot
+		WantedBy=multi-user.target default.target
+	EOF
     # We must ensure the inner-tunnel link is removed, or RADIUS will refuse to start
-    unlink /var/home/wavelet-root/config/raddb/sites-enabled/inner-tunnel
+    unlink "/var/home/wavelet-root/config/raddb/sites-enabled/inner-tunnel"
 	systemctl --user daemon-reload
 	systemctl --user start freeradius.service
 }
 
 enable_radsec(){
-	cd /var/home/wavelet-root/config/radius || exit 1
+	cd "/var/home/wavelet-root/config/radius" || exit 1
 	# Append correct client entry to tls module
 	# This is required or RADIUS will not respond to the WiFi AP!
 	# If we wind up supporting systems running multiple AP, this will need attention.
 	# find #_APPEND_HERE and add
 	echo "Appending TLS NAS client to /sites-enabled/tls, required for secured communication between AP and RADIUS."
-	wifi_ipaddr="$(cat /var/home/wavelet-root/config/wifi_ipaddr)"
+	# once we have consumed the AP IP Address in the conf file, we can remove that line from the file.
+	sed -i '/WIFI_IPADDR=/d' "/etc/wavelet.conf"
 	echo "		client waveletAP {
-			ipaddr = ${wifi_ipaddr}
+			ipaddr = ${WIFI_IPADDR}
 			proto = tls
 			secret = radsec
 		}" > tls_client_block
 	sed -i "/#_APPEND_RADSEC_CLIENT_HERE/r tls_client_block" sites-enabled/tls
-	cp -f sites-enabled/tls /var/home/wavelet-root/config/raddb/sites-enabled
+	cp -f "sites-enabled/tls" "/var/home/wavelet-root/config/raddb/sites-enabled"
 	# May not be needed - would make replacing the AP a real pain in the event of hw failure
 	# generate_client_certificate "wavelet_ap";
 	# This approach at the simplest should be adding our generated IPA CA to the CA store on the Access Point.
@@ -114,9 +118,10 @@ enable_radsec(){
 	currentSubnet="$(ipcalc "$currentIPCIDR" | sed -n '2p')"
 	# We could try to scan the subnet for a valid AP now, or just allow NAS requests from the entire subnet.  Leave permissive for now.
 	# Require client cert means the AP must have a signed certificate from the CA we generated above.  This will be complex to manage, and require a full PKI.
-	echo "# Defines a RADIUS client.
+	cat > "/var/home/wavelet-root/config/raddb/clients.conf" <<EOF
+# Defines a RADIUS client.
 # Only one AP client for this system, simplified config.  127.0.0.1 disabled as testing unnecessary.
-	client waveletAP {
+client waveletAP {
 	ipaddr = ${currentSubnet#*:} # accept NAS client calls from this subnet
 	proto = *
 	secret = radsec
@@ -129,11 +134,12 @@ enable_radsec(){
 		lifetime = 0
 		idle_timeout = 30
 	}
-}" > /var/home/wavelet-root/config/raddb/clients.conf
+}
+EOF
 }
 
 # Remove inner tunnel, it is not needed for EAP-TLS
-rm -rf /var/home/wavelet-root/config/raddb/sites-enabled/inner-tunnel
+rm -rf "/var/home/wavelet-root/config/raddb/sites-enabled/inner-tunnel"
 
 
 #####
@@ -143,13 +149,13 @@ rm -rf /var/home/wavelet-root/config/raddb/sites-enabled/inner-tunnel
 #####
 
 
-logName=$HOME/logs/radius_conf.log
-if [[ -e $logName || -L $logName ]] ; then
+logName="$HOME/logs/radius_conf.log"
+if [[ -e "$logName" || -L "$logName" ]] ; then
 	i=0
-	while [[ -e $logName-$i || -L $logName-$i ]] ; do
+	while [[ -e "$logName-$i" || -L "$logName-$i" ]] ; do
 		(( i++ ))
 	done
-	logName=$logName-$i
+	logName="$logName-$i"
 fi
 
 exec > "$logName" 2>&1

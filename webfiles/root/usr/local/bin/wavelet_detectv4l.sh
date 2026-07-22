@@ -454,9 +454,9 @@ encoder_checkNetwork(){
 		touch /home/wavelet/config/NETWORK_ERROR_FLAG
 		exit 0
 	fi
-	if ping -c 3 "$(cat /var/home/wavelet/config/etcd_ip)"; then
+	if ping -c 3 "$SVR_IP"; then
 		echo -e "Online and connected to Wavelet Server, continuing..\n"
-		detect_method "${usbPath}"
+		detect_method "$usbPath"
 	else
 		echo -e "No network connection, device registration will be unsuccessful, sleeping for 5 seconds and trying again..\n"
 		sleep 5

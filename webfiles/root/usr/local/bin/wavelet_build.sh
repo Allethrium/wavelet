@@ -73,7 +73,7 @@ fi
 
 etcd_provision_watcher(){
 	# wavelet user systemd service to get provision data back after processing from svr
-	serverHostName="$(cat /var/home/wavelet/config/serverhostname.txt)"
+	serverHostName="$SVR_HOSTNAME"
 	local provisionPass; provisionPass="$(cat /var/home/wavelet/config/provisionpw)"
 	cat > "/var/home/wavelet/.config/systemd/user/wavelet_provision_watcher.service" <<-EOF
 		[Unit]
@@ -464,8 +464,8 @@ nginx_quadlets(){
 		[Install]
 		WantedBy=multi-user.target
 	EOF
-	echo -e "	The control service should be available via web browser on:\n		http://$(cat /var/home/wavelet/config/serverhostname.txt)\n"
-	hostNameSys="$(hostname)"
+	echo -e "	The control service should be available via web browser on:\n		http://$SVR_HOSTNAME\n"
+	hostNameSys="$SVR_HOSTNAME"
 	sed -i "s/localhost/$hostNameSys/g" "/var/home/wavelet/http-php/nginx/nginx.conf"
 }
 
@@ -1096,7 +1096,7 @@ check_clientGroupMemberShip(){
 	# Orchestrator should take it from here, and register us in /GROUPS/ and /UI/group/ etc.
 }
 ping_server(){
-	if ping -c 1 -w 1 "$(cat /var/home/wavelet/config/etcd_ip)"; then
+	if ping -c 1 -w 1 "$SVR_IP"; then
 		connected=true
 	else
 		(( attempts++ ))
@@ -1142,7 +1142,7 @@ event_connectNetwork(){
 		fi
 	fi
 
-	wifiSSID="$(cat /var/home/wavelet/config/wifi_ssid)"
+	wifiSSID="$WIFI_SSID"
 	# Note on a client, the hostname is always appended to the wifi SSID for the connection ID.
 	if [[ -n "$wirelessUUID" ]]; then
 		echo "	Found WiFi connection, proceeding.."

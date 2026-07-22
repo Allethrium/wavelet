@@ -586,7 +586,7 @@ toggle_userInterface() {
 		uiEnable_moveUGWindow
 		echo "$workspace" > "/var/home/wavelet/config/webui.enabled"
 		swaymsg -s "$swaySocket" "workspace $workspace"
-		swaymsg -s "$swaySocket" exec "/usr/bin/firefox" https://"$(cat /var/home/wavelet/config/serverhostname.txt)"
+		swaymsg -s "$swaySocket" exec "/usr/bin/firefox" "https://$SVR_HOSTNAME"
 	fi
 }
 toggle_screencast(){

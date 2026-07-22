@@ -112,6 +112,7 @@ DEVELOPER_MODE=${developerMode:-0}
 ENABLE_WIFI=${enableWifi:-0}
 WIFI_SSID=${wifi_ssid:-}
 WIFI_BSSID=${wifi_bssid:-}
+WIFI_IPADDR=${WIFI_IP_ADDR:-}
 # If an external registry is available, we populate here.  Implies external HTTPD server on port 8080 also.
 DEPLOYMENT_REGISTRY=${DEPLOYMENT_REGISTRY}
 # This refers to the server's registry.

@@ -479,14 +479,15 @@ chown -R wavelet-root:wavelet-root "/var/home/wavelet-root/"
 	generate_coreos_image
 	configure_tftpboot
 	# We don't need tftp files to be executable, maybe not even writable..
-	find /var/lib/tftpboot -type f -print0 | xargs -0 chmod 644
+	find "/var/lib/tftpboot" -type f -print0 | xargs -0 chmod 644
 	# Restore SElinux contexts or we will get an AVC denial when DHCP attempts to serve tftp requests
-	restorecon -Rv /var/lib/tftpboot
+	restorecon -Rv "/var/lib/tftpboot"
 	# Copy EFI files to http pxe
 	cp -R /var/lib/tftpboot/* "/var/home/wavelet/http/pxe"
 	cp "/etc/wavelet.conf" "/var/home/wavelet/http/ignition/wavelet.conf"
 	coreos_systemd_fix
-	chown -R wavelet:wavelet /var/home/wavelet/http
+	chown -R wavelet:wavelet "/var/home/wavelet/http"
+	echo "PXE_COMPLETE=yes" >> "/etc/wavelet.conf"
 ) &
 
 (
