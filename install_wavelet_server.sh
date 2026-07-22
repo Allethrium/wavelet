@@ -117,7 +117,7 @@ WIFI_IPADDR=${WIFI_IP_ADDR:-}
 DEPLOYMENT_REGISTRY=${DEPLOYMENT_REGISTRY}
 # This refers to the server's registry.
 REGISTRY=${svr_ip:-192.168.1.32}
-# Usually on
+# Additional system build state flags
 UG_BUILD_TYPE=${dev_flag:-release}
 EOF
 

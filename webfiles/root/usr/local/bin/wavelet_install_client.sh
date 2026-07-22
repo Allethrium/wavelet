@@ -422,7 +422,7 @@ echo "	Extracted AppImage contents available in /usr/local/bin/ultragrid/squashf
 
 # Disable self so we don't run again on the next boot.
 systemctl set-default graphical.target
-echo "CLIENT_INSTALL_COMPLETE=yes" >> /etc/wavelet/wavelet.conf
+echo "CLIENT_INSTALL_COMPLETE=1" >> /etc/wavelet/wavelet.conf
 generate_wavelet_userspace_services
 systemctl --user -M wavelet@ daemon-reload
 

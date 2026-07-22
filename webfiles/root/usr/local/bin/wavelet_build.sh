@@ -3,7 +3,7 @@
 # This is launched in userspace.
 # The service is called each logon from Sway, checks to see if already built, then calls other scripts as required.
 
-# Source the wavelet configuration helper functions
+# Source the wavelet configuration file
 if [[ -f "/etc/wavelet.conf" ]]; then
     source "/etc/wavelet.conf"
 fi
@@ -105,7 +105,7 @@ etcd_provision_request(){
 	"$ETCDMANAGEMENTMOD" "client_provision_get_data"
 	sleep 2
 	# Wait for etcd_interaction to perform its task and write the done flag
-	while ! grep -q "^CLIENT_PROVISION_RQ_COMPLETE=yes\|^CLIENT_PROVISION_RQ_COMPLETE=true" /etc/wavelet.conf; do
+	while ! grep -q "^CLIENT_PROVISION_RQ_COMPLETE=1" /etc/wavelet.conf; do
 		sleep .1
 		echo "waiting for provision process to complete.."
 	done
@@ -128,7 +128,7 @@ detect_self(){
 	systemctl --user enable foot-server.socket --now
 	# We need a network connection first.
 	event_connectNetwork
-	if grep -q "^CLIENT_PROVISION_COMPLETE=yes\|^CLIENT_PROVISION_COMPLETE=true" /etc/wavelet.conf; then
+	if grep -q "^CLIENT_PROVISION_COMPLETE=1" /etc/wavelet.conf; then
 		echo "Provisioning completed, detecting self via etcd.."
 		# We must get a ping from the server before continuing
 		# since we are already provisioned, a wifi connection by default is available
@@ -212,7 +212,7 @@ event_decoder(){
 event_decoder_newHost(){
 	# Handles an entirely new wavelet client
 	# Provision request to etcd
-	if ! grep -q "^CLIENT_PROVISION_COMPLETE=yes\|^CLIENT_PROVISION_COMPLETE=true" /etc/wavelet.conf; then
+	if ! grep -q "^CLIENT_PROVISION_COMPLETE=1" "/etc/wavelet.conf"; then
 		echo "	Sending provision request to server for Etcd credentials.."
 		etcd_provision_watcher; sleep 2
 		etcd_provision_request
@@ -226,7 +226,7 @@ put /HOSTS/$hostNameSys/control/generateConf \"1\"
 
 "
 		write_etcd_txn "$KEYDATA"
-		sed -i "s/^CLIENT_PROVISION_COMPLETE=.*/CLIENT_PROVISION_COMPLETE=yes/" /etc/wavelet.conf
+		sed -i "s/^CLIENT_PROVISION_COMPLETE=.*/CLIENT_PROVISION_COMPLETE=1/" "/etc/wavelet.conf"
 	fi
 
 	# Wait for the orchestrator to generate the config file
@@ -317,8 +317,8 @@ event_encoder(){
 
 event_server(){
 	# Responsible for generating the wavelet-specific userspace services that form the appliance core
-	# Source conf file
-	source "/var/home/wavelet/config/$(hostname).conf"
+	# Source the bootstrap conf file
+	source "/etc/wavelet.conf"
 	if [[ "$PXE_COMPLETE" == 1 ]]; then
 		echo "	PXE service up and running, continuing.."
 	else
@@ -327,6 +327,8 @@ event_server(){
 	fi
 	if [[ "$SVR_BOOTSTRAP_COMPLETE" == 1 ]]; then
 		echo "	Server bootstrap completed, continuing"
+		# We should have the individual server conf file available at this point.
+		source "/var/home/wavelet/config/$(hostname).conf"
 	else
 		echo "	Server bootstrap not completed"
 		server_bootstrap
@@ -471,12 +473,14 @@ nginx_quadlets(){
 
 server_bootstrap(){
 	# Bootstraps the server processes including Apache HTTP server for distribution files, and the web interface NGINX/PHP pod
-	until grep -q "^UG_DEPENDS_COMPLETE=yes\|^UG_DEPENDS_COMPLETE=true" /etc/wavelet.conf; do
-		sleep .1
-	done
 	if [[ "$SERVER_BOOTSTRAP_COMPLETE" == 1 ]]; then
 		echo -e "	Server bootstrap has already been completed, exiting..\n"
 		return 0
+	fi
+
+	if [[ "$SERVER_DOMAIN_ENROLLMENT_COMPLETE" != 1 ]]; then
+		echo "	ERROR: Domain enrollment is not complete!"
+		exit 1
 	fi
 	bootstrap_http(){
 		# Generate http and nginx-pod containers
@@ -488,7 +492,7 @@ server_bootstrap(){
 	}
 	# Generate basic ETCD roles and key permissions
 	test_etcd_auth() {
-		if [[ ! -f "/var/home/wavelet/config/etcd_auth.enabled" ]]; then
+		if ! grep -q "^ETCD_AUTH_ENABLED=1" "/etc/wavelet.conf"; then
 			sleep .1
 			test_etcd_auth
 		else
@@ -581,7 +585,7 @@ put /HOSTS/$hostNameSys/confHash \"$checksum\"
 	# Ensure we hit the group videoSource key once to force a videoSourceConfig refresh
 	KEYNAME="/GROUPS/$groupHash/control/sourceHash"; KEYNAME="1"; write_etcd_global &
 	echo "	System services and configuration keys generated, starting services now.."
-	sed -i "s/^SERVER_FIRSTRUN_FLAG=.*/SERVER_FIRSTRUN_FLAG=yes/" /etc/wavelet.conf
+	sed -i "s/^SERVER_FIRSTRUN_FLAG=.*/SERVER_FIRSTRUN_FLAG=1/" "/etc/wavelet.conf"
 	event_server
 }
 

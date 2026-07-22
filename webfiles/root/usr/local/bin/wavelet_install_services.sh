@@ -438,7 +438,7 @@ else
 	exit 1
 fi
 
-if grep -q "^PXE_COMPLETE=yes\|^PXE_COMPLETE=true" /etc/wavelet.conf; then
+if grep -q "^PXE_COMPLETE=1" "/etc/wavelet.conf"; then
 	exit 0
 fi
 

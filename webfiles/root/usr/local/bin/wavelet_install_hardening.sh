@@ -30,7 +30,7 @@ event_server(){
 	configure_idm
 	# We need to configure SELinux policy permanent -P to allow containers to read the cert bundle package
 	setsebool -P container_read_certs 1
-	if grep -q "^SERVER_DOMAIN_ENROLLMENT_COMPLETE=yes\|^SERVER_DOMAIN_ENROLLMENT_COMPLETE=true" /etc/wavelet.conf; then
+	if grep -q "^SERVER_DOMAIN_ENROLLMENT_COMPLETE=1" /etc/wavelet.conf; then
 		echo "	Domain enrollment is complete, proceeding to configure certificates and service principals.." >> "$logName"
 		sleep 1
 		# Create a watcher service to keep certs up to date
@@ -494,7 +494,7 @@ install_server_security_layer(){
 	wait_for_line "Client configuration complete."
 	#podman exec freeipa_server ldapmodify -x -D "cn=admin" -W  -f pwmod.ldif
 	# Ideally here, we could use REST calls w/ Unleashed to add our new CA to the AP
-	echo "SERVER_DOMAIN_ENROLLMENT_COMPLETE=yes" >> /etc/wavelet.conf
+	echo "SERVER_DOMAIN_ENROLLMENT_COMPLETE=1" >> "/etc/wavelet.conf"
 }
 
 ipa_dns_tsig(){
