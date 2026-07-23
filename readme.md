@@ -56,6 +56,7 @@ The system builds upon the following projects.  Their use in this project does n
 * FFMPEG         -  https://git.ffmpeg.org/ffmpeg.git
 * PipeWire       -  https://github.com/PipeWire
 * ImageMagick    -  https://imagemagick.org/
+* NDI (VIDEZ)    -  https://ndi.video/
 
 
 ## INSTALLATION

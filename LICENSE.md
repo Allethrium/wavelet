@@ -138,3 +138,8 @@ package makes several changes from the original “fec” package, including
 addition of the Python API, refactoring of the C API to support zero-copy
 operation, a few clean-ups and optimizations of the core code itself, and
 the addition of a command-line tool named “zfec”.
+
+### NDI
+
+This system may utilize NDI (NewTek/VIDEZ) network video protocol for video transmission from licensed devices.
+NDI® is a registered trademark of Vizrt NDI AB. Available from https://ndi.video/

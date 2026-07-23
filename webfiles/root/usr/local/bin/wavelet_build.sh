@@ -327,10 +327,10 @@ event_server(){
 	fi
 	if [[ "$SVR_BOOTSTRAP_COMPLETE" == 1 ]]; then
 		echo "	Server bootstrap completed, continuing"
-		# We should have the individual server conf file available at this point.
+		# We should now have the individual server conf file available at this point.
 		source "/var/home/wavelet/config/$(hostname).conf"
 	else
-		echo "	Server bootstrap not completed"
+		echo "	Server bootstrap not completed!"
 		server_bootstrap
 	fi
 	# Tag device redetect
@@ -473,10 +473,6 @@ nginx_quadlets(){
 
 server_bootstrap(){
 	# Bootstraps the server processes including Apache HTTP server for distribution files, and the web interface NGINX/PHP pod
-	if [[ "$SERVER_BOOTSTRAP_COMPLETE" == 1 ]]; then
-		echo -e "	Server bootstrap has already been completed, exiting..\n"
-		return 0
-	fi
 
 	if [[ "$SERVER_DOMAIN_ENROLLMENT_COMPLETE" != 1 ]]; then
 		echo "	ERROR: Domain enrollment is not complete!"
@@ -502,7 +498,6 @@ server_bootstrap(){
 	test_etcd_auth
 	mkdir -p ~/.ssh/secrets
 	bootstrap_http
-	touch /var/home/wavelet/server_bootstrap_completed
 	# Test the local environment for available codecs
 	event_generate_codecEntries
 	echo "	Server software configuration is now complete, generating initial server host data.."
@@ -926,7 +921,7 @@ event_generate_hotplug(){
 		Type=oneshot
 		TimeoutStartSec=5
 		ExecStart=${WAVELET_DETECTV4L_MOD} add %I
-		EOF
+	EOF
 	# Called after udev has invoked detectv4l directly via machinectl from root
 	# runs in the wavelet userland
 	cat > "/var/home/wavelet/.config/systemd/user/wavelet_v4l_delete@.service" <<-EOF
@@ -941,7 +936,7 @@ event_generate_hotplug(){
 
 		[Install]
 		WantedBy=default.target
-		EOF
+	EOF
 }
 event_generate_host_monitor(){
 	# Templates for Device health monitoring.  Each host gets one.
@@ -966,7 +961,7 @@ event_generate_host_monitor(){
 
 			[Install]
 			WantedBy=default.target
-			EOF
+		EOF
 		cat > "/var/home/wavelet/.config/systemd/user/wavelet_host_monitor.timer" <<-EOF
 			[Unit]
 			Description=Timer for ping monitor
@@ -977,7 +972,7 @@ event_generate_host_monitor(){
 
 			[Install]
 			WantedBy=timers.target
-			EOF
+		EOF
 	fi
 
 }

@@ -157,10 +157,11 @@ enable_radsec(){
 				if [[ "$verify_ip" != true ]]; then
 					echo "	WARNING:  Could not verify $resolvedIP via avahi or reachability checks."
 				fi
-				echo "	Performing curl to verify manufacturer on https://$resolvedIP..."
+				echo "	Performing curl to verify manufacturer on: https://$resolvedIP/admin/login.jsp"
 				# Use -k to allow self-signed certs, -s for silent, -m 5 for 5 sec timeout
-				result="$(curl -ks -m 5 "https://$resolvedIP" 2>/dev/null)"
-				if [[ "$result" != *"Ruckus"* && "$result" != *"RUCKUS"* ]]; then
+				result="$(curl -ks -m 5 "https://$resolvedIP/admin/login.jsp" 2>/dev/null)"
+				# This is the common login redirect for Unleashed.
+				if [[ "$result" != *"Ruckus"* ]]; then
 					echo "	ERROR:  resolve IP does not appear to be a Ruckus Access point"
 					echo "	Continuing so that RADIUS accepts this NAS, but CA injection likely won't work"
 					echo "	This will break RADSEC and cause TLS error log spam from the RADIUS container."
