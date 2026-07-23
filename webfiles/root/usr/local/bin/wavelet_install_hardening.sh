@@ -65,7 +65,8 @@ event_server(){
 		# Now all our later services
 		configure_radius_sp
 		configure_enrollment
-		configure_wavelet_ap
+		# Note we aren't performing a full AP config at this time, just uploading the CA so it will accept TLS
+		upload_ca_to_ap
 		# Finally we generate our 802.1x EAP-TLS profiles
 		configure_freeipa_8021x
     	# Configure DHCP (ISC-Kea) with our earlier subnet declarations

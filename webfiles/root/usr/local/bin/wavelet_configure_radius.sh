@@ -81,7 +81,7 @@ configure_radius(){
 		Volume=/var/home/wavelet-root/config/raddb/:/etc/raddb:z
 		# CA
 		Volume=/etc/ipa/ca.crt:/etc/ipa/ca.crt:ro
-		Exec=radiusd -fxx -l stdout
+		Exec=radiusd -fx -l stdout
 
 		[Service]
 		ExecStartPre=/bin/bash -c 'until curl -ksf https://192.168.1.227:8443/acme/ >/dev/null 2>&1; do sleep 3; done'
