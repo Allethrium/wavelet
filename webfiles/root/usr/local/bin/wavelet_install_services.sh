@@ -55,17 +55,18 @@ install_ug_depends(){
 
 etcd_create_roles(){
 	# Certificates should already be generated from wavelet_install_hardening
-	sed -i "s|svrIP|$SVR_IP|g" /etc/etcd.yaml.conf
-	sed -i "s|svrHostName|$SVR_HOSTNAME|g" /etc/etcd.yaml.conf
-	mv /etc/etcd.yaml.conf /etc/etcd/etcd.conf
+	sed -i "s|svrIP|$SVR_IP|g" "/etc/etcd.yaml.conf"
+	sed -i "s|svrHostName|$SVR_HOSTNAME|g" "/etc/etcd.yaml.conf"
+	mv "/etc/etcd.yaml.conf" "/etc/etcd/etcd.conf"
 	until systemctl start etcd-quadlet.service; do
-		sleep 1
+		sleep .1
 	done
 	# RunOnce for server provisioning, creates etcd roles.
 	echo -e "\n	Calling etcd_interaction to generate etcd authentication and roles..\n"
 	# Ensure decoder ignition template is copied
-	cp /var/home/wavelet/config/decoder_custom.yml /var/home/wavelet/http/ignition/
+	cp "/var/home/wavelet/config/decoder_custom.yml" "/var/home/wavelet/http/ignition/"
 	/usr/local/bin/wavelet_etcd_management.sh "generate_etcd_core_roles"
+	echo "ETCD_AUTH_ENABLED=1" >> "/etc/wavelet.conf"
 }
 
 generate_tftpboot() {

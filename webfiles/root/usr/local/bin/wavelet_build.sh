@@ -473,7 +473,7 @@ nginx_quadlets(){
 
 server_bootstrap(){
 	# Bootstraps the server processes including Apache HTTP server for distribution files, and the web interface NGINX/PHP pod
-
+	echo "	Performing server initial configuration.."
 	if [[ "$SERVER_DOMAIN_ENROLLMENT_COMPLETE" != 1 ]]; then
 		echo "	ERROR: Domain enrollment is not complete!"
 		exit 1
@@ -488,6 +488,7 @@ server_bootstrap(){
 	}
 	# Generate basic ETCD roles and key permissions
 	test_etcd_auth() {
+		echo "	Waiting for ETCD_AUTH_ENABLED=1 in /etc/wavelet.conf.."
 		if ! grep -q "^ETCD_AUTH_ENABLED=1" "/etc/wavelet.conf"; then
 			sleep .1
 			test_etcd_auth
@@ -495,6 +496,7 @@ server_bootstrap(){
 			echo "	Auth flag present, continuing!"
 		fi
 	}
+
 	test_etcd_auth
 	mkdir -p ~/.ssh/secrets
 	bootstrap_http
