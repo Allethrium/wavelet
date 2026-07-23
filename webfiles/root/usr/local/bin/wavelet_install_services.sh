@@ -548,6 +548,7 @@ freshclam
 
 # Generate UltraGrid squashfs dir so we don't need to worry about FUSE for some uses (reflector/hd-rum-translator)
 mkdir -p "/usr/local/bin/ultragrid" && cd "/usr/local/bin/ultragrid"
+# TODO - silence this to keep the log clean unless error
 /usr/local/bin/UltraGrid.AppImage --appimage-extract
 echo "	Extracted AppImage contents available in /usr/local/bin/ultragrid/squashfs-root/"
 echo "	to invoke call the AppRun binary from this location or the /var/wavelet_ramfs dir"

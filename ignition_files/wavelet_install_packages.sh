@@ -493,6 +493,14 @@ install_packages(){
 	/usr/bin/cp -r /var/wavelet_root/etc/skel/.* /var/home/wavelet-root/
 	/usr/bin/cp -r /var/wavelet_root/etc/skel/.* /var/roothome/
 
+	# SELinux haveged module
+	/usr/bin/mkdir -p /var/lib/wavelet/selinux
+	haveged_pp=$(/usr/bin/find /var/wavelet_root -name "my-haveged.pp" -type f | head -n 1)
+	if [[ -n "$haveged_pp" ]]; then
+		/usr/bin/cp -f "$haveged_pp" /var/lib/wavelet/selinux/my-haveged.pp
+		/usr/sbin/semodule -i /var/lib/wavelet/selinux/my-haveged.pp
+	fi
+
 	# Polkit rules
 	# Note we want to preserve the tabs in the polkit rules for readability
 	if [[ "$1" == *"decoder" ]]; then
