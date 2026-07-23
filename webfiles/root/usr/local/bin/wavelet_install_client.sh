@@ -26,7 +26,8 @@ Domains=$DOMAIN" > "/etc/systemd/resolved.conf"
 	systemctl enable systemd-resolved.service --now
 	resolvectl dns "$active_networkInterface" "$DC1_IP"
 	resolvectl domain "$active_networkInterface" "$DOMAIN"
-	chmod +x "/etc/NetworkManager/dispatcher.d/20-ipa-dns-update"
+	# TODO - not necessary
+#	chmod +x "/etc/NetworkManager/dispatcher.d/20-ipa-dns-update"
 	echo "  	DNS Reconfigured.."
 }
 
@@ -384,6 +385,10 @@ ausearch -c '(gssproxy)' --raw | audit2allow -M my-gssproxy
 semodule -X 300 -i my-gssproxy.pp
 systemctl restart gssproxy.service
 
+# Add haveged selinux policy
+if [[ -f "/var/lib/wavelet/selinux/my-haveged.pp" ]]; then
+    semodule -i "/var/lib/wavelet/selinux/my-haveged.pp"
+fi
 # Prevent NetworkManager from randomizing device MAC Addresses, which can interfere with WiFi EAP-TLS authentication
 cat > /etc/NetworkManager/conf.d/30-mac-randomization.conf << EOF
 [device-mac-randomization]
@@ -438,8 +443,6 @@ mkdir -p /var/wavelet_ramfs
 cat > "/etc/systemd/system/var-wavelet_ramfs.mount" <<-EOF
 [Unit]
 Description=Wavelet user ramdisk (tmpfs) for UltraGrid binaries
-After=local-fs.target
-Wants=local-fs.target
 
 [Mount]
 What=tmpfs

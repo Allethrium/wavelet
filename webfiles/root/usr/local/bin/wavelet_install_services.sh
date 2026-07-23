@@ -406,8 +406,10 @@ EOF
 	systemctl restart avahi-daemon.service
 
 	# Fix gssproxy SElinux bug
-	ausearch -c '(gssproxy)' --raw | audit2allow -M my-gssproxy
-	semodule -X 300 -i my-gssproxy.pp
+	# TODO - as of FCOS44 this seems unnecessary?  Verify.
+	# Note: also since building with sec opt disable maybe has alleviated some audit errors?
+#	ausearch -c '(gssproxy)' --raw | audit2allow -M my-gssproxy
+#	semodule -X 300 -i my-gssproxy.pp
 	systemctl enable gssproxy.service --now
 	# no.wifi is a mode flag, set via configuration
 	systemctl enable avahi-daemon
@@ -438,23 +440,26 @@ else
 	exit 1
 fi
 
-if grep -q "^PXE_COMPLETE=1" "/etc/wavelet.conf"; then
+if [[ "$PXE_COMPLETE" == 1 ]]; then
 	exit 0
 fi
 
 # Enable entropy daemon for quicker CA generation during hardening
 # Haveged is installed in the client layer, so is available on all wavelet devices.
+# We need to ensure we have an SElinux context here
+# REF: https://github.com/fedora-selinux/selinux-policy/issues/3206
+# Install pre-compiled haveged SELinux policy module to allow entropyd_t to create files in tmpfs_t
+mkdir -p /var/lib/wavelet/selinux
+if [[ -f "/var/lib/wavelet/selinux/my-haveged.pp" ]]; then
+    semodule -i "/var/lib/wavelet/selinux/my-haveged.pp"
+fi
 systemctl enable haveged --now
-
-# Firewalld is installed from.. somewhere as a dependency.
-# Disable (for now until performance testing, because a firewall would be nice)
-systemctl disable firewalld.service --now
 
 # Wavelet modules are now preprovisioned on both the server and clients, and processed in the installer script
 # So we don't need to handle them here.
 install_ug_depends
 
-echo "  Setting wavelet homedir permissions.."
+echo "	Setting wavelet homedir permissions.."
 chmod g+s "/var/home/wavelet"
 setfacl -dm u:wavelet:rwx "/var/home/wavelet"
 setfacl -dm g:wavelet:rwx "/var/home/wavelet"
@@ -487,21 +492,14 @@ chown -R wavelet-root:wavelet-root "/var/home/wavelet-root/"
 	cp "/etc/wavelet.conf" "/var/home/wavelet/http/ignition/wavelet.conf"
 	coreos_systemd_fix
 	chown -R wavelet:wavelet "/var/home/wavelet/http"
-	echo "Setting PXE_COMPLETE=1 flag in wavelet.conf.."
-	echo "PXE_COMPLETE=1" >> "/etc/wavelet.conf"
+	echo "	Setting PXE_COMPLETE=1 flag in wavelet.conf.."
+	echo "	PXE_COMPLETE=1" >> "/etc/wavelet.conf"
 ) &
 
 (
 	# Setup Domain Controller, PKI and provision service principals
-	echo "  Calling hardening module to install security layer in subshell.."
+	echo "	Calling hardening module to install security layer in subshell.."
 	/usr/local/bin/wavelet_install_hardening.sh > /dev/null 2>&1
-	if [[ -f "/etc/pki/tls/certs/etcd.crt" ]]; then
-		echo "  ETCD Certificate available, continuing to generate ETCD users and roles.."
-		etcd_create_roles
-	else
-		echo "  Etcd cert not available, DC provisioning has encountered an error!"
-		exit 1
-	fi
 	# Enable provision watcher for ETCD user RBAC as well as the domain enrollment watcher for generating our initial domain join OTP.
 	machinectl shell wavelet-root@ "$(which bash)" \
 		-c "systemctl --user daemon-reload && systemctl --user enable wavelet_provision.service wavelet_enrollment_watcher.service wavelet_deprovision_watcher.service --now"
@@ -517,7 +515,9 @@ chown -R wavelet-root:wavelet-root "/var/home/wavelet-root/"
 		echo "	ETCD Certificate available, continuing to generate ETCD users and roles.."
 		etcd_create_roles
 	else
-		echo "	Etcd cert not available, DC provisioning has encountered an error!"
+		echo "	Etcd cert not available, DC provisioning has encountered a fatal error!"
+		echo "	Hardening log is available at:  /var/roothome/logs/"
+		echo "	Please also check IPA logs in /var/freeipa-data/var/log/ for more information"
 		exit 1
 	fi
 ) &
@@ -557,8 +557,6 @@ mkdir -p "/var/wavelet_ramfs"
 cat > "/etc/systemd/system/var-wavelet_ramfs.mount" <<-EOF
 	[Unit]
 	Description=Wavelet system ramdisk (tmpfs) for UltraGrid binaries
-	After=local-fs.target
-	Wants=local-fs.target
 
 	[Mount]
 	What=tmpfs
@@ -580,8 +578,6 @@ EOF
 cat > "/etc/systemd/system/var-home-wavelet-ramfs.mount" <<-EOF
 	[Unit]
 	Description=Wavelet user ramdisk (tmpfs) for ephemeral scripts
-	After=local-fs.target
-	Wants=local-fs.target
 
 	[Mount]
 	What=tmpfs

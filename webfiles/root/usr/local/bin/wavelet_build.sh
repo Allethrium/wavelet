@@ -317,7 +317,7 @@ event_encoder(){
 
 event_server(){
 	# Responsible for generating the wavelet-specific userspace services that form the appliance core
-	# Source the bootstrap conf file
+	# Source the bootstrap conf file (this is NOT the server conf file!)
 	source "/etc/wavelet.conf"
 	if [[ "$PXE_COMPLETE" == 1 ]]; then
 		echo "	PXE service up and running, continuing.."

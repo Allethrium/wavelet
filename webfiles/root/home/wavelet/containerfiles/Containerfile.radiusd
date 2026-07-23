@@ -1,4 +1,4 @@
-FROM fedora:42
+FROM fedora:latest
 RUN rm -rf /etc/yum.repos.d/fedora-cisco-openh264.repo && \
 	dnf -y update && \
 	dnf install -y radiusd && \

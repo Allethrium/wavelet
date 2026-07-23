@@ -57,30 +57,30 @@ generate_etcd_core_roles(){
 	# Generate etcd roles
 	# Etcd roles must be generated because the wavelet_build, detectv4l modules do not know if security is on or off
 	# webui ensures the webui can only write to keys under the range "/UI/" and all other orchestration happens separately.
-	if [ "$EUID" -ne 0 ]
-	then echo "  Only runs during initial setup as root." >> /var/home/wavelet/logs/etcdlog.log
-	exit 1
+	if [[ "$EUID" -ne 0 ]];	then
+		echo "  Only runs during initial setup as root." >> "/var/home/wavelet/logs/etcdlog.log"
+		exit 1
 	fi
 	# Generate our userdirs that will support the wrapper files
 	init_wrapper_contexts
 	# we need to create this dir
-	mkdir -p /var/home/root/logs
-	echo -e "\n\n  Generating etcd users and roles, setting userArg to null.." >> /root/logs/etcdlog.log
+	mkdir -p "/var/home/root/logs"
+	echo -e "\n\n  Generating etcd users and roles, setting userArg to null.." >> "/root/logs/etcdlog.log"
 	unset userArg
-	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" role add webui
-	KEYNAME="/UI/"; KEYVALUE="True"; etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" put "${KEYNAME}" -- "${KEYVALUE}"
-	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" role grant-permission webui --prefix=true readwrite "/UI/"
+	etcdctl --endpoints="$ETCDENDPOINT" --cacert="$certificateAuthorityFile" role add webui
+	KEYNAME="/UI/"; KEYVALUE="True"; etcdctl --endpoints="$ETCDENDPOINT" --cacert="$certificateAuthorityFile" put "$KEYNAME" -- "$KEYVALUE"
+	etcdctl --endpoints="$ETCDENDPOINT" --cacert="$certificateAuthorityFile" role grant-permission webui --prefix=true readwrite "/UI/"
 	# The server should be able to modify everything, and has its own "root" role.  Most coordination happens on the server, so this is fine.
-	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" role add server
-	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" role grant-permission server --prefix=true readwrite ""
+	etcdctl --endpoints="$ETCDENDPOINT" --cacert="$certificateAuthorityFile" role add server
+	etcdctl --endpoints="$ETCDENDPOINT" --cacert="$certificateAuthorityFile" role grant-permission server --prefix=true readwrite ""
 	# The PROV role is designed for provision requests and is 'wide open' so that an initial host can request a provision key
-	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" role add PROV
-	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" role grant-permission PROV --prefix=true readwrite "/PROV/"
-	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" role add ENROLL
-	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" role grant-permission ENROLL --prefix=true readwrite "/ENROLL/"
+	etcdctl --endpoints="$ETCDENDPOINT" --cacert="$certificateAuthorityFile" role add PROV
+	etcdctl --endpoints="$ETCDENDPOINT" --cacert="$certificateAuthorityFile" role grant-permission PROV --prefix=true readwrite "/PROV/"
+	etcdctl --endpoints="$ETCDENDPOINT" --cacert="$certificateAuthorityFile" role add ENROLL
+	etcdctl --endpoints="$ETCDENDPOINT" --cacert="$certificateAuthorityFile" role grant-permission ENROLL --prefix=true readwrite "/ENROLL/"
 	# DHCP role is a specific key for the DHCP IPC into the rest of the system
-	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" role add DHCP
-   	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" role grant-permission DHCP --prefix=true readwrite "/DHCP"
+	etcdctl --endpoints="$ETCDENDPOINT" --cacert="$certificateAuthorityFile" role add DHCP
+   	etcdctl --endpoints="$ETCDENDPOINT" --cacert="$certificateAuthorityFile" role grant-permission DHCP --prefix=true readwrite "/DHCP"
 	echo "  Core etcd roles generated, moving on to user accounts.." >> "/root/logs/etcdlog.log"
 	generate_etcd_core_users
 }
@@ -565,8 +565,8 @@ main() {
 	# Get user info
 	user="$(whoami)"
 	hostNameSys="$(hostname)"
-	mkdir -p /var/home/"${user}"/logs
-	echo -e "\n**New log**" >> /var/home/"${user}"/logs/etcdlog.log
+	mkdir -p "/var/home/$user/logs"
+	echo -e "\n**New log**" >> "/var/home/$user/logs/etcdlog.log"
 
 	# Process command line arguments
 	action="$1"
@@ -574,7 +574,7 @@ main() {
 	param2="$3"
 	param3="$4"
 
-	case "${action}" in
+	case "$action" in
 	"generate_etcd_core_roles")
 		generate_etcd_core_roles
 		;;
@@ -591,16 +591,16 @@ main() {
 		client_provision_request
 		;;
 	"encrypt_pw_data")
-		encrypt_pw_data "${param1}" "${param2}"
+		encrypt_pw_data "$param1" "$param2"
 		;;
 	"encrypt_webui_data")
-		encrypt_webui_data "${param1}"
+		encrypt_webui_data "$param1"
 		;;
 	"test_auth")
-		test_auth "${param1}"
+		test_auth "$param1"
 		;;
 	*)
-		echo "	Unknown action: ${action}"
+		echo "	Unknown action: $action"
 		echo "	Available actions:"
 		echo "    	generate_etcd_core_roles"
 		echo "		generate_etcd_core_users"

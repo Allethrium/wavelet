@@ -79,7 +79,7 @@ event_server(){
 
 			[Service]
 			Type=oneshot
-			ExecStart=/bin/bash -c 'loginctl enable-linger wavelet-root && loginctl start-session wavelet-root'
+			ExecStart=/bin/bash -c 'loginctl enable-linger wavelet-root'
 			RemainAfterExit=yes
 
 			[Install]

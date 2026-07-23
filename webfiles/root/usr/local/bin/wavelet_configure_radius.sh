@@ -9,10 +9,11 @@
 source "/etc/wavelet.conf"
 
 build_containerfile(){
+	# TODO - test on fedora:latest (44)
 	# We limit to Fedora 42 as there is a bug with Freeradius and OpenSSL on the latest version 43.
 	containerFile="/var/home/wavelet-root/config/Containerfile.radius"
-cat > "$containerFile" << EOF
-FROM fedora:42
+	cat > "$containerFile" << EOF
+FROM fedora:latest
 RUN rm -rf /etc/yum.repos.d/fedora-cisco-openh264.repo && \
 	dnf -y update && \
 	dnf install -y radiusd && \
@@ -101,14 +102,87 @@ enable_radsec(){
 	# This is required or RADIUS will not respond to the WiFi AP!
 	# If we wind up supporting systems running multiple AP, this will need attention.
 	# find #_APPEND_HERE and add
-	echo "Appending TLS NAS client to /sites-enabled/tls, required for secured communication between AP and RADIUS."
+	if [[ -z "$WIFI_IPADDR" ]]; then
+		echo "	ERROR:  Wifi IP address isn't populated, attempting to resource file.."
+		source "/etc/wavelet.conf"
+		if [[ -z "$WIFI_IPADDR" ]]; then
+			echo "	Attempting to resolve WiFi AP IP address via MAC ($WIFI_BSSID)..."
+			resolvedIP=""
+			while read -r entry; do
+				ip_addr=$(echo "$entry" | awk '{print $1}')
+				mac_addr=$(echo "$entry" | awk '{print $5}')
+				if [[ "$mac_addr" == *"$WIFI_BSSID"* ]]; then
+					resolvedIP="$ip_addr"
+					break
+				fi
+			done < <(ip -4 neigh show 2>/dev/null)
+			if [[ -z "$resolvedIP" ]]; then
+				while read -r line; do
+					if [[ "$line" == *"$WIFI_BSSID"* ]]; then
+						# Extract IP from arp -a output: ? (192.168.1.1) at 00:11:22:33:44:55
+						resolvedIP=$(echo "$line" | grep -oE '\([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\)' | tr -d '()')
+						if [[ -n "$resolvedIP" ]]; then
+							break
+						fi
+					fi
+				done < <(arp -a -n 2>/dev/null)
+			fi
+			if [[ -z "$resolvedIP" ]]; then
+				echo "	ERROR:  Could not resolve WiFi AP IP address from MAC $WIFI_BSSID"
+			else
+				echo "	Resolved IP: $resolvedIP"
+				echo "	Verifying resolved IP via avahi/reverse lookup and reachability..."
+				verify_ip=false
+				# Check via avahi-resolve-address if available
+				if command -v avahi-resolve-address &> /dev/null; then
+					avahi_result="$(avahi-resolve-address -4 "$resolvedIP" 2>/dev/null)"
+					avahi_host=$(echo "$avahi_result" | awk '{print $2}')
+					if [[ -n "$avahi_host" && "$avahi_host" != "-" && "$avahi_host" != "." ]]; then
+						echo "	Avahi resolved hostname: $avahi_host"
+						verify_ip=true
+					fi
+				fi
+				if [[ "$verify_ip" != true ]]; then
+					if timeout 3 bash -c "echo >/dev/tcp/$resolvedIP/443" 2>/dev/null; then
+						echo "	Port 443 on $resolvedIP is open, verification passed."
+						verify_ip=true
+					elif ping -c 1 -W 2 "$resolvedIP" > /dev/null 2>&1; then
+						echo "	Ping to $resolvedIP succeeded, verification passed."
+						verify_ip=true
+					elif command -v nmap &> /dev/null && nmap -p 443 --open -n "$resolvedIP" > /dev/null 2>&1; then
+						echo "	nmap verified port 443 open on $resolvedIP, verification passed."
+						verify_ip=true
+					fi
+				fi
+				if [[ "$verify_ip" != true ]]; then
+					echo "	WARNING:  Could not verify $resolvedIP via avahi or reachability checks."
+				fi
+				echo "	Performing curl to verify manufacturer on https://$resolvedIP..."
+				# Use -k to allow self-signed certs, -s for silent, -m 5 for 5 sec timeout
+				result="$(curl -ks -m 5 "https://$resolvedIP" 2>/dev/null)"
+				if [[ "$result" != *"Ruckus"* && "$result" != *"RUCKUS"* ]]; then
+					echo "	ERROR:  resolve IP does not appear to be a Ruckus Access point"
+					echo "	Continuing so that RADIUS accepts this NAS, but CA injection likely won't work"
+					echo "	This will break RADSEC and cause TLS error log spam from the RADIUS container."
+				else
+					echo "	Verified: $resolvedIP appears to be a Ruckus Access point."
+				fi
+				echo "WIFI_IPADDR=$resolvedIP" >> "/etc/wavelet.conf"
+			fi
+		fi
+		# Re-source wavelet.conf with the populated IP address
+		source "/etc/wavelet.conf"
+	fi
+	echo "	Appending TLS NAS client to /sites-enabled/tls, required for secured communication between AP and RADIUS."
 	# once we have consumed the AP IP Address in the conf file, we can remove that line from the file.
 	sed -i '/WIFI_IPADDR=/d' "/etc/wavelet.conf"
-	echo "		client waveletAP {
+	cat > "tls_client_block" <<EOF
+		client waveletAP {
 			ipaddr = ${WIFI_IPADDR}
 			proto = tls
 			secret = radsec
-		}" > tls_client_block
+		}
+EOF
 	sed -i "/#_APPEND_RADSEC_CLIENT_HERE/r tls_client_block" sites-enabled/tls
 	cp -f "sites-enabled/tls" "/var/home/wavelet-root/config/raddb/sites-enabled"
 	# May not be needed - would make replacing the AP a real pain in the event of hw failure
@@ -164,5 +238,5 @@ echo "	Called with ${*}"
 case "$@" in
 	*server*)	echo "	Configuring RADIUS server!"; configure_radius
 	;;
-	*)			echo "Called with invalid option!"; exit 0
+	*)			echo "	Called with invalid option!"; exit 0
 esac

@@ -76,7 +76,7 @@ pull_registry_images(){
   	sourceList+=("quay.io/coreos/etcd:v3.6.4")
 	sourceList+=("quay.io/coreos/coreos-installer:release")
 	sourceList+=("registry.fedoraproject.org/fedora:latest")
-	sourceList+=("registry.fedoraproject.org/fedora:42") # needed to avoid RADIUSD bug
+	# sourceList+=("registry.fedoraproject.org/fedora:42") # needed to avoid RADIUSD bug
 	sourceList+=("docker.io/library/nginx:alpine")
 	sourceList+=("docker.io/library/php:fpm")
 	sourceList+=("docker.io/redis:latest")
