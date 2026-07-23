@@ -66,7 +66,6 @@ etcd_create_roles(){
 	# Ensure decoder ignition template is copied
 	cp "/var/home/wavelet/config/decoder_custom.yml" "/var/home/wavelet/http/ignition/"
 	/usr/local/bin/wavelet_etcd_management.sh "generate_etcd_core_roles"
-	echo "ETCD_AUTH_ENABLED=1" >> "/etc/wavelet.conf"
 }
 
 generate_tftpboot() {

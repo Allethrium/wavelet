@@ -95,7 +95,6 @@ configure_radius(){
     # We must ensure the inner-tunnel link is removed, or RADIUS will refuse to start
     unlink "/var/home/wavelet-root/config/raddb/sites-enabled/inner-tunnel"
 	systemctl --user daemon-reload
-	systemctl --user start freeradius.service
 }
 
 enable_radsec(){
@@ -214,6 +213,39 @@ client waveletAP {
 	}
 }
 EOF
+	upload_ca_to_ap
+}
+
+upload_ca_to_ap(){
+	# Uploads the generated CA to the WiFi AP
+	local cookie_file; local login_url
+	local base_url; local loginResponse
+	# This file is populated by the install_wavelet_server.sh module at the beginning of the installation process.
+	source "/var/home/wavelet-root/config/wifi_adminuser"
+	if [[ -z "$WIFI_ADMIN_USER" ]] || [[ -z "$WIFI_ADMIN_PW" ]] || [[ -z "$WIFI_IPADDR" ]]; then
+		echo "	ERROR: WIFI AP CREDENTIALS UNDEFINED.  You may need to upload the ca.crt manually."
+		return 1
+	fi
+	cookie_file="$(mktemp)"
+	# Establish session and get CSRF token
+	login_url="$(curl "https://$WIFI_IPADDR" -k -s -L -o /dev/null -w '%{url_effective}')"
+	base_url=$(dirname "$login_url")
+	loginResponse="$(curl -k -c "$cookie_file" "$login_url" \
+		-d username="$WIFI_ADMIN_USER" -d password="$WIFI_ADMIN_PW" -d ok=Log\ In -i \
+		| awk '/^HTTP_X_CSRF_TOKEN:/ { print $2 }' \
+		| tr -d '\040\011\012\015')"
+	# Upload CA certificate
+	curl -k -b "$cookie_file" \
+		-X POST "$base_url/_upload.jsp" \
+		-H "X-CSRF-Token: $loginResponse" \
+		-F "u=@/etc/ipa/ca.crt;filename=ipaca.crt;type=application/pkix-cert" \
+		-F "request_type=xhr" \
+		-F "action=uploadCA" \
+		-F "callback=uploader_uploadCA" \
+		-F "ImportCaMethod=append"
+	# Cleanup
+	rm -f "$cookie_file"
+	echo "CA certificate upload completed"
 }
 
 # Remove inner tunnel, it is not needed for EAP-TLS

@@ -65,8 +65,6 @@ event_server(){
 		# Now all our later services
 		configure_radius_sp
 		configure_enrollment
-		# Note we aren't performing a full AP config at this time, just uploading the CA so it will accept TLS
-		upload_ca_to_ap
 		# Finally we generate our 802.1x EAP-TLS profiles
 		configure_freeipa_8021x
     	# Configure DHCP (ISC-Kea) with our earlier subnet declarations
@@ -163,7 +161,6 @@ generate_kea_quadlet(){
 	fi
 	# We need to make a kea user on the system to sync with the containerfile's UID
 	useradd -u 964 kea -U
-	chmod 0770 /run/wavelet/sockets
 	# Generate quadlet
 	echo "	Generating ISC-Kea Quadlet.."
 	# Note, the podman quadlet generator complains about the WantedBy line even though it appears a valid config option.
@@ -665,9 +662,9 @@ configure_httpd_sp(){
 		sleep .5
 	done
 	# We need to manually copy these certs initially, as the service is not yet running
-	mkdir -p "/var/home/wavelet/config/certs/private"
+	mkdir -p "/var/home/wavelet/config/certs"
 	cp "/etc/pki/tls/certs/httpd.crt" "/var/home/wavelet/config/certs"
-	cp "/etc/pki/tls/private/httpd.key" "/var/home/wavelet/config/certs/private"
+	cp "/etc/pki/tls/private/httpd.key" "/var/home/wavelet/config/certs"
 	chown -R wavelet:wavelet "/var/home/wavelet/config/certs"
 	# To Pull httpd.conf out of the container:
 	# podman run --rm httpd:2.4 cat /usr/local/apache2/conf/httpd.conf > custom-httpd.conf
@@ -938,34 +935,6 @@ configure_wavelet_ap(){
 	#	-H "X-CSRF-Token: $loginResponse" \
 	#	--data-raw "$xmlString"
 	echo "		AP configuration completed successfully!"
-}
-
-upload_ca_to_ap(){
-	local wifi_ap_ip; local wifi_adminUser; local wifi_adminPass; local cookie_file; local login_url
-	local base_url; local loginResponse
-	wifi_ap_ip="$1"
-	wifi_adminUser="$2"
-	wifi_adminPass="$3"
-	cookie_file="$(mktemp)"
-	# Establish session and get CSRF token
-	login_url="$(curl https://"$wifi_ap_ip" -k -s -L -o /dev/null -w '%{url_effective}')"
-	base_url=$(dirname "$login_url")
-	loginResponse="$(curl -k -c "$cookie_file" "$login_url" \
-		-d username="$wifi_adminUser" -d password="$wifi_adminPass" -d ok=Log\ In -i \
-		| awk '/^HTTP_X_CSRF_TOKEN:/ { print $2 }' \
-		| tr -d '\040\011\012\015')"
-	# Upload CA certificate
-	curl -k -b "$cookie_file" \
-		-X POST "$base_url/_upload.jsp" \
-		-H "X-CSRF-Token: $loginResponse" \
-		-F "u=@/etc/ipa/ca.crt;filename=ipaca.crt;type=application/pkix-cert" \
-		-F "request_type=xhr" \
-		-F "action=uploadCA" \
-		-F "callback=uploader_uploadCA" \
-		-F "ImportCaMethod=append"
-	# Cleanup
-	rm -f "$cookie_file"
-	echo "CA certificate upload completed"
 }
 
 configure_ap_video_optimization(){

@@ -167,7 +167,7 @@ generate_etcd_core_users(){
 	sed -i '/^\[Container\]/a Secret=dhcpUser,type=env,target=dhcpUser' /etc/containers/systemd/kea.container
 	systemctl daemon-reload && systemctl restart kea.service
 	# Create a flag to tell us etcd auth is enabled, and remove the etcd provision flag from /var/
-	echo "ETCD_AUTH_ENABLED=1" >> /var/wavelet.conf
+	echo "ETCD_AUTH_ENABLED=1" >> /etc/wavelet.conf
 	rm -rf /var/server.etcd.provision
 	chown -R wavelet-root:wavelet-root /var/home/wavelet-root; chown -R wavelet:wavelet /var/home/wavelet
 	unset PassWord
