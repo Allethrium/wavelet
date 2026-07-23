@@ -42,7 +42,7 @@ configure_radius(){
 	echo "	podman run -d -v /var/home/wavelet-root/config:/var/tmp:z $SVR_HOSTNAME/radiusd cp -R /etc/raddb/ /var/tmp"
 	# Ensure ownerships are correct before proceeding
 	sudo chown -R wavelet-root:wavelet-root "/var/home/wavelet-root"
-	podman run --rm -v /var/home/wavelet-root/config:/var/tmp:z "$SVR_HOSTNAME/radiusd" sh -c 'cp -r /etc/raddb /var/tmp/raddb'
+	podman run --rm -v /var/home/wavelet-root/config:/var/tmp:z "$SVR_HOSTNAME/radiusd" sh -c 'cp -r /etc/raddb /var/tmp/'
 	# Now that we have a full skeleton of RADIUS configuration files, we copy our templates in
 	echo -e "\n\n	Copying RADIUS configuration files from git, as user: $(whoami)"
 	sudo cp -R "/var/wavelet_root/home/wavelet-root/config/radius/" "/var/home/wavelet-root/config/"
