@@ -31,39 +31,41 @@ configure_radius(){
 	# If LAN deployment, the container should already be available in the server's registry
 	cd "/var/home/wavelet-root/config" || exit 1
 	output="$(curl https://$SVR_HOSTNAME:5000/v2/_catalog)"
-
 	if [[ "$output" == *"radiusd"* ]]; then
 		echo "	Found expected container in registry catalog.."
 	else
 		echo "	Radius container not available on local registry, building container locally.."
 		build_containerfile
 	fi
-
-	podman run -d -v /var/home/wavelet-root/config:/var/tmp:z "$SVR_HOSTNAME/radiusd" cp -R /etc/raddb/ /var/tmp
+	# TODO - we seem to have an error here - the skel config is no longer being correctly generated.
+	echo "	Generating skel raddb configuration:"
+	echo "	podman run -d -v /var/home/wavelet-root/config:/var/tmp:z $SVR_HOSTNAME/radiusd cp -R /etc/raddb/ /var/tmp"
+	# Ensure ownerships are correct before proceeding
+	sudo chown -R wavelet-root:wavelet-root "/var/home/wavelet-root"
+	podman run --rm -v /var/home/wavelet-root/config:/var/tmp:z "$SVR_HOSTNAME/radiusd" sh -c 'cp -r /etc/raddb /var/tmp/raddb'
 	# Now that we have a full skeleton of RADIUS configuration files, we copy our templates in
 	echo -e "\n\n	Copying RADIUS configuration files from git, as user: $(whoami)"
-	sudo cp -R /var/wavelet_root/home/wavelet-root/config/radius/ /var/home/wavelet-root/config/; sudo chown -R wavelet-root:wavelet-root /var/home/wavelet-root
+	sudo cp -R "/var/wavelet_root/home/wavelet-root/config/radius/" "/var/home/wavelet-root/config/"
 	echo "	Copying custom files from /radius to /raddb config directory"
-	rsync -a /var/home/wavelet-root/config/radius/ /var/home/wavelet-root/config/raddb/
-	# Modify the radiusd config to run as root, or there will be permissions issues when accessing config files and certificates.  
+	rsync -a "/var/home/wavelet-root/config/radius/" "/var/home/wavelet-root/config/raddb/"
+	# Modify the radiusd config to run as root, or there will be permissions issues when accessing config files and certificates.
 	# Since we are running inside a rootless container, this is less problematic (but still bad practice..)
-	sed -i 's/user = radiusd/user = root/g' /var/home/wavelet-root/config/raddb/radiusd.conf; sed -i 's/group = radiusd/group = root/g' /var/home/wavelet-root/config/raddb/radiusd.conf
+	if [[ ! -f "/var/home/wavelet-root/config/raddb/radiusd.conf" ]]; then
+		echo "	ERROR:  radiusd.conf missing! cannot continue."
+		exit 1
+	else
+		sed -i 's/user = radiusd/user = root/g' "/var/home/wavelet-root/config/raddb/radiusd.conf"
+		sed -i 's/group = radiusd/group = root/g' "/var/home/wavelet-root/config/raddb/radiusd.conf"
+		sed -i 's|cadir   = ${confdir}/certs|cadir   = /etc/ipa|g' "/var/home/wavelet-root/config/raddb/radiusd.conf"
+	fi
+	sudo chown -R wavelet-root:wavelet-root "/var/home/wavelet-root"
 	# Enable radius-over-tls & config clients directives appropriately
 	enable_radsec
-	# Test command
-	# podman run -it -v /var/home/wavelet-root/config/raddb:/etc/raddb -v /var/home/wavelet-root/config/radius/certs:/etc/raddb/certs:z radiusd_container radiusd -fxx -l stdout
-
-	# We must modify the CAdir so it points to our IPA CA
-	# shellcheck disable=SC2016
-	sed -i 's|cadir   = ${confdir}/certs|cadir   = /etc/ipa|g' "/var/home/wavelet-root/config/raddb/radiusd.conf"
-	# now the container complains once again of permissions, this is likely the same problem between the container subuser/host user mismatch that keeps occurring when I try this.
-	# seems a shame I can't get server services running from user account, but it's probably like that for a reason..
-	# we should probably move the call for this spinup to root
 
 	echo "	Generating RADIUS quadlet.."
-	mkdir -p "/home/wavelet-root/.config/containers/systemd/"
+	mkdir -p "/var/home/wavelet-root/.config/containers/systemd/"
 	# Note the ExecStartPre directive, which checks for freeIPA's ACME service responder before starting.
-	cat > "/home/wavelet-root/.config/containers/systemd/freeradius.container" <<-EOF
+	cat > "/var/home/wavelet-root/.config/containers/systemd/freeradius.container" <<-EOF
 		[Unit]
 		Description=FreeRADIUS Quadlet
 		After=network.target freeipa.service
@@ -168,15 +170,16 @@ enable_radsec(){
 				else
 					echo "	Verified: $resolvedIP appears to be a Ruckus Access point."
 				fi
-				echo "WIFI_IPADDR=$resolvedIP" >> "/etc/wavelet.conf"
+				echo "WIFI_IPADDR=$resolvedIP" >> "/var/home/wavelet-root/wifi_ipaddr.txt"
 			fi
 		fi
 		# Re-source wavelet.conf with the populated IP address
-		source "/etc/wavelet.conf"
+		WIFI_IPADDR="$(</var/home/wavelet-root/wifi_ipaddr.txt)"
+		WIFI_IPADDR="${WIFI_IPADDR##*=}"
 	fi
 	echo "	Appending TLS NAS client to /sites-enabled/tls, required for secured communication between AP and RADIUS."
 	# once we have consumed the AP IP Address in the conf file, we can remove that line from the file.
-	sed -i '/WIFI_IPADDR=/d' "/etc/wavelet.conf"
+	rm -rf "/var/home/wavelet-root/wifi_ipaddr.txt"
 	cat > "tls_client_block" <<EOF
 		client waveletAP {
 			ipaddr = ${WIFI_IPADDR}

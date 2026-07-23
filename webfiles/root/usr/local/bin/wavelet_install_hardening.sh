@@ -529,12 +529,10 @@ key \"KEA-DHCP\" {
 	ipa dnszone-mod "${DOMAIN^^}." --allow-sync-ptr=TRUE
 	# Because of our very weird virtual/host setup, we need to manually add the server DNS record and reverse;
 	ipa dnsrecord-add "$DOMAIN." "$(hostname -s)" --a-rec "$SVR_IP"
-	# Add reverse DNS zone for the IPA server subnet (e.g., 1.168.192.in-addr.arpa. for 192.168.1.x)
-	local reverseZone="1.168.192.in-addr.arpa."
-	ipa dnszone-add "$reverseZone" --network="${childSubnetNetworkAddr}${childSubnetRangeStart}/28" || true
+	# Note: Reverse DNS zone for the IPA server subnet is already created by --auto-reverse during IPA server installation
 	# Restart ipa service so that the modified ipa-ext.conf is loaded for named
 	systemctl restart freeipa.service
-	sleep 5
+	sleep 8
 }
 
 wait_for_line(){
