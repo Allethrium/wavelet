@@ -319,23 +319,16 @@ event_server(){
 	# Responsible for generating the wavelet-specific userspace services that form the appliance core
 	# Source the bootstrap conf file (this is NOT the server conf file!)
 	source "/etc/wavelet.conf"
-	if [[ "$PXE_COMPLETE" == 1 ]]; then
-		echo "	PXE service up and running, continuing.."
-	else
-		echo "	PXE boot service has not completed setup.  Please check logs."
-		exit 1
-	fi
-	if [[ "$SVR_BOOTSTRAP_COMPLETE" == 1 ]]; then
+	if [[ "$ETCD_AUTH_ENABLED" == 1 ]]; then
 		echo "	Server bootstrap completed, continuing"
 		# We should now have the individual server conf file available at this point.
-		source "/var/home/wavelet/config/$(hostname).conf"
+		source "/var/home/wavelet/config/$hostNameSys.conf"
 	else
 		echo "	Server bootstrap not completed!"
 		server_bootstrap
 	fi
 	# Tag device redetect
-	echo -e "\n	System services and configuration keys generated, starting services now.."
-	systemctl --user daemon-reload
+	echo "	System services and configuration keys generated, starting services now.."
 	# Orchestrator should already be active
 	systemctl --user start http-php-pod.service
 	systemctl --user enable \
@@ -347,9 +340,8 @@ event_server(){
 	if [[ "$SVR_FIRSTRUN" == 1 ]]; then
 		echo "	First run, setting UIEnable flag.."
 		KEYNAME="/HOSTS/$hostNameSys/control/UIEnable"; KEYVALUE="1"; write_etcd_global &
-		sed -i "/^SERVER_FIRSTRUN_FLAG=/d" "/etc/wavelet.conf"
+		sed -i "/^export SERVER_FIRSTRUN_FLAG=/d" "/var/home/wavelet/config/$hostNameSys.conf"
 	fi
-	sleep 1
 	echo "	Running initial device detection.."
 	/bin/bash -c "$WAVELET_DETECTV4L_MOD 'redetect'"
 }
@@ -547,6 +539,8 @@ server_bootstrap(){
 		export HOST_IP="$serverIPAddress"
 		export INPUT_DEVICE_PRESENT="0"
 		export MOD_REVISION="$newVersion"
+		export SERVER_BOOTSTRAP_COMPLETE=1
+		export SERVER_FIRSTRUN_FLAG=1
 	EOF
 	echo -e "	Generated svr config:\n$(cat "$configContent")\n"
 	# export vars for utilization
@@ -582,8 +576,6 @@ put /HOSTS/$hostNameSys/confHash \"$checksum\"
 	# Ensure we hit the group videoSource key once to force a videoSourceConfig refresh
 	KEYNAME="/GROUPS/$groupHash/control/sourceHash"; KEYNAME="1"; write_etcd_global &
 	echo "	System services and configuration keys generated, starting services now.."
-	echo "SERVER_BOOTSTRAP_COMPLETE=1" >> "/etc/wavelet.conf"
-	echo "SERVER_FIRSTRUN_FLAG=1" >> "/etc/wavelet.conf"
 	event_server
 }
 
