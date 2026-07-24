@@ -319,9 +319,8 @@ event_server(){
 	# Responsible for generating the wavelet-specific userspace services that form the appliance core
 	# Source the bootstrap conf file (this is NOT the server conf file!)
 	source "/etc/wavelet.conf"
-	if [[ "$ETCD_AUTH_ENABLED" == 1 ]]; then
-		echo "	Server bootstrap completed, continuing"
-		# We should now have the individual server conf file available at this point.
+	if [[ -f "/var/home/wavelet/config/$hostNameSys.conf" ]]; then
+		echo "	Server bootstrap completed and conf file is present, continuing"
 		source "/var/home/wavelet/config/$hostNameSys.conf"
 	else
 		echo "	Server bootstrap not completed!"
