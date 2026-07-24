@@ -582,7 +582,8 @@ put /HOSTS/$hostNameSys/confHash \"$checksum\"
 	# Ensure we hit the group videoSource key once to force a videoSourceConfig refresh
 	KEYNAME="/GROUPS/$groupHash/control/sourceHash"; KEYNAME="1"; write_etcd_global &
 	echo "	System services and configuration keys generated, starting services now.."
-	sed -i "s/^SERVER_FIRSTRUN_FLAG=.*/SERVER_FIRSTRUN_FLAG=1/" "/etc/wavelet.conf"
+	echo "SERVER_BOOTSTRAP_COMPLETE=1" >> "/etc/wavelet.conf"
+	echo "SERVER_FIRSTRUN_FLAG=1" >> "/etc/wavelet.conf"
 	event_server
 }
 
@@ -742,6 +743,7 @@ test_with_ug() {
     temp_log=$(mktemp)
     command="$ULTRAGRID_APPRUN --tool uv -t file:$input -c $codec_config -d file:name=$output_file localhost"
     echo "	Running: $command"
+    # TODO - Ensure redirected to null or output file, we don't want this in the wavelet_build.log, it's too verbose
     $command > "$temp_log" 2>&1 &
     ug_pid=$!
     UG_PIDS+=("$ug_pid")
@@ -797,7 +799,7 @@ test_with_ug() {
           return 1
         fi
     else
-        echo "UltraGrid failed to complete or produce output"
+        echo "	UltraGrid failed to complete or produce output. Disqualifying codec."
         cat "$temp_log"
         return 1
     fi
@@ -813,17 +815,17 @@ runSSIMtest(){
     	# SSIM outputs per-frame data; extract the All value from the last line
     	ssim_avg=$(tail -n 1 "$ssim_log" | awk '{print $(NF-1)}' | cut -d':' -f2 | tr -d ' ()')
 	if [ -z "$ssim_avg" ]; then
-		echo "SSIM average not found in log file. Checking ffmpeg output..."
+		echo "	SSIM average not found in log file. Checking ffmpeg output..."
 		# Try to extract from ffmpeg stderr output instead
 		ssim_avg=$(grep -i "All:" "${ssim_log}.ffmpeg.log" | tail -n 1 | awk '{print $(NF-1)}')
     fi
 	if [ -z "$ssim_avg" ] || [ "$ssim_avg" = "inf" ]; then
-		echo "SSIM average not found or invalid. Marking as failed."
+		echo "	SSIM average not found or invalid. Marking as failed."
 		status="FAILED"
 	else
 		echo "SSIM average: $ssim_avg"
 		if (( $(echo "$ssim_avg < 0.90" | bc -l) )); then
-			echo "SSIM average ($ssim_avg) below threshold (0.90). Marking as VISUAL_FAILED."
+			echo "	SSIM average ($ssim_avg) below threshold (0.90). Marking as VISUAL_FAILED."
         	status="VISUAL_FAILED"
 		fi
 	fi
@@ -831,7 +833,7 @@ runSSIMtest(){
       qualityResult=1
     fi
   else
-    echo "SSIM computation failed!"
+    echo "	SSIM computation failed!"
     qualityResult=1
   fi
   rm -f "${ssim_log}.ffmpeg.log"
@@ -854,12 +856,12 @@ runVMAFtest(){
 			vmaf_avg=$(grep -oP '"mean":\s*\K[0-9.]+' "$vmaf_log" | head -n 1)
 		fi
 		if [ -z "$vmaf_avg" ] || [ "$vmaf_avg" = "null" ]; then
-			echo "VMAF average not found. Marking as failed."
+			echo "	VMAF average not found. Marking as failed."
 			status="FAILED"
 		else
-			echo "VMAF average: $vmaf_avg"
+			echo "	VMAF average: $vmaf_avg"
 			if (( $(echo "$vmaf_avg < 85" | bc -l) )); then
-				echo "VMAF average ($vmaf_avg) below threshold (85). Marking as VISUAL_FAILED."
+				echo "	VMAF average ($vmaf_avg) below threshold (85). Marking as VISUAL_FAILED."
 				status="VISUAL_FAILED"
 			fi
 		fi
@@ -867,7 +869,7 @@ runVMAFtest(){
 			qualityResult=1
 		fi
 	else
-    	echo "VMAF computation failed!"
+    	echo "	VMAF computation failed!"
     	cat "${vmaf_log}.ffmpeg.log"
     	qualityResult=1
 	fi

@@ -105,7 +105,7 @@ reconfigure_dns(){
 dns=none" > "/etc/NetworkManager/conf.d/dns.conf"
 	echo -e "$IPAServerHostIP dc1.$DOMAIN dc1" >> "/etc/hosts"
 	echo -e "$IPAServerHostIP dc1.$DOMAIN dc1" > /var/home/wavelet/http/ignition/dc1_host_entry
-	echo -e "DC1_IP=$IPAServerHostIP\nDC1_HOSTNAME=dc1.$DOMAIN" >> /etc/wavelet.conf
+	echo -e "DC1_IP=$IPAServerHostIP\nDC1_HOSTNAME=dc1.$DOMAIN" >> "/etc/wavelet.conf"
 	chown wavelet:wavelet /var/home/wavelet/http/ignition/dc1_host_entry
 	nmcli connection reload
 	sleep 5
@@ -116,7 +116,7 @@ dns=none" > "/etc/NetworkManager/conf.d/dns.conf"
 	sleep 3
 	systemctl restart NetworkManager
 	sleep 3
-	rm -rf /etc/resolv.conf
+	rm -rf "/etc/resolv.conf"
 	# Note this is an append operation!
 	cat >> "/etc/resolv.conf" <<-EOF
 		nameserver $IPAServerHostIP

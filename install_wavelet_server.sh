@@ -223,7 +223,7 @@ print_help(){
 	echo -e "-ip=, --serverip=\nDefines the server static IP4 address (I.E 192.168.0.2)"	
 	echo -e "-g=, --servergateway=\nDefines the server static IP4 gateway (I.E 192.168.0.1)"	
 	echo -e "-dns=, --serverdns=\nDefines the server DNS forwarder (I.E 192.168.0.53)"
-	echo -e "-c=, --config=\nDefines a configuration file instead of commandline parameters"
+	echo -e "-c=, --config=\nDefines a configuration file instead of commandline parameters (see wavelet_example.conf)"
 	exit 0
 }
 
@@ -361,6 +361,7 @@ parse_config_file() {
 			DEPLOYMENT_REGISTRY) DEPLOYMENT_REGISTRY="$value" ;;
 			PATCH_MODE) patchMode="$value" ;;
 			UG_BUILD_TYPE|UGDEV) dev_flag="DEV" ;;
+			CODEC_TEST) codec_testing="1";;
 		esac
 	done < "$config_file"
 }
@@ -389,6 +390,7 @@ for i in "$@"
 				print_help;	exit 0
 				;;
 			-p=*|--password=*|--pass=*)
+				# TODO - split to SU and wavelet user options
 				PASSWORD=${i#*=}; echo -e "	Password defined for BOTH user accounts as: ${PASSWORD}";
 				;;
 			-ws=*|--wifissid=*)
