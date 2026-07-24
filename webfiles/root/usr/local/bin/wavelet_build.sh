@@ -355,10 +355,10 @@ event_server(){
 }
 
 setup_httpd_quadlet(){
-	echo -e "Generating Apache Podman container and systemd service file"
+	echo "		Generating Apache Podman container and systemd service file"
 	mkdir -p "/var/home/wavelet/.config/containers/systemd/"
 	# ref https://hub.docker.com/_/httpd
-	cat > /var/home/wavelet/.config/containers/systemd/httpd.container <<-EOF
+	cat > "/var/home/wavelet/.config/containers/systemd/httpd.container" <<-EOF
 		[Unit]
 		Description=HTTPD Quadlet
 		After=local-fs.target
@@ -396,7 +396,7 @@ setup_httpd_quadlet(){
 	# Note daemon-reload and service start handled in calling function
 }
 nginx_quadlets(){
-	echo "Setting up NGINX + PHP-FPM quadlet.."
+	echo "		Setting up NGINX + PHP-FPM quadlet.."
 	cat > "/var/home/wavelet/.config/containers/systemd/php-fpm.container" <<-EOF
 		[Unit]
 		Description=PHP:FPM
@@ -740,7 +740,7 @@ test_with_ug() {
     codec_config="$2"
     output_file="$3"
     codec_name="$4"
-    temp_log=$(mktemp)
+    temp_log="$(mktemp)"
     command="$ULTRAGRID_APPRUN --tool uv -t file:$input -c $codec_config -d file:name=$output_file localhost"
     echo "	Running: $command"
     # TODO - Ensure redirected to null or output file, we don't want this in the wavelet_build.log, it's too verbose
