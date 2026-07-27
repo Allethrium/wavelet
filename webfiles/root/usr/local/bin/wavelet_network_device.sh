@@ -233,6 +233,11 @@ populate_to_etcd(){
 		initGroupHash="$GROUP_HASH"
 	fi
 	echo "	Populating ETCD with discovery data.."
+	# Validate deviceHostName to prevent etcd transaction injection
+	if [[ ! "$deviceHostName" =~ ^[A-Za-z0-9_-]+$ ]]; then
+		echo "	ERR: Invalid characters in deviceHostName, rejecting!"
+		return 1
+	fi
 	# Packed format $HASH -- IP;DEVICE_LABEL(attempts to set the device hostname!);MAC;type
 	interfaceEntry="$ipAddr;$deviceHostName;$macAddr;$type;$subType"
 	domainVar="$(dnsdomainname)"

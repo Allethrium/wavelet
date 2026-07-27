@@ -479,13 +479,18 @@ server_bootstrap(){
 	}
 	# Generate basic ETCD roles and key permissions
 	test_etcd_auth() {
+		local max_retries=300
+		local retry_count=0
 		echo "	Waiting for ETCD_AUTH_ENABLED=1 in /etc/wavelet.conf.."
-		if ! grep -q "^ETCD_AUTH_ENABLED=1" "/etc/wavelet.conf"; then
+		while ! grep -q "^ETCD_AUTH_ENABLED=1" "/etc/wavelet.conf"; do
+			if (( retry_count >= max_retries )); then
+				echo "	ERR: ETCD auth flag not set after $max_retries attempts, aborting."
+				exit 1
+			fi
 			sleep .1
-			test_etcd_auth
-		else
-			echo "	Auth flag present, continuing!"
-		fi
+			(( retry_count++ ))
+		done
+		echo "	Auth flag present, continuing!"
 	}
 
 	test_etcd_auth

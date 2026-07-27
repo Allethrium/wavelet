@@ -242,7 +242,7 @@ if [[ "$hostNameSys" = *"svr"* ]]; then
 	exit 0
 fi
 
-if [[ "$ENABLE_WIFI" == 1 ]]; then
+if [[ "$ENABLE_WIFI" != 1 ]]; then
 	echo "	The WIFI_MODE_ENABLED flag is disabled.  Please enable this if this host should utilize wireless connectivity."
 	exit 0
 fi

@@ -271,6 +271,8 @@ generate_device_info() {
 	# 7) delete rest
 	# Device string long is the interface key /UI/interface, packed format of:  DEVICELABEL;DEVICE FULL PATH
 	deviceLabel="$cardType:USB-$busInfo"
+	# Validate deviceLabel to prevent etcd transaction injection
+	deviceLabel="${deviceLabel%%[![:alnum:]_-]*}"
 	deviceString="$v4l_device_path/$deviceLabel"
 	deviceHash="$(sha256sum <<<"$hostNameSys, $deviceLabel, $serial" | tr -d \"[:space:]-\")"
 	echo -e "	Device name is:	$deviceLabel\n	Card type is:	$cardType\n	Bus address:	$busInfo\n	Serial:		${serial:-'null'}"
@@ -449,7 +451,8 @@ detect_self(){
 
 encoder_checkNetwork(){
 	# Checks for a network connection, without this detection may proceed too quickly and devices may not populate
-	if [[ "$1" -gt 3 ]]; then
+	local retry_count=${1:-0}
+	if [[ "$retry_count" -gt 3 ]]; then
 		echo -e "\nThree repeat tries exceeded, there may be a network configuration issue.  Please troubleshoot\n"
 		touch /home/wavelet/config/NETWORK_ERROR_FLAG
 		exit 0
@@ -460,8 +463,8 @@ encoder_checkNetwork(){
 	else
 		echo -e "No network connection, device registration will be unsuccessful, sleeping for 5 seconds and trying again..\n"
 		sleep 5
-		(( $1=$1++ ))
-		encoder_checkNetwork 
+		(( retry_count++ ))
+		encoder_checkNetwork "$retry_count"
 	fi
 }
 

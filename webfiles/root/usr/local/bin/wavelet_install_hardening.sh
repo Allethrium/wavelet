@@ -84,12 +84,13 @@ event_server(){
 			[Install]
 			WantedBy=multi-user.target
 		EOF
-		systemctl daemon-reload
-		configure_firewall
-		systemctl enable wavelet-root-autologin.service
-		systemctl restart etcd-quadlet.service registry.service
-		echo -e "\n	Security infrastructure successfully configured!" >> "$logName"
-		# We may want to now shred the administrator secret as it should no longer be necessary.
+		if systemctl daemon-reload && configure_firewall && systemctl enable wavelet-root-autologin.service && systemctl restart etcd-quadlet.service registry.service; then
+			echo -e "\n	Security infrastructure successfully configured!" >> "$logName"
+			# We may want to now shred the administrator secret as it should no longer be necessary.
+		else
+			echo -e "	Failed to configure security infrastructure!" >> "$logName"
+			exit 1
+		fi
 	else
 		echo -e "	Domain controller is not responding to kerberos ticket requests!" >> "$logName"
 		exit 1
@@ -300,7 +301,7 @@ configure_idm(){
 		echo "We will continue with a default password, but this default password is effectively public knowledge!" >> "$logName"
 	fi
 	# Check for DM password
-	if [[ -n "$directoryManagerPassword" ]]; then
+	if [[ -z "$directoryManagerPassword" ]]; then
 		echo "The domain Directory Manager password doesn't appear to be set" >> "$logName"
 		cat "/var/secrets/ipaadmpw.secure" > "/var/secrets/ipadmpw.secure"
 		local directoryManagerPassword="$administratorPassword"
@@ -384,6 +385,9 @@ configure_idm(){
 --allow-zone-overlap
 --no-hbac-allow 
 --setup-adtrust" > /var/freeipa-data/ipa-server-install-options
+	# Set secure permissions on the options file (0600) so only root can read it
+	# Note: The podman container will access this via the :Z volume mount which handles SELinux context
+	chmod 0600 /var/freeipa-data/ipa-server-install-options
 	echo -e "\n	Attempting setup of FreeIPA server instance.." >> "$logName"
 	echo -e "\n Details in journalctl or /var/freeipa-data/var/logs" >> "$logName"
 	ipaHostName="dc1.$DOMAIN"
@@ -397,7 +401,6 @@ configure_idm(){
 		--ip="$IPAServerHostIP" \
 		--network=ipa_ipvlan \
 		-v /var/freeipa-data:/data:Z \
-		--tls-verify=false \
 		"$hostNameSys/freeipa-server:latest" ipa-server-install -q -U < "/var/freeipa-data/ipa-server-install-options"
 	# Wait for server install to complete
 	file="/var/freeipa-data/var/log/ipaserver-install.log" >> "$logName"
@@ -408,6 +411,10 @@ configure_idm(){
 	wait_for_line "INFO The ipa-server-install command was successful"
 	# Make sure the INSTALL container has been stopped and destroyed!
 	podman rm freeipa_dc1_install -f
+	# Securely shred the FreeIPA install options file that contains plaintext passwords
+	if [[ -f "/var/freeipa-data/ipa-server-install-options" ]]; then
+		shred -u -v -n 3 "/var/freeipa-data/ipa-server-install-options"
+	fi
 	# Generate named ACL
 	echo -e "acl \"wavelet_network\" {\n127.0.0.1;\n$currentSubnet;\n};" >> "/var/freeipa-data/etc/named/ipa-ext.conf"
 	echo -e "allow-recursion { wavelet_network; };\nallow-query-cache { wavelet_network; };" >> "/var/freeipa-data/etc/named/ipa-options-ext.conf"
@@ -1156,7 +1163,7 @@ configure_firewall(){
     # etcd (clients)
     nft add rule inet wavelet input ip saddr "$subNetCIDR" tcp dport "{ 2379,2380 }" accept
     # Registry
-    nft add rule inet wavelet input tcp dport 5000 accept
+    nft add rule inet wavelet input ip saddr "$subNetCIDR" tcp dport 5000 accept
     # FreeIPA
     nft add rule inet wavelet input ip saddr "$subNetCIDR" udp dport "{ 88, 389, 636, 8822, 8823, 464 }" accept
     nft add rule inet wavelet input ip saddr "$subNetCIDR" tcp dport "{ 88, 389, 636, 8822, 8823, 464 }" accept

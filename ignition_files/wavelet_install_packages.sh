@@ -110,9 +110,9 @@ event_server(){
 	setup_registry_quadlet
 	pull_registry_images
 	# Pull these images in serial as they are heavy
-	pull_overlay "coreos_overlay_client" --tls-verify=false
+	pull_overlay "coreos_overlay_client"
 	podman tag coreos_overlay_client:latest "$hostNameSys/coreos_overlay_client"
-	podman push --tls-verify=false "$hostNameSys/coreos_overlay_client" "$hostNameSys:5000/coreos_overlay_client"
+	podman push "$hostNameSys/coreos_overlay_client" "$hostNameSys:5000/coreos_overlay_client"
 	# Remove nameserver karg if it exists
 	if rpm-ostree kargs | grep -q 'nameserver'; then
 	  rpm-ostree kargs --delete nameserver
@@ -253,7 +253,7 @@ pull_registry_images() {
     sourceList+=("registry.fedoraproject.org/fedora:42")
   else
     echo "An external registry is configured! Pulling sources from: $oci_registry"
-    local tls="--tls-verify=false"
+    local tls=""
     sourceList+=("${oci_registry}/etcd:latest")
     sourceList+=("${oci_registry}/coreos-installer:latest")
     sourceList+=("${oci_registry}/fedora:latest")
@@ -288,7 +288,7 @@ pull_registry_images() {
       echo "Pushing container $source to $hostNameSys:5000/${shortSource%%:*}"
       retry=1
       while (( retry <= max_retries )); do
-        if timeout $timeout podman push --tls-verify=false "$source" "$hostNameSys:5000/${shortSource%%:*}"; then
+        if timeout $timeout podman push "$source" "$hostNameSys:5000/${shortSource%%:*}"; then
           break
         fi
         echo "Push attempt $retry failed for $hostNameSys/${shortSource%%:*}. Retrying in 5 seconds..."
@@ -340,7 +340,7 @@ export_container_image(){
 	registry_hostname=$SVR_HOSTNAME
 	local registry_url="$registry_hostname:5000"
 	echo -e "\n	Exporting $imageTarget to registry $registry_url"
-	if podman push --format oci --tls-verify=false \
+	if podman push --format oci \
 	    "localhost/$imageTarget" \
 	    "$registry_url/$imageTarget:latest"; then
 		echo -e "${GREEN}Successfully pushed $imageTarget${NC}"
@@ -370,14 +370,14 @@ pull_overlay(){
 	  echo "Attempting to pull overlay image: $image_name"
 	while (( retry <= max_retries )); do
 		# Try with registry hostname first
-		if timeout 480 podman pull --tls-verify=false "$oci_registry/$image_name"; then
+		if timeout 480 podman pull "$oci_registry/$image_name"; then
 			echo "Successfully pulled $image_name from $oci_registry"
 			return 0
 		fi
 		echo "Pull attempt $retry failed for $oci_registry/$image_name"
 		# Try with IP address and explicit port as fallback
     	local registry_ip="${DEPLOYMENT_REGISTRY:-${REGISTRY}}"
-    	if timeout 480 podman pull --tls-verify=false "$registry_ip:5000/$image_name"; then
+    	if timeout 480 podman pull "$registry_ip:5000/$image_name"; then
 			echo "Successfully pulled $image_name using IP fallback: $registry_ip:5000"
 			return 0
 		fi

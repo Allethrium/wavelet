@@ -40,9 +40,10 @@ certificateAuthorityFile="/etc/ipa/ca.crt"
 
 # Helper function for consistent command execution
 execute_etcd_cmd() {
-	local cmd="$1"
-	echo "Executing: $cmd" >> /var/home/"${user}"/logs/etcdlog.log
-	eval "etcdctl $cmd"
+	# Redact passwords from logging
+	local logCmd=$(echo "$@" | sed -e 's/--new-user-password [^ ]*/--new-user-password REDACTED/g' -e 's/--user [^ ]*/--user REDACTED/g')
+	echo "Executing: etcdctl $logCmd" >> /var/home/"${user}"/logs/etcdlog.log
+	etcdctl "$@"
 }
 
 # Define cleanup handler
@@ -206,15 +207,15 @@ test_coreUserContexts(){
 		    return 1
 	    fi
 	    # Attempt to write to the test key in etcd
-	    password="$(cat "$memory_file")"
-	    echo "  Attempting test with $etcdUser, and password: $password" >> "$log_file"
-	    if ! etcdctl --endpoints="$ETCDENDPOINT" --cacert="$certificateAuthorityFile" --user="$etcdUser:$password" put "$etcdpath" -- "test"; then
+	    # Use ETCDCTL_USER and ETCDCTL_PASSWORD environment variables to avoid password exposure in logs and ps
+	    local etcd_password="$(cat "$memory_file")"
+	    if ! ETCDCTL_USER="$etcdUser" ETCDCTL_PASSWORD="$etcd_password" etcdctl --endpoints="$ETCDENDPOINT" --cacert="$certificateAuthorityFile" put "$etcdpath" -- "test"; then
 		    echo "  Failed to execute etcd command for $context" >&2
 		    return 1
 	    fi
 	    # Clean up: Remove the memory file after testing
 	    echo " Removing test key.."
-	    etcdctl --endpoints="$ETCDENDPOINT" --cacert="$certificateAuthorityFile" --user="$etcdUser:$password" del "$etcdpath"
+	    ETCDCTL_USER="$etcdUser" ETCDCTL_PASSWORD="$etcd_password" etcdctl --endpoints="$ETCDENDPOINT" --cacert="$certificateAuthorityFile" del "$etcdpath"
 	    rm -f "$memory_file" || true
 	done
 	echo "	Core users provisioned and tested!"
@@ -305,9 +306,11 @@ test_auth() {
 	password2=$(cat /var/home/wavelet/http-php/secrets/pw2.txt)
 	decrypt=$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" -in /var/home/wavelet/http-php/secrets/crypt.bin -d)
 	webuipw=$(echo "${decrypt}" | base64 -d)
-	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="/etc/ipa/ca.crt" --user webui:"${webuipw}" put "/UI/ui_auth" -- "True"
-	echo "  Attempting: etcdctl --endpoints=${ETCDENDPOINT} --cacert=${certificateAuthorityFile} --user webui:${webuipw} get ${KEYNAME}" >> /var/home/"${user}"/logs/etcdlog.log
-	returnVal=$(etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user webui:"${webuipw}" get "${KEYNAME}" --print-value-only)
+	# Use ETCDCTL_USER and ETCDCTL_PASSWORD environment variables to avoid password exposure in logs and ps
+	ETCDCTL_USER="webui" ETCDCTL_PASSWORD="${webuipw}" etcdctl --endpoints="${ETCDENDPOINT}" --cacert="/etc/ipa/ca.crt" put "/UI/ui_auth" -- "True"
+	# Log without password for security
+	echo "  Attempting: etcdctl --endpoints=${ETCDENDPOINT} --cacert=${certificateAuthorityFile} get ${KEYNAME}" >> /var/home/"${user}"/logs/etcdlog.log
+	returnVal=$(ETCDCTL_USER="webui" ETCDCTL_PASSWORD="${webuipw}" etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" get "${KEYNAME}" --print-value-only)
 	echo "  Returned: ${returnVal}" >> /var/home/"${user}"/logs/etcdlog.log
 	if [[ "${returnVal}" == *"True"* ]]; then
 		echo "  Test successful!" >> /var/home/"${user}"/logs/etcdlog.log
@@ -345,36 +348,35 @@ generate_etcd_host_role() {
 		exit 1
 	fi
 	# Get client hostname from PROV request
-	cmd="get /PROV/REQUEST --print-value-only"
-	clientHostName="$(etcdctl $cmd)"
+	clientHostName="$(etcdctl get /PROV/REQUEST --print-value-only)"
 	if [[ -z "$clientHostName" ]]; then
 		echo "		Client hostname is empty! Cannot continue!" >> "/var/home/${user}/logs/etcdlog.log"
+		exit 1
+	fi
+	# Validate clientHostName against allowed characters
+	if [[ ! "$clientHostName" =~ ^[a-zA-Z0-9-]{1,63}$ ]]; then
+		echo "		Client hostname '$clientHostName' contains invalid characters! Cannot continue!" >> "/var/home/${user}/logs/etcdlog.log"
 		exit 1
 	fi
 	clientHostNameShort="${clientHostName:0:7}"
 	echo "  Client hostname retrieved for: $clientHostName" >> /var/home/wavelet-root/logs/etcdlog.log
 	# Create role for client
-	cmd="role add $clientHostNameShort"
-	execute_etcd_cmd "$cmd"
+	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" role add "$clientHostNameShort"
 	# Helper functions for key and role operations
 	createCmd() {
-		cmd="put ${1} -- ${2}"
-		execute_etcd_cmd "$cmd"
+		etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" put "${1}" -- "${2}"
 	}
 	roleCmd() {
 		# Read + Write and prefixes
-		cmd="role grant-permission $clientHostNameShort readwrite ${1} --prefix=true"
-		execute_etcd_cmd "$cmd"
+		etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" role grant-permission "$clientHostNameShort" readwrite "${1}" --prefix=true
 	}
 	roleCmdReadOnly() {
 		# ReadOnly and prefixes
-		cmd="role grant-permission $clientHostNameShort read ${1} --prefix=true"
-		execute_etcd_cmd "$cmd"
+		etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" role grant-permission "$clientHostNameShort" read "${1}" --prefix=true
 	}
 	roleCmdReadKeyOnly() {
 		# Read that key only
-		cmd="role grant-permission $clientHostNameShort read ${1} --prefix=false"
-		execute_etcd_cmd "$cmd"
+		etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" role grant-permission "$clientHostNameShort" read "${1}" --prefix=false
 	}
 	# Generate then acquire the hash value for this host
 	# Since everything starts its life in wavelet as a decoder, this is always "dec"
@@ -406,9 +408,8 @@ generate_etcd_host_role() {
 	# Generate client password and create user
 	local PassWord; local password2; local result
 	PassWord="$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')"
-	cmd="user add $clientHostNameShort --new-user-password ${PassWord}"
-	echo "  Generating new user with: ${cmd}" >> /var/home/wavelet-root/logs/etcdlog.log
-	execute_etcd_cmd "$cmd"
+	echo "  Generating new user for: $clientHostNameShort" >> /var/home/wavelet-root/logs/etcdlog.log
+	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" user add "$clientHostNameShort" --new-user-password "${PassWord}"
 	# Two-factor authentication setup
 	password2="$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')"
 	echo "${PassWord}" | openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" \
@@ -422,11 +423,9 @@ generate_etcd_host_role() {
 	    local clientArg
 		echo "  Password encrypted and tested successfully!" >> /var/home/wavelet-root/logs/etcdlog.log
 		# Ensure our successfully generated user credentials are assigned to our etcd role, otherwise we get permission denied error
-		cmd="user grant-role $clientHostNameShort $clientHostNameShort"
-		execute_etcd_cmd "$cmd"
+		etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" user grant-role "$clientHostNameShort" "$clientHostNameShort"
 		clientArg="$clientHostNameShort:$result"
-		cmd="put /HOSTS/$clientHostName/test -- test"
-		if execute_etcd_cmd "$cmd"; then
+		if etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" put "/HOSTS/$clientHostName/test" -- "test"; then
 			echo " 	Etcd put with generated credentials:  $clientArg success!" >> /var/home/wavelet-root/logs/testCreds.log
 		else
 			echo "	Etcd failure!  Please check logs."
@@ -434,21 +433,19 @@ generate_etcd_host_role() {
 	else
 		echo "  Decrypt failed, something is wrong!" >> /var/home/wavelet-root/logs/etcdlog.log
 		echo "  Cleaning up user+Roles.." >> /var/home/wavelet-root/logs/etcdlog.log
-		cmd="user del $clientHostNameShort"; execute_etcd_cmd "$cmd"
-		cmd="role del $clientHostNameShort"; execute_etcd_cmd "$cmd"
+		etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" user del "$clientHostNameShort"
+		etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" role del "$clientHostNameShort"
 		exit 1
 	fi
 	# Upload credentials to etcd for client retrieval
-	cmd="put /PROV/CRYPT -- $(cat /var/home/wavelet-root/config/.$clientHostNameShort.enc | base64)"
-	execute_etcd_cmd "$cmd"; rm -rf "/var/home/wavelet-root/config/.$clientHostNameShort.enc"
-	cmd="put /PROV/FACTOR2 -- ${password2}"
-	execute_etcd_cmd "$cmd"
+	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" put "/PROV/CRYPT" -- "$(cat /var/home/wavelet-root/config/.$clientHostNameShort.enc | base64)"
+	rm -rf "/var/home/wavelet-root/config/.$clientHostNameShort.enc"
+	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" put "/PROV/FACTOR2" -- "${password2}"
 	# Cleanup
 	unset PassWord
 	rm -rf "/var/home/wavelet-root/config/${clientHostName}.crypt.bin"
 	# Signal client that credentials are ready
-	cmd="put /PROV/RESPONSE -- ${clientHostName}"
-	execute_etcd_cmd "$cmd"
+	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" put "/PROV/RESPONSE" -- "${clientHostName}"
 	echo "  Host credentials generated and parsed back to etcd cluster, host should retrieve these credentials and proceed from here.." >> /var/home/wavelet-root/logs/etcdlog.log
 	exit 0
 }
@@ -462,7 +459,7 @@ event_generate_hash(){
 		hostHash=$(cat /proc/sys/kernel/random/uuid | sha256sum | tr -d ' \t\n-')
 		echo -e "		Generated host hash:	$hostHash \n"
 		# Check for pre-existing keys here
-		KEYNAME="/HOSTS/$clientHostName}"; hashExists="$("$ETCDINTERACTIONMOD" 'read_etcd_global' $KEYNAME)"
+		KEYNAME="/HOSTS/$clientHostName"; hashExists="$("$ETCDINTERACTIONMOD" 'read_etcd_global' $KEYNAME)"
 		if [[ -z "$hashExists" || "${#hashExists}" -le 1 ]]; then
 			echo "		Generated hash value lookup provides: $hashExists, which is null or less than 1 char, therefore it is not valid."
 			echo "		Populating initial device type template from hostname.."
@@ -479,9 +476,9 @@ event_generate_hash(){
 			esac
 			echo "		Populating host keys.."
 			# Populate host data (orchestrator takes care of UI, after initial prefix generation)
-			KEYNAME="/HOSTS/$clientHostName/control/type"; cmd="put $KEYNAME -- $KEYVALUE";	execute_etcd_cmd "$cmd"
-			KEYNAME="/HOSTS/$clientHostName"; KEYVALUE="$hostHash"; cmd="put $KEYNAME -- $KEYVALUE"; execute_etcd_cmd "$cmd"
-			KEYNAME="/UI/HOSTS/$hostHash"; KEYVALUE="$clientHostName"; cmd="put $KEYNAME -- $KEYVALUE"; execute_etcd_cmd "$cmd"
+			etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" put "/HOSTS/$clientHostName/control/type" -- "$KEYVALUE"
+			etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" put "/HOSTS/$clientHostName" -- "$hostHash"
+			etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" put "/UI/HOSTS/$hostHash" -- "$clientHostName"
 		else
 			echo "		/HOSTS/$clientHostName Hash value exists: $hashExists"
 			echo "		Device already populated, taking no further action."

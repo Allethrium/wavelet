@@ -34,6 +34,7 @@ while true; do
         if (( now > shutdown_at )); then
             systemctl --user stop UltraGrid.Encoder.service
             echo "$(date): Encoder process stopped - timeout expired, zero subscribers." >> "$log_file"
+            rm -f /var/tmp/encoder_shutdown_at
             KEYNAME="/HOSTS/$(hostname)/control/healthStatus"; KEYVALUE="OK: ENCODER SHUTDOWN TIMEOUT"; write_etcd_global &
             exit 0
         fi

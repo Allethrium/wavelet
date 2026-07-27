@@ -25,9 +25,10 @@ ignition:
   security:
     tls:
       certificate_authorities:
-        - local: ca.crt
+        # The only CA the decoders should have is the server's Domain Controller CA.
+        - source: http://waveletDC1/ipa/config/ca.crt
           verification:
-            hash:
+            hash: wavelet_dc1_caHash
 storage:
   disks:
     - device: /dev/disk/by-id/coreos-boot-disk

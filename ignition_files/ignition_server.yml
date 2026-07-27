@@ -19,6 +19,7 @@ kernel_arguments:
     - splash
     - rd.neednet=1
     - rd.timeout=10
+# Comment_tag_CA
 storage:
   disks:
     - device: /dev/disk/by-id/coreos-boot-disk
@@ -45,6 +46,13 @@ storage:
       wipe_filesystem: true
   files:
     # Setup Ignition Files
+    # Deployment server CA certificate
+    # This is generated from build_registry.sh and is required for TLS to the local httpd+registry
+    - path: /var/ca.crt
+      mode: 0644
+      overwrite: true
+      contents:
+        source: https://DEPLOYMENT_SERVER/ca.crt
     # This is required to spinup the decoder ISO once the server boots.
     # the local file is relative to --files-dir cmdline option in Butane
     # The customized decoder yml file which can be modified and regenerated once server provisioned

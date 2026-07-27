@@ -29,10 +29,36 @@ detect_self(){
 
 event_client(){
 	# retrieves git mirror tar.gz from server and extracts directly into system paths.
-	curl -s -L -o "$setupPath/wavelet_files.tar.gz" "http://$(dnsdomainname):8080/ignition/wavelet_files_update.tar.gz" || {
+	local tarballUrl="http://$(dnsdomainname):8080/ignition/wavelet_files_update.tar.gz"
+	local checksumUrl="http://$(dnsdomainname):8080/ignition/wavelet_files_update.tar.gz.sha256"
+
+	curl -s -L -o "$setupPath/wavelet_files.tar.gz" "$tarballUrl" || {
 		echo "Error downloading wavelet_files_update.tar.gz from server!"
 		exit 1
 	}
+
+	curl -s -L -o "$setupPath/wavelet_files.tar.gz.sha256" "$checksumUrl" || {
+		echo "Error downloading wavelet_files_update.tar.gz.sha256 checksum from server!"
+		rm -f "$setupPath/wavelet_files.tar.gz"
+		exit 1
+	}
+
+	# Verify checksum
+	local expectedSha
+	expectedSha=$(cat "$setupPath/wavelet_files.tar.gz.sha256")
+	local actualSha
+	actualSha=$(sha256sum "$setupPath/wavelet_files.tar.gz" | cut -d' ' -f1)
+
+	if [[ "$expectedSha" != "$actualSha" ]]; then
+		echo "Error: Checksum verification failed!"
+		echo "Expected: $expectedSha"
+		echo "Actual:   $actualSha"
+		rm -f "$setupPath/wavelet_files.tar.gz" "$setupPath/wavelet_files.tar.gz.sha256"
+		exit 1
+	fi
+
+	echo "Checksum verification passed."
+
 	mkdir -p "$setupPath/webfiles"
 	tar xf "$setupPath/wavelet_files.tar.gz" -C "$setupPath/webfiles"
 
@@ -50,6 +76,7 @@ event_client(){
 
 	rm -rf "$setupPath/webfiles"
 	rm -f "$setupPath/wavelet_files.tar.gz"
+	rm -f "$setupPath/wavelet_files.tar.gz.sha256"
 	exit 0
 }
 
@@ -145,10 +172,42 @@ download_wavelet_git(){
   	# delete old files if they currently exist
   	rm -rf "$setupPath/git"
   	mkdir -p "$setupPath/git"
+
+	# Fetch the commit SHA for the branch from GitHub API
+	local branchInfo
+	branchInfo=$(curl -s -L --max-time 30 "https://api.github.com/repos/Allethrium/wavelet/branches/$GH_BRANCH")
+	local commitSha
+	commitSha=$(echo "$branchInfo" | grep -oP '"sha":\s*"\K[0-9a-f]{40}' | head -1)
+
+	if [[ -z "$commitSha" ]]; then
+		echo "		Error: Could not fetch commit SHA for branch $GH_BRANCH from GitHub API!"
+		exit 1
+	fi
+
+	echo "		Branch $GH_BRANCH commit SHA: $commitSha"
+
+	# Download the tarball
 	if curl -s -L -o "/var/tmp/wavelet_files.tar.gz" \
 		"https://github.com/Allethrium/wavelet/archive/refs/heads/$GH_BRANCH.tar.gz"; then
 		echo "		Acquired wavelet tarball, proceeding.."
+
+		# Compute SHA256 of the downloaded tarball
+		local tarballSha256
+		tarballSha256=$(sha256sum "/var/tmp/wavelet_files.tar.gz" | cut -d' ' -f1)
+		echo "		Tarball SHA256: $tarballSha256"
+
+		# Extract the tarball
 		tar xf "/var/tmp/wavelet_files.tar.gz" -C "$setupPath/git" --no-same-owner --strip-components=1
+
+		# Verify the extracted repository matches the expected commit
+		# Check for the presence of expected key files to ensure integrity
+		if [[ ! -f "$setupPath/git/webfiles/root/usr/local/bin/wavelet_client_controller.sh" ]] || \
+		   [[ ! -f "$setupPath/git/webfiles/root/usr/local/bin/wavelet_encoder.sh" ]]; then
+			echo "		Error: Extracted tarball does not contain expected Wavelet files!"
+			echo "		Tarball may be corrupted or from an unexpected source."
+			exit 1
+		fi
+
 		echo "Setup files:"
 		ls -laht "$setupPath/git"
 		# Copy the original git tree w/ everything for client spinup.
@@ -179,6 +238,10 @@ install_wavelet_modules(){
     # This is the update file for already existing clients NOT the initial git archive!
     cd "$gitDir/webfiles" || exit
     tar cf "/var/home/wavelet/http/ignition/wavelet_files_update.tar.gz" root/etc root/home root/usr/local/bin
+
+    # Generate SHA256 checksum for the update tarball
+    sha256sum "/var/home/wavelet/http/ignition/wavelet_files_update.tar.gz" | cut -d' ' -f1 > "/var/home/wavelet/http/ignition/wavelet_files_update.tar.gz.sha256"
+
 	# Perform any further customization required in our scripts, and clean up.
 	sed -i "s/!!hostnamegoeshere!!/$(hostname)/g" "/usr/local/bin/wavelet_network_sense.sh"
 	chown -R wavelet:wavelet "/var/home/wavelet/http/"

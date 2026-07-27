@@ -196,7 +196,12 @@ process_hostlist() {
 	for cmd in "${write_cmds[@]}"; do
 		local k="${cmd%=*}"
 		local v="${cmd#*=}"
-		txn_buffer+="put \"$k\" \"$v"$'\n'
+		# Validate k and v to prevent etcd transaction injection
+		if [[ ! "$k" =~ ^/UI/HOSTS/[^/]+/control/[a-zA-Z0-9_-]+$ ]] || [[ ! "$v" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+			echo "	ERR: Invalid characters in etcd transaction key/value, rejecting!"
+			return 1
+		fi
+		txn_buffer+="put \"$k\" \"$v\"\n"
 	done
 	# Remove trailing newline
 	txn_buffer="${txn_buffer%$'\n'}"
@@ -264,7 +269,7 @@ event_group_input_persist() {
 # HOST functionality
 event_deprovision(){
 	# Deprovision functionality
-	if [[ "$etcdValue" -eq 1 ]]; then
+	if [[ "$etcdValue" == "1" ]]; then
 		echo "	Deprovision flag is set.  System will deprovision itself.."
 		echo "	Setting hard deprovision flag to start teardown timer.."
 		KEYNAME="/HOSTS/$hostNameSys/DEPROVISION"; KEYVALUE="1"; write_etcd_global
@@ -279,7 +284,7 @@ event_deprovision(){
 	fi
 }
 event_deprovision_timer(){
-	if [[ "$etcdValue" -eq 1 ]]; then
+	if [[ "$etcdValue" == "1" ]]; then
 		# This starts a timer which will activate wavelet_deprovision_watcher to perform cleanup
 		echo "	Deprovision flag is set.  System will deprovision itself.."
 		echo "	Setting hard deprovision flag to start teardown timer.."
@@ -921,11 +926,16 @@ event_change_group(){
 		KEYNAME="/GROUPS/$serverHostname"; read_etcd_global; etcdValue="$printvalue"
    		# Write the group key back and let the server orchestrator update the UI.
    	fi
-   	echo "	Changing client group to hash: $etcdValue"
-   	# Will also trigger a conf update, but since the checksum should match, no issue
-   	# If it doesn't, server conf will overwrite host conf.
-   	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; KEYVALUE="$etcdValue"; write_etcd_global &
-   	configKey="GROUP_HASH"
+	echo "	Changing client group to hash: $etcdValue"
+	# Will also trigger a conf update, but since the checksum should match, no issue
+	# If it doesn't, server conf will overwrite host conf.
+	KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; KEYVALUE="$etcdValue"; write_etcd_global &
+	configKey="GROUP_HASH"
+	# Validate etcdValue to prevent sed injection (reject / and newlines)
+	if [[ "$etcdValue" == *"/"* ]] || [[ "$etcdValue" == *$'\n'* ]] || [[ "$etcdValue" == *$'\r'* ]]; then
+		echo "	ERR: Invalid characters in group hash, rejecting!"
+		exit 0
+	fi
 	if grep -q "^export $configKey=" "$configFile"; then
 		sed -i "s/^export $configKey=.*/export $configKey=\"$etcdValue\"/" "$configFile"
 	else
@@ -937,6 +947,15 @@ event_change_group(){
 event_delete_group(){
 	# Server only
 	echo "      Finding components in specified group.."
+	# Validate etcdValue is not empty and matches hash format
+	if [[ -z "$etcdValue" ]]; then
+		echo "      Cannot delete group: etcdValue is empty!"
+		exit 0
+	fi
+	if [[ ! "$etcdValue" =~ ^[a-f0-9]{64}$ ]]; then
+		echo "      Cannot delete group: etcdValue '$etcdValue' is not a valid hash format!"
+		exit 0
+	fi
 	# We also need the hash of the primary group
 	# As this is always run on the server, and the server is always in the primary group:
 	if [[ "$etcdValue" == "$primaryGroupHash" ]]; then
@@ -1308,6 +1327,12 @@ run_decoder(){
 	videoSourceCmd="${configPayload##*cmd:}"
 	if [[ -n "$videoSourceCmd" && "$videoSourceCmd" != "cmd:" ]]; then
 		videoSourceCmd="$(base64 -d <<<"$videoSourceCmd")"
+		# Reject newlines/control chars to prevent systemd unit injection
+		if [[ "$videoSourceCmd" =~ [$'\n\r\t'] ]] || [[ ! "$videoSourceCmd" =~ ^[a-zA-Z0-9_./\-:]+$ ]]; then
+			echo "	ERR: Invalid characters in decoded videoSourceCmd, rejecting!"
+			KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="ERR: Invalid videoSourceCmd"; write_etcd_global &
+			exit 0
+		fi
 	fi
 	echo "	Parsed videoSourceConfig - Type: $videoSourceType, SubType: $videoSourceSubType, Active: $activeFlag"
 	echo "	Video Source Subtype: $videoSourceSubType"
@@ -1465,10 +1490,11 @@ regenerate_staticImage(){
 		exit 0
 	fi
 	local attempt=1
+	local max_attempts=3
 	KEYNAME="/UI/GROUPS/$groupHash/control/staticImage"; read_etcd_global
 	echo "        Downloading static image video loop for local playback from $printvalue.."
 	# We just grab the mp4 loop direct from the webserver URL, including the sha256 hash
-	until [[ attempt -gt 3 ]]; do
+	while [[ $attempt -le $max_attempts ]]; do
 		wget -O "/var/home/wavelet/config/staticImage.mp4" "$printvalue"
 		wget -O "/var/home/wavelet/config/staticImage.sha256" "${printvalue%.mp4}.sha256"
   		serverCheckSum="$(cat "/var/home/wavelet/config/staticImage.sha256")"
@@ -1477,18 +1503,20 @@ regenerate_staticImage(){
 		if [[ "$localCheckSum" != "$serverCheckSum" ]]; then
 	  		echo "	ERR: static image hash mismatch!"
 	  		(( attempt++ ))
-	  		regenerate_staticImage
+	  		if [[ $attempt -gt $max_attempts ]]; then
+	  			errorStatus="ERR: Unable to update static image selection, hash mismatch!"
+	  			KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="$errorStatus"; write_etcd_global &
+	  			echo "	$errorStatus"
+	  			return 1
+	  		fi
+	  		sleep 1
 	  	else
 	  		KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="OK: Static image updated"
 	  		write_etcd_global &
 	  		echo "	$KEYVALUE"
+	  		return 0
 	  	fi
 	done
-	if [[ $attempt -eq 3 ]]; then
-		errorStatus="ERR: Unable to update static image selection, hash mismatch!"
-		KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="$errorStatus"; write_etcd_global &
-		echo "	$errorStatus"
-	fi
 }
 regenerate_blankImage(){
   # Grab the staticImage and generate it correctly.
@@ -1702,7 +1730,7 @@ netCat(){
 #    echo "Port: $port, Command: $controlPortCmd"
     response=$(nc 127.0.0.1 "$port" <<<"$controlPortCmd");
     # "202 Accepted" = UltraGrid change upstream after a bugfix, we will accept both
-    if [[ "$response" != *"202 Accepted"* ]] || [[ "$response" != *"200 OK"* ]]; then
+    if [[ "$response" != *"202 Accepted"* && "$response" != *"200 OK"* ]]; then
     	echo "	Control Port exception: $response"
     fi
 }

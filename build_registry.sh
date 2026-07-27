@@ -16,7 +16,7 @@ export_container_image(){
     echo -e "\n	Exporting $imageTarget to registry $registry_url"
     # Tag and push
     if podman tag "localhost/$imageTarget" "$registry_addr/$imageTarget:latest"; then
-        if podman push --format oci --tls-verify=false "localhost/$imageTarget" "$registry_url/$imageTarget:latest"; then
+        if podman push --format oci "localhost/$imageTarget" "$registry_url/$imageTarget:latest"; then
             echo -e "${GREEN}		Successfully pushed $imageTarget${NC}"
             # Remove local localhost/ image to avoid doubling storage in local podman storage
             # since the registry now holds the image
@@ -29,6 +29,26 @@ export_container_image(){
         echo -e "${RED}		Failed to tag $imageTarget${NC}"
         return 1
     fi
+}
+
+build_container_image_if_needed(){
+    local imageTarget="$1"
+    local containerFile="$2"
+    local env="$3"
+
+    # Check if image already exists in the local registry
+    local registry_addr
+    registry_addr=$(hostname -f)
+    local registry_url="$registry_addr:5000"
+
+    # Check if image exists in registry
+    if curl -s -q "http://${registry_url}/v2/${imageTarget}/manifests/latest" | grep -q "schemaVersion"; then
+        echo -e "${GREEN}	Image $imageTarget already exists in registry, skipping build.${NC}"
+        return 0
+    fi
+
+    # If not in registry, build it
+    build_container_image "$imageTarget" "$containerFile" "$env"
 }
 
 build_container_image(){
@@ -92,6 +112,39 @@ pull_registry_images(){
 		echo "	Pushing tagged image localhost/${sourceShort%%:*} to LAN registry.."
 		export_container_image "${sourceShort%%:*}"
 	done
+}
+
+generate_self_signed_certs(){
+	# Generate self-signed CA and server certificates for the deployment server
+	echo -e "Generating self-signed CA and server certificates for HTTPD..."
+	mkdir -p ~/.config/var/ssl/certs
+	mkdir -p ~/.config/var/ssl/private
+
+	# Generate CA private key and certificate
+	openssl genrsa -out ~/.config/var/ssl/private/ca.key 2048 2>/dev/null
+	openssl req -x509 -new -nodes -key ~/.config/var/ssl/private/ca.key \
+		-sha256 -days 3650 -out ~/.config/var/ssl/certs/ca.crt \
+		-subj "/C=US/ST=State/L=City/O=Wavelet/OU=Deployment/CN=Wavelet Deployment CA" 2>/dev/null
+
+	# Generate server private key and certificate signing request
+	openssl genrsa -out ~/.config/var/ssl/private/server.key 2048 2>/dev/null
+	local server_host=$(hostname -f)
+	openssl req -new -key ~/.config/var/ssl/private/server.key \
+		-out ~/.config/var/ssl/private/server.csr \
+		-subj "/C=US/ST=State/L=City/O=Wavelet/OU=Deployment/CN=${server_host}" 2>/dev/null
+
+	# Generate server certificate signed by our CA
+	openssl x509 -req -in ~/.config/var/ssl/private/server.csr \
+		-CA ~/.config/var/ssl/certs/ca.crt -CAkey ~/.config/var/ssl/private/ca.key \
+		-CAcreateserial -out ~/.config/var/ssl/certs/server.crt -days 3650 -sha256 2>/dev/null
+
+	# Ensure CA.crt is available via this httpd server as a data object
+	mkdir -p ~/.config/var/www/ssl
+	cp ~/.config/var/ssl/certs/ca.crt ~/.config/var/www/ssl/ca.crt
+	echo -e "	Certificates generated successfully:"
+	echo -e "	CA Certificate: ~/.config/var/ssl/certs/ca.crt"
+	echo -e "	Server Certificate: ~/.config/var/ssl/certs/server.crt"
+	echo -e "	Server Private Key: ~/.config/var/ssl/private/server.key"
 }
 
 configure_httpd(){
@@ -229,6 +282,10 @@ SSLProxyProtocol all -SSLv3
 SSLPassPhraseDialog  builtin
 SSLSessionCache        "shmcb:/usr/local/apache2/logs/ssl_scache(512000)"
 SSLSessionCacheTimeout  300
+SSLEngine on
+SSLCertificateFile "/etc/pki/tls/certs/server.crt"
+SSLCertificateKeyFile "/etc/pki/tls/private/server.key"
+SSLCertificateChainFile "/etc/pki/tls/certs/ca.crt"
 EOF
 	podman pull docker.io/library/httpd:latest
 	echo -e "[Unit]
@@ -243,6 +300,9 @@ PublishPort=8443:443
 Network=host
 Volume=%h/.config/var/www:/usr/local/apache2/htdocs:ro,z
 Volume=%h/.config/var/lib/httpd/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro,z
+Volume=%h/.config/var/ssl/certs/server.crt:/etc/pki/tls/certs/server.crt:ro,z
+Volume=%h/.config/var/ssl/private/server.key:/etc/pki/tls/private/server.key:ro,z
+Volume=%h/.config/var/ssl/certs/ca.crt:/etc/pki/tls/certs/ca.crt:ro,z
 Tmpfs=/run
 Tmpfs=/tmp
 Exec=httpd-foreground
@@ -262,8 +322,8 @@ WantedBy=default.target" > ~/.config/containers/systemd/httpd.container
 	echo "Test" > ~/.config/var/www/test.txt
 	sleep 2
 	# Do a curl test here to ensure we have expected output
-	cmd="$(curl localhost:8080/test.txt)"
-	if [[ $cmd == "Test" ]]; then
+	cmd="$(curl -k https://localhost:8443/test.txt 2>/dev/null || curl localhost:8080/test.txt)"
+	if [[ "$cmd" == "Test" ]]; then
 		echo "Test successful, HTTPD server is running!"
 	else
 		echo "HTTPD server is not functional, check container and firewall settings!"
@@ -358,28 +418,6 @@ build_ffmpeg_rpm(){
     echo -e "${GREEN}FFmpeg RPMs available at http://$(hostname -f):8080/rpms/${NC}"
 }
 
-setup_rpm_repository(){
-	echo "Setting up RPM repository..."
-	mkdir -p ~/.config/var/www/rpms
-	find "$waveletdir/rpmbuild/RPMS" -name "*.rpm" -exec cp {} ~/.config/var/www/rpms \; 2>/dev/null || true
-	if command -v createrepo_c &> /dev/null; then
-		echo "Generating repository metadata..."
-		createrepo_c ~/.config/var/www/rpms
-		cat > ~/.config/var/www/rpms/wavelet-local.repo << EOF
-[wavelet-local]
-name=Wavelet Local Repository
-baseurl=http://svr.wavelet.allethrium:8080/rpms/
-enabled=1
-gpgcheck=0
-skip_if_unavailable=1
-EOF
-		echo "Repository configuration file created at ~/.config/var/www/rpms/wavelet-local.repo"
-		generate_package_list
-	else
-		echo -e "${RED}Warning: createrepo_c not found - repository metadata not generated${NC}"
-	fi
-}
-
 configure_registry(){
 	# Sets up the registry
 	mkdir -p "$HOME/.config/containers/systemd/registry/registry.conf.d"
@@ -408,13 +446,28 @@ Restart=always
 WantedBy=multi-user.target" > ~/.config/containers/systemd/registry.container
  	echo -e "[[registry]]
 prefix = \"*.$(dnsdomainname)\"
-location = \"$ip:5000\"
+location = \"http://$ip:5000\"
 insecure = true
 
 [[registry]]
 prefix = \"localhost:5000\"
-location = \"$ip:5000\"
-insecure = true" > ~/.config/containers/systemd/registry/registry.conf.d/01-local-registry.conf
+location = \"http://localhost:5000\"
+insecure = true
+
+[[registry.mirror]]
+location = \"docker.io\"
+
+[[registry.mirror]]
+location = \"quay.io\"
+
+[[registry.mirror]]
+location = \"registry.fedoraproject.org\"" > ~/.config/containers/systemd/registry/registry.conf.d/01-local-registry.conf
+
+	# Create directory for registry certificates
+	mkdir -p ~/.config/containers/certs.d/$ip:5000
+	mkdir -p ~/.config/containers/certs.d/localhost:5000
+	cp ~/.config/var/ssl/certs/ca.crt ~/.config/containers/certs.d/$ip:5000/ca.crt
+	cp ~/.config/var/ssl/certs/ca.crt ~/.config/containers/certs.d/localhost:5000/ca.crt
 	systemctl --user daemon-reload && systemctl --user restart registry.service
 	sleep 2
 	if curl -q "http://$(hostname -f):5000/v2"; then
@@ -433,6 +486,32 @@ check_firewall_ports() {
     echo "  8080/tcp     - HTTPD (http)"
     echo "  8443/tcp     - HTTPD (https)"
     echo "  5355/udp     - LLMNR/DNS-SD"
+}
+
+check_required_packages(){
+    # Check for required packages/tools needed for the build process
+    local missing_packages=()
+
+    # Check for required commands
+    local required_commands=("podman" "openssl" "curl" "wget" "jq" "systemctl")
+    for cmd in "${required_commands[@]}"; do
+        if ! command -v "$cmd" &> /dev/null; then
+            missing_packages+=("$cmd")
+        fi
+    done
+
+    if [[ ${#missing_packages[@]} -gt 0 ]]; then
+        echo -e "${RED}Error: The following required packages/commands are missing:${NC}"
+        for pkg in "${missing_packages[@]}"; do
+            echo -e "  - $pkg"
+        done
+        echo -e "${RED}Please install the required packages and try again.${NC}"
+        echo -e "${GREEN}On Fedora/RHEL/CentOS: dnf install podman openssl curl wget jq createrepo_c${NC}"
+        echo -e "${GREEN}On Ubuntu/Debian: apt-get install podman openssl curl wget jq createrepo-c${NC}"
+        exit 1
+    else
+        echo -e "${GREEN}All required packages and commands are available.${NC}"
+    fi
 }
 
 detect_fcos_version(){
@@ -466,7 +545,7 @@ exec >"$waveletdir/logs/build_registry.log" 2>&1
 #  	exit 1
 #fi
 
-if [[ $(hostname) == "localhost" ]]; then
+if [[ "$(hostname)" == "localhost" ]]; then
 	echo -e "${RED}Your machine seems to be called localhost"
 	echo -e "This will result in the wavelet server being unable to contact the registry."
 	echo -e "Please rename your system to something unique using hostnamectl or by editing /etc/hostname before proceding.${NC}"
@@ -501,6 +580,13 @@ if [[ -z "$waveletdir" ]]; then
   exit 1
 fi
 
+if [[ ! -f "$HOME/.config/var/ssl/certs/ca.crt" ]]; then
+	generate_self_signed_certs
+fi
+
+# Check for required packages
+check_required_packages
+
 configure_registry
 configure_httpd
 # Registry seems problematic unless restarted twice?
@@ -530,16 +616,18 @@ mkdir -p "$ffmpeg_rpms_dir"
 cp "$output_dir"/ffmpeg-${ffmpeg_version}-*.fc${FCOS_VERSION}.x86_64.rpm "$ffmpeg_rpms_dir/" 2>/dev/null || true
 cp "$output_dir"/ffmpeg-libs-${ffmpeg_version}-*.fc${FCOS_VERSION}.x86_64.rpm "$ffmpeg_rpms_dir/" 2>/dev/null || true
 
+
 # Build the OCI container layers for the client, then utilize that as a base for the server layer.
-build_container_image "coreos_overlay_client" "Containerfile.coreos.overlay.client"
-build_container_image "coreos_overlay_server" "Containerfile.coreos.overlay.server"
+# Check if containers already exist in registry before building
+build_container_image_if_needed "coreos_overlay_client" "Containerfile.coreos.overlay.client"
+build_container_image_if_needed "coreos_overlay_server" "Containerfile.coreos.overlay.server"
 
 # Build additional container images.  Many of these had to be from-scratch due to limitations in the official containers.
-build_container_image "tftpd" "Containerfile.tftpd"
-build_container_image "tftpboot" "Containerfile.tftpboot"
-build_container_image "isc-kea" "Containerfile.isc-kea"
-build_container_image "radiusd" "Containerfile.radiusd"
-build_container_image "php-fpm-redis" "Containerfile.php-fpm-redis"
+build_container_image_if_needed "tftpd" "Containerfile.tftpd"
+build_container_image_if_needed "tftpboot" "Containerfile.tftpboot"
+build_container_image_if_needed "isc-kea" "Containerfile.isc-kea"
+build_container_image_if_needed "radiusd" "Containerfile.radiusd"
+build_container_image_if_needed "php-fpm-redis" "Containerfile.php-fpm-redis"
 
 pull_registry_images
 echo -e "${GREEN}Registry base images generated and stored in the registry on this host."

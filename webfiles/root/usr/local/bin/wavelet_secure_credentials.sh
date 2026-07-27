@@ -37,28 +37,19 @@ init_secure_storage() {
     local user_context="$1"
     # Create secure runtime directories
     RUNTIME_CREDS_DIR="/run/user/$(id -u)/wavelet"
-    SHARED_MEMORY_DIR="/dev/shm/wavelet-$$"
+    # Use mktemp -d for secure, unpredictable temporary directory instead of predictable /dev/shm/wavelet-$$ path
+    SHARED_MEMORY_DIR="$(mktemp -d -t wavelet-creds-XXXXXX)"
     mkdir -p "${RUNTIME_CREDS_DIR}" "${SHARED_MEMORY_DIR}"
     chmod 700 "${RUNTIME_CREDS_DIR}" "${SHARED_MEMORY_DIR}"
-    # Mount tmpfs for extra security if possible
-    if mountpoint -q "${SHARED_MEMORY_DIR}" 2>/dev/null; then
-        :  # Already mounted
-    else
-        mount -t tmpfs -o size=1M,mode=700,uid="$(id -u)",gid="$(id -g)" tmpfs "${SHARED_MEMORY_DIR}" 2>/dev/null || {
-            # Fallback to regular directory with strict permissions
-            chmod 700 "${SHARED_MEMORY_DIR}"
-        }
-    fi
 }
 
 cleanup_secure_storage() {
   # Secure cleanup of all credential storage
   # Memory-mapped secure storage for runtime credentials
   RUNTIME_CREDS_DIR="/run/user/$(id -u)/wavelet"
-  SHARED_MEMORY_DIR="/dev/shm/wavelet-$$"
-  if [[ -d "${SHARED_MEMORY_DIR}" ]]; then
+  # SHARED_MEMORY_DIR is now set by init_secure_storage via mktemp -d
+  if [[ -n "${SHARED_MEMORY_DIR}" && -d "${SHARED_MEMORY_DIR}" ]]; then
     find "${SHARED_MEMORY_DIR}" -type f -exec shred -vfz -n 3 {} \; 2>/dev/null
-    umount "${SHARED_MEMORY_DIR}" 2>/dev/null || true
     rm -rf "${SHARED_MEMORY_DIR}"
   fi
   if [[ -d "${RUNTIME_CREDS_DIR}" ]]; then
@@ -124,7 +115,7 @@ encrypt_credential() {
 			"wavelet") chown wavelet:wavelet "${key_file}" "${cred_file}" ;;
 			# I REALLY do not like these have to be world-readable for the PHP process in the container to access them.
 			# It may be better all around to copy them into the container rather than attempt volume mount.
-			"webui") chown wavelet:wavelet "${key_file}" "${cred_file}"; chmod 0644 ;;
+			"webui") chown wavelet:wavelet "${key_file}" "${cred_file}"; chmod 0644 "${key_file}" "${cred_file}" ;;
         esac
         echo "    Credential: '${credential_name}' encrypted successfully for user: ${user_context}" >> "${log_file}"
         return 0
@@ -307,7 +298,7 @@ create_secure_etcd_wrapper() {
 		# Note the subshell ()
 		(
 			generate_etcd_userarg "user=\$USER_CONTEXT" "extraargs=\$ADDITIONAL_ARGS"
-			if [[ $? -ne 0 ]]; then
+			if [[ \$? -ne 0 ]]; then
 				echo "Failed to generate etcd credentials" >&2
 				exit 1
 			fi

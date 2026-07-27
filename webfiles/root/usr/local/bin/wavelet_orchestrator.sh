@@ -575,7 +575,7 @@ resolve_group_source_for_host(){
 audio_toggle(){
 	# TBD - update for group primitives
 	KEYNAME="/UI/audio"; read_etcd_global
-	if [[ "${printvalue}" -ne 0 ]]; then
+	if [[ "${printvalue}" != "0" ]]; then
 		audioLevel="1.00"
 	else
 		audioLevel="0.00"
@@ -627,7 +627,7 @@ bluetooth_connect(){
 	KEYNAME="/audio/bluetooth_connect_notify"; KEYVALUE="0"; write_etcd_global
 	# check to see if audio is even enabled, if not, we exit 0
 	KEYNAME="/UI/TOGGLES/BLUETOOTH"; read_etcd_global
-	if [[ "${printvalue}" -eq "0" ]]; then
+	if [[ "${printvalue}" == "0" ]]; then
 	echo -e "\nAudio bit is not enabled, disabling bluetooth and exiting\n"
 	echo -e 'power off\n' | bluetoothctl
 	exit 0
@@ -675,6 +675,11 @@ update_host_config_key() {
 	local short_hostNameSys="${hostNameSys%%.*}"
 	local configKey="$1"
 	local configValue="$2"
+	# Validate configValue to prevent sed injection (reject / and newlines)
+	if [[ "$configValue" == *"/"* ]] || [[ "$configValue" == *$'\n'* ]] || [[ "$configValue" == *$'\r'* ]]; then
+		echo "	ERR: Invalid characters in configValue, rejecting!"
+		exit 0
+	fi
 	# Update the corresponding variable based on configKey
 	case "$configKey" in
 		HOST_IP)
@@ -694,7 +699,11 @@ update_host_config_key() {
 			;;
 	esac
 	local configFile="/var/home/wavelet/config/$keyHostName.conf"
+	local lockFile="/var/home/wavelet/config/$keyHostName.conf.lock"
 	echo "Updating conf file $configFile"
+	# Acquire file lock to prevent concurrent modifications
+	exec 200>"$lockFile"
+	flock -x 200
 	# Find the key in our config file and update it
 	# sed replace the line starting with "export $configKey=" to the updated value.
 	if grep -q "^export $configKey=" "$configFile"; then
@@ -702,6 +711,8 @@ update_host_config_key() {
 	else
 		echo "export $configKey=\"$configValue\"" >> "$configFile"
 	fi
+	# Release file lock
+	flock -u 200
 	# Upload the client config
 	upload_client_config
 }
@@ -748,6 +759,10 @@ update_host_config_full() {
 	local newVersion=1
 	# Here, we build the file contents properly.
 	local configFile="/var/home/wavelet/config/$keyHostName.conf"
+	local lockFile="/var/home/wavelet/config/$keyHostName.conf.lock"
+	# Acquire file lock to prevent concurrent modifications
+	exec 200>"$lockFile"
+	flock -x 200
 	cat > "$configFile" <<-EOF
 		export CLUSTER_ID="$CLUSTER_ID"
 		export PRIMARY_GROUPHASH="$PRIMARY_GROUPHASH"
@@ -760,6 +775,8 @@ update_host_config_full() {
 		export INPUT_DEVICE_PRESENT="$INPUT_DEVICE_PRESENT"
 		export MOD_REVISION="$newVersion"
 	EOF
+	# Release file lock
+	flock -u 200
 	upload_client_config
 	# Populate our vars encase this was initial config and we are running through new_host subsequently.
 	hostHash="$CLIENT_HOSTHASH"

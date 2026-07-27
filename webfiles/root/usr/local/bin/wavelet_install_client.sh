@@ -413,9 +413,6 @@ chown wavelet:wavelet /var/log/wavelet
 # Ensure other system services are active
 systemctl enable certmonger.service --now
 
-# We check our cores and run system optimizations if necessary
-/usr/local/bin/wavelet_system_optimize.sh
-
 install_security_layer
 configure_firewall
 

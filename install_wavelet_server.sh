@@ -22,6 +22,20 @@ init_users_yaml() {
 EOF
 }
 
+ca_data_yaml() {
+	# TODO ensure this data object is available on the local httpd server after build_registry.sh
+	# TODO ensure this works.
+	cat <<EOF > ca_data_yaml
+ignition:
+  security:
+    tls:
+      certificate_authorities:
+        # The only CA the decoders should have is the server's Domain Controller CA.
+        - source: http://${DEPLOYMENT_REGISTRY}:8080/ca.crt
+          verification:
+            hash: ${caHash}
+EOF
+}
 generate_user_yaml(){
 	local name; local password_hash; local ssh_authorized_keys
 	name=$1
@@ -265,36 +279,72 @@ download_wavelet_git(){
 	else
     	GH_BRANCH="master"
 	fi
-	if curl -s -L -o "$HOME/.config/var/www/$GH_BRANCH.tar.gz" \
-		"https://github.com/Allethrium/wavelet/archive/refs/heads/$GH_BRANCH.tar.gz"; then
-		echo "	Acquired wavelet tarball, proceeding.."
-	else
-		echo "	Error downloading wavelet tarball!  aborting!"
-		echo "	Please check this user's write permissions to ~/.config/var/www"
+
+	# Fetch the commit SHA for the branch from GitHub API
+	local branchInfo
+	branchInfo=$(curl -s -L --max-time 30 "https://api.github.com/repos/Allethrium/wavelet/branches/$GH_BRANCH")
+	local commitSha
+	commitSha=$(echo "$branchInfo" | grep -oP '"sha":\s*"\K[0-9a-f]{40}' | head -1)
+	if [[ -z "$commitSha" ]]; then
+		echo "	Error: Could not fetch commit SHA for branch $GH_BRANCH from GitHub API!"
 		exit 1
 	fi
+	echo "	Branch $GH_BRANCH commit SHA: $commitSha"
+	# Check if we have a cached tarball with matching SHA
+	local cached_tarball="$HOME/.config/var/www/${GH_BRANCH}_cached.tar.gz"
+	local cached_sha_file="$HOME/.config/var/www/${GH_BRANCH}_sha256.txt"
+	if [[ -f "$cached_tarball" ]] && [[ -f "$cached_sha_file" ]]; then
+		cached_sha=$(cat "$cached_sha_file")
+		if [[ "$cached_sha" == "$commitSha" ]]; then
+			echo "	Using cached wavelet tarball with matching commit SHA: $commitSha"
+			cp "$cached_tarball" "$HOME/.config/var/www/$GH_BRANCH.tar.gz"
+			echo "	Acquired wavelet tarball from cache, proceeding.."
+			return 0
+		fi
+	fi
+
+	# Determine download source: local deployment server (HTTPS) or GitHub (HTTPS)
+	local download_url
+	if [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
+		download_url="https://${DEPLOYMENT_REGISTRY%%:*}:8443/${GH_BRANCH}.tar.gz"
+		# Use --insecure for self-signed certificate on local deployment server
+		if curl -s -k -L -o "$HOME/.config/var/www/$GH_BRANCH.tar.gz" "$download_url"; then
+			echo "	Acquired wavelet tarball from local deployment server, proceeding.."
+		else
+			echo "	Error downloading wavelet tarball from local deployment server!  aborting!"
+			echo "	Please check this user's write permissions to ~/.config/var/www"
+			exit 1
+		fi
+	else
+		download_url="https://github.com/Allethrium/wavelet/archive/refs/heads/$GH_BRANCH.tar.gz"
+		if curl -s -L -o "$HOME/.config/var/www/$GH_BRANCH.tar.gz" "$download_url"; then
+			echo "	Acquired wavelet tarball, proceeding.."
+		else
+			echo "	Error downloading wavelet tarball!  aborting!"
+			echo "	Please check this user's write permissions to ~/.config/var/www"
+			exit 1
+		fi
+	fi
+
+	# Compute SHA256 of the downloaded tarball
+	local tarballSha256
+	tarballSha256=$(sha256sum "$HOME/.config/var/www/$GH_BRANCH.tar.gz" | cut -d' ' -f1)
+	echo "	Tarball SHA256: $tarballSha256"
+
+	# Cache the tarball and its commit SHA
+	cp "$HOME/.config/var/www/$GH_BRANCH.tar.gz" "$cached_tarball"
+	echo "$commitSha" > "$cached_sha_file"
 }
 
 check_and_update_ultragrid_continuous(){
-	# Checks the UltraGrid continuous build checksum from GitHub against a cached local copy.
-	# Downloads and overwrites the local file if the remote checksum differs (new release).
-	local ug_release_repo="${UG_RELEASE_REPO:-CESNET/UltraGrid}"
+	# Checks the UltraGrid continuous build checksum against a cached local copy.
+	# Downloads and overwrites the local file if the local checksum differs or file is missing.
+	local ug_release_repo="${UG_RELEASE_REPO:-armelvil/UltraGrid}"
 	local ug_download_url="https://github.com/${ug_release_repo}/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage"
 	local ug_cached_checksum="/var/home/wavelet/config/.ultragrid_continuous.sha256"
 	local ug_local_file="${WAVELET_HTTP_DIR:-/home/wavelet/http}/UltraGrid-continuous-x86_64.AppImage"
-	local remote_sha256=""
 	local local_sha256=""
-	# Fetch the latest release page to extract the SHA-256 of the continuous build
-	echo "	Checking UltraGrid continuous build checksum from GitHub..."
-	remote_sha256=$(curl -sL --max-time 30 \
-		"https://api.github.com/repos/${ug_release_repo}/releases/tags/continuous" | \
-		grep -oP '"sha256":\s*"\K[^"]+' || true)
-	if [[ -z "$remote_sha256" ]]; then
-		echo -e "	${RED}	WARNING: Could not fetch UltraGrid continuous checksum from GitHub.${NC}"
-		echo -e "	Continuing with existing local build."
-		return 0
-	fi
-	echo -e "	Remote checksum: ${remote_sha256}"
+
 	# Check if the local file exists and compute its checksum
 	if [[ ! -f "$ug_local_file" ]]; then
 		echo -e "	${GREEN}	UltraGrid continuous build not found locally. Downloading...${NC}"
@@ -306,25 +356,34 @@ check_and_update_ultragrid_continuous(){
 		fi
 		chmod +x "$ug_local_file"
 		local_sha256=$(sha256sum "$ug_local_file" | cut -d' ' -f1)
-		echo "$remote_sha256" > "$ug_cached_checksum"
-		echo -e "	${GREEN}	UltraGrid continuous build downloaded and cached.${NC}"
+		echo "$local_sha256" > "$ug_cached_checksum"
+		echo -e "	${GREEN}	UltraGrid continuous build downloaded and cached with checksum: ${local_sha256}${NC}"
 		return 0
 	fi
+
+	# Compute local checksum and compare with cached checksum
 	local_sha256=$(sha256sum "$ug_local_file" | cut -d' ' -f1)
-	echo -e "	Local checksum:  ${local_sha256}"
-	if [[ "$remote_sha256" == "$local_sha256" ]]; then
-		echo -e "	${GREEN}	UltraGrid continuous build is up to date.${NC}"
-		return 0
+
+	if [[ -f "$ug_cached_checksum" ]]; then
+		cached_sha256=$(cat "$ug_cached_checksum")
+		echo -e "	Local checksum:  ${local_sha256}"
+		echo -e "	Cached checksum: ${cached_sha256}"
+		if [[ "$local_sha256" == "$cached_sha256" ]]; then
+			echo -e "	${GREEN}	UltraGrid continuous build is verified and up to date.${NC}"
+			return 0
+		fi
 	fi
-	echo -e "	${RED}	UltraGrid checksum mismatch! New version available. Downloading...${NC}"
+
+	echo -e "	${RED}	UltraGrid checksum mismatch or no cached checksum! New version available. Downloading...${NC}"
 	curl -sL --max-time 120 -o "$ug_local_file" "$ug_download_url"
 	if [[ $? -ne 0 ]]; then
 		echo -e "	${RED}	Error downloading UltraGrid continuous build! Aborting.${NC}"
 		exit 1
 	fi
 	chmod +x "$ug_local_file"
-	echo "$remote_sha256" > "$ug_cached_checksum"
-	echo -e "	${GREEN}	UltraGrid continuous build updated successfully.${NC}"
+	local_sha256=$(sha256sum "$ug_local_file" | cut -d' ' -f1)
+	echo "$local_sha256" > "$ug_cached_checksum"
+	echo -e "	${GREEN}	UltraGrid continuous build updated successfully with new checksum: ${local_sha256}${NC}"
 }
 
 parse_config_file() {
@@ -390,7 +449,7 @@ for i in "$@"
 				print_help;	exit 0
 				;;
 			-p=*|--password=*|--pass=*)
-				# TODO - split to SU and wavelet user options
+				# TODO - split to SU and wavelet user options so we get different passwords.  LATER.  right now we are still labbing!
 				PASSWORD=${i#*=}; echo -e "	Password defined for BOTH user accounts as: ${PASSWORD}";
 				;;
 			-ws=*|--wifissid=*)
@@ -499,10 +558,27 @@ if [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
 	rm -f ignition_files/wavelet_keys.csv
 	echo "type,path,mode,overwrite,owner,group,content" >> ignition_files/wavelet_keys.csv
 	sed -i "s|192.168.1.32:5000|$DEPLOYMENT_REGISTRY|g" $INPUTFILES
-	sed -i "s|192.168.1.32:8080|${DEPLOYMENT_REGISTRY%%:*}:8080|g" $INPUTFILES
-	sed -i "s|https://github.com/Allethrium/wavelet/archive/refs/heads/master.tar.gz|http://${DEPLOYMENT_REGISTRY%%:*}:8080/master.tar.gz|g" $INPUTFILES
+	sed -i "s|192.168.1.32:8080|${DEPLOYMENT_REGISTRY%%:*}:8443|g" $INPUTFILES
+	sed -i "s|https://github.com/Allethrium/wavelet/archive/refs/heads/master.tar.gz|https://${DEPLOYMENT_REGISTRY%%:*}:8443/master.tar.gz|g" $INPUTFILES
 	# Set UltraGrid to local LAN server, which ought to have both builds if build_registry.sh worked as it should.
-	sed -i "s|https://github.com/CESNET/UltraGrid/releases/download/v1.10.5/UltraGrid-1.10.5-x86_64.AppImage|http://${DEPLOYMENT_REGISTRY%%:*}:8080/UltraGrid-1.10.5-x86_64.AppImage|g" $INPUTFILES
+	sed -i "s|https://github.com/CESNET/UltraGrid/releases/download/v1.10.5/UltraGrid-1.10.5-x86_64.AppImage|https://${DEPLOYMENT_REGISTRY%%:*}:8443/UltraGrid-1.10.5-x86_64.AppImage|g" $INPUTFILES
+
+	# Add CA certificate to wavelet_keys.csv for CoreOS to trust the deployment server's self-signed certificate
+	if [[ -f "$HOME/.config/var/ssl/certs/ca.crt" ]]; then
+		# Add the CA to ignition folder
+		cp "$HOME/.config/var/ssl/certs/ca.crt" "ignition_files/ca.crt"
+		# Compute SHA256 hash of the CA certificate
+		caHash="sha256-$(sha256sum "$HOME/.config/var/ssl/certs/ca.crt" | cut -d' ' -f1)"
+		# Generate base64-encoded data URI for the CA certificate
+		ca_base64=$(base64 -w 0 "$HOME/.config/var/ssl/certs/ca.crt")
+		ca_data_uri="data:text/plain;base64,${ca_base64}"
+		# Replace placeholders in server ignition file for certificateAuthorities
+		ca_data_yaml
+    	ca_block="$(cat ca_data_yaml)"
+    	awk -vca_block="$ca_block" '/# Comment_tag_CA/{print ca_block;next}1' \
+    		./server_custom.yml > tmp && mv tmp ./server_custom.yml
+    	sed -i "s|https://DEPLOYMENT_SERVER/ca.crt|https://$DEPLOYMENT_REGISTRY:8080/ca.crt|g" ./server_custom.yml
+	fi
 	download_wavelet_git
 else
 	echo "	Local registry option not defined, running standalone setup.."
@@ -515,6 +591,11 @@ else
 	# Note the nameserver must later be removed because it will interfere with DNS during spinup
 	echo "	Setting nameserver to gateway 9.9.9.9 for simple DNS resolution during initial setup.."
 	sed -i "s|#nameserver|- nameserver=9.9.9.9|g" $INPUTFILES
+	# Remove the security.tls.certificateAuthorities section for standalone setup
+	# The server will use its domain CA (FreeIPA) that gets provisioned during the second boot
+	sed -i '/^security:/,/^storage:/d' $INPUTFILES
+	# Also remove any orphaned 'ignition:' lines that might be left
+	sed -i '/^ignition:/d' $INPUTFILES
 fi
 
 echo "	Dev mode is now enabled by default due to the need for running a patched UltraGrid AppImage.."

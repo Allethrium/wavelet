@@ -122,8 +122,8 @@ destroy_host_role() {
 	fi
 	clientHostNameShort="${targetHostName:0:7}"
 	if [[ -z $clientHostNameShort ]]; then
-		echo "	ERR:  Client host name isn't present!  Attempting fallback.."
-
+		echo "	ERR:  Client host short name is empty or invalid, cannot proceed with deprovisioning!"
+		exit 1
 	fi
 	echo "  Cleaning up user+Roles.." >> "/var/home/$user/logs/etcdlog.log"
 	cmd="user del $clientHostNameShort"; execute_etcd_cmd "$cmd"

@@ -186,6 +186,12 @@ generate_systemd_unit(){
 	# Grab our inputVars.
 	if [[ "$hostNameSys" = *"svr"* ]]; then
 		KEYNAME="/HOSTS/$hostNameSys/server_commands"; read_etcd_global; serverInputvar="$(base64 -d <<<"$printvalue")"
+		# Reject newlines/control chars to prevent systemd unit injection
+		if [[ "$serverInputvar" =~ [$'\n\r\t'] ]] || [[ ! "$serverInputvar" =~ ^[a-zA-Z0-9_./\-:]+$ ]]; then
+			echo "	ERR: Invalid characters in decoded serverInputvar, rejecting!"
+			KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="ERR: Invalid serverInputvar"; write_etcd_global &
+			unset serverInputvar
+		fi
 	else
 		# Zero that out so nothing will be populated
 		unset serverInputvar

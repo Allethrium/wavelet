@@ -69,25 +69,39 @@ etcd_create_roles(){
 }
 
 generate_tftpboot() {
+	local max_retries=3
+	local retry_count=${1:-0}
 	# The Containerfile will generate an output direct to /var/lib/tftpboot with a populated set of UEFI secure boot files.
 	# Note that the shim may only load if the client host's BIOS/EFI is set to OS:Other -
 	# the shim may not work with the microsoft defaults on some machines without complaints.
+	# NOTE: --privileged is used here to allow the container to access network/boot files and generate the tftpboot directory structure.
+	# This is necessary for the tftpboot generation process but should be documented as a security consideration.
+	if [[ "$retry_count" -ge "$max_retries" ]]; then
+		echo "	ERR: TFTPboot generation failed after $max_retries attempts, aborting."
+		return 1
+	fi
 	if [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
 		echo "	Pulling prebuilt container image from LAN registry server.."
-		if podman run --tls-verify=false --privileged --security-opt label=disable -v /var/lib:/tmp/ "$DEPLOYMENT_REGISTRY:5000/tftpboot"; then
+		if podman run --privileged --security-opt label=disable -v /var/lib:/tmp/ "$DEPLOYMENT_REGISTRY:5000/tftpboot"; then
 			echo "	TFTPboot directory generated! Continuing.."
+			return 0
 		else
 			echo "	ERR:  issue pulling container.  Attempting to build tftpboot container image and execute locally.."
-			generate_tftpboot
+			(( retry_count++ ))
+			generate_tftpboot "$retry_count"
+			return $?
 		fi
 	else
 		echo "	Building tftpboot container image and executing.."
 		if podman build --tag tftpboot -f /home/wavelet/containerfiles/Containerfile.tftpboot; then
 			podman run --privileged --security-opt label=disable -v /var/lib:/tmp/ "tftpboot"
+			return 0
 		else
 			# This cannot be a failable step
 			echo "	TFTPboot generation failed!  Attempting again!"
-			generate_tftpboot
+			(( retry_count++ ))
+			generate_tftpboot "$retry_count"
+			return $?
 		fi
 	fi
 	# Grub aarch64 boot option (just here as placeholder)
@@ -109,8 +123,22 @@ pull_coreos_files() {
 		kernel=""; rootfs=""; initrd=""
 		while IFS= read -r line; do
 			filename="$(basename "$line")"
+			# Include .sig files for verification
 			if [[ "$filename" == *.sig ]]; then
-				continue # skip line
+				# Download .sig files as well
+				sigFile="$line"
+				echo "	Downloading signature: $HTTPD_SERVER/$sigFile"
+				rm -rf "$dir/${sigFile##*/}"
+				(
+					until curl -f \
+					-o "$dir/$(basename "$sigFile")" \
+					--retry 3 --retry-delay 1 \
+					"$HTTPD_SERVER/$sigFile"; do
+						sleep .1;
+					done
+				) &
+				pids+=($!)
+				continue
 			fi
 			case "$(basename "$line")" in
                 *live-rootfs*.img)	rootfs="$line"; files+=("$line");;
@@ -138,16 +166,16 @@ pull_coreos_files() {
 		for pid in "${pids[@]}"; do
 			wait "$pid"
 		done
-		localFile=${file##*/}
 		chown -R wavelet:wavelet "/var/home/wavelet/http/pxe"
 	else
 		echo "	Attempting to pull CoreOS images from internet sources.."
 		# This can fail, hence gets it's own function with a retry
 		# We need to "jog" DNS resolution
 		ping -c 4 quad9.org
+		# Download using coreos-installer (signature verification is enabled by default, use --insecure to disable)
 		podman run --security-opt label=disable --pull=always --rm -v .:/data -w /data \
 			"$(hostname -f)/coreos-installer:latest" download -f pxe
-		echo "	CoreOS Image files downloaded, continuing to generate client machine ISO files.."
+		echo "	CoreOS Image files downloaded with default signature verification, continuing to generate client machine ISO files.."
 	fi
 	# Check the generated files exist
 	coreosVersion="$(find $dir/*fedora* | head -n 1)"
@@ -265,6 +293,8 @@ generate_bootc_image() {
 		--tag "$bootc_image_name" \
 		-f /home/wavelet/containerfiles/Containerfile.bootc-decoder \
 		/home/wavelet/containerfiles/
+	# NOTE: --privileged is used here for the bootc-image-builder container to allow it to build bootable images.
+	# This is necessary for the bootc-image-builder process but should be documented as a security consideration.
 	podman run --rm -it --privileged \
 		-v "$(pwd)":/output \
 		-v /var/lib/containers/storage:/var/lib/containers/storage \
@@ -473,62 +503,130 @@ chown -R wavelet-root:wavelet-root "/var/home/wavelet-root/"
 
 # Generate TFTPBOOT folder along with appropriate entries for our populated boot options
 # We can run this in a parallel subshell as it's independent of the hardening process
+PXE_SUCCESS=0
 (
 	echo "	Generating PXE and UEFI/HTTPS Boot infrastructure in subshell.."
 	mkdir -p "/var/lib/tftpboot/pxelinux.cfg"
 	mkdir -p "/var/home/wavelet/http/pxe/pxelinux.cfg/"
-	mkdir -p "/var/home/wavelet/pxe" && cd "/var/home/wavelet/pxe" || return
+	mkdir -p "/var/home/wavelet/pxe" && cd "/var/home/wavelet/pxe" || exit 1
 	mkdir -p "/var/lib/tftpboot"
 	chmod +x {/var/home/wavelet/pxe,/var/home/wavelet/http,/var/home/wavelet/http/pxe}
-	generate_tftpboot
-	generate_coreos_image
-	configure_tftpboot
+	if ! generate_tftpboot; then
+		echo "	ERR: TFTPboot generation failed, aborting PXE infrastructure setup."
+		exit 1
+	fi
+	if ! generate_coreos_image; then
+		echo "	ERR: CoreOS image generation failed, aborting PXE infrastructure setup."
+		exit 1
+	fi
+	if ! configure_tftpboot; then
+		echo "	ERR: TFTPboot configuration failed, aborting PXE infrastructure setup."
+		exit 1
+	fi
 	# We don't need tftp files to be executable, maybe not even writable..
 	find "/var/lib/tftpboot" -type f -print0 | xargs -0 chmod 644
 	# Restore SElinux contexts or we will get an AVC denial when DHCP attempts to serve tftp requests
 	restorecon -Rv "/var/lib/tftpboot"
 	# Copy EFI files to http pxe
-	cp -R /var/lib/tftpboot/* "/var/home/wavelet/http/pxe"
-	cp "/etc/wavelet.conf" "/var/home/wavelet/http/ignition/wavelet.conf"
-	coreos_systemd_fix
-	chown -R wavelet:wavelet "/var/home/wavelet/http"
-	echo "	Setting PXE_COMPLETE=1 flag in wavelet.conf.."
-	echo "PXE_COMPLETE=1" >> "/etc/wavelet.conf"
+	if ! cp -R /var/lib/tftpboot/* "/var/home/wavelet/http/pxe"; then
+		echo "	ERR: Copying EFI files to http pxe failed, aborting PXE infrastructure setup."
+		exit 1
+	fi
+	if ! cp "/etc/wavelet.conf" "/var/home/wavelet/http/ignition/wavelet.conf"; then
+		echo "	ERR: Copying wavelet.conf to ignition failed, aborting PXE infrastructure setup."
+		exit 1
+	fi
+	if ! coreos_systemd_fix; then
+		echo "	ERR: CoreOS systemd fix failed, aborting PXE infrastructure setup."
+		exit 1
+	fi
+	if ! chown -R wavelet:wavelet "/var/home/wavelet/http"; then
+		echo "	ERR: Setting http ownership failed, aborting PXE infrastructure setup."
+		exit 1
+	fi
+	echo "	PXE infrastructure setup completed successfully."
+	PXE_SUCCESS=1
+	exit 0
 ) &
+PXE_SUBPID=$!
 
+HARDENING_SUBPID=0
 (
 	# Setup Domain Controller, PKI and provision service principals
 	echo "	Calling hardening module to install security layer in subshell.."
-	/usr/local/bin/wavelet_install_hardening.sh > /dev/null 2>&1
+	if ! /usr/local/bin/wavelet_install_hardening.sh > /dev/null 2>&1; then
+		echo "	ERR: Hardening module failed, aborting DC provisioning."
+		exit 1
+	fi
 	# Enable provision watcher for ETCD user RBAC as well as the domain enrollment watcher for generating our initial domain join OTP.
-	machinectl shell wavelet-root@ "$(which bash)" \
-		-c "systemctl --user daemon-reload && systemctl --user enable wavelet_provision.service wavelet_enrollment_watcher.service wavelet_deprovision_watcher.service --now"
-	machinectl shell wavelet-root@ "$(which bash)" \
-		-c "/usr/local/bin/wavelet_configure_radius.sh server"
+	if ! machinectl shell wavelet-root@ "$(which bash)" \
+		-c "systemctl --user daemon-reload && systemctl --user enable wavelet_provision.service wavelet_enrollment_watcher.service wavelet_deprovision_watcher.service --now"; then
+		echo "	ERR: Enabling provision watcher services failed."
+		exit 1
+	fi
+	if ! machinectl shell wavelet-root@ "$(which bash)" \
+		-c "/usr/local/bin/wavelet_configure_radius.sh server"; then
+		echo "	ERR: Configuring RADIUS failed."
+		exit 1
+	fi
 	# Reload systemd daemon and reload registry to cut down on trace logspam
-	systemctl daemon-reload
-	systemctl restart registry.service
+	if ! systemctl daemon-reload; then
+		echo "	ERR: Systemd daemon-reload failed."
+		exit 1
+	fi
+	if ! systemctl restart registry.service; then
+		echo "	ERR: Restarting registry.service failed."
+		exit 1
+	fi
 	# RADIUS seems to have some issues unless manually restarted
-	machinectl shell wavelet-root@ "$(which bash)" \
-		-c "systemctl --user restart freeradius.service"
+	if ! machinectl shell wavelet-root@ "$(which bash)" \
+		-c "systemctl --user restart freeradius.service"; then
+		echo "	ERR: Restarting freeradius.service failed."
+		exit 1
+	fi
 	if [[ -f "/etc/pki/tls/certs/etcd.crt" ]]; then
 		echo "	ETCD Certificate available, continuing to generate ETCD users and roles.."
-		etcd_create_roles
+		if ! etcd_create_roles; then
+			echo "	ERR: ETCD roles creation failed."
+			exit 1
+		fi
 	else
 		echo "	Etcd cert not available, DC provisioning has encountered a fatal error!"
 		echo "	Hardening log is available at:  /var/roothome/logs/"
 		echo "	Please also check IPA logs in /var/freeipa-data/var/log/ for more information"
 		exit 1
 	fi
+	echo "	DC provisioning completed successfully."
+	exit 0
 ) &
+HARDENING_SUBPID=$!
 
-wait
+# Wait for PXE subshell to complete and check its status
+wait $PXE_SUBPID
+PXE_EXIT_STATUS=$?
+if [[ $PXE_EXIT_STATUS -ne 0 ]]; then
+	echo "	ERR: PXE infrastructure setup subshell failed with exit status $PXE_EXIT_STATUS!"
+	exit 1
+fi
+
+# Wait for hardening subshell to complete and check its status
+if [[ $HARDENING_SUBPID -gt 0 ]]; then
+	wait $HARDENING_SUBPID
+	HARDENING_EXIT_STATUS=$?
+	if [[ $HARDENING_EXIT_STATUS -ne 0 ]]; then
+		echo "	ERR: DC provisioning subshell failed with exit status $HARDENING_EXIT_STATUS!"
+		exit 1
+	fi
+fi
 
 echo "	Regenerating decoder ignition files and keys.."
 generate_decoder_ignition
 
 # These two steps require the subshell processes to have completed
 cp "/etc/ipa/ca.crt" "/var/home/wavelet/http/ignition"
+
+# Set PXE_COMPLETE=1 flag in wavelet.conf only after successful completion
+echo "PXE_COMPLETE=1" >> "/etc/wavelet.conf"
 
 # Ensure the wavelet user owns the http folder, and set +x and read perms on http folder and subfolders
 chmod -R 0755 "/var/home/wavelet/http"
