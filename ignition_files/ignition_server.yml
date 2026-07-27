@@ -3,22 +3,22 @@
 # version: 3.5.0
 ---
 variant: fcos
-version: 1.6.0
+version: 1.7.0
 kernel_arguments:
   should_exist:
     # - nosmt
     - preempt=full
     - threadirqs
     - mitigations=off
-    - ip=192.168.1.32::192.168.1.1:255.255.255.0:svr.wavelet.allethrium::on
+    - ip=192.168.1.32::192.168.1.1:255.255.255.0::none
+    - hostname=svr.wavelet.allethrium
     - cpufreq.default_governor=performance
     - nvme_probe_timeout=3
     - nvme_core.default_ps_max_latency_us=200000
-    - rhgb
-    - quiet
-    - splash
-    - rd.neednet=1
-    - rd.timeout=10
+#    - rhgb
+#    - quiet
+#    - splash
+    - rd.timeout=20
 # Comment_tag_CA
 storage:
   disks:
@@ -31,9 +31,9 @@ storage:
           wipe_partition_entry: true
         - number: 4
           label: root
-          size_mib: 0
-          start_mib: 0
-          resize: false
+          size_mib: 65536 # 0
+          #          start_mib: 0
+          resize: true # false
           wipe_partition_entry: true
   filesystems:
     - device: /dev/disk/by-partlabel/boot
@@ -46,16 +46,9 @@ storage:
       wipe_filesystem: true
   files:
     # Setup Ignition Files
-    # Deployment server CA certificate
-    # This is generated from build_registry.sh and is required for TLS to the local httpd+registry
-    - path: /var/ca.crt
-      mode: 0644
-      overwrite: true
-      contents:
-        source: https://DEPLOYMENT_SERVER/ca.crt
     # This is required to spinup the decoder ISO once the server boots.
-    # the local file is relative to --files-dir cmdline option in Butane
-    # The customized decoder yml file which can be modified and regenerated once server provisioned
+    # the local file is relative to the "--files-dir" option in Butane
+    # The customized decoder yml file which can be modified and regenerated once the server provisioned
     - path: /home/wavelet/config/decoder_custom.yml
       mode: 0644
       overwrite: true
@@ -82,7 +75,7 @@ storage:
     - path: /var/wavelet_keys.csv
       mode: 0600
       contents:
-       local: wavelet_keys.csv
+        local: wavelet_keys.csv
     # The conf file, which provides most system configuration data.
     - path: /etc/wavelet.conf
       mode: 0644
@@ -101,7 +94,7 @@ storage:
     - path: /usr/local/bin/wavelet_install_packages.sh
       mode: 0755
       contents:
-       local: wavelet_install_packages.sh
+        local: wavelet_install_packages.sh
     # UltraGrid executable - track latest stable release where possible
     - path: /usr/local/bin/UltraGrid.AppImage
       mode: 0755
@@ -112,7 +105,7 @@ storage:
 # user accounts, passwords and pubkeys (populated from installer)
 passwd:
   users:
-      #ADD_USER_YAML_HERE
+  #ADD_USER_YAML_HERE
 # Configure SYSTEM systemd units
 systemd:
   units:
@@ -125,37 +118,36 @@ systemd:
         Before=getty@tty1.service             
         ConditionFirstBoot=yes
         Wants=network-online.target
-        # Also wait for NM-wait-online so the static IP is actually up
-        After=network-online.target NetworkManager-wait-online.service
-        
+        After=network-online.target
         [Service]
         Type=oneshot
         ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_packages.sh "master.tar.gz" "/var/wavelet_keys.csv"'
         ExecStartPost=-systemctl reboot
-        
         [Install]
         WantedBy=multi-user.target
     # Reboot service
     - name: server-reboot.timer
       enabled: true
       contents: |
-          [Unit]
-          Description=Daily Reboot
-        
-          [Timer]
-          OnCalendar=*-*-* 06:00:00
-        
-          [Install]
-          WantedBy=timers.target
+        [Unit]
+        Description=Daily Reboot
+        [Timer]
+        OnCalendar=*-*-* 06:00:00
+        [Install]
+        WantedBy=timers.target
     # Reboot service timer
     - name: server-reboot.service
       contents: |
-          [Unit]
-          Description=Daily Reboot
-        
-          [Service]
-          Type=simple
-          ExecStart=/usr/bin/systemctl --force reboot
+        [Unit]
+        Description=Daily Reboot
+        [Service]
+        Type=simple
+        ExecStart=/usr/bin/systemctl --force reboot
+    # Mask the coreos partition size services, as we set these arbitrarily above now.
+    - name: coreos-growpart.service
+      mask: true
+    - name: coreos-rootfs.service
+      mask: true
     # Mask docker entirely
     - name: docker.service
       mask: true
@@ -163,6 +155,9 @@ systemd:
       mask: true
     # Mask irqbalance
     - name: irqbalance.service
+      mask: true
+    # Mask networkManager-waitonline
+    - name: NetworkManager-wait-online.service
       mask: true
     # Autologin dropin service
     - name: getty@tty1.service
@@ -172,7 +167,6 @@ systemd:
             [Unit]
             Description=Wait for wavelet packages to install before starting autologin
             After=wavelet_installer.service
-
             [Service]
             # Override Execstart in main unit
             ExecStart=            

@@ -39,7 +39,7 @@ main(){
 	# Get list of hostkeys
     KEYNAME="/HOSTS/"; read_etcd_prefix_list
     while read -r key; do
-       	if [[ -n "$key" ]] && [[ "$key" =~ ^/HOSTS/[^/]+/IP$ ]]; then
+       	if [[ -n "$key" ]] && [[ "$key" =~ ^/HOSTS/[^/]+/control/IP$ ]]; then
            	# Read the IP value from the next line
            	read -r ip
            	if [[ -z "$ip" ]]; then

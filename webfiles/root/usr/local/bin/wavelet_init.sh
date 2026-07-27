@@ -116,7 +116,7 @@ exec > /var/home/wavelet/logs/initialize.log 2>&1
 # Populate available devices
 WAVELET_DETECTV4L_MOD=""
 if [[ -f "/var/wavelet_ramfs/wavelet_detectv4l.sh" ]]; then
-	WAVELET_DETECTV4L_MOD="/var/wavelet_ramfs/etcd_interaction_hooks.sh"
+	WAVELET_DETECTV4L_MOD="/var/wavelet_ramfs/wavelet_detectv4l.sh"
 else
 	WAVELET_DETECTV4L_MOD="/usr/local/bin/wavelet_detectv4l.sh"
 fi

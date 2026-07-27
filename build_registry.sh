@@ -119,26 +119,38 @@ generate_self_signed_certs(){
 	echo -e "Generating self-signed CA and server certificates for HTTPD..."
 	mkdir -p ~/.config/var/ssl/certs
 	mkdir -p ~/.config/var/ssl/private
-
 	# Generate CA private key and certificate
 	openssl genrsa -out ~/.config/var/ssl/private/ca.key 2048 2>/dev/null
 	openssl req -x509 -new -nodes -key ~/.config/var/ssl/private/ca.key \
 		-sha256 -days 3650 -out ~/.config/var/ssl/certs/ca.crt \
 		-subj "/C=US/ST=State/L=City/O=Wavelet/OU=Deployment/CN=Wavelet Deployment CA" 2>/dev/null
-
 	# Generate server private key and certificate signing request
 	openssl genrsa -out ~/.config/var/ssl/private/server.key 2048 2>/dev/null
 	local server_host=$(hostname -f)
+	# Determine server IP address for SAN (fallback to 192.168.1.252 if not available)
+	local server_ip=$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1' | head -n 1)
+	if [ -z "$server_ip" ]; then
+		server_ip="192.168.1.252"
+	fi
 	openssl req -new -key ~/.config/var/ssl/private/server.key \
 		-out ~/.config/var/ssl/private/server.csr \
 		-subj "/C=US/ST=State/L=City/O=Wavelet/OU=Deployment/CN=${server_host}" 2>/dev/null
-
+	# Create extensions file for server certificate with DNS and IP SANs
+	# This allows us to support ignition where DNS isn't yet available in the deployment environment
+	cat > ~/.config/var/ssl/private/server.ext <<-EOF
+		[ v3_ext ]
+		subjectAltName = DNS:${server_host},IP:${server_ip}
+		basicConstraints = CA:FALSE
+		keyUsage = digitalSignature, keyEncipherment
+		extendedKeyUsage = serverAuth
+	EOF
 	# Generate server certificate signed by our CA
 	openssl x509 -req -in ~/.config/var/ssl/private/server.csr \
 		-CA ~/.config/var/ssl/certs/ca.crt -CAkey ~/.config/var/ssl/private/ca.key \
-		-CAcreateserial -out ~/.config/var/ssl/certs/server.crt -days 3650 -sha256 2>/dev/null
-
-	# Ensure CA.crt is available via this httpd server as a data object
+		-CAcreateserial -out ~/.config/var/ssl/certs/server.crt -days 3650 -sha256 \
+		-extfile ~/.config/var/ssl/private/server.ext -extensions v3_ext 2>/dev/null
+	# Ensure CA.crt is available via this httpd server as a file
+	# It is injected to the server ignition as a local file by install_wavelet_server.sh
 	mkdir -p ~/.config/var/www/ssl
 	cp ~/.config/var/ssl/certs/ca.crt ~/.config/var/www/ssl/ca.crt
 	echo -e "	Certificates generated successfully:"
@@ -340,7 +352,13 @@ WantedBy=default.target" > ~/.config/containers/systemd/httpd.container
 		--pull=always \
 		--rm \
 		-v .:/data -w /data \
-		"$REGISTRY_REF" download -f pxe
+		"$REGISTRY_REF" download -s stable -a x86_64 -f pxe
+	# And we need to download the baremetal ISO so our initial install media can get created.
+	podman run --security-opt label=disable \
+		--pull=always \
+		--rm \
+		-v .:/data -w /data \
+		"$REGISTRY_REF" download -s stable -a x86_64 -p metal -f raw.xz
 	cd "$waveletdir" || return
 }
 
@@ -446,13 +464,13 @@ Restart=always
 WantedBy=multi-user.target" > ~/.config/containers/systemd/registry.container
  	echo -e "[[registry]]
 prefix = \"*.$(dnsdomainname)\"
-location = \"http://$ip:5000\"
-insecure = true
+location = \"https://$ip:5000\"
+insecure = false
 
 [[registry]]
 prefix = \"localhost:5000\"
-location = \"http://localhost:5000\"
-insecure = true
+location = \"https://localhost:5000\"
+insecure = false
 
 [[registry.mirror]]
 location = \"docker.io\"

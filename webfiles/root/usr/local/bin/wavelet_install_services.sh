@@ -368,6 +368,8 @@ generate_decoder_ignition(){
 	# Generates the decoder ignition with wavelet_decoder_keys.csv
 	# Ensure the CA is available for injection into the decoder.ign
 	cp "/etc/ipa/ca.crt" "/var/home/wavelet/config/"
+	# Generate the CA sha256 hash
+	caHash="$(sha256sum <"/etc/ipa/ca.crt" | tr -d \"[:space:]-\")"
 	cat > /var/home/wavelet/config/wavelet_decoder_keys.csv <<-EOF
 		type,path,mode,overwrite,owner,group,content
 		file,/etc/systemd/logind.conf.d/inhibit-suspend.conf,0644,,,[Login]\nHandleLidSwitch=ignore
@@ -387,6 +389,8 @@ generate_decoder_ignition(){
 	EOF
 	echo -e "  \nRegenerating decoder.ign with enrollment and provision credentials.."
 	sed -i "s|#hostname#|$DOMAIN|g" /var/home/wavelet/config/decoder_custom.yml
+	# Add the verification hash
+	sed -i "s|wavelet_dc1_caHash|sha256-$caHash|g" /var/home/wavelet/config/decoder_custom.yml
 	# Embed the expected SHA512 hash of the wavelet archive.  wavelet_installer_update should alter this value on new git pulls.
 	#sed -i "s|#waveletFilesVerificationHash|sha512-$(cat /var/secrets/waveletFiles_sha512.txt)|g" /var/home/wavelet/config/decoder_custom.yml
 	butane --pretty --files-dir "/var/home/wavelet/config/" "/var/home/wavelet/config/decoder_custom.yml" \

@@ -2,10 +2,16 @@
 for i in "$@"
 	do
 		case $i in
-			"mode=iso") echo -e "	Running in network isolation mode, enabling kargs for faster provisioning..\n"	;	isoMode="1"
-			;;
-			*)			echo -e "	Initial Setup mode running, configuring Server ISO File..\n"			;	serverMode="1"
-			;;
+			"mode=iso")
+				echo -e "	Running in network isolation mode, enabling kargs for faster provisioning..\n"
+				isoMode="1"
+				;;
+			deploy=*)
+				DEPLOYMENT_SERVER="${i#*=}"
+				;;
+			*)
+				echo -e "	Initial Setup mode running, configuring Server ISO File..\n"
+				;;
 		esac
 done
 
@@ -21,12 +27,28 @@ echo -e "\n	**	Note: Put the drive controller for target devices in AHCI mode fr
 # automated_installer process now autodetects the system's drive for installation - this arg is just here as a placeholder now.
 DESTINATION_DEVICE="/dev/nvme0n1"
 FILEPREFIX="fedora-coreos-"
-if ls ./$FILEPREFIX* > /dev/null 2>&1; then
-	echo "	CoreOS image already exists."
-	:
+
+if [[ -n "$DEPLOYMENT_SERVER" ]]; then
+	# A deployment server already has the ISO available, we use that
+	REGISTRY_DIR="${HOME}/.config/var/www"
+else
+	REGISTRY_DIR="$(pwd)"
+	# Check if CoreOS files already exist in the registry directory
+	if ls "$REGISTRY_DIR"/$FILEPREFIX* > /dev/null 2>&1; then
+		echo "	CoreOS images/components already exist in the registry."
 	else
-	echo -e "\n	No ISO found, downloading CoreOS ISO from internet, please be patient while this task executes..\n"
-	coreos-installer download -s stable -a x86_64 -p metal -f iso
+		echo -e "\n	No CoreOS files found in registry, downloading CoreOS metal raw image from internet, please be patient while this task executes..\n"
+		# Using the podman container for consistency with build_registry.sh
+		# Downloading raw.xz is typically better for automated disk imaging than ISO
+		REGISTRY_REF="quay.io/coreos/coreos-installer:latest"
+		podman run --security-opt label=disable \
+			--pull=always \
+			--rm \
+			-v /tmp:/data -w /data \
+			"$REGISTRY_REF" download -s stable -a x86_64 -p metal -f raw.xz
+		# Move the downloaded raw.xz to the registry directory for future use
+		mv /tmp/fedora-coreos-*.raw.xz "$REGISTRY_DIR/" 2>/dev/null || true
+	fi
 fi
 
 # Find Image file and generate ignition files utilizing Butane

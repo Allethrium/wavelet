@@ -30,12 +30,14 @@ ignition:
   security:
     tls:
       certificate_authorities:
-        # The only CA the decoders should have is the server's Domain Controller CA.
-        - source: http://${DEPLOYMENT_REGISTRY}:8080/ca.crt
+        # This is only for the server deploying against a local httpd/registry.
+        - local: ca.crt
           verification:
-            hash: ${caHash}
 EOF
+# pull the verification for now..
+#             hash: ${caHash}
 }
+
 generate_user_yaml(){
 	local name; local password_hash; local ssh_authorized_keys
 	name=$1
@@ -178,7 +180,8 @@ EOF
 
 	# Customize launching kernel args, this will accelerate the bootup as NetworkManager-wait-online won't hang for 30+s
 	echo "	Applying kernel args: ip=${svr_ip}::${gateway}:${subnet}:${serverHostName}::on"
-	sed -i "s|ip=192.168.1.32::192.168.1.1:255.255.255.0:svr.wavelet.allethrium::on|ip=${svr_ip}::${gateway}:${subnet}:${serverHostName}::on|g" ${INPUTFILES}
+	sed -i "s|ip=192.168.1.32::192.168.1.1:255.255.255.0::on|ip=${svr_ip}::${gateway}:${subnet}::on|g" ${INPUTFILES}
+	sed -i "s|hostname=svr.wavelet.allethriudm|hostname=${serverHostName}|g" ${INPUTFILES}
 	mkdir -p var
 	for file in ${INPUTFILES}; do
 	  cat $file > var/generated_$file
@@ -567,6 +570,7 @@ if [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
 	if [[ -f "$HOME/.config/var/ssl/certs/ca.crt" ]]; then
 		# Add the CA to ignition folder
 		cp "$HOME/.config/var/ssl/certs/ca.crt" "ignition_files/ca.crt"
+		cp "$HOME/.config/var/ssl/certs/ca.crt" "$HOME/.config/var/www/ca.crt"
 		# Compute SHA256 hash of the CA certificate
 		caHash="sha256-$(sha256sum "$HOME/.config/var/ssl/certs/ca.crt" | cut -d' ' -f1)"
 		# Generate base64-encoded data URI for the CA certificate
@@ -617,4 +621,4 @@ rm -rf users_yaml dev.flag
 rm -rf *.yml
 echo -e "${GREEN}	Calling coreos_installer.sh to generate ISO images."
 echo -e "	You will need to burn the generated server ISO to USB/SD cards for initial boot.${NC}"
-./coreos_installer.sh "${developerMode}"
+./coreos_installer.sh "${developerMode}" "$DEPLOYMENT_REGISTRY"

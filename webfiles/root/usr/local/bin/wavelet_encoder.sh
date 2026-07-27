@@ -121,7 +121,11 @@ generate_local_args(){
 		done
 			# Batch all adds and deletes in one go
 			if [[ ${#newEntries[@]} -gt 0 ]]; then
-				sed -i '/^$i,/d' "$deviceMapFile" 2>/dev/null
+				# Remove stale entries and add new ones
+				for entry in "${newEntries[@]}"; do
+					entryWithoutAdd="${entry#ADD:}"
+					sed -i "/^${entryWithoutAdd},/d" "$deviceMapFile" 2>/dev/null
+				done
 				printf '%s\n' "${newEntries[@]#ADD:}" >> "$deviceMapFile"
 			fi
 	fi
