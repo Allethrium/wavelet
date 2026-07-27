@@ -30,12 +30,13 @@ ignition:
   security:
     tls:
       certificate_authorities:
-        # The only CA the decoders should have is the server's Domain Controller CA.
-        - source: http://${DEPLOYMENT_REGISTRY}:8080/ca.crt
+        # This is only for the server deploying against a local httpd/registry.
+        - local: ca.crt
           verification:
             hash: ${caHash}
 EOF
 }
+
 generate_user_yaml(){
 	local name; local password_hash; local ssh_authorized_keys
 	name=$1
@@ -567,6 +568,7 @@ if [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
 	if [[ -f "$HOME/.config/var/ssl/certs/ca.crt" ]]; then
 		# Add the CA to ignition folder
 		cp "$HOME/.config/var/ssl/certs/ca.crt" "ignition_files/ca.crt"
+		cp "$HOME/.config/var/ssl/certs/ca.crt" "$HOME/.config/var/www/ca.crt"
 		# Compute SHA256 hash of the CA certificate
 		caHash="sha256-$(sha256sum "$HOME/.config/var/ssl/certs/ca.crt" | cut -d' ' -f1)"
 		# Generate base64-encoded data URI for the CA certificate

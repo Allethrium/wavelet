@@ -64,6 +64,9 @@ processChildDevices(){
 	fi
 
 	best_score=0
+	best_format=""
+	best_resolution=""
+	best_fps=""
 
 	# Score our returned devices and proceed to generate info for the "best" v4l devNode available
 	for i in "${goodDevs[@]}"; do
@@ -76,13 +79,16 @@ processChildDevices(){
 		if (( score > best_score )); then
 			best_score="$score"
 			best_device="$path"
+			best_format="$format"
+			best_resolution="$resolution"
+			best_fps="$fps"
 		fi
 	done
 	# Here we would want to compare the returns from each compatible sibling device, and pick the best.
 	# stuff.
-	echo -e "\n		Best v4l node for parent device ${parentDevice} is: $best_device, ${resolution}, ${fps}, ${format}\n" >> "${logName}" 
+	echo -e "\n		Best v4l node for parent device ${parentDevice} is: $best_device, ${best_resolution}, ${best_fps}, ${best_format}\n" >> "${logName}"
 	generate_device_info "${best_device}"
-	unset best_score best_device goodDevs
+	unset best_score best_device best_format best_resolution best_fps goodDevs
 }
 
 check_etcdDuplicates(){
@@ -221,7 +227,7 @@ processFormatBlock(){
 			if (( "${width}" > "${maxWidth:-0}" )) \
 			&& (( "${height}" > "${maxHeight:-0}" )) \
 			|| (( "${maxWidth}" == 0 )) \
-			&& (( $(echo "$fps >= 30") )); then
+			&& (( $(echo "$fps >= 30" | bc -l) )); then
 				if (( width * 9 == height * 16 )); then
 					maxHeight="$height"; maxWidth="$width"
 					#bestFormat="$pxlFormat:$width:$height:$fps"

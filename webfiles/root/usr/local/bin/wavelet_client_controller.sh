@@ -832,11 +832,11 @@ event_group_set_staticImage(){
 	}
 	ffmpeg \
 		-fflags +genpts -loop 1 -i "$staticImageFile" \
-		-t 30 -c:v mjpeg -q:v 0 "/var/home/wavelet/http-php/html/images/${staticImageFile}_$groupHash.mp4"
-	cat > "${staticImageFile}_$groupHash.sha256" <<- EOF
-$(sha256sum < "${staticImageFile}_$groupHash.mp4")
+		-t 30 -c:v mjpeg -q:v 0 "/var/home/wavelet/http-php/html/images/staticImage_$groupHash.mp4"
+	cat > "staticImage_$groupHash.sha256" <<- EOF
+$(sha256sum < "/var/home/wavelet/http-php/html/images/staticImage_$groupHash.mp4")
 EOF
-	KEYVALUE="https://$hostNameSys/images/${staticImageFile}_$groupHash.mp4"
+	KEYVALUE="https://$hostNameSys/images/staticImage_$groupHash.mp4"
 	KEYNAME="/UI/GROUPS/$groupHash/control/staticImage"; write_etcd_global # This will call this function again, but now it'll be a URL.
 	get_hosts_in_group
 	for groupHostHash in "${hostsInGroup[@]}"; do
@@ -858,7 +858,7 @@ event_group_set_codec(){
 	# if no, exit 0
 	# Example input: "ffv1")           	KEYVALUE="$codeCmd;FFMPEG FFV1.  High bandwidth, high quality, lossless";;
 	#	strip anything after the semicolon delimiter, this is our codec command
-	codecCmd="${etcdKey#;*}"
+	codecCmd="${etcdValue%%;*}"
 	controlPortCmd="compress $codecCmd"; netCat "6162" "$controlPortCmd"
 	# here we'd check for video output and if something went wrong, we should restart our encoder process to self-heal.
 }
@@ -1493,29 +1493,38 @@ regenerate_staticImage(){
 	local max_attempts=3
 	KEYNAME="/UI/GROUPS/$groupHash/control/staticImage"; read_etcd_global
 	echo "        Downloading static image video loop for local playback from $printvalue.."
+
+	# Validate etcd-supplied URL to prevent SSRF
+	if [[ "$printvalue" != https://* && "$printvalue" != http://localhost* && "$printvalue" != http://127.0.0.1* && "$printvalue" != http://$hostNameSys* ]]; then
+		echo "	ERR: Invalid static image URL, rejecting etcd-supplied URL!"
+		errorStatus="ERR: Invalid static image URL"
+		KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="$errorStatus"; write_etcd_global &
+		return 1
+	fi
+
 	# We just grab the mp4 loop direct from the webserver URL, including the sha256 hash
 	while [[ $attempt -le $max_attempts ]]; do
 		wget -O "/var/home/wavelet/config/staticImage.mp4" "$printvalue"
 		wget -O "/var/home/wavelet/config/staticImage.sha256" "${printvalue%.mp4}.sha256"
-  		serverCheckSum="$(cat "/var/home/wavelet/config/staticImage.sha256")"
-  		# Todo try to replace with bash param expansion
+		serverCheckSum="$(cat "/var/home/wavelet/config/staticImage.sha256" | cut -d' ' -f1)"
+		# Todo try to replace with bash param expansion
 		localCheckSum=$(sha256sum "/var/home/wavelet/config/staticImage.mp4" | cut -d' ' -f1)
 		if [[ "$localCheckSum" != "$serverCheckSum" ]]; then
-	  		echo "	ERR: static image hash mismatch!"
-	  		(( attempt++ ))
-	  		if [[ $attempt -gt $max_attempts ]]; then
-	  			errorStatus="ERR: Unable to update static image selection, hash mismatch!"
-	  			KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="$errorStatus"; write_etcd_global &
-	  			echo "	$errorStatus"
-	  			return 1
-	  		fi
-	  		sleep 1
-	  	else
-	  		KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="OK: Static image updated"
-	  		write_etcd_global &
-	  		echo "	$KEYVALUE"
-	  		return 0
-	  	fi
+			echo "	ERR: static image hash mismatch!"
+			(( attempt++ ))
+			if [[ $attempt -gt $max_attempts ]]; then
+				errorStatus="ERR: Unable to update static image selection, hash mismatch!"
+				KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="$errorStatus"; write_etcd_global &
+				echo "	$errorStatus"
+				return 1
+			fi
+			sleep 1
+		else
+			KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="OK: Static image updated"
+			write_etcd_global &
+			echo "	$KEYVALUE"
+			return 0
+		fi
 	done
 }
 regenerate_blankImage(){
@@ -1934,16 +1943,18 @@ update_config() {
 	configTemp="$(mktemp)"
 	KEYNAME="/HOSTS/$hostNameSys/confHash"; read_etcd_global; confHash="$printvalue"
 	KEYNAME="/HOSTS/$hostNameSys/conf"; read_etcd_global; configData="$printvalue"
-	echo "$configData" > "$configTemp"
+	# Decode base64 config data to temp file
+	echo "$configData" | base64 -d > "$configTemp"
 	# test config for data integrity
 	checksum="$(sha256sum <"$configTemp" | tr -d ' \t\n-')"
-	if [[ "$confHash" != "$configData" ]]; then
+	if [[ "$confHash" != "$checksum" ]]; then
 		echo "	ERR:  Config file data integrity issue!"
 		exit 0
 	else
 		# overwrite our configFile
-		echo "$configData" > "$configFile"
+		cat "$configTemp" > "$configFile"
 	fi
+	rm -f "$configTemp"
 }
 
 

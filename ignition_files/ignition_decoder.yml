@@ -26,7 +26,7 @@ ignition:
     tls:
       certificate_authorities:
         # The only CA the decoders should have is the server's Domain Controller CA.
-        - source: http://waveletDC1/ipa/config/ca.crt
+        - local: ca.crt
           verification:
             hash: wavelet_dc1_caHash
 storage:

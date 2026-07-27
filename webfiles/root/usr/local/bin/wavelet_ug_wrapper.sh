@@ -128,12 +128,12 @@ netCat(){
 inputError(){
 	# Handle input errors
 	errorCase="$1"
-	if [[ -z "$errorTimer_$1" ]]; then
+	if [[ -z "${errorTimer_$1:-}" ]]; then
 		start_timer "errorTimer_$1"
 		error_timers["$1"]="$timer_id_out"
 		start_timer "badReset"
 	else
-		timer_elapsed="$(get_timer_elapsed "$errorTimer_$1")"
+		timer_elapsed="$(get_timer_elapsed "${errorTimer_$1}")"
 		if (( "$timer_elapsed" > 30 )); then
            	echo -e "\033[32m	Error: $1 exceeds 30 seconds!  Terminating process!\033[0m" | systemd-cat -t "UltraGrid"
            	# Serious > 30second error, we let the watchdog kill the process
