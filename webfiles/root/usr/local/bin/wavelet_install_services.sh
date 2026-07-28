@@ -115,7 +115,8 @@ pull_coreos_files() {
 	mkdir -p "/var/home/wavelet/http/pxe"
 	if [[ -n $DEPLOYMENT_REGISTRY ]]; then
 		# Get httpd contents
-		caCertLocation="/etc/docker/certs.d/$DEPLOYMENT_IP\:5000/ca.crt"
+		cp "/etc/docker/certs.d/$DEPLOYMENT_IP:5000/ca.crt" "/var/home/wavelet/config/deployment_ca.crt"
+		caCertLocation="/var/home/wavelet/config/deployment_ca.crt"
 		HTTPD_SERVER="https://$DEPLOYMENT_IP:8443"
 		echo "	Running external httpd initialization server, pulling from LAN source: $HTTPD_SERVER"
 		result="$(curl --cacert "$caCertLocation" -s "$HTTPD_SERVER" | sed -n 's/.*href="\([^"]*\)".*/\1/p' | grep -E '\.[^/]+$')"
