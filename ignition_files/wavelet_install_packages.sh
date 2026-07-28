@@ -271,7 +271,7 @@ pull_registry_images() {
       echo "Starting pull for $source"
       local retry=1
       while (( retry <= max_retries )); do
-        if timeout $timeout podman pull "$tls" "$source"; then
+        if timeout $timeout podman pull "$source"; then
           break
         fi
         echo "Pull attempt $retry failed for $source. Retrying in 5 seconds..."

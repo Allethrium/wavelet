@@ -58,6 +58,7 @@ etcd_create_roles(){
 	sed -i "s|svrIP|$SVR_IP|g" "/etc/etcd.yaml.conf"
 	sed -i "s|svrHostName|$SVR_HOSTNAME|g" "/etc/etcd.yaml.conf"
 	mv "/etc/etcd.yaml.conf" "/etc/etcd/etcd.conf"
+	echo "	Waiting for etcd service to spin up.."
 	until systemctl start etcd-quadlet.service; do
 		sleep .1
 	done
@@ -120,6 +121,7 @@ pull_coreos_files() {
 		HTTPD_SERVER="https://$DEPLOYMENT_IP:8443"
 		echo "	Running external httpd initialization server, pulling from LAN source: $HTTPD_SERVER"
 		result="$(curl --cacert "$caCertLocation" -s "$HTTPD_SERVER" | sed -n 's/.*href="\([^"]*\)".*/\1/p' | grep -E '\.[^/]+$')"
+		echo -e "	Result:\n$result"
 		# Generate our file candidate list
 		declare -a files=()
 		kernel=""; rootfs=""; initrd=""
@@ -130,12 +132,13 @@ pull_coreos_files() {
 				# Download .sig files as well
 				sigFile="$line"
 				echo "	Downloading signature: $HTTPD_SERVER/$sigFile"
-				rm -rf "$dir/${sigFile##*/}"
+				rm -rf "$dir/${sigFile##*/:-}"
 				(
 					until curl -f \
-					-o "$dir/$(basename "$sigFile")" \
-					--retry 3 --retry-delay 1 \
-					"$HTTPD_SERVER/$sigFile"; do
+						--cacert "$caCertLocation" -s \
+						-o "$dir/$(basename "$sigFile")" \
+						--retry 3 --retry-delay 1 \
+						"$HTTPD_SERVER/$sigFile"; do
 						sleep .1;
 					done
 				) &
@@ -152,12 +155,13 @@ pull_coreos_files() {
 		pids=()
 		for file in "${files[@]}"; do
 			echo "	Downloading: $HTTPD_SERVER/$file"
-			rm -rf "$dir/${file##*/}"
+			rm -rf "$dir/${file##*/:-}"
 			(
-				until curl -f \
-				-o "$dir/$(basename "$file")" \
-				--retry 3 --retry-delay 1 \
-				"$HTTPD_SERVER/$file"; do
+					until curl -f \
+					--cacert "$caCertLocation" -s \
+					-o "$dir/$(basename "$file")" \
+					--retry 3 --retry-delay 1 \
+					"$HTTPD_SERVER/$file"; do
 					sleep .1;
 				done
 				cp "$dir/${file##*/}" "/var/home/wavelet/http/pxe/" &
@@ -224,7 +228,7 @@ generate_coreos_image() {
 	#		automated_installer.yml (FCCT/Butane YML config for initial boot)
 	#		automated_coreos_deployment.sh (HDD Detection script)
 	#		decoder.ign (should be pre-provisioned from initial setup script prior to installing the server)
-	# TODO - https
+	# TODO - https implementation, does Grub even support this?
 	configURL="http://$SVR_HOSTNAME:8080/ignition/automated_installer.ign"
 	# The boot process now calls an initial coreOS Live image
 	# This has an automation process burned in with a custom ignition file.
@@ -441,12 +445,6 @@ EOF
 	# seems to work after two attempts
 	systemctl start avahi-daemon.service
 	systemctl restart avahi-daemon.service
-
-	# Fix gssproxy SElinux bug
-	# TODO - as of FCOS44 this seems unnecessary?  Verify.
-	# Note: also since building with sec opt disable maybe has alleviated some audit errors?
-#	ausearch -c '(gssproxy)' --raw | audit2allow -M my-gssproxy
-#	semodule -X 300 -i my-gssproxy.pp
 	systemctl enable gssproxy.service --now
 	# no.wifi is a mode flag, set via configuration
 	systemctl enable avahi-daemon
@@ -553,7 +551,6 @@ PXE_SUCCESS=0
 	fi
 	echo "	PXE infrastructure setup completed successfully."
 	PXE_SUCCESS=1
-	exit 0
 ) &
 PXE_SUBPID=$!
 
@@ -604,22 +601,21 @@ HARDENING_SUBPID=0
 		exit 1
 	fi
 	echo "	DC provisioning completed successfully."
-	exit 0
 ) &
 HARDENING_SUBPID=$!
 
 # Wait for PXE subshell to complete and check its status
 wait $PXE_SUBPID
 PXE_EXIT_STATUS=$?
-if [[ $PXE_EXIT_STATUS -ne 0 ]]; then
+if [[ "$PXE_EXIT_STATUS" -ne 0 ]]; then
 	echo "	ERR: PXE infrastructure setup subshell failed with exit status $PXE_EXIT_STATUS!"
 	exit 1
 fi
 
 # Wait for hardening subshell to complete and check its status
-if [[ $HARDENING_SUBPID -gt 0 ]]; then
-	wait $HARDENING_SUBPID
-	HARDENING_EXIT_STATUS=$?
+if [[ "$HARDENING_SUBPID" -gt 0 ]]; then
+	wait "$HARDENING_SUBPID"
+	HARDENING_EXIT_STATUS="$?"
 	if [[ $HARDENING_EXIT_STATUS -ne 0 ]]; then
 		echo "	ERR: DC provisioning subshell failed with exit status $HARDENING_EXIT_STATUS!"
 		exit 1
