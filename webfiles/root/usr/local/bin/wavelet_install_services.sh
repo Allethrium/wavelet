@@ -115,9 +115,10 @@ pull_coreos_files() {
 	mkdir -p "/var/home/wavelet/http/pxe"
 	if [[ -n $DEPLOYMENT_REGISTRY ]]; then
 		# Get httpd contents
-		HTTPD_SERVER="http://$DEPLOYMENT_IP:8080"
+		caCertLocation="/etc/docker/certs.d/$DEPLOYMENT_IP\:5000/ca.crt"
+		HTTPD_SERVER="https://$DEPLOYMENT_IP:8443"
 		echo "	Running external httpd initialization server, pulling from LAN source: $HTTPD_SERVER"
-		result="$(curl -s "$HTTPD_SERVER" | sed -n 's/.*href="\([^"]*\)".*/\1/p' | grep -E '\.[^/]+$')"
+		result="$(curl --cacrt "$caCertLocation" -s "$HTTPD_SERVER" | sed -n 's/.*href="\([^"]*\)".*/\1/p' | grep -E '\.[^/]+$')"
 		# Generate our file candidate list
 		declare -a files=()
 		kernel=""; rootfs=""; initrd=""
@@ -222,6 +223,7 @@ generate_coreos_image() {
 	#		automated_installer.yml (FCCT/Butane YML config for initial boot)
 	#		automated_coreos_deployment.sh (HDD Detection script)
 	#		decoder.ign (should be pre-provisioned from initial setup script prior to installing the server)
+	# TODO - https
 	configURL="http://$SVR_HOSTNAME:8080/ignition/automated_installer.ign"
 	# The boot process now calls an initial coreOS Live image
 	# This has an automation process burned in with a custom ignition file.
