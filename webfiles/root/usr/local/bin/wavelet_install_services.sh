@@ -118,7 +118,7 @@ pull_coreos_files() {
 		caCertLocation="/etc/docker/certs.d/$DEPLOYMENT_IP\:5000/ca.crt"
 		HTTPD_SERVER="https://$DEPLOYMENT_IP:8443"
 		echo "	Running external httpd initialization server, pulling from LAN source: $HTTPD_SERVER"
-		result="$(curl --cacrt "$caCertLocation" -s "$HTTPD_SERVER" | sed -n 's/.*href="\([^"]*\)".*/\1/p' | grep -E '\.[^/]+$')"
+		result="$(curl --cacert "$caCertLocation" -s "$HTTPD_SERVER" | sed -n 's/.*href="\([^"]*\)".*/\1/p' | grep -E '\.[^/]+$')"
 		# Generate our file candidate list
 		declare -a files=()
 		kernel=""; rootfs=""; initrd=""
