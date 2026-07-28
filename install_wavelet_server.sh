@@ -11,7 +11,7 @@ NC="\033[0m"
 # User setup
 init_users_yaml() {
 	# Ensure nothing adds TABS in the cat command below, YAML won't transpile correctly without indentation being entirely spaces.
-	cat <<EOF > users_yaml
+	cat <<EOF > "users_yaml"
     - name: USERNAMEGOESHERE
       password_hash: PASSWORDGOESHERE
       groups:
@@ -23,9 +23,7 @@ EOF
 }
 
 ca_data_yaml() {
-	# TODO ensure this data object is available on the local httpd server after build_registry.sh
-	# TODO ensure this works.
-	cat <<EOF > ca_data_yaml
+	cat <<EOF > "ca_data_yaml"
 ignition:
   security:
     tls:
@@ -33,9 +31,15 @@ ignition:
         # This is only for the server deploying against a local httpd/registry.
         - local: ca.crt
           verification:
+            hash: ${caHash}
 EOF
-# pull the verification for now..
-#             hash: ${caHash}
+	# We do not need hash verification again here because if it were bad, ignition would fail with the CA above.
+	cat <<EOF > "ca_file_yaml"
+    - path: /etc/docker/certs.d/${DEPLOYMENT_IP}:5000/ca.crt
+      mode: 0755
+      contents:
+        local: ca.crt
+EOF
 }
 
 generate_user_yaml(){
@@ -131,6 +135,7 @@ WIFI_BSSID=${wifi_bssid:-}
 WIFI_IPADDR=${WIFI_IP_ADDR:-}
 # If an external registry is available, we populate here.  Implies external HTTPD server on port 8080 also.
 DEPLOYMENT_REGISTRY=${DEPLOYMENT_REGISTRY}
+DEPLOYMENT_IP=${DEPLOYMENT_IP}
 # This refers to the server's registry.
 REGISTRY=${svr_ip:-192.168.1.32}
 # Additional system build state flags
@@ -179,8 +184,8 @@ cat > ./ignition_files/wavelet_keys.csv <<-EOF
 EOF
 
 	# Customize launching kernel args, this will accelerate the bootup as NetworkManager-wait-online won't hang for 30+s
-	echo "	Applying kernel args: ip=${svr_ip}::${gateway}:${subnet}:${serverHostName}::on"
-	sed -i "s|ip=192.168.1.32::192.168.1.1:255.255.255.0::on|ip=${svr_ip}::${gateway}:${subnet}::on|g" ${INPUTFILES}
+	echo "	Applying kernel args: ip=${svr_ip}::${gateway}:${subnet}:${serverHostName}::none"
+	sed -i "s|ip=192.168.1.32::192.168.1.1:255.255.255.0::none|ip=${svr_ip}::${gateway}:${subnet}::none|g" ${INPUTFILES}
 	sed -i "s|hostname=svr.wavelet.allethriudm|hostname=${serverHostName}|g" ${INPUTFILES}
 	mkdir -p var
 	for file in ${INPUTFILES}; do
@@ -254,7 +259,7 @@ validate_ip_port(){
   		echo "		Issue pinging container registry! Aborting!"
   		exit 1
 	fi
-	if curl -s http://$registry_port/v2 > /dev/null; then
+	if curl -sk -s https://$registry_port/v2 > /dev/null; then
 		echo -e "${GREEN}	Registry running and responding to curl!${NC}"
 		registry="$ip_part"
 	else
@@ -293,40 +298,43 @@ download_wavelet_git(){
 		exit 1
 	fi
 	echo "	Branch $GH_BRANCH commit SHA: $commitSha"
+
 	# Check if we have a cached tarball with matching SHA
 	local cached_tarball="$HOME/.config/var/www/${GH_BRANCH}_cached.tar.gz"
 	local cached_sha_file="$HOME/.config/var/www/${GH_BRANCH}_sha256.txt"
 	if [[ -f "$cached_tarball" ]] && [[ -f "$cached_sha_file" ]]; then
 		cached_sha=$(cat "$cached_sha_file")
 		if [[ "$cached_sha" == "$commitSha" ]]; then
-			echo "	Using cached wavelet tarball with matching commit SHA: $commitSha"
-			cp "$cached_tarball" "$HOME/.config/var/www/$GH_BRANCH.tar.gz"
-			echo "	Acquired wavelet tarball from cache, proceeding.."
-			return 0
+			# Validate the cached tarball is a valid tar.gz archive
+			if tar -tzf "$cached_tarball" > /dev/null 2>&1; then
+				echo "	Using cached wavelet tarball with matching commit SHA: $commitSha"
+				cp "$cached_tarball" "$HOME/.config/var/www/$GH_BRANCH.tar.gz"
+				echo "	Acquired wavelet tarball from cache, proceeding.."
+				return 0
+			else
+				echo "	Warning: Cached tarball is not a valid tar.gz archive, re-downloading..."
+			fi
 		fi
 	fi
 
-	# Determine download source: local deployment server (HTTPS) or GitHub (HTTPS)
-	local download_url
-	if [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
-		download_url="https://${DEPLOYMENT_REGISTRY%%:*}:8443/${GH_BRANCH}.tar.gz"
-		# Use --insecure for self-signed certificate on local deployment server
-		if curl -s -k -L -o "$HOME/.config/var/www/$GH_BRANCH.tar.gz" "$download_url"; then
-			echo "	Acquired wavelet tarball from local deployment server, proceeding.."
-		else
-			echo "	Error downloading wavelet tarball from local deployment server!  aborting!"
-			echo "	Please check this user's write permissions to ~/.config/var/www"
-			exit 1
-		fi
+	# Download from GitHub
+	local download_url="https://github.com/Allethrium/wavelet/archive/refs/heads/$GH_BRANCH.tar.gz"
+	if curl -s -f -L -o "$HOME/.config/var/www/$GH_BRANCH.tar.gz" "$download_url"; then
+		echo "	Acquired wavelet tarball, proceeding.."
 	else
-		download_url="https://github.com/Allethrium/wavelet/archive/refs/heads/$GH_BRANCH.tar.gz"
-		if curl -s -L -o "$HOME/.config/var/www/$GH_BRANCH.tar.gz" "$download_url"; then
-			echo "	Acquired wavelet tarball, proceeding.."
-		else
-			echo "	Error downloading wavelet tarball!  aborting!"
-			echo "	Please check this user's write permissions to ~/.config/var/www"
-			exit 1
-		fi
+		echo "	Error downloading wavelet tarball!  aborting!"
+		echo "	Please check this user's write permissions to ~/.config/var/www"
+		exit 1
+	fi
+
+	# Validate the downloaded file is a valid tar.gz archive
+	if ! tar -tzf "$HOME/.config/var/www/$GH_BRANCH.tar.gz" > /dev/null 2>&1; then
+		echo "	Error: Downloaded file is not a valid tar.gz archive!"
+		echo "	File size: $(wc -c < "$HOME/.config/var/www/$GH_BRANCH.tar.gz") bytes"
+		echo "	First 200 bytes:"
+		head -c 200 "$HOME/.config/var/www/$GH_BRANCH.tar.gz" | cat -v
+		rm -f "$HOME/.config/var/www/$GH_BRANCH.tar.gz"
+		exit 1
 	fi
 
 	# Compute SHA256 of the downloaded tarball
@@ -421,6 +429,7 @@ parse_config_file() {
 			WIFI_DEVICE_PASSWORD) wifi_devicePassword="$value" ;;
 			WIFI_IP_ADDR) wifi_ipAddr="$value" ;;
 			DEPLOYMENT_REGISTRY) DEPLOYMENT_REGISTRY="$value" ;;
+			DEPLOYMENT_IP) DEPLOYMENT_IP="$value" ;;
 			PATCH_MODE) patchMode="$value" ;;
 			UG_BUILD_TYPE|UGDEV) dev_flag="DEV" ;;
 			CODEC_TEST) codec_testing="1";;
@@ -556,15 +565,19 @@ if [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
 	# We would verify the registry format here to ensure it's a valid type, script will break if not valid format
 	# These get an IP from the local interface, useful in automation later
 	get_publicinterface
-	validate_ip_port "$DEPLOYMENT_REGISTRY"
+	if [[ -z "$DEPLOYMENT_IP" ]]; then
+		# We specified a registry, but not a deployment registry IP.  resolve ithere
+		Echo "	Determining deployment IP address from registry argument.."
+		# make sure we get the IP address from the correct subnet if we have a server on multiple subnets
+		DEPLOYMENT_IP="$result"
+	fi
+	validate_ip_port "$DEPLOYMENT_IP"
 	INPUTFILES="server_custom.yml decoder_custom.yml"
 	rm -f ignition_files/wavelet_keys.csv
 	echo "type,path,mode,overwrite,owner,group,content" >> ignition_files/wavelet_keys.csv
-	sed -i "s|192.168.1.32:5000|$DEPLOYMENT_REGISTRY|g" $INPUTFILES
-	sed -i "s|192.168.1.32:8080|${DEPLOYMENT_REGISTRY%%:*}:8443|g" $INPUTFILES
-	sed -i "s|https://github.com/Allethrium/wavelet/archive/refs/heads/master.tar.gz|https://${DEPLOYMENT_REGISTRY%%:*}:8443/master.tar.gz|g" $INPUTFILES
+	sed -i "s|https://github.com/Allethrium/wavelet/archive/refs/heads/master.tar.gz|https://${DEPLOYMENT_IP%%:*}:8443/master.tar.gz|g" $INPUTFILES
 	# Set UltraGrid to local LAN server, which ought to have both builds if build_registry.sh worked as it should.
-	sed -i "s|https://github.com/CESNET/UltraGrid/releases/download/v1.10.5/UltraGrid-1.10.5-x86_64.AppImage|https://${DEPLOYMENT_REGISTRY%%:*}:8443/UltraGrid-1.10.5-x86_64.AppImage|g" $INPUTFILES
+	sed -i "s|https://github.com/CESNET/UltraGrid/releases/download/v1.10.5/UltraGrid-1.10.5-x86_64.AppImage|https://${DEPLOYMENT_IP%%:*}:8443/UltraGrid-1.10.5-x86_64.AppImage|g" $INPUTFILES
 
 	# Add CA certificate to wavelet_keys.csv for CoreOS to trust the deployment server's self-signed certificate
 	if [[ -f "$HOME/.config/var/ssl/certs/ca.crt" ]]; then
@@ -578,10 +591,14 @@ if [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
 		ca_data_uri="data:text/plain;base64,${ca_base64}"
 		# Replace placeholders in server ignition file for certificateAuthorities
 		ca_data_yaml
-    	ca_block="$(cat ca_data_yaml)"
-    	awk -vca_block="$ca_block" '/# Comment_tag_CA/{print ca_block;next}1' \
+    	ca_data="$(cat ca_data_yaml)"
+    	awk -vca_block="$ca_data" '/# Comment_tag_CA/{print ca_block;next}1' \
     		./server_custom.yml > tmp && mv tmp ./server_custom.yml
-    	sed -i "s|https://DEPLOYMENT_SERVER/ca.crt|https://$DEPLOYMENT_REGISTRY:8080/ca.crt|g" ./server_custom.yml
+    	sed -i "s|https://DEPLOYMENT_SERVER/ca.crt|https://$DEPLOYMENT_IP:8080/ca.crt|g" ./server_custom.yml
+    	ca_file="$(cat ca_file_yaml)"
+    	awk -vca_file="$ca_file" '/    # Deployment server CA goes here/{print ca_file;next}1' \
+    		./server_custom.yml > tmp && mv tmp ./server_custom.yml
+		rm -f {ca_data_yaml,ca_file_yaml}
 	fi
 	download_wavelet_git
 else
@@ -590,8 +607,6 @@ else
 	INPUTFILES="server_custom.yml decoder_custom.yml"
 	rm -f ignition_files/wavelet_keys.csv
 	echo "type,path,mode,overwrite,owner,group,content" >> ignition_files/wavelet_keys.csv
-	sed -i "s|192.168.1.32:5000|$registry|g" $INPUTFILES
-	sed -i "s|192.168.1.32:8080|${registry%%:*}:8080|g" $INPUTFILES
 	# Note the nameserver must later be removed because it will interfere with DNS during spinup
 	echo "	Setting nameserver to gateway 9.9.9.9 for simple DNS resolution during initial setup.."
 	sed -i "s|#nameserver|- nameserver=9.9.9.9|g" $INPUTFILES
@@ -621,4 +636,8 @@ rm -rf users_yaml dev.flag
 rm -rf *.yml
 echo -e "${GREEN}	Calling coreos_installer.sh to generate ISO images."
 echo -e "	You will need to burn the generated server ISO to USB/SD cards for initial boot.${NC}"
-./coreos_installer.sh "${developerMode}" "$DEPLOYMENT_REGISTRY"
+if [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
+	./coreos_installer.sh "${developerMode}" "deploy=$DEPLOYMENT_REGISTRY"
+else
+	./coreos_installer.sh "${developerMode}"
+fi

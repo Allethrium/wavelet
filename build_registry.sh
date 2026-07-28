@@ -117,54 +117,56 @@ pull_registry_images(){
 generate_self_signed_certs(){
 	# Generate self-signed CA and server certificates for the deployment server
 	echo -e "Generating self-signed CA and server certificates for HTTPD..."
-	mkdir -p ~/.config/var/ssl/certs
-	mkdir -p ~/.config/var/ssl/private
+	mkdir -p "$HOME/.config/var/ssl/certs"
+	mkdir -p "$HOME/.config/var/ssl/private"
 	# Generate CA private key and certificate
-	openssl genrsa -out ~/.config/var/ssl/private/ca.key 2048 2>/dev/null
-	openssl req -x509 -new -nodes -key ~/.config/var/ssl/private/ca.key \
-		-sha256 -days 3650 -out ~/.config/var/ssl/certs/ca.crt \
+	openssl genrsa -out "$HOME/.config/var/ssl/private/ca.key" 2048 2>/dev/null
+	openssl req -x509 -new -nodes -key "$HOME/.config/var/ssl/private/ca.key" \
+		-sha256 -days 3650 -out "$HOME/.config/var/ssl/certs/ca.crt" \
 		-subj "/C=US/ST=State/L=City/O=Wavelet/OU=Deployment/CN=Wavelet Deployment CA" 2>/dev/null
 	# Generate server private key and certificate signing request
-	openssl genrsa -out ~/.config/var/ssl/private/server.key 2048 2>/dev/null
-	local server_host=$(hostname -f)
+	openssl genrsa -out "$HOME/.config/var/ssl/private/server.key" 2048 2>/dev/null
+	local server_host="$(hostname)"
 	# Determine server IP address for SAN (fallback to 192.168.1.252 if not available)
-	local server_ip=$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1' | head -n 1)
-	if [ -z "$server_ip" ]; then
-		server_ip="192.168.1.252"
+	if [[ -z "$ip" ]]; then
+		ip=$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1' | head -n 1)
 	fi
-	openssl req -new -key ~/.config/var/ssl/private/server.key \
-		-out ~/.config/var/ssl/private/server.csr \
+	if [[ -z "$ip" ]]; then
+		ip="192.168.1.252"
+	fi
+	openssl req -new -key "$HOME/.config/var/ssl/private/server.key" \
+		-out "$HOME/.config/var/ssl/private/server.csr" \
 		-subj "/C=US/ST=State/L=City/O=Wavelet/OU=Deployment/CN=${server_host}" 2>/dev/null
 	# Create extensions file for server certificate with DNS and IP SANs
 	# This allows us to support ignition where DNS isn't yet available in the deployment environment
-	cat > ~/.config/var/ssl/private/server.ext <<-EOF
+	cat > "$HOME/.config/var/ssl/private/server.ext" <<-EOF
 		[ v3_ext ]
-		subjectAltName = DNS:${server_host},IP:${server_ip}
+		subjectAltName = DNS:${server_host},IP:${ip}
 		basicConstraints = CA:FALSE
 		keyUsage = digitalSignature, keyEncipherment
 		extendedKeyUsage = serverAuth
 	EOF
 	# Generate server certificate signed by our CA
-	openssl x509 -req -in ~/.config/var/ssl/private/server.csr \
-		-CA ~/.config/var/ssl/certs/ca.crt -CAkey ~/.config/var/ssl/private/ca.key \
-		-CAcreateserial -out ~/.config/var/ssl/certs/server.crt -days 3650 -sha256 \
-		-extfile ~/.config/var/ssl/private/server.ext -extensions v3_ext 2>/dev/null
+	openssl x509 -req -in "$HOME/.config/var/ssl/private/server.csr" \
+		-CA "$HOME/.config/var/ssl/certs/ca.crt" -CAkey "$HOME/.config/var/ssl/private/ca.key" \
+		-CAcreateserial -out "$HOME/.config/var/ssl/certs/server.crt" -days 3650 -sha256 \
+		-extfile "$HOME/.config/var/ssl/private/server.ext" -extensions v3_ext 2>/dev/null
 	# Ensure CA.crt is available via this httpd server as a file
 	# It is injected to the server ignition as a local file by install_wavelet_server.sh
-	mkdir -p ~/.config/var/www/ssl
-	cp ~/.config/var/ssl/certs/ca.crt ~/.config/var/www/ssl/ca.crt
+	mkdir -p "$HOME/.config/var/www/ssl"
+	cp "$HOME/.config/var/ssl/certs/ca.crt" "$HOME/.config/var/www/ssl/ca.crt"
 	echo -e "	Certificates generated successfully:"
-	echo -e "	CA Certificate: ~/.config/var/ssl/certs/ca.crt"
-	echo -e "	Server Certificate: ~/.config/var/ssl/certs/server.crt"
-	echo -e "	Server Private Key: ~/.config/var/ssl/private/server.key"
+	echo -e "	CA Certificate: $HOME/.config/var/ssl/certs/ca.crt"
+	echo -e "	Server Certificate: $HOME/.config/var/ssl/certs/server.crt"
+	echo -e "	Server Private Key: $HOME/.config/var/ssl/private/server.key"
 }
 
 configure_httpd(){
   # Spins up an HTTPD server which will provide the coreos images
 	echo -e "Generating Apache Podman container and systemd service file"
-	mkdir -p ~/.config/var/www
-	mkdir -p ~/.config/var/lib/httpd
-	cat > ~/.config/var/lib/httpd/httpd.conf << EOF
+	mkdir -p "$HOME/.config/var/www"
+	mkdir -p "$HOME/.config/var/lib/httpd"
+	cat > "$HOME/.config/var/lib/httpd/httpd.conf" << EOF
 # minimized apache server config for local cache server
 ServerRoot "/usr/local/apache2"
 Listen 8080
@@ -300,48 +302,54 @@ SSLCertificateKeyFile "/etc/pki/tls/private/server.key"
 SSLCertificateChainFile "/etc/pki/tls/certs/ca.crt"
 EOF
 	podman pull docker.io/library/httpd:latest
-	echo -e "[Unit]
-Description=HTTPD Quadlet
-After=local-fs.target
+	cat > "$HOME/.config/containers/systemd/httpd.container" <<-EOF
+		[Unit]
+		Description=HTTPD Quadlet
+		After=local-fs.target
 
-[Container]
-ContainerName=httpd
-Image=httpd:latest
-PublishPort=8080:80
-PublishPort=8443:443
-Network=host
-Volume=%h/.config/var/www:/usr/local/apache2/htdocs:ro,z
-Volume=%h/.config/var/lib/httpd/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro,z
-Volume=%h/.config/var/ssl/certs/server.crt:/etc/pki/tls/certs/server.crt:ro,z
-Volume=%h/.config/var/ssl/private/server.key:/etc/pki/tls/private/server.key:ro,z
-Volume=%h/.config/var/ssl/certs/ca.crt:/etc/pki/tls/certs/ca.crt:ro,z
-Tmpfs=/run
-Tmpfs=/tmp
-Exec=httpd-foreground
+		[Container]
+		ContainerName=httpd
+		Image=httpd:latest
+		Network=host
+		Volume=%h/.config/var/www:/usr/local/apache2/htdocs:ro,z
+		Volume=%h/.config/var/lib/httpd/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro,z
+		Volume=%h/.config/var/ssl/certs/server.crt:/etc/pki/tls/certs/server.crt:ro,z
+		Volume=%h/.config/var/ssl/private/server.key:/etc/pki/tls/private/server.key:ro,z
+		Volume=%h/.config/var/ssl/certs/ca.crt:/etc/pki/tls/certs/ca.crt:ro,z
+		Tmpfs=/run
+		Tmpfs=/tmp
+		Exec=httpd-foreground
 
-[Service]
-Restart=always
-RestartSec=5
+		[Service]
+		Restart=always
+		RestartSec=5
 
-[Install]
-# Start by default on boot
-WantedBy=default.target" > ~/.config/containers/systemd/httpd.container
+		[Install]
+		# Start by default on boot
+		WantedBy=default.target
+	EOF
 	echo -e "\nApache Podman container generated, service has been enabled in systemd, starting service now..\n"
 	# Note we don't specify a firewall zone here, but could add detection logic?
 	podman pull docker.io/library/httpd:latest
 	systemctl --user daemon-reload; systemctl --user restart httpd.service
 	# We can use this to generate some of our wavelet files and deploy them from a local httpd server instead of internet.
-	echo "Test" > ~/.config/var/www/test.txt
+	echo "Test" > "$HOME/.config/var/www/test.txt"
 	sleep 2
 	# Do a curl test here to ensure we have expected output
-	cmd="$(curl -k https://localhost:8443/test.txt 2>/dev/null || curl localhost:8080/test.txt)"
+	cmd="$(curl -k "https://$(hostname):8443/test.txt" 2>/dev/null)"
 	if [[ "$cmd" == "Test" ]]; then
-		echo "Test successful, HTTPD server is running!"
+		echo "Hostname Test successful, HTTPD server is running!"
 	else
 		echo "HTTPD server is not functional, check container and firewall settings!"
 		exit 1
 	fi
-	cd ~/.config/var/www || exit
+	cmd="$(curl -k "https://${ip}:8443/test.txt" 2>/dev/null)"
+	if [[ "$cmd" == "Test" ]]; then
+		echo "IP SAN HTTPD Test successful"
+	else
+		echo "HTTPD server is not functional with IP address, TLS connections using anything other than hostname may fail!"
+	fi
+	cd "$HOME/.config/var/www" || exit
 	# UltraGrid AppImage (continuous + version)
 	echo "Downloading UltraGrid AppImages (patched Continuous, and current targeted upstream release)"
 	wget -nc https://github.com/armelvil/UltraGrid/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage
@@ -358,20 +366,20 @@ WantedBy=default.target" > ~/.config/containers/systemd/httpd.container
 		--pull=always \
 		--rm \
 		-v .:/data -w /data \
-		"$REGISTRY_REF" download -s stable -a x86_64 -p metal -f raw.xz
+		"$REGISTRY_REF" download -s stable -a x86_64 -p metal -f iso
 	cd "$waveletdir" || return
 }
 
 get_registry_reference(){
 	local image_name="$1"
-	local registry_addr="${REGISTRY_ADDR:-localhost}"
-	# Try registry address first, fall back to localhost
-	output="$(curl http://localhost:5000/v2/_catalog | jq)"
+	local registry_addr="${REGISTRY_ADDR:-$(hostname -f)}"
+	# Try registry address first
+	output="$(curl -sk https://$(hostname -f):5000/v2/_catalog | jq)"
 	echo -e "	Available registry images:\n$output"
 	if [[ "$output" != *"coreos-installer"* ]]; then
-		echo "$registry_addr:5000/$image_name"
+		echo "$(hostname -f):5000/$image_name"
 	else
-		echo "localhost:5000/$image_name"
+		echo "$(hostname -f):5000/$image_name"
 	fi
 }
 
@@ -384,7 +392,7 @@ get_registry_for_push(){
 		registry_addr="$(hostname -I | awk '{print $1}')"
 	fi
     # Quick connectivity test
-	if curl -q "http://$(hostname -f):5000/v2"; then
+	if curl -sk -q "https://$(hostname -f):5000/v2"; then
 		echo -e "${GREEN}Registry running and responding to curl!${NC}"
 		hostname -f
 		return 0
@@ -439,56 +447,59 @@ build_ffmpeg_rpm(){
 configure_registry(){
 	# Sets up the registry
 	mkdir -p "$HOME/.config/containers/systemd/registry/registry.conf.d"
+	mkdir -p "$HOME/.config/containers/systemd/registry/data"
  	arg="docker.io/library/registry:3"
-	echo -e "[Unit]
-Description=Wavelet container registry
-After=network-online.target
-Wants=network-online.target
+ 	cat > "$HOME/.config/containers/systemd/registry.container" <<-EOF
+		[Unit]
+		Description=Wavelet container registry
+		After=network-online.target
+		Wants=network-online.target
 
-[Container]
-ContainerName=registry
-Image=$arg
-AutoUpdate=local
-PublishPort=5000:5000/tcp
-PublishPort=5000:5000/udp
-Network=host
-# Needed to supress trace error logspam
-Environment=REGISTRY_LOG_LEVEL=info
-Environment=OTEL_TRACES_EXPORTER=none
-Volume=%h/.config/containers/systemd/registry/:/var/lib/registry/:z
+		[Container]
+		ContainerName=registry
+		Image=$arg
+		AutoUpdate=local
+		PublishPort=5000:5000/tcp
+		Network=host
+		# Needed to supress trace error logspam
+		Environment=REGISTRY_LOG_LEVEL=info
+		Environment=OTEL_TRACES_EXPORTER=none
+		Environment=REGISTRY_HTTP_TLS_CERTIFICATE=/certs/server.crt
+		Environment=REGISTRY_HTTP_TLS_KEY=/certs/server.key
+		Volume=%h/.config/containers/systemd/registry/data:/var/lib/registry:z
+		Volume=%h/.config/var/ssl/certs/server.crt:/certs/server.crt:z
+		Volume=%h/.config/var/ssl/private/server.key:/certs/server.key:z
 
-[Service]
-Restart=always
+		[Service]
+		Restart=always
 
-[Install]
-WantedBy=multi-user.target" > ~/.config/containers/systemd/registry.container
- 	echo -e "[[registry]]
-prefix = \"*.$(dnsdomainname)\"
-location = \"https://$ip:5000\"
-insecure = false
+		[Install]
+		WantedBy=multi-user.target
+	EOF
+ 	cat > "$HOME/.config/containers/systemd/registry/registry.conf.d/01-local-registry.conf" <<-EOF
+ 		[[registry]]
+		prefix = \"*.$(dnsdomainname)\"
+		location = \"https://$ip:5000\"
+		ca = [\"$HOME/.config/var/ssl/certs/ca.crt\"]
 
-[[registry]]
-prefix = \"localhost:5000\"
-location = \"https://localhost:5000\"
-insecure = false
+		[[registry.mirror]]
+		location = \"docker.io\"
 
-[[registry.mirror]]
-location = \"docker.io\"
+		[[registry.mirror]]
+		location = \"quay.io\"
 
-[[registry.mirror]]
-location = \"quay.io\"
-
-[[registry.mirror]]
-location = \"registry.fedoraproject.org\"" > ~/.config/containers/systemd/registry/registry.conf.d/01-local-registry.conf
+		[[registry.mirror]]
+		location = \"registry.fedoraproject.org\"
+	EOF
 
 	# Create directory for registry certificates
-	mkdir -p ~/.config/containers/certs.d/$ip:5000
-	mkdir -p ~/.config/containers/certs.d/localhost:5000
-	cp ~/.config/var/ssl/certs/ca.crt ~/.config/containers/certs.d/$ip:5000/ca.crt
-	cp ~/.config/var/ssl/certs/ca.crt ~/.config/containers/certs.d/localhost:5000/ca.crt
+	mkdir -p "$HOME/.config/containers/certs.d/$ip:5000"
+	mkdir -p "$HOME/.config/containers/certs.d/$(hostname -f):5000"
+	cp "$HOME/.config/var/ssl/certs/ca.crt" "$HOME/.config/containers/certs.d/$ip:5000/ca.crt"
+	cp "$HOME/.config/var/ssl/certs/ca.crt" "$HOME/.config/containers/certs.d/$(hostname -f):5000/ca.crt"
 	systemctl --user daemon-reload && systemctl --user restart registry.service
 	sleep 2
-	if curl -q "http://$(hostname -f):5000/v2"; then
+	if curl -sk -q "https://$(hostname -f):5000/v2"; then
 		echo -e "${GREEN}Registry running and responding to curl!${NC}"
 	else
 		echo -e "${RED}Registry not responding, restarting and trying again..${NC}"
@@ -565,7 +576,7 @@ exec >"$waveletdir/logs/build_registry.log" 2>&1
 
 if [[ "$(hostname)" == "localhost" ]]; then
 	echo -e "${RED}Your machine seems to be called localhost"
-	echo -e "This will result in the wavelet server being unable to contact the registry."
+	echo -e "This will result in possible hostname issues."
 	echo -e "Please rename your system to something unique using hostnamectl or by editing /etc/hostname before proceding.${NC}"
 fi
 
@@ -598,9 +609,7 @@ if [[ -z "$waveletdir" ]]; then
   exit 1
 fi
 
-if [[ ! -f "$HOME/.config/var/ssl/certs/ca.crt" ]]; then
-	generate_self_signed_certs
-fi
+generate_self_signed_certs
 
 # Check for required packages
 check_required_packages

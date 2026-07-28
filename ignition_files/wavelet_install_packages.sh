@@ -188,36 +188,10 @@ setup_registry_quadlet(){
 
 check_registry(){
 	# Do we have an external registry or no?
-	# Note we are not using a secured registry until IPA is configured!
-	# Registry IP comes from the conf file (DEPLOYMENT_REGISTRY or REGISTRY)
-	registry="${DEPLOYMENT_REGISTRY:-${REGISTRY}}"
-	if [[ -z "$registry" ]]; then
-		echo "ERROR: Registry IP not set in config file!"
-		exit 1
-	fi
-	if [[ "$registry" != "$(hostname -i)" ]]; then
-		echo "Registry IP and server IP does not match!"
-		# We can now use bootc, defining the lan or server registries.
-		cat > /etc/containers/registries.conf.d/11-lan.conf <<- EOF
-			[[registry]]
-			prefix = "lan.$DOMAIN"
-			location = "${DEPLOYMENT_REGISTRY}:5000"
-			gpg-verify = false
-			insecure = true
-		EOF
-		cat > /etc/containers/registries.conf.d/10-wavelet.conf <<- EOF
-			[[registry]]
-			prefix = "svr.$DOMAIN"
-			location = "${REGISTRY}:5000"
-			insecure = true
-		EOF
-		oci_registry="lan.$DOMAIN"
-		externalReg=1
-		# It is easier to perform the registry podman pull here to save us an if test
-		podman pull --tls-verify=false "$oci_registry/registry"
-		echo "Pulling OCI client image from external registry to local registry, oci_registry set to: $oci_registry"
-		echo "Container images will be pulled from external registry"
-	else
+	# DEPLOYMENT_REGISTRY should be defined in the conf file
+	# DEPLOYMENT_IP may be used as a backup
+	if [[ -z "$DEPLOYMENT_IP" ]]; then
+		echo "	Registry IP not set in config file, this is a local-only deployment."
 		oci_registry="svr.$DOMAIN"
 		externalReg=0
 		podman pull "docker.io/library/registry"
@@ -227,6 +201,30 @@ check_registry(){
 		# Export implied in build function
 		build_container_image "coreos_overlay_client" "Containerfile.coreos.overlay.client"
 		build_container_image "coreos_overlay_server" "Containerfile.coreos.overlay.server"
+	else
+		echo "Deployment server is defined in wavelet.conf, utilizing external registry.."
+		# Define the LAN registry conf
+		cat > "/etc/containers/registries.conf.d/11-lan.conf" <<-EOF
+			[[registry]]
+			prefix = "lan.$DOMAIN"
+			location = "${DEPLOYMENT_IP}:5000"
+			insecure = false
+		EOF
+		# The server registry is "temporarily" insecure as it only works locally
+		# We then utilize a domain certificate/CA once FreeIPA has spun up.
+		cat > "/etc/containers/registries.conf.d/10-wavelet.conf" <<-EOF
+			[[registry]]
+			prefix = "svr.$DOMAIN"
+			location = "$(hostname):5000"
+			insecure = true
+		EOF
+		oci_registry="lan.$DOMAIN"
+		externalReg=1
+		# It is easier to perform the registry podman pull here to save us an if test
+		# NOTE:  ca.crt must exist at: /etc/containers/certs.d/lan.wavelet.local/ca.crt
+		podman pull "$oci_registry/registry"
+		echo "Pulling OCI client image from external registry to local registry, oci_registry set to: $oci_registry"
+		echo "Container images will be pulled from external registry"
 	fi
 }
 

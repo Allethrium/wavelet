@@ -82,7 +82,7 @@ generate_tftpboot() {
 	fi
 	if [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
 		echo "	Pulling prebuilt container image from LAN registry server.."
-		if podman run --privileged --security-opt label=disable -v /var/lib:/tmp/ "$DEPLOYMENT_REGISTRY:5000/tftpboot"; then
+		if podman run --privileged --security-opt label=disable -v /var/lib:/tmp/ "$DEPLOYMENT_REGISTRY/tftpboot"; then
 			echo "	TFTPboot directory generated! Continuing.."
 			return 0
 		else
@@ -115,7 +115,7 @@ pull_coreos_files() {
 	mkdir -p "/var/home/wavelet/http/pxe"
 	if [[ -n $DEPLOYMENT_REGISTRY ]]; then
 		# Get httpd contents
-		HTTPD_SERVER="http://$DEPLOYMENT_REGISTRY:8080"
+		HTTPD_SERVER="http://$DEPLOYMENT_IP:8080"
 		echo "	Running external httpd initialization server, pulling from LAN source: $HTTPD_SERVER"
 		result="$(curl -s "$HTTPD_SERVER" | sed -n 's/.*href="\([^"]*\)".*/\1/p' | grep -E '\.[^/]+$')"
 		# Generate our file candidate list

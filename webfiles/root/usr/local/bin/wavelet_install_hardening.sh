@@ -711,6 +711,14 @@ configure_registry_sp(){
 		[Install]
 		WantedBy=multi-user.target
 	EOF
+	# TODO - ensure the cert makes it into the correct docker dir
+	# Ensure we modify the registry definition to secure after are done, or calls to it will fail.
+	cat > "/etc/containers/registries.conf.d/10-wavelet.conf" <<-EOF
+		[[registry]]
+		prefix = "svr.$DOMAIN"
+		location = "$(hostname):5000"
+		insecure = false
+	EOF
 }
 
 configure_radius_sp(){
