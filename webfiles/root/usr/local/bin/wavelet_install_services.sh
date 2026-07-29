@@ -558,6 +558,7 @@ HARDENING_SUBPID=0
 (
 	# Setup Domain Controller, PKI and provision service principals
 	echo "	Calling hardening module to install security layer in subshell.."
+	echo "	logs in: /var/roothome/logs/hardening.log"
 	if ! /usr/local/bin/wavelet_install_hardening.sh > /dev/null 2>&1; then
 		echo "	ERR: Hardening module failed, aborting DC provisioning."
 		exit 1
