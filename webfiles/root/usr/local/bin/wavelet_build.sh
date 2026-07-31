@@ -739,7 +739,8 @@ test_with_ug() {
     temp_log="$(mktemp)"
     command="$ULTRAGRID_APPRUN --tool uv -t file:$input -c $codec_config -d file:name=$output_file localhost"
     echo "	Running: $command"
-    # TODO - Ensure redirected to null or output file, we don't want this in the wavelet_build.log, it's too verbose
+    # TODO - Ensure redirected to null or a different output file
+    # TODO - we don't want this in the wavelet_build.log, it's too verbose
     $command > "$temp_log" 2>&1 &
     ug_pid=$!
     UG_PIDS+=("$ug_pid")

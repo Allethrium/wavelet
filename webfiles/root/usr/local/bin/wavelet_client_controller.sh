@@ -832,7 +832,7 @@ event_group_set_staticImage(){
 	}
 	ffmpeg \
 		-fflags +genpts -loop 1 -i "$staticImageFile" \
-		-t 30 -c:v mjpeg -q:v 0 "/var/home/wavelet/http-php/html/images/staticImage_$groupHash.mp4"
+		-t 30 -c:v mjpeg -q:v 0 "/var/home/wavelet/http-php/html/images/staticImage_$groupHash.mp4" 2>/dev/null
 	cat > "staticImage_$groupHash.sha256" <<- EOF
 $(sha256sum < "/var/home/wavelet/http-php/html/images/staticImage_$groupHash.mp4")
 EOF
@@ -1545,7 +1545,7 @@ regenerate_blankImage(){
 	-colorspace RGB /var/home/wavelet/config/blankImage.bmp
   ffmpeg \
 	-fflags +genpts -loop 1 -i /var/home/wavelet/config/blankImage.bmp \
-	-t 10 -c:v mjpeg -q:v 0 /var/home/wavelet/config/blankImage.mp4
+	-t 10 -c:v mjpeg -q:v 0 /var/home/wavelet/config/blankImage.mp4 2>/dev/null
   KEYNAME="/HOSTS/$hostNameSys/control/updateImage"; delete_etcd_key_global &
 }
 

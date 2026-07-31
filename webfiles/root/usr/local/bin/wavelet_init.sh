@@ -67,7 +67,7 @@ event_init_staticImage(){
 		rm -rf "/var/home/wavelet/http-php/html/images/init_staticImage.mp4"
 		ffmpeg \
 			-fflags +genpts -loop 1 -i "$staticImageFile" \
-			-t 10 -c:v mjpeg -q:v 0 "/var/home/wavelet/http-php/html/images/init_staticImage.mp4"
+			-t 10 -c:v mjpeg -q:v 0 "/var/home/wavelet/http-php/html/images/init_staticImage.mp4" 2>/dev/null
 		rm -rf "/var/home/wavelet/config/staticImage.mp4"
     	cp -f "/var/home/wavelet/http-php/html/images/init_staticImage.mp4" "/var/home/wavelet/config/staticImage.mp4"
     	tries=0

@@ -110,6 +110,83 @@ generate_tftpboot() {
 	# -o /var/lib/tftpboot/grubnetaa64.efi.signed
 }
 
+fedora_gpg_import() {
+	# Imports Fedora GPG signing keys for CoreOS image verification.
+	# These are the official Fedora release keys used to sign Fedora CoreOS
+	# PXE images. The keyring is stored persistently for re-use.
+	local keyring_dir="/var/home/wavelet/config/gpg"
+	local keyring="$keyring_dir/fedora-coreos.gpg"
+	mkdir -p "$keyring_dir"
+	# Check if keyring already has usable keys
+	if [[ -f "$keyring" ]] && gpg --no-default-keyring --keyring="$keyring" --list-keys 2>/dev/null | grep -q '^pub'; then
+		return 0
+	fi
+	local tmpdir
+	tmpdir="$(mktemp -d)"
+	echo "	Downloading Fedora GPG signing key from fedoraproject.org..."
+	if ! curl -fsSL --retry 3 --retry-delay 5 \
+		-o "$tmpdir/fedora.gpg" \
+		"https://fedoraproject.org/fedora.gpg"; then
+		echo "  ERR: Failed to download Fedora GPG key for signature verification!"
+		rm -rf "$tmpdir"
+		return 1
+	fi
+	# Import into keyring format usable by gpgv
+	if ! gpg --no-default-keyring --keyring="$keyring" --import "$tmpdir/fedora.gpg" 2>/dev/null; then
+		echo "  ERR: Failed to import Fedora GPG key into keyring!"
+		rm -rf "$tmpdir"
+		return 1
+	fi
+	rm -rf "$tmpdir"
+	echo "  Fedora GPG key imported successfully for CoreOS image verification."
+	return 0
+}
+
+verify_coreos_signatures() {
+	# Verifies downloaded CoreOS PXE images against their detached .sig files
+	# using gpgv. Corrupted/mismatched files are removed so the caller can retry.
+	local verify_dir="$1"
+	local keyring="/var/home/wavelet/config/gpg/fedora-coreos.gpg"
+	if [[ ! -f "$keyring" ]] || ! gpg --no-default-keyring --keyring="$keyring" --list-keys 2>/dev/null | grep -q '^pub'; then
+		if ! fedora_gpg_import; then
+			echo "  ERR: Cannot verify CoreOS image signatures -- Fedora GPG key unavailable."
+			echo "  ERR: Supply chain verification disabled for this run."
+			return 0
+		fi
+	fi
+	local all_valid=0
+	local verified_count=0
+	for sigfile in "$verify_dir"/*.sig; do
+		[[ -f "$sigfile" ]] || continue
+		local datafile="${sigfile%.sig}"
+		if [[ ! -f "$datafile" ]]; then
+			echo "  WARN: Signature file $(basename "$sigfile") has no matching data file, skipping."
+			continue
+		fi
+		echo "  Verifying signature: $(basename "$datafile")..."
+		if gpgv --keyring="$keyring" "$sigfile" "$datafile"; then
+			echo "    OK: $(basename "$datafile") -- signature valid."
+			(( verified_count++ ))
+		else
+			echo "    FAIL: $(basename "$datafile") -- signature INVALID! Removing corrupted file."
+			rm -f "$datafile" "$sigfile"
+			all_valid=1
+		fi
+	done
+	if [[ "$verified_count" -eq 0 ]] && [[ "$all_valid" -eq 0 ]]; then
+		echo "  WARN: No CoreOS .sig files found to verify. Supply chain check skipped."
+		echo "  WARN: Falling back to file existence check only."
+		return 0
+	fi
+	if [[ "$all_valid" -ne 0 ]]; then
+		echo "  ERR: One or more CoreOS image signature checks FAILED."
+		echo "  ERR: Corrupted files removed; re-download will be attempted."
+		return 1
+	fi
+	echo "  All available CoreOS image signatures verified successfully."
+	return 0
+}
+
 pull_coreos_files() {
 	# Copy coreos ISO files from the server (or download from internet sources)
 	dir="/var/home/wavelet/setup"
@@ -124,6 +201,7 @@ pull_coreos_files() {
 		echo -e "	Result:\n$result"
 		# Generate our file candidate list
 		declare -a files=()
+		declare -a pids=()
 		kernel=""; rootfs=""; initrd=""
 		while IFS= read -r line; do
 			filename="$(basename "$line")"
@@ -152,7 +230,6 @@ pull_coreos_files() {
 				*)	: ;;
 			esac
 		done <<<"$result"
-		pids=()
 		for file in "${files[@]}"; do
 			echo "	Downloading: $HTTPD_SERVER/$file"
 			rm -rf "$dir/${file##*/:-}"
@@ -173,6 +250,11 @@ pull_coreos_files() {
 			wait "$pid"
 		done
 		chown -R wavelet:wavelet "/var/home/wavelet/http/pxe"
+		# Verify downloaded CoreOS images against their detached GPG signatures
+		if ! verify_coreos_signatures "$dir"; then
+			echo "  ERR: CoreOS image verification failed, clearing download state for retry."
+			kernel=""; rootfs=""; initrd=""
+		fi
 	else
 		echo "	Attempting to pull CoreOS images from internet sources.."
 		# This can fail, hence gets it's own function with a retry
@@ -373,8 +455,9 @@ generate_wavelet_userspace_services(){
 
 generate_decoder_ignition(){
 	# Generates the decoder ignition with wavelet_decoder_keys.csv
-	# Ensure the CA is available for injection into the decoder.ign
+	# Ensure the CA & conf file is available for injection into the decoder.ign
 	cp "/etc/ipa/ca.crt" "/var/home/wavelet/config/"
+	cp "/etc/wavelet.conf" "/var/home/wavelet/config/"
 	# Generate the CA sha256 hash
 	caHash="$(sha256sum <"/etc/ipa/ca.crt" | tr -d \"[:space:]-\")"
 	cat > /var/home/wavelet/config/wavelet_decoder_keys.csv <<-EOF
