@@ -194,7 +194,7 @@ install_security_layer(){
 	# Joins the device to the FreeIPA domain and requests an 802.1x certificate
 	nmcli con mod "$(nmcli -g NAME con show | head -1)" ipv4.dns "$DC1_IP" ipv4.dns-search "$DOMAIN"
 	# Import DC1 host entry to /etc/hosts
-	cat "/var/home/wavelet/config/dc1_host_entry" >> "/etc/hosts"
+	cat "$DC1_IP $DC1_HOSTNAME" >> "/etc/hosts"
 	# Check to see systemd-resolved is running
 	echo "Configuring systemd-resolved..."
 	reconfigure_dns
@@ -368,10 +368,6 @@ groupadd -fg 84 avahi && useradd -c "Avahi Daemon Owner" -d /run/avahi-daemon -u
 groupadd -fg 86 netdev
 mkdir -p "/var/lib/avahi/services"
 systemctl enable avahi-daemon.service --now # May fail, but will correctly start next reboot
-
-# Fix GSSProxy AVC Denial
-ausearch -c '(gssproxy)' --raw | audit2allow -M my-gssproxy
-semodule -X 300 -i my-gssproxy.pp
 systemctl restart gssproxy.service
 
 # Add haveged selinux policy
@@ -395,7 +391,7 @@ cat > "/etc/NetworkManager/conf.d/30-mac-randomization.conf" <<-EOF
 EOF
 
 # Ensure other system services are active
-systemctl enable certmonger.service --now
+systemctl enable certmonger.service
 
 install_security_layer
 configure_firewall

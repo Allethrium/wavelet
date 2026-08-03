@@ -648,11 +648,6 @@ HARDENING_SUBPID=0
 	fi
 	# Enable provision watcher for ETCD user RBAC as well as the domain enrollment watcher for generating our initial domain join OTP.
 	if ! machinectl shell wavelet-root@ "$(which bash)" \
-		-c "systemctl --user daemon-reload && systemctl --user enable wavelet_provision.service wavelet_enrollment_watcher.service wavelet_deprovision_watcher.service --now"; then
-		echo "	ERR: Enabling provision watcher services failed."
-		exit 1
-	fi
-	if ! machinectl shell wavelet-root@ "$(which bash)" \
 		-c "/usr/local/bin/wavelet_configure_radius.sh server"; then
 		echo "	ERR: Configuring RADIUS failed."
 		exit 1
@@ -682,6 +677,11 @@ HARDENING_SUBPID=0
 		echo "	Etcd cert not available, DC provisioning has encountered a fatal error!"
 		echo "	Hardening log is available at:  /var/roothome/logs/"
 		echo "	Please also check IPA logs in /var/freeipa-data/var/log/ for more information"
+		exit 1
+	fi
+	if ! machinectl shell wavelet-root@ "$(which bash)" \
+		-c "systemctl --user daemon-reload && systemctl --user enable wavelet_provision.service wavelet_enrollment_watcher.service wavelet_deprovision_watcher.service --now"; then
+		echo "	ERR: Enabling provision watcher services failed."
 		exit 1
 	fi
 	echo "	DC provisioning completed successfully."

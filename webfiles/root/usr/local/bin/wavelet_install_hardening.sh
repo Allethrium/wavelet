@@ -87,6 +87,8 @@ event_server(){
 		if systemctl daemon-reload && configure_firewall && systemctl enable wavelet-root-autologin.service && systemctl restart etcd-quadlet.service registry.service; then
 			echo -e "\n	Security infrastructure successfully configured!" >> "$logName"
 			# We may want to now shred the administrator secret as it should no longer be necessary.
+			# Specifically return exit 0
+			exit 0
 		else
 			echo -e "	Failed to configure security infrastructure!" >> "$logName"
 			exit 1
