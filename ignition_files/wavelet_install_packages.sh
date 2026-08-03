@@ -436,15 +436,15 @@ rpm_overlay_install_client(){
 	cat > /etc/containers/registries.conf.d/10-wavelet.conf <<- EOF
 		[[registry]]
 		prefix = "$SVR_HOSTNAME"
-		location = "$REGISTRY"
+		location = "$SVR_HOSTNAME:5000"
 	EOF
 	# Ensure the ca.crt is added to the expected docker folder
-	mkdir -p "/etc/containers/certs.d/$REGISTRY"
-	cp "/var/home/wavelet/config/ca.crt" "/etc/containers/certs.d/$REGISTRY/ca.crt"
-	chmod 0644 "/etc/containers/certs.d/$SVR_HOSTNAME/ca.crt"
+	mkdir -p "/etc/containers/certs.d/$SVR_HOSTNAME:5000"
+	cp "/var/home/wavelet/config/ca.crt" "/etc/containers/certs.d/$SVR_HOSTNAME:5000/ca.crt"
+	chmod 0644 "/etc/containers/certs.d/$SVR_HOSTNAME:5000/ca.crt"
 	echo "	Pulling from $REGISTRY/coreos_overlay_client"
 #	bootc switch --transport registry "$serverHostName/coreos_overlay_client"
-	rpm-ostree rebase "ostree-unverified-image:registry:$REGISTRY/coreos_overlay_client"
+	rpm-ostree rebase "ostree-unverified-image:registry:$SVR_HOSTNAME/coreos_overlay_client"
 	echo "RPM package updates completed, finishing installer task.."
 	echo "Generating client install service systemd entry.."
 	cat > "/etc/systemd/system/wavelet_install_client.service" <<-EOF
