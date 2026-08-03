@@ -180,7 +180,6 @@ request_otp_phase2(){
 		# Remove the enrollpw credential, because we don't need to ever enroll this host again.
 		rm -rf "/etc/systemd/system/etcd_enroll_watcher.service"
 		systemctl disable etcd_enroll_watcher.service --now && systemctl daemon-reload
-		shred "/var/run/etcd_otp_value" && rm -rf "/var/run/etcd_otp_value"
 		shred "/var/root/secrets/enrollpw" && rm -rf "/var/root/secrets/enrollpw"
 		# Domain join completion is tracked by the presence of the file, but we don't need a state flag for this
 		# as it's an intermediate step, not a final installation state
@@ -219,8 +218,7 @@ install_security_layer(){
 		--wait \
 		--wait-timeout=60 \
 		--key-size=2048 \
-		--after-command=setfacl -m u:wavelet:r "/etc/pki/tls/certs/eaptls-client-${clientHostName}.crt" \
-			&& setfacl -m u:wavelet:r "/etc/pki/tls/private/eaptls-client-${clientHostName}.key"
+		--after-command="setfacl -m u:wavelet:r /etc/pki/tls/certs/eaptls-client-${clientHostName}.crt && setfacl -m u:wavelet:r /etc/pki/tls/private/eaptls-client-${clientHostName}.key"
 }
 
 configure_firewall(){
