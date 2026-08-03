@@ -35,19 +35,19 @@ event_decoder(){
 	arch="$(uname -m)"
 	case "$arch" in
 		"x86_64")
-			echo -e "AMD64 architecture, running base install..\n"
+			echo -e "		AMD64 architecture, running base install..\n"
 			rpm_overlay_install_client
 			;;
 		"aarch64")
-			echo -e "aarch64 architecture, switching to ARM ostree.."
+			echo -e "		aarch64 architecture, switching to ARM ostree.."
 			rpm_ostree_ARM
 			;;
 		"riscv64")
-			echo -e "RISC-V architecture, switching to RISCV ostree.."
+			echo -e "		RISC-V architecture, switching to RISCV ostree.."
 			rpm_ostree_RISCV
 			;;
 		*)
-			echo -e "Architecture unsupported, exiting..\n"
+			echo -e "		Architecture unsupported, exiting..\n"
 			;;
 	esac
 }
@@ -395,16 +395,18 @@ rpm_overlay_install_server(){
 	rpm-ostree status
 	echo -e "\n	Current bootc status: "
 	bootc status
-	# Bug note - as of FCOS 20260621, bootc switch performs correctly and ostree rebase appears depreciated
+	# We are not using GPG signing for our ostree commits, so we still use ostree-unverified-image in the refspec
+	# Given even a deployment server here is largely ephemeral,
+	# a GPG sig is "correct" but overkill, as we aren't doing mass deployments.
 	if [[ "$externalReg" == "0" ]]; then
 		echo "	Rebasing from local containers-storage..."
 #		bootc switch --transport containers-storage "$storage/coreos_overlay_server:latest"
-		rpm-ostree rebase --experimental "ostree-unverified-image:containers-storage:localhost/coreos_overlay_server:latest"
+		rpm-ostree rebase "ostree-unverified-image:containers-storage:localhost/coreos_overlay_server:latest"
 	else
 		storage="$oci_registry"
 		echo "	Rebasing from registry: $storage..."
 #		bootc switch --transport registry "$storage/coreos_overlay_server:latest"
-		rpm-ostree rebase --experimental "ostree-unverified-image:registry:$storage/coreos_overlay_server"
+		rpm-ostree rebase "ostree-unverified-image:registry:$storage/coreos_overlay_server"
 	fi
 	rpm-ostree initramfs enable
 #	# ── DIAGNOSTICS: capture staged deployment state immediately after rebase ──
@@ -424,24 +426,25 @@ rpm_overlay_install_server(){
 
 rpm_overlay_install_client(){
 	# Pulls the client overlay and installs it.  For obvious reasons, client only.
-	serverHostName="$(grep -E '^DOMAIN=' /etc/wavelet/wavelet.conf 2>/dev/null | cut -d'=' -f2 | sed 's/^/svr./' || echo "svr.$DOMAIN")"
-	serverIPAddress="$(grep -E '^SVR_IP=' /etc/wavelet/wavelet.conf 2>/dev/null | cut -d'=' -f2)"
 	oci_registry="$serverIPAddress:5000"
 	echo "Installing via container and applying as ostree overlay.."
-	until ping -c 1 "$serverHostName"; do
+	until ping -c 1 "$SVR_HOSTNAME"; do
 		sleep .1
 	done
 	# add the svr host entry for early DNS resolution
-	echo "$serverIPAddress $serverHostName" > /etc/hosts
+	echo "$serverIPAddress $SVR_HOSTNAME" > /etc/hosts
 	cat > /etc/containers/registries.conf.d/10-wavelet.conf <<- EOF
 		[[registry]]
-		prefix = "svr.$DOMAIN"
-		location = "${oci_registry}"
-		insecure = true
+		prefix = "$SVR_HOSTNAME"
+		location = "$REGISTRY"
 	EOF
-	echo "	Pulling from $serverHostName/coreos_overlay_client"
+	# Ensure the ca.crt is added to the expected docker folder
+	mkdir -p "/etc/containers/certs.d/$REGISTRY"
+	cp "/var/home/wavelet/config/ca.crt" "/etc/containers/certs.d/$REGISTRY/ca.crt"
+	chmod 0644 "/etc/containers/certs.d/$SVR_HOSTNAME/ca.crt"
+	echo "	Pulling from $REGISTRY/coreos_overlay_client"
 #	bootc switch --transport registry "$serverHostName/coreos_overlay_client"
-	rpm-ostree rebase --experimental "ostree-unverified-image:registry:$serverHostName/coreos_overlay_client"
+	rpm-ostree rebase "ostree-unverified-image:registry:$REGISTRY/coreos_overlay_client"
 	echo "RPM package updates completed, finishing installer task.."
 	echo "Generating client install service systemd entry.."
 	cat > "/etc/systemd/system/wavelet_install_client.service" <<-EOF
