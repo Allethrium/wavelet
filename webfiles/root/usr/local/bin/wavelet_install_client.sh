@@ -204,21 +204,23 @@ install_security_layer(){
 	# Note that for this certificate profile:
 	# IPA should NOT require any special permissions beyond being a domain member to acquire this cert.
 	echo "	Requesting IPA EAP-TLS client certificate.."
+	# Note we use a short hostname here
+	clientHostName="$(hostname -s)"
 	sudo ipa-getcert request \
 		--id=802_1x \
 		--profile=ca802_1xCert \
 		--renew \
-		--keyfile="/etc/pki/tls/private/eaptls-client-${hostNameSys}.key" \
+		--keyfile="/etc/pki/tls/private/eaptls-client-${clientHostName}.key" \
 		--key-owner=root \
 		--key-perms=600 \
-		--certfile="/etc/pki/tls/certs/eaptls-client-${hostNameSys}.crt" \
+		--certfile="/etc/pki/tls/certs/eaptls-client-${clientHostName}.crt" \
 		--cert-owner=root \
 		--cert-perms=644 \
 		--wait \
 		--wait-timeout=60 \
-		--key-size=2048
-#	setfacl -m u:wavelet:r /etc/pki/tls/private/${clientCertificateName}
-#	setfacl -m u:wavelet:r /etc/pki/tls/certs/${clientKeyName}
+		--key-size=2048 \
+		--after-command=setfacl -m u:wavelet:r "/etc/pki/tls/certs/eaptls-client-${clientHostName}.crt" \
+			&& setfacl -m u:wavelet:r "/etc/pki/tls/private/eaptls-client-${clientHostName}.key"
 }
 
 configure_firewall(){
@@ -290,6 +292,7 @@ WantedBy=sway-session.target" > "$file"
 
 source "/etc/wavelet.conf"
 ETCDENDPOINT="https://$SVR_HOSTNAME:2379"
+# Same CA will be installed in /etc/ipa/ca.crt after domain enrollment
 ETCDCTL_CACERT="/var/home/wavelet/config/ca.crt"
 hostNameSys="$(hostname -f)"
 active_networkInterface=""

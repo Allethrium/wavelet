@@ -87,7 +87,7 @@ connectwifi_psk(){
 
 connectwifi_enterprise(){   
 	# This should spawn on client spinup
-	# The generated connection should be managable from the user account via the policykit rules.
+	# The generated connection should be manageable from the user account via the policykit rules and filesystem ACLs
 	clientCertificateName="eaptls-client-$hostNameSys.crt"
 	clientKeyName="eaptls-client-$hostNameSys.key"
 	if [[ ! -f "/etc/pki/tls/certs/$clientCertificateName" ]] || [[ ! -f "/etc/pki/tls/private/$clientKeyName" ]]; then
