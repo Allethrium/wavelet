@@ -5,8 +5,6 @@
 #	Provisioning services, so that it can talk to etcd and the DC.
 
 
-
-
 check_resolved() {
     if systemctl is-active --quiet systemd-resolved; then
         return 0
@@ -18,10 +16,12 @@ reconfigure_dns(){
 	# Modify system connection to utilize the DC going forwards
 	# This is necessary so that IPA DNS discovery functions correctly
 	systemctl disable systemd-resolved.service --now
-	echo -e "[Resolve]
-DNS=$DC1_IP
-FallbackDNS=$gateway 9.9.9.9
-Domains=$DOMAIN" > "/etc/systemd/resolved.conf"
+	cat > "/etc/systemd/resolved.conf" <<-EOF
+		[Resolve]
+		DNS=$DC1_IP
+		FallbackDNS=$gateway 9.9.9.9
+		Domains=$DOMAIN
+	EOF
 	# Add our dc1 entry here - the entry is also populated into /etc/hosts below.
 	systemctl enable systemd-resolved.service --now
 	resolvectl dns "$active_networkInterface" "$DC1_IP"
@@ -289,15 +289,10 @@ WantedBy=sway-session.target" > "$file"
 
 
 source "/etc/wavelet.conf"
-
-# Single initialization block - all variables populated here once
 ETCDENDPOINT="https://$SVR_HOSTNAME:2379"
 ETCDCTL_CACERT="/var/home/wavelet/config/ca.crt"
 hostNameSys="$(hostname -f)"
-
-# Network interface detection (single source of truth)
 active_networkInterface=""
-
 if [[ -z "$active_networkInterface" ]]; then
 	active_networkInterface="$(ip -4 route show default | awk '/default via/{print $5; exit}' 2>/dev/null)"
 fi
@@ -317,13 +312,7 @@ if [[ -z "$active_networkInterface" || "$active_networkInterface" == "lo" ]]; th
 	echo "ERROR: Could not detect a valid network interface. Aborting DNS reconfiguration."
 	return 1
 fi
-gateway="$(read _ _ gateway _ < <(ip route list match 0/0); echo "$gateway")"
-
-# Domain and DC configuration (single source of truth)
-DOMAIN="$(dnsdomainname)"
-DC1_IP="$(</var/home/wavelet/config/DC1_ip)"
-DC1_IP="$(echo "$DC1_IP" | tr -d '\r' | xargs)"
-
+gateway="$SVR_GW"
 # IP and MAC Data for this host
 myIPAddr="$(hostname -I | xargs)"
 myMACAddr="$(nmcli -e no -g GENERAL.HWADDR dev show "$active_networkInterface")"
@@ -333,10 +322,10 @@ if [[ -z "$DC1_IP" ]]; then
 	exit 1
 fi
 
-mkdir -p /var/home/wavelet/logs
-mkdir -p /var/home/wavelet/setup
+mkdir -p "/var/home/wavelet/logs"
+mkdir -p "/var/home/wavelet/setup"
 
-exec > /var/home/wavelet/logs/install_client.log 2>&1
+exec > "/var/home/wavelet/logs/install_client.log" 2>&1
 
 # generate proper RC files for root/wavelet-root which gives us aliases and powerline
 cd /root || return; rm .bashrc .bash_profile; cp /etc/skel/{.bashrc,.bash_profile} .
@@ -345,7 +334,7 @@ cd /var/home/wavelet-root || return; rm .bashrc .bash_profile; cp /etc/skel/{.ba
 # Fix AVAHI otherwise NDI won't function correctly, amongst other things
 # https://www.linuxfromscratch.org/blfs/view/svn/basicnet/avahi.html
 # Runs first because it doesn't matter what kind of server/client device, it'll need this.
-cat > /etc/dbus-1/system.d/org.freedesktop.avahi.conf << EOF
+cat > "/etc/dbus-1/system.d/org.freedesktop.avahi.conf" << EOF
 <!DOCTYPE busconfig PUBLIC
 		  "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
 		  "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
@@ -377,7 +366,7 @@ cat > /etc/dbus-1/system.d/org.freedesktop.avahi.conf << EOF
 EOF
 groupadd -fg 84 avahi && useradd -c "Avahi Daemon Owner" -d /run/avahi-daemon -u 84 -g avahi -s /bin/false avahi
 groupadd -fg 86 netdev
-mkdir -p /var/lib/avahi/services
+mkdir -p "/var/lib/avahi/services"
 systemctl enable avahi-daemon.service --now # May fail, but will correctly start next reboot
 
 # Fix GSSProxy AVC Denial
@@ -390,25 +379,20 @@ if [[ -f "/var/lib/wavelet/selinux/my-haveged.pp" ]]; then
     semodule -i "/var/lib/wavelet/selinux/my-haveged.pp"
 fi
 # Prevent NetworkManager from randomizing device MAC Addresses, which can interfere with WiFi EAP-TLS authentication
-cat > /etc/NetworkManager/conf.d/30-mac-randomization.conf << EOF
-[device-mac-randomization]
-wifi.scan-rand-mac-address=no
-wifi.connect-rand-mac-address=no
+cat > "/etc/NetworkManager/conf.d/30-mac-randomization.conf" <<-EOF
+	[device-mac-randomization]
+	wifi.scan-rand-mac-address=no
+	wifi.connect-rand-mac-address=no
 
-[connection]
-# Explicitly disable all MAC randomization for all connections
-# This ensures the real MAC is always used for RADIUS authentication
-wifi.mac-address-blacklist=
+	[connection]
+	# Explicitly disable all MAC randomization for all connections
+	# This ensures the real MAC is always used for RADIUS authentication
+	wifi.mac-address-blacklist=
 
-[device]
-# Match all WiFi devices
-wifi.mac-address=
+	[device]
+	# Match all WiFi devices
+	wifi.mac-address=
 EOF
-
-# Create directories for wavelet configuration
-mkdir -p /etc/wavelet
-mkdir -p /var/log/wavelet
-chown wavelet:wavelet /var/log/wavelet
 
 # Ensure other system services are active
 systemctl enable certmonger.service --now
@@ -418,25 +402,25 @@ configure_firewall
 
 # Generate UltraGrid squashfs dir so we don't need to worry about FUSE for some uses (reflector/hd-rum-translator)
 # This shaves about 500ms off cold start time.
-mkdir -p /usr/local/bin/ultragrid && cd /usr/local/bin/ultragrid
+mkdir -p "/usr/local/bin/ultragrid" && cd "/usr/local/bin/ultragrid"
 /usr/local/bin/UltraGrid.AppImage --appimage-extract
 echo "	Extracted AppImage contents available in /usr/local/bin/ultragrid/squashfs-root/ - to invoke call the AppRun binary."
 
 # Disable self so we don't run again on the next boot.
 systemctl set-default graphical.target
-echo "CLIENT_INSTALL_COMPLETE=1" >> /etc/wavelet.conf
+echo "CLIENT_INSTALL_COMPLETE=1" >> "/etc/wavelet.conf"
 generate_wavelet_userspace_services
 systemctl --user -M wavelet@ daemon-reload
 
 # We need to copy the serverhostname and provision credentials to wavelet for ETCD provisioning
-cp /var/root/secrets/provisionpw /var/home/wavelet/config
-chown -R wavelet:wavelet /var/home/wavelet
+cp "/var/root/secrets/provisionpw" "/var/home/wavelet/config"
+chown -R wavelet:wavelet "/var/home/wavelet"
 
 # Generate our /var/lib and assign perms
-mkdir -p /var/lib/wavelet; chown wavelet:wavelet /var/lib/wavelet
+mkdir -p /var/lib/wavelet; chown wavelet:wavelet "/var/lib/wavelet"
 
 # Generate the persistent ramdisk
-mkdir -p /var/wavelet_ramfs
+mkdir -p "/var/wavelet_ramfs"
 cat > "/etc/systemd/system/var-wavelet_ramfs.mount" <<-EOF
 [Unit]
 Description=Wavelet user ramdisk (tmpfs) for UltraGrid binaries
