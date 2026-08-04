@@ -232,6 +232,15 @@ while (true) {
     $delay = min($baseDelay * pow(2, $retryCount - 1), 60);
     error_log("ETCD_WATCH: Watch connection lost, reconnecting in: $delay seconds. (attempt $retryCount/$maxRetries)");
     sleep($delay);
+    // Refresh etcd auth token before reconnecting, otherwise the stale/expired
+    // token gets reused on every retry and the watch fails consistently.
+    $newToken = get_etcd_auth_token();
+    if ($newToken !== false) {
+        $token = $newToken;
+        error_log("ETCD_WATCH: Auth token refreshed before reconnect");
+    } else {
+        error_log("ETCD_WATCH: ERROR: Failed to refresh auth token before reconnect");
+    }
     // Reconnect Redis if needed
     if ($redisClient->ping()) {
         continue;
