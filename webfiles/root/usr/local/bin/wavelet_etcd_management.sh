@@ -510,8 +510,8 @@ client_provision_get_data() {
 	# Etcd, annoyingly, likes to complain and stop working if both get populated
 	# rather than more intelligently accepting cmdline over the env (if populated)
 	# So we actually have to manually set it here, even though population of it in bash doesn't work, it still causes etcd to fail (????)
-	export ETCDCTL_CACERT="/etc/ipa/ca.crt"
-	export ETCDCTL_ENDPOINTS="$ETCDENDPOINT"
+	export ETCDCTL_CACERT=/etc/ipa/ca.crt
+	export ETCDCTL_ENDPOINTS=$ETCDENDPOINT
 	output="$(etcdctl --user PROV:$provPW get /PROV/RESPONSE --print-value-only)"
 	if [[ -z "$output" ]]; then
 		echo "ERROR:  Output is null!"
