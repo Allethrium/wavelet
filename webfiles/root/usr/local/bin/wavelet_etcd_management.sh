@@ -334,8 +334,8 @@ generate_etcd_host_role() {
 	fi
 	# Log directory setup
 	user="wavelet-root"
-	mkdir -p /var/home/"${user}"/logs
-	mkdir -p /var/home/"${user}"/config
+	mkdir -p "/var/home/${user}/logs"
+	mkdir -p "/var/home/${user}/config"
 	# Get user arguments from secure credentials (will fail if run without etcd root user)
 	generate_etcd_userarg "user=wavelet-root" "extraargs=root"
 	export ETCDCTL_ENDPOINTS="https://$SVR_HOSTNAME:2379"
@@ -344,7 +344,7 @@ generate_etcd_host_role() {
 		echo "	Failed to get secure etcd credentials" >> "/var/home/${user}/logs/etcdlog.log"
 		exit 1
 	fi
-	echo "	Generating role and user for ETCD client.." >> /var/home/wavelet-root/logs/etcdlog.log
+	echo "	Generating role and user for ETCD client.." >> "/var/home/${user}/logs/etcdlog.log"
 	if [[ "$ETCDCTL_USER" != "root" ]]; then
 		echo "	Etcd user incorrect, please check env!"
 		exit 1
@@ -356,29 +356,29 @@ generate_etcd_host_role() {
 		exit 1
 	fi
 	# Validate clientHostName against allowed characters
-if [[ ! "$clientHostName" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]{0,62}$ ]]; then
+	if [[ ! "$clientHostName" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]{0,62}$ ]]; then
 		echo "		Client hostname '$clientHostName' contains invalid characters! Cannot continue!" >> "/var/home/${user}/logs/etcdlog.log"
 		exit 1
 	fi
 	clientHostNameShort="${clientHostName:0:7}"
 	echo "  Client hostname retrieved for: $clientHostName" >> /var/home/wavelet-root/logs/etcdlog.log
 	# Create role for client
-	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" role add "$clientHostNameShort"
+	etcdctl role add "$clientHostNameShort"
 	# Helper functions for key and role operations
 	createCmd() {
-		etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" put "${1}" -- "${2}"
+		etcdctl put "${1}" -- "${2}"
 	}
 	roleCmd() {
 		# Read + Write and prefixes
-		etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" role grant-permission "$clientHostNameShort" readwrite "${1}" --prefix=true
+		etcdctl role grant-permission "$clientHostNameShort" readwrite "${1}" --prefix=true
 	}
 	roleCmdReadOnly() {
 		# ReadOnly and prefixes
-		etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" role grant-permission "$clientHostNameShort" read "${1}" --prefix=true
+		etcdctl role grant-permission "$clientHostNameShort" read "${1}" --prefix=true
 	}
 	roleCmdReadKeyOnly() {
 		# Read that key only
-		etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" role grant-permission "$clientHostNameShort" read "${1}" --prefix=false
+		etcdctl role grant-permission "$clientHostNameShort" read "${1}" --prefix=false
 	}
 	# Generate then acquire the hash value for this host
 	# Since everything starts its life in wavelet as a decoder, this is always "dec"
@@ -411,7 +411,7 @@ if [[ ! "$clientHostName" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]{0,62}$ ]]; then
 	local PassWord; local password2; local result
 	PassWord="$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')"
 	echo "  Generating new user for: $clientHostNameShort" >> "/var/home/wavelet-root/logs/etcdlog.log"
-	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" user add "$clientHostNameShort" --new-user-password "${PassWord}"
+	etcdctl user add "$clientHostNameShort" --new-user-password "${PassWord}"
 	# Two-factor authentication setup
 	password2="$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')"
 	echo "${PassWord}" | openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" \
@@ -425,9 +425,9 @@ if [[ ! "$clientHostName" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]{0,62}$ ]]; then
 	    local clientArg
 		echo "  Password encrypted and tested successfully!" >> "/var/home/wavelet-root/logs/etcdlog.log"
 		# Ensure our successfully generated user credentials are assigned to our etcd role, otherwise we get permission denied error
-		etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" user grant-role "$clientHostNameShort" "$clientHostNameShort"
+		etcdctl user grant-role "$clientHostNameShort" "$clientHostNameShort"
 		clientArg="$clientHostNameShort:$result"
-		if etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" put "/HOSTS/$clientHostName/test" -- "test"; then
+		if etcdctl put "/HOSTS/$clientHostName/test" -- "test"; then
 			echo " 	Etcd put with generated credentials:  $clientArg success!" >> "/var/home/wavelet-root/logs/etcdlog.log"
 			# TODO - disable when deploying to prod
 			echo "	Credential generated: $clientArg" >> "/var/roothome/logs/testCreds.log"
@@ -437,19 +437,19 @@ if [[ ! "$clientHostName" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]{0,62}$ ]]; then
 	else
 		echo "  Decrypt failed, something is wrong!" >> /var/home/wavelet-root/logs/etcdlog.log
 		echo "  Cleaning up user+Roles.." >> /var/home/wavelet-root/logs/etcdlog.log
-		etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" user del "$clientHostNameShort"
-		etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" role del "$clientHostNameShort"
+		etcdctl user del "$clientHostNameShort"
+		etcdctl role del "$clientHostNameShort"
 		exit 1
 	fi
 	# Upload credentials to etcd for client retrieval
-	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" put "/PROV/CRYPT" -- "$(cat /var/home/wavelet-root/config/.$clientHostNameShort.enc | base64)"
+	etcdctl put "/PROV/CRYPT" -- "$(cat /var/home/wavelet-root/config/.$clientHostNameShort.enc | base64)"
 	rm -rf "/var/home/wavelet-root/config/.$clientHostNameShort.enc"
-	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" put "/PROV/FACTOR2" -- "${password2}"
+	etcdctl put "/PROV/FACTOR2" -- "${password2}"
 	# Cleanup
 	unset PassWord
 	rm -rf "/var/home/wavelet-root/config/${clientHostName}.crypt.bin"
 	# Signal client that credentials are ready
-	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" put "/PROV/RESPONSE" -- "${clientHostName}"
+	etcdctl put "/PROV/RESPONSE" -- "${clientHostName}"
 	echo "	Written: /PROV/RESPONSE -- ${clientHostName}"
 	echo "  Host credentials generated and parsed back to etcd cluster, host should retrieve these credentials and proceed from here.." >> /var/home/wavelet-root/logs/etcdlog.log
 	exit 0
@@ -481,9 +481,9 @@ event_generate_hash(){
 			esac
 			echo "		Populating host keys.."
 			# Populate host data (orchestrator takes care of UI, after initial prefix generation)
-			etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" put "/HOSTS/$clientHostName/control/type" -- "$KEYVALUE"
-			etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" put "/HOSTS/$clientHostName" -- "$hostHash"
-			etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" put "/UI/HOSTS/$hostHash" -- "$clientHostName"
+			etcdctl put "/HOSTS/$clientHostName/control/type" -- "$KEYVALUE"
+			etcdctl put "/HOSTS/$clientHostName" -- "$hostHash"
+			etcdctl put "/UI/HOSTS/$hostHash" -- "$clientHostName"
 		else
 			echo "		/HOSTS/$clientHostName Hash value exists: $hashExists"
 			echo "		Device already populated, taking no further action."
@@ -624,7 +624,7 @@ init_wrapper_contexts() {
 	# Create the wavelet group if it doesn't exist
 	if ! getent group wavelet-bin >/dev/null 2>&1; then
 	groupadd wavelet-bin
-	echo "	Created wavelet-bin system group" >> /root/logs/etcdlog.log
+	echo "	Created wavelet-bin system group" >> "/root/logs/etcdlog.log"
 	fi
 	# Add wavelet users to the wavelet-bin group
 	usermod -a -G wavelet-bin wavelet 2>/dev/null || echo "	Warning: Could not add wavelet to wavelet-bin group"  >> /root/logs/etcdlog.log
@@ -632,26 +632,26 @@ init_wrapper_contexts() {
 	# Create base directories
 	mkdir -p /var/lib/wavelet/bin/{root,wavelet-root,wavelet}
 	# Set ownership and permissions
-	chown root:wavelet-bin /var/lib/wavelet/bin
-	chown root:wavelet-bin /var/lib/wavelet/bin/root
-	chown wavelet-root:wavelet-bin /var/lib/wavelet/bin/wavelet-root
-	chown wavelet:wavelet-bin /var/lib/wavelet/bin/wavelet
+	chown root:wavelet-bin "/var/lib/wavelet/bin"
+	chown root:wavelet-bin "/var/lib/wavelet/bin/root"
+	chown wavelet-root:wavelet-bin "/var/lib/wavelet/bin/wavelet-root"
+	chown wavelet:wavelet-bin "/var/lib/wavelet/bin/wavelet"
 	# Set directory permissions: owner can read/write/execute, group can read/write/execute, others have no access
-	chmod 775 /var/lib/wavelet/bin
-	chmod 775 /var/lib/wavelet/bin/root
-	chmod 775 /var/lib/wavelet/bin/wavelet-root
-	chmod 775 /var/lib/wavelet/bin/wavelet
+	chmod 775 "/var/lib/wavelet/bin"
+	chmod 775 "/var/lib/wavelet/bin/root"
+	chmod 775 "/var/lib/wavelet/bin/wavelet-root"
+	chmod 775 "/var/lib/wavelet/bin/wavelet"
 	# Set SELinux contexts once - files created in these directories will inherit the context
 	if command -v semanage >/dev/null 2>&1; then
 	# Set the file context for the directories and all files within them
-	semanage fcontext -a -t bin_t "/var/lib/wavelet/bin(/.*)?" 2>/dev/null || echo "	Note: SELinux context already exists"  >> /root/logs/etcdlog.log
-	restorecon -Rv /var/lib/wavelet/bin 2>/dev/null || echo "  Note: Could not restore SELinux contexts"  >> /root/logs/etcdlog.log
-	echo "	SELinux contexts set for /var/lib/wavelet/bin"  >> /root/logs/etcdlog.log
+	semanage fcontext -a -t bin_t "/var/lib/wavelet/bin(/.*)?" 2>/dev/null || echo "	Note: SELinux context already exists"  >> "/root/logs/etcdlog.log"
+	restorecon -Rv /var/lib/wavelet/bin 2>/dev/null || echo "  Note: Could not restore SELinux contexts"  >> "/root/logs/etcdlog.log"
+	echo "	SELinux contexts set for /var/lib/wavelet/bin"  >> "/root/logs/etcdlog.log"
 	else
-	echo "	SELinux tools not available, skipping context setup"  >> /root/logs/etcdlog.log
+	echo "	SELinux tools not available, skipping context setup"  >> "/root/logs/etcdlog.log"
 	fi
 
-	echo "	Wavelet bin directories initialized with group permissions"  >> /root/logs/etcdlog.log
+	echo "	Wavelet bin directories initialized with group permissions"  >> "/root/logs/etcdlog.log"
 }
 
 revert_server(){
@@ -663,7 +663,7 @@ revert_server(){
 	# Reverts the server back to a "mint" condition before the wavelet_build module performs server bootstrap.
 	# Must be run as root
 	systemctl stop etcd-quadlet.service
-	/usr/bin/rm -rf /var/lib/etcd-data
+	/usr/bin/rm -rf "/var/lib/etcd-data"
 	/usr/bin/rm -rf /var/home/wavelet/{server_bootstrap_completed,encoder.firstrun,reflector_clients_ip.txt}
 	/usr/bin/systemctl reboot -i
 }
