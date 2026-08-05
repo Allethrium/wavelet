@@ -354,7 +354,7 @@ generate_etcd_host_role() {
 		exit 1
 	fi
 	# Validate clientHostName against allowed characters
-	if [[ ! "$clientHostName" =~ ^[a-zA-Z0-9-]{1,63}$ ]]; then
+if [[ ! "$clientHostName" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]{0,62}$ ]]; then
 		echo "		Client hostname '$clientHostName' contains invalid characters! Cannot continue!" >> "/var/home/${user}/logs/etcdlog.log"
 		exit 1
 	fi
@@ -489,15 +489,15 @@ client_provision_get_data() {
 	# This is run from the client side as 1337/wavelet, from provision_watcher, and retrieves the populated data from etcd
     local provPW; local output; local credName; local factor2; local password2	; local password1
 	if [[ "$EUID" -ne 1337 ]]; then
-		echo "Please run as wavelet" >> /var/home/"${user}"/logs/etcdlog.log
+		echo "Please run as wavelet" >> "/var/home/${user}/logs/etcdlog.log"
 		exit 0
 	fi
 	# Setup
 	user="wavelet"
-	mkdir -p /var/home/wavelet/logs
+	mkdir -p "/var/home/wavelet/logs"
 	hostNameSys="$(hostname)"
-	mkdir -p /var/home/wavelet/.ssh/secrets
-	echo "  Getting client data from previous provision request.." >> /var/home/wavelet/logs/etcdlog.log
+	mkdir -p "/var/home/wavelet/.ssh/secrets"
+	echo "  Getting client data from previous provision request.." >> "/var/home/wavelet/logs/etcdlog.log"
 	# Get response from PROV
 	provPW="$(cat /var/home/wavelet/config/provisionpw)"
 	# Check to make sure this is the "actively provisioning" system - this is a bad way to do this, as it doesn't support concurrency.
@@ -507,17 +507,17 @@ client_provision_get_data() {
 	# So we actually have to manually set it here, even though population of it in bash doesn't work, it still causes etcd to fail (????)
 	export ETCDCTL_CACERT="/etc/ipa/ca.crt"
 	export ETCDCTL_ENDPOINTS="$ETCDENDPOINT"
-	output=$(etcdctl --user PROV:$provPW get "/PROV/RESPONSE" --print-value-only)
-	echo "	Got host: $output" >> /var/home/wavelet/logs/etcdlog.log
-	if [[ "${hostNameSys}" != "${output}" ]]; then
-		echo "	This request isn't for me. Ignoring." >> /var/home/wavelet/logs/etcdlog.log
+	output=$(etcdctl --user "PROV:$provPW" get "/PROV/RESPONSE" --print-value-only)
+	echo "	Got host: $output" >> "/var/home/wavelet/logs/etcdlog.log"
+	if [[ "$hostNameSys" != "$output" ]]; then
+		echo "	This request isn't for me. Ignoring." >> "/var/home/wavelet/logs/etcdlog.log"
 		exit 0
 	fi
 	# Get all necessary credentials from etcd
 	credName="${hostNameSys:0:7}"
-	etcdctl --user PROV:$provPW get "/PROV/CRYPT" --print-value-only | base64 -d  > "/var/home/wavelet/config/.${credName}.enc"
-	factor2=$(etcdctl --user PROV:$provPW get "/PROV/FACTOR2" --print-value-only)
-	echo "${factor2}" > "/var/home/wavelet/.ssh/secrets/.$credName.key"
+	etcdctl --user "PROV:$provPW" get "/PROV/CRYPT" --print-value-only | base64 -d  > "/var/home/wavelet/config/.${credName}.enc"
+	factor2=$(etcdctl --user "PROV:$provPW" get "/PROV/FACTOR2" --print-value-only)
+	echo "$factor2" > "/var/home/wavelet/.ssh/secrets/.$credName.key"
 	# Test credentials by writing and reading a test key
 	password2="$(cat /var/home/wavelet/.ssh/secrets/.$credName.key)"
 	# Note that the **ETCD** passwords are NOT "double-base64" translated, because they do not contain escapeChars.
@@ -532,9 +532,9 @@ client_provision_get_data() {
 		echo "  Client test successful!" >> "/var/home/wavelet/logs/etcdlog.log"
 		# Clean up provisioning keys
 		echo "  Cleaning provision keys.." >> "/var/home/wavelet/logs/etcdlog.log"
-		etcdctl --user PROV:$provPW del "/PROV/CRYPT"
-		etcdctl --user PROV:$provPW del "/PROV/FACTOR2"
-		etcdctl --user PROV:$provPW del "/PROV/RESPONSE"
+		etcdctl --user "PROV:$provPW" del "/PROV/CRYPT"
+		etcdctl --user "PROV:$provPW "del "/PROV/FACTOR2"
+		etcdctl --user "PROV:$provPW" del "/PROV/RESPONSE"
 		echo "  Provisioning process completed. Client ready for etcd access.." >> "/var/home/wavelet/logs/etcdlog.log"
 		echo "CLIENT_PROVISION_RQ_COMPLETE=1" >> "/etc/wavelet.conf"
 		exit 0
@@ -553,8 +553,7 @@ client_provision_request(){
 	local provPW="$(cat /var/home/wavelet/config/provisionpw)"
 	# Our CA and endpoints are now set in bash profile.
 	# Etcd, annoyingly, likes to complain and stop working if both get populated
-	# rather than more intelligently accepting cmdline over the env (if populated)
-	etcdctl --user PROV:$provPW put "/PROV/REQUEST" -- "$hostNameSys"
+	etcdctl --user "PROV:$provPW" put "/PROV/REQUEST" -- "$hostNameSys"
 }
 
 # Main function to handle arguments

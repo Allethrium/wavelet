@@ -40,8 +40,6 @@ join_domain(){
 	# SELinux breaks certmonger, so we fix this here
 	semanage fcontext -a -t certmonger_var_lib_t "/var/lib/certmonger(/.*)?"
 	restorecon -Rv "/var/lib/certmonger"
-	machinectl shell wavelet-root@ cat "/var/home/wavelet/config/serverhostname.txt" \
-    "$(which bash)" -c "echo $(hostname) > /var/home/wavelet-root/config/keytab_request"
 	# The OTP can be used only once, then it becomes invalid
 	ipa-client-install --password "$password" \
         --unattended \
