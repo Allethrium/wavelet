@@ -126,6 +126,8 @@ generate_etcd_core_users(){
 	local PassWord;
 	PassWord="$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')"
 	encrypt_credential "wavelet-root" "root" "${PassWord}" "etcd"
+	# TODO - disable in prod deployment
+	echo "	Root credential generated: root:$PassWord" >> "/var/roothome/logs/testCreds.log"
 	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" user add root --new-user-password "${PassWord}"
 	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" user grant-role root root
 	# Server
@@ -408,25 +410,27 @@ if [[ ! "$clientHostName" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]{0,62}$ ]]; then
 	# Generate client password and create user
 	local PassWord; local password2; local result
 	PassWord="$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')"
-	echo "  Generating new user for: $clientHostNameShort" >> /var/home/wavelet-root/logs/etcdlog.log
+	echo "  Generating new user for: $clientHostNameShort" >> "/var/home/wavelet-root/logs/etcdlog.log"
 	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" user add "$clientHostNameShort" --new-user-password "${PassWord}"
 	# Two-factor authentication setup
 	password2="$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')"
 	echo "${PassWord}" | openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" \
 		-out "/var/home/wavelet-root/config/.$clientHostNameShort.enc"
 	# Verify encryption worked
-	echo "  Verifying password setup.." >> /var/home/wavelet-root/logs/etcdlog.log
+	echo "  Verifying password setup.." >> "/var/home/wavelet-root/logs/etcdlog.log"
 	result="$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass pass:${password2} \
 		-in /var/home/wavelet-root/config/.$clientHostNameShort.enc -d)"
 	result="$(echo $result)"
 	if [[ "$result" == "$PassWord" ]]; then
 	    local clientArg
-		echo "  Password encrypted and tested successfully!" >> /var/home/wavelet-root/logs/etcdlog.log
+		echo "  Password encrypted and tested successfully!" >> "/var/home/wavelet-root/logs/etcdlog.log"
 		# Ensure our successfully generated user credentials are assigned to our etcd role, otherwise we get permission denied error
 		etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" user grant-role "$clientHostNameShort" "$clientHostNameShort"
 		clientArg="$clientHostNameShort:$result"
 		if etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" put "/HOSTS/$clientHostName/test" -- "test"; then
-			echo " 	Etcd put with generated credentials:  $clientArg success!" >> /var/home/wavelet-root/logs/testCreds.log
+			echo " 	Etcd put with generated credentials:  $clientArg success!" >> "/var/home/wavelet-root/logs/etcdlog.log"
+			# TODO - disable when deploying to prod
+			echo "	Credential generated: $clientArg" >> "/var/roothome/logs/testCreds.log"
 		else
 			echo "	Etcd failure!  Please check logs."
 		fi
@@ -446,6 +450,7 @@ if [[ ! "$clientHostName" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]{0,62}$ ]]; then
 	rm -rf "/var/home/wavelet-root/config/${clientHostName}.crypt.bin"
 	# Signal client that credentials are ready
 	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" --user "$ETCDCTL_USER" put "/PROV/RESPONSE" -- "${clientHostName}"
+	echo "	Written: /PROV/RESPONSE -- ${clientHostName}"
 	echo "  Host credentials generated and parsed back to etcd cluster, host should retrieve these credentials and proceed from here.." >> /var/home/wavelet-root/logs/etcdlog.log
 	exit 0
 }
@@ -507,10 +512,14 @@ client_provision_get_data() {
 	# So we actually have to manually set it here, even though population of it in bash doesn't work, it still causes etcd to fail (????)
 	export ETCDCTL_CACERT="/etc/ipa/ca.crt"
 	export ETCDCTL_ENDPOINTS="$ETCDENDPOINT"
-	output=$(etcdctl --user "PROV:$provPW" get "/PROV/RESPONSE" --print-value-only)
+	output="$(etcdctl --user PROV:$provPW get /PROV/RESPONSE --print-value-only)"
+	if [[ -z "$output" ]]; then
+		echo "ERROR:  Output is null!"
+		exit 1
+	fi
 	echo "	Got host: $output" >> "/var/home/wavelet/logs/etcdlog.log"
 	if [[ "$hostNameSys" != "$output" ]]; then
-		echo "	This request isn't for me. Ignoring." >> "/var/home/wavelet/logs/etcdlog.log"
+		echo "	This request isn't for me.  It's for $output.   Ignoring." >> "/var/home/wavelet/logs/etcdlog.log"
 		exit 0
 	fi
 	# Get all necessary credentials from etcd
