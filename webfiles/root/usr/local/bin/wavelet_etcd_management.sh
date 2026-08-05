@@ -529,7 +529,7 @@ client_provision_get_data() {
 		echo "		Using CA copy from wavelet config.."
 		caCrtArg="--cacert=$HOME/config/ca.crt"
 	else
-		caCrtArg="/etc/ipa/ca.crt"
+		caCrtArg="--cacert=/etc/ipa/ca.crt"
 	fi
 	etcdctl "$caCrtArg" --user "PROV:$provPW" get /PROV/CRYPT --print-value-only | base64 -d  > "/var/home/wavelet/config/.${credName}.enc"
 	factor2=$(etcdctl --user "PROV:$provPW" get "/PROV/FACTOR2" --print-value-only)
