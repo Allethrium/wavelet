@@ -83,6 +83,7 @@ etcd_provision_watcher(){
 
 		[Service]
 		Environment=ETCDCTL_ENDPOINTS='https://$serverHostName:2379'
+		Environment=ETCDCTL_CACERT=/etc/ipa/ca.crt
 		ExecStart=/usr/bin/etcdctl --user PROV:$provisionPass watch /PROV/RESPONSE \
 	-w simple -- /usr/bin/bash -c "$WAVELET_PROVISION_MOD '2'"
 		StartLimitBurst=30
