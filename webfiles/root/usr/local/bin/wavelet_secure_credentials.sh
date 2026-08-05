@@ -302,8 +302,8 @@ create_secure_etcd_wrapper() {
 				echo "Failed to generate etcd credentials" >&2
 				exit 1
 			fi
-			export ETCDCTL_ENDPOINTS="https://${SVR_HOSTNAME}:2379"
-			export ETCDCTL_CACERT="/etc/ipa/ca.crt"
+			export ETCDCTL_ENDPOINTS=https://${SVR_HOSTNAME}:2379
+			export ETCDCTL_CACERT=/etc/ipa/ca.crt
 			export ADDITIONAL_ARGS
 			exec etcdctl watch \$ETCD_KEY --prefix -w simple -- /usr/bin/bash -c "\$SCRIPT_TO_RUN \$ADDITIONAL_ARGS"
 		)

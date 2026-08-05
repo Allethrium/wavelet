@@ -451,7 +451,7 @@ generate_etcd_host_role() {
 	# Signal client that credentials are ready
 	etcdctl put "/PROV/RESPONSE" -- "${clientHostName}"
 	echo "	Written: /PROV/RESPONSE -- ${clientHostName}"
-	echo "  Host credentials generated and parsed back to etcd cluster, host should retrieve these credentials and proceed from here.." >> /var/home/wavelet-root/logs/etcdlog.log
+	echo "  Host credentials generated and parsed back to etcd cluster, host should retrieve these credentials and proceed from here.." >> "/var/home/wavelet-root/logs/etcdlog.log"
 	exit 0
 }
 
@@ -504,7 +504,7 @@ client_provision_get_data() {
 	mkdir -p "/var/home/wavelet/.ssh/secrets"
 	echo "  Getting client data from previous provision request.." >> "/var/home/wavelet/logs/etcdlog.log"
 	# Get response from PROV
-	provPW="$(cat /var/home/wavelet/config/provisionpw)"
+	provPW="$(cat /var/home/wavelet/config/provisionpw | xargs)"
 	# Check to make sure this is the "actively provisioning" system - this is a bad way to do this, as it doesn't support concurrency.
 	# our CA and endpoints are now set in bash profile.
 	# Etcd, annoyingly, likes to complain and stop working if both get populated
