@@ -510,7 +510,6 @@ client_provision_get_data() {
 	# Etcd, annoyingly, likes to complain and stop working if both get populated
 	# rather than more intelligently accepting cmdline over the env (if populated)
 	# So we actually have to manually set it here, even though population of it in bash doesn't work, it still causes etcd to fail (????)
-	export ETCDCTL_CACERT=/etc/ipa/ca.crt
 	export ETCDCTL_ENDPOINTS=$ETCDENDPOINT
 	output="$(etcdctl --user PROV:$provPW get /PROV/RESPONSE --print-value-only)"
 	if [[ -z "$output" ]]; then
@@ -524,7 +523,15 @@ client_provision_get_data() {
 	fi
 	# Get all necessary credentials from etcd
 	credName="${hostNameSys:0:7}"
-	etcdctl --user "PROV:$provPW" get "/PROV/CRYPT" --print-value-only | base64 -d  > "/var/home/wavelet/config/.${credName}.enc"
+	caCrtArg=""
+	if [[ ! -f "$ETCDCTL_CACERT" ]]; then
+		unset ETCDCTL_CACERT
+		echo "		Using CA copy from wavelet config.."
+		caCrtArg="--cacert=$HOME/config/ca.crt"
+	else
+		caCrtArg="/etc/ipa/ca.crt"
+	fi
+	etcdctl "$caCrtArg" --user "PROV:$provPW" get /PROV/CRYPT --print-value-only | base64 -d  > "/var/home/wavelet/config/.${credName}.enc"
 	factor2=$(etcdctl --user "PROV:$provPW" get "/PROV/FACTOR2" --print-value-only)
 	echo "$factor2" > "/var/home/wavelet/.ssh/secrets/.$credName.key"
 	# Test credentials by writing and reading a test key
