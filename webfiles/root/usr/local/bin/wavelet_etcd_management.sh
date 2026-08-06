@@ -519,9 +519,10 @@ client_provision_get_data() {
 	# Note that the **ETCD** passwords are NOT "double-base64" translated, because they do not contain escapeChars.
 	password1="$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass pass:${password2} \
 		-in /var/home/wavelet/config/.${credName}.enc -d)"
-	clientArg="--user ${credName}:${password1}"
+	clientArg="--user $credName:$password1"
 	# Test write and read
-	etcdctl "$clientArg" put "/HOSTS/${HOSTNAME}/Client_test" -- "True"
+	echo -e "Running:\n	etcdctl $clientArg put /HOSTS/${HOSTNAME}/Client_test -- True"
+	result="$(etcdctl $clientArg put /HOSTS/${HOSTNAME}/Client_test -- True)"
 	output="$(etcdctl $clientArg get /HOSTS/${HOSTNAME}/Client_test --print-value-only)"
 
 	if [[ "$output" == "True" ]]; then
