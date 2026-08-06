@@ -491,47 +491,27 @@ event_generate_hash(){
 }
 
 client_provision_get_data() {
-	# This is run from the client side as 1337/wavelet, from provision_watcher, and retrieves the populated data from etcd
+	# This is run from the client side as 1337/wavelet, from wavelet_provision_watcher.service
+	# It should not launch unless wavelet_provision.sh has done hostname/domain name checking.
+	# It will run with the prepopulated ETCD environment vars
     local provPW; local output; local credName; local factor2; local password2	; local password1
 	if [[ "$EUID" -ne 1337 ]]; then
 		echo "Please run as wavelet" >> "/var/home/${user}/logs/etcdlog.log"
 		exit 0
 	fi
+#	echo "\nDEBUG:	ENV"
+#	echo "$(env)"
 	# Setup
 	user="wavelet"
 	mkdir -p "/var/home/wavelet/logs"
-	hostNameSys="$(hostname)"
 	mkdir -p "/var/home/wavelet/.ssh/secrets"
 	echo "  Getting client data from previous provision request.." >> "/var/home/wavelet/logs/etcdlog.log"
 	# Get response from PROV
 	provPW="$(cat /var/home/wavelet/config/provisionpw | xargs)"
-	# Check to make sure this is the "actively provisioning" system - this is a bad way to do this, as it doesn't support concurrency.
-	# our CA and endpoints are now set in bash profile.
 	# Etcd, annoyingly, likes to complain and stop working if both get populated
-	# rather than more intelligently accepting cmdline over the env (if populated)
 	# So we actually have to manually set it here, even though population of it in bash doesn't work, it still causes etcd to fail (????)
-	export ETCDCTL_ENDPOINTS=$ETCDENDPOINT
-	output="$(etcdctl --user PROV:$provPW get /PROV/RESPONSE --print-value-only)"
-	if [[ -z "$output" ]]; then
-		echo "ERROR:  Output is null!"
-		exit 1
-	fi
-	echo "	Got host: $output" >> "/var/home/wavelet/logs/etcdlog.log"
-	if [[ "$hostNameSys" != "$output" ]]; then
-		echo "	This request isn't for me.  It's for $output.   Ignoring." >> "/var/home/wavelet/logs/etcdlog.log"
-		exit 0
-	fi
-	# Get all necessary credentials from etcd
-	credName="${hostNameSys:0:7}"
-	caCrtArg=""
-	if [[ ! -f "$ETCDCTL_CACERT" ]]; then
-		unset ETCDCTL_CACERT
-		echo "		Using CA copy from wavelet config.."
-		caCrtArg="--cacert=$HOME/config/ca.crt"
-	else
-		caCrtArg="--cacert=/etc/ipa/ca.crt"
-	fi
-	etcdctl "$caCrtArg" --user "PROV:$provPW" get /PROV/CRYPT --print-value-only | base64 -d  > "/var/home/wavelet/config/.${credName}.enc"
+	credName="${HOSTNAME:0:7}"
+	etcdctl --user "PROV:$provPW" get /PROV/CRYPT --print-value-only | base64 -d  > "/var/home/wavelet/config/.${credName}.enc"
 	factor2=$(etcdctl --user "PROV:$provPW" get "/PROV/FACTOR2" --print-value-only)
 	echo "$factor2" > "/var/home/wavelet/.ssh/secrets/.$credName.key"
 	# Test credentials by writing and reading a test key
@@ -541,8 +521,8 @@ client_provision_get_data() {
 		-in /var/home/wavelet/config/.${credName}.enc -d)"
 	clientArg="--user ${credName}:${password1}"
 	# Test write and read
-	etcdctl "$clientArg" put "/HOSTS/${hostNameSys}/Client_test" -- "True"
-	output="$(etcdctl $clientArg get /HOSTS/${hostNameSys}/Client_test --print-value-only)"
+	etcdctl "$clientArg" put "/HOSTS/${HOSTNAME}/Client_test" -- "True"
+	output="$(etcdctl $clientArg get /HOSTS/${HOSTNAME}/Client_test --print-value-only)"
 
 	if [[ "$output" == "True" ]]; then
 		echo "  Client test successful!" >> "/var/home/wavelet/logs/etcdlog.log"
@@ -551,7 +531,7 @@ client_provision_get_data() {
 		etcdctl --user "PROV:$provPW" del "/PROV/CRYPT"
 		etcdctl --user "PROV:$provPW "del "/PROV/FACTOR2"
 		etcdctl --user "PROV:$provPW" del "/PROV/RESPONSE"
-		echo "  Provisioning process completed. Client ready for etcd access.." >> "/var/home/wavelet/logs/etcdlog.log"
+		echo " 	Provisioning process completed. Client ready for etcd access.." >> "/var/home/wavelet/logs/etcdlog.log"
 		echo "CLIENT_PROVISION_RQ_COMPLETE=1" >> "/etc/wavelet.conf"
 		exit 0
 	else

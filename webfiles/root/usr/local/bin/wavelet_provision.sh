@@ -13,7 +13,7 @@ step1() {
 	if [[ "$ETCD_WATCH_VALUE" == *"$(dnsdomainname)"* ]]; then
 		echo "Client request domain name correct, proceeding"
 	else
-		echo "Domain name $printvalue incorrect for client machine, exiting."
+		echo "Domain name $ETCD_WATCH_VALUE incorrect for client machine, exiting."
 	exit 1
 	fi
 	if [[ "$ETCD_WATCH_VALUE" == *"svr"* ]]; then
@@ -31,7 +31,12 @@ step2() {
 		echo "This step should only run as the wavelet user on the client machine, and responds to the key bring re-written with the expected provision data."
 		exit 1
 	fi
+	if [[ $ETCD_WATCH_EVENT == "PUT" ]] && [[ "$ETCD_WATCH_VALUE" != "$(hostname)" ]]; then
+		echo " ETCD_WATCH_VALUE env does not match this machine hostname."
+		exit 0
+	fi
 	echo "Getting client provision data.."
+	sleep 2
 	"$ETCDMANAGEMENTMOD" "client_provision_get_data"
 }
 
@@ -50,10 +55,10 @@ else
 fi
 
 user="$(whoami)"
-mkdir -p /var/home/"${user}"/logs
-exec > /var/home/"${user}"/logs/provision_request.log 2>&1
+mkdir -p "/var/home/${user}/logs"
+exec > "/var/home/${user}/logs/provision_request.log" 2>&1
 
-if [[ "$@" = "2" ]]; then
+if [[ "$1" = "2" ]]; then
 	echo "step 2 provisioning activated"
 	step2
 else
