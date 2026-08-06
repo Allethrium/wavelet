@@ -127,7 +127,7 @@ generate_etcd_core_users(){
 	PassWord="$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')"
 	encrypt_credential "wavelet-root" "root" "${PassWord}" "etcd"
 	# TODO - disable in prod deployment
-	echo "	Root credential generated: root:$PassWord" >> "/var/roothome/logs/testCreds.log"
+	echo "	Root credential generated: root:$PassWord" >> "/var/home/$user/logs/testCreds.log"
 	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" user add root --new-user-password "${PassWord}"
 	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" user grant-role root root
 	# Server
@@ -430,7 +430,7 @@ generate_etcd_host_role() {
 		if etcdctl put "/HOSTS/$clientHostName/test" -- "test"; then
 			echo " 	Etcd put with generated credentials:  $clientArg success!" >> "/var/home/wavelet-root/logs/etcdlog.log"
 			# TODO - disable when deploying to prod
-			echo "	Credential generated: $clientArg" >> "/var/roothome/logs/testCreds.log"
+			echo "	Credential generated: $clientArg" >> "/var/home/$user/logs/testCreds.log"
 		else
 			echo "	Etcd failure!  Please check logs."
 		fi
@@ -442,7 +442,7 @@ generate_etcd_host_role() {
 		exit 1
 	fi
 	# Upload credentials to etcd for client retrieval
-	etcdctl put "/PROV/CRYPT" -- "$(cat /var/home/wavelet-root/config/.$clientHostNameShort.enc | base64)"
+	etcdctl put "/PROV/CRYPT" -- "$(base64 <"/var/home/wavelet-root/config/.$clientHostNameShort.enc")"
 	rm -rf "/var/home/wavelet-root/config/.$clientHostNameShort.enc"
 	etcdctl put "/PROV/FACTOR2" -- "${password2}"
 	# Cleanup
@@ -511,14 +511,23 @@ client_provision_get_data() {
 	# Etcd, annoyingly, likes to complain and stop working if both get populated
 	# So we actually have to manually set it here, even though population of it in bash doesn't work, it still causes etcd to fail (????)
 	credName="${HOSTNAME:0:7}"
-	etcdctl --user "PROV:$provPW" get /PROV/CRYPT --print-value-only | base64 -d  > "/var/home/wavelet/config/.${credName}.enc"
-	factor2=$(etcdctl --user "PROV:$provPW" get "/PROV/FACTOR2" --print-value-only)
+	# This is a binary crypt, so we parse it directly.
+	etcdctl --user PROV:$provPW get /PROV/CRYPT --print-value-only | base64 -d  > "/var/home/wavelet/config/.${credName}.enc"
+	factor2="$(etcdctl --user PROV:$provPW get /PROV/FACTOR2 --print-value-only)"
 	echo "$factor2" > "/var/home/wavelet/.ssh/secrets/.$credName.key"
 	# Test credentials by writing and reading a test key
 	password2="$(cat /var/home/wavelet/.ssh/secrets/.$credName.key)"
 	# Note that the **ETCD** passwords are NOT "double-base64" translated, because they do not contain escapeChars.
 	password1="$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass pass:${password2} \
 		-in /var/home/wavelet/config/.${credName}.enc -d)"
+	if [[ -z "$password1" ]]; then
+		echo "	ERR: no password available!"
+		etcdctl --user PROV:$provPW get /PROV/CRYPT --print-value-only | base64 -d  > "/var/home/wavelet/config/.${credName}.enc"
+		if [[ -z $(cat "/var/home/wavelet/config/.${credName}.enc") ]]; then
+			echo "	ERR: password crypt file retrieval failed.  Cannot continue."
+			exit 1
+		fi
+	fi
 	clientArg="--user $credName:$password1"
 	# Test write and read
 	echo -e "Running:\n	etcdctl $clientArg put /HOSTS/${HOSTNAME}/Client_test -- True"
