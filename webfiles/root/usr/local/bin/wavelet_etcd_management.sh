@@ -445,7 +445,6 @@ generate_etcd_host_role() {
 	# Upload credentials to etcd for client retrieval.
 	# Write both credentials and verify they are readable before signalling the client
 	# via /PROV/RESPONSE, so we can never publish an empty / partial handshake.
-	set -x
 	cryptBase64="$(base64 </var/home/wavelet-root/config/.$clientHostNameShort.enc)"
 	etcdctl put "/PROV/CRYPT" -- "$cryptBase64"
 	etcdctl put "/PROV/FACTOR2" -- "${password2}"
@@ -462,7 +461,6 @@ generate_etcd_host_role() {
 	etcdctl put "/PROV/RESPONSE" -- "${clientHostName}"
 	echo "	Written: /PROV/RESPONSE -- ${clientHostName}"
 	echo "  Host credentials generated and parsed back to etcd cluster, host should retrieve these credentials and proceed from here.." >> "/var/home/wavelet-root/logs/etcdlog.log"
-	set +x
 	exit 0
 }
 
