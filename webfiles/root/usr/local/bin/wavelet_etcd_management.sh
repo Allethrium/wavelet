@@ -329,7 +329,7 @@ generate_etcd_host_role() {
 	# These permissions can really only be added after the initial host provisioning is completed, because they do not exist prior to this.
 	# This is processed on the ***server only*** from wavelet-root user.
 	if [[ "$EUID" -ne 9337 ]]; then
-		echo "	Please run as wavelet-root" >> /var/home/"${user}"/logs/etcdlog.log
+		echo "	Please run as wavelet-root" >> "/var/home/$user/logs/etcdlog.log"
 		exit
 	fi
 	# Log directory setup
@@ -361,7 +361,7 @@ generate_etcd_host_role() {
 		exit 1
 	fi
 	clientHostNameShort="${clientHostName:0:7}"
-	echo "  Client hostname retrieved for: $clientHostName" >> /var/home/wavelet-root/logs/etcdlog.log
+	echo "  Client hostname retrieved for: $clientHostName" >> "/var/home/$user/logs/etcdlog.log"
 	# Create role for client
 	etcdctl role add "$clientHostNameShort"
 	# Helper functions for key and role operations
@@ -428,23 +428,33 @@ generate_etcd_host_role() {
 		etcdctl user grant-role "$clientHostNameShort" "$clientHostNameShort"
 		clientArg="$clientHostNameShort:$result"
 		if etcdctl put "/HOSTS/$clientHostName/test" -- "test"; then
-			echo " 	Etcd put with generated credentials:  $clientArg success!" >> "/var/home/wavelet-root/logs/etcdlog.log"
+			echo "	Etcd put with generated credentials:  $clientArg success!" >> "/var/home/wavelet-root/logs/etcdlog.log"
 			# TODO - disable when deploying to prod
 			echo "	Credential generated: $clientArg" >> "/var/home/$user/logs/testCreds.log"
 		else
 			echo "	Etcd failure!  Please check logs."
+			exit 1
 		fi
 	else
-		echo "  Decrypt failed, something is wrong!" >> /var/home/wavelet-root/logs/etcdlog.log
-		echo "  Cleaning up user+Roles.." >> /var/home/wavelet-root/logs/etcdlog.log
+		echo "  Decrypt failed, something is wrong!" >> "/var/home/$user/logs/etcdlog.log"
+		echo "  Cleaning up user+Roles.." >> "/var/home/$user/logs/etcdlog.log"
 		etcdctl user del "$clientHostNameShort"
 		etcdctl role del "$clientHostNameShort"
 		exit 1
 	fi
-	# Upload credentials to etcd for client retrieval
-	etcdctl put "/PROV/CRYPT" -- "$(base64 <"/var/home/wavelet-root/config/.$clientHostNameShort.enc")"
-	rm -rf "/var/home/wavelet-root/config/.$clientHostNameShort.enc"
+	# Upload credentials to etcd for client retrieval.
+	# Write both credentials and verify they are readable before signalling the client
+	# via /PROV/RESPONSE, so we can never publish an empty / partial handshake.
+	set -x
+	cryptBase64="$(base64 </var/home/wavelet-root/config/.$clientHostNameShort.enc)"
+	etcdctl put "/PROV/CRYPT" -- "$cryptBase64"
 	etcdctl put "/PROV/FACTOR2" -- "${password2}"
+	cryptCheck="$(etcdctl get /PROV/CRYPT --print-value-only)"
+	factor2Check="$(etcdctl get /PROV/FACTOR2 --print-value-only)"
+	if [[ -z "$cryptCheck" || "$cryptCheck" != "$cryptBase64" || -z "$factor2Check" || "$factor2Check" != "$password2" ]]; then
+		echo "	ERR: published provisioning credentials could not be verified in etcd." >> "/var/home/wavelet-root/logs/etcdlog.log"
+		exit 1
+	fi
 	# Cleanup
 	unset PassWord
 	rm -rf "/var/home/wavelet-root/config/${clientHostName}.crypt.bin"
@@ -452,6 +462,7 @@ generate_etcd_host_role() {
 	etcdctl put "/PROV/RESPONSE" -- "${clientHostName}"
 	echo "	Written: /PROV/RESPONSE -- ${clientHostName}"
 	echo "  Host credentials generated and parsed back to etcd cluster, host should retrieve these credentials and proceed from here.." >> "/var/home/wavelet-root/logs/etcdlog.log"
+	set +x
 	exit 0
 }
 
@@ -511,35 +522,58 @@ client_provision_get_data() {
 	# Etcd, annoyingly, likes to complain and stop working if both get populated
 	# So we actually have to manually set it here, even though population of it in bash doesn't work, it still causes etcd to fail (????)
 	credName="${HOSTNAME:0:7}"
+	# This section reads the provisioning credential the server published under /PROV/CRYPT
+	# and /PROV/FACTOR2, then decrypts it into the actual etcd password for this host.
+	#
+	# The watcher can fire as soon as /PROV/RESPONSE is written, but the server writes
+	# /PROV/CRYPT and /PROV/FACTOR2 *before* /PROV/RESPONSE in the same run.  We therefore
+	# must NOT treat a temporarily-empty value as a failure -- retry until both keys carry
+	# non-empty content (that is what "not ready yet" actually looks like).  This replaces
+	# the old code that tore down and deleted the very keys it still needed.
+	local cryptB64="" factor2="" attempts=0
+	while : ; do
+		attempts=$((attempts+1))
+		# --print-value-only + get returns empty (no error) when the key is not present yet.
+		cryptB64="$(etcdctl --user PROV:$provPW get /PROV/CRYPT --print-value-only 2>/dev/null)"
+		factor2="$(etcdctl --user PROV:$provPW get /PROV/FACTOR2 --print-value-only 2>/dev/null)"
+		if [[ -n "$cryptB64" && -n "$factor2" ]]; then
+			break
+		fi
+		if [[ $attempts -ge 300 ]]; then
+			echo "	ERR: /PROV/CRYPT or /PROV/FACTOR2 still empty after $attempts attempts." >> "/var/home/wavelet/logs/etcdlog.log"
+			return 1
+		fi
+		echo "	Provision keys not ready yet (attempt $attempts), retrying.." >> "/var/home/wavelet/logs/etcdlog.log"
+		sleep 1
+	done
+
 	# This is a binary crypt, so we parse it directly.
-	etcdctl --user PROV:$provPW get /PROV/CRYPT --print-value-only | base64 -d  > "/var/home/wavelet/config/.${credName}.enc"
-	factor2="$(etcdctl --user PROV:$provPW get /PROV/FACTOR2 --print-value-only)"
+	echo "$cryptB64" | base64 -d  > "/var/home/wavelet/config/.${credName}.enc"
 	echo "$factor2" > "/var/home/wavelet/.ssh/secrets/.$credName.key"
+	if [[ ! -s "/var/home/wavelet/config/.${credName}.enc" ]]; then
+		echo "	ERR: parsed crypt file is empty even though /PROV/CRYPT was non-empty." >> "/var/home/wavelet/logs/etcdlog.log"
+		return 1
+	fi
 	# Test credentials by writing and reading a test key
 	password2="$(cat /var/home/wavelet/.ssh/secrets/.$credName.key)"
 	# Note that the **ETCD** passwords are NOT "double-base64" translated, because they do not contain escapeChars.
-	password1="$(openssl enc -e -aes-256-cbc -md sha512 -pbkdf2 -pass pass:${password2} \
-		-in /var/home/wavelet/config/.${credName}.enc -d)"
+	password1="$(openssl enc -d -aes-256-cbc -md sha512 -pbkdf2 -pass "pass:${password2}" \
+		-in "/var/home/wavelet/config/.${credName}.enc")"
 	if [[ -z "$password1" ]]; then
-		echo "	ERR: no password available!"
-		etcdctl --user PROV:$provPW get /PROV/CRYPT --print-value-only | base64 -d  > "/var/home/wavelet/config/.${credName}.enc"
-		if [[ -z $(cat "/var/home/wavelet/config/.${credName}.enc") ]]; then
-			echo "	ERR: password crypt file retrieval failed.  Cannot continue."
-			exit 1
-		fi
+		echo "	ERR: decrypt of provisioned credential produced no password." >> "/var/home/wavelet/logs/etcdlog.log"
+		return 1
 	fi
 	clientArg="--user $credName:$password1"
 	# Test write and read
 	echo -e "Running:\n	etcdctl $clientArg put /HOSTS/${HOSTNAME}/Client_test -- True"
 	result="$(etcdctl $clientArg put /HOSTS/${HOSTNAME}/Client_test -- True)"
 	output="$(etcdctl $clientArg get /HOSTS/${HOSTNAME}/Client_test --print-value-only)"
-
 	if [[ "$output" == "True" ]]; then
 		echo "  Client test successful!" >> "/var/home/wavelet/logs/etcdlog.log"
 		# Clean up provisioning keys
 		echo "  Cleaning provision keys.." >> "/var/home/wavelet/logs/etcdlog.log"
 		etcdctl --user "PROV:$provPW" del "/PROV/CRYPT"
-		etcdctl --user "PROV:$provPW "del "/PROV/FACTOR2"
+		etcdctl --user "PROV:$provPW" del "/PROV/FACTOR2"
 		etcdctl --user "PROV:$provPW" del "/PROV/RESPONSE"
 		echo " 	Provisioning process completed. Client ready for etcd access.." >> "/var/home/wavelet/logs/etcdlog.log"
 		echo "CLIENT_PROVISION_RQ_COMPLETE=1" >> "/etc/wavelet.conf"
