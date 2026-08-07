@@ -84,7 +84,7 @@ etcd_provision_watcher(){
 		[Service]
 		Environment=ETCDCTL_ENDPOINTS='https://$serverHostName:2379'
 		Environment=ETCDCTL_CACERT=/etc/ipa/ca.crt
-		ExecStart=/usr/bin/etcdctl --user PROV:$provisionPass watch /PROV/RESPONSE \
+		ExecStart=/usr/bin/etcdctl --user PROV:$provisionPass watch /PROV/%H/RESPONSE \
 	-w simple -- /usr/bin/bash -c "$WAVELET_PROVISION_MOD '2'"
 		StartLimitBurst=30
 
@@ -134,7 +134,8 @@ detect_self(){
 		# We must get a ping from the server before continuing
 		# since we are already provisioned, a wifi connection by default is available
 		# If the no-wifi flag is set, ethernet should already be available
-		serverHostName="$(<"/var/home/wavelet/config/serverhostname.txt")"
+		# Server hostname is populated in /etc/wavelet.conf
+		serverHostName="$SVR_HOSTNAME"
 		"$WAVELET_SCREENCAST_MOD" "capable"
 		# Wait until etcd service is available on the server before proceeding
 		until result=$("$ETCDINTERACTIONMOD" "check_status"); do
