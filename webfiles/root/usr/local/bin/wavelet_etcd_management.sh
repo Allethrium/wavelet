@@ -523,12 +523,8 @@ client_provision_get_data() {
 	# This section reads the provisioning credential the server published under /PROV/CRYPT
 	# and /PROV/FACTOR2, then decrypts it into the actual etcd password for this host.
 	#
-	# The watcher can fire as soon as /PROV/RESPONSE is written, but the server writes
-	# /PROV/CRYPT and /PROV/FACTOR2 *before* /PROV/RESPONSE in the same run.  We therefore
-	# must NOT treat a temporarily-empty value as a failure -- retry until both keys carry
-	# non-empty content (that is what "not ready yet" actually looks like).  This replaces
-	# the old code that tore down and deleted the very keys it still needed.
 	local cryptB64="" factor2="" attempts=0
+	local max_attempts=10
 	while : ; do
 		attempts=$((attempts+1))
 		# --print-value-only + get returns empty (no error) when the key is not present yet.
@@ -537,7 +533,7 @@ client_provision_get_data() {
 		if [[ -n "$cryptB64" && -n "$factor2" ]]; then
 			break
 		fi
-		if [[ $attempts -ge 300 ]]; then
+		if [[ $attempts -ge $max_attempts ]]; then
 			echo "	ERR: /PROV/CRYPT or /PROV/FACTOR2 still empty after $attempts attempts." >> "/var/home/wavelet/logs/etcdlog.log"
 			return 1
 		fi

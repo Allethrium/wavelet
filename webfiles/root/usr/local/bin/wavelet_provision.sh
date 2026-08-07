@@ -31,8 +31,7 @@ step2() {
 		echo "This step should only run as the wavelet user on the client machine, and responds to the key bring re-written with the expected provision data."
 		exit 1
 	fi
-	if [[ $ETCD_WATCH_EVENT == "PUT" ]] && [[ "$ETCD_WATCH_VALUE" != "$(hostname)" ]]; then
-		echo " ETCD_WATCH_VALUE env does not match this machine hostname."
+	if [[ $ETCD_WATCH_EVENT == "DELETE" ]] || [[ "$ETCD_WATCH_VALUE" != "$(hostname)" ]]; then
 		exit 0
 	fi
 	echo "Getting client provision data.."
