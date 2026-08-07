@@ -107,7 +107,7 @@ etcd_provision_request(){
 	sleep 2
 	# Wait for etcd_interaction to perform its task and write the done flag
 	echo "waiting for provision process to complete.."
-	while ! grep -q "^Provisioning process completed. Client ready for etcd access.." "/var/home/wavelet/logs/etcdlog.log"; do
+	while ! grep -q "Provisioning process completed. Client ready for etcd access.." "/var/home/wavelet/logs/etcdlog.log"; do
 		sleep .1
 	done
 	# Test etcd interaction via the wrapper process
