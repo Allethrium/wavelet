@@ -532,11 +532,12 @@ client_provision_get_data() {
 	# the server and readable by the client.  Each client only reads its own subtree, so a stale
 	# value left over from another provisioning run cannot collide or fire this client early.
 	local provPrefix="/PROV/$(hostname)"
-	echo "	Client key dump:"
-	etcdctl --user PROV:$provPW get $provPrefix --prefix >> "/var/home/wavelet/logs/etcdlog.log"
+	echo "	Client key dump:" >> "/var/home/wavelet/logs/etcdlog.log"
+	etcdctl --user PROV:$provPW get "$provPrefix/" --prefix >> "/var/home/wavelet/logs/etcdlog.log"
 	while : ; do
 		attempts=$((attempts+1))
 		# --print-value-only + get returns empty (no error) when the key is not present yet.
+		# TODO - this is NOT working in-script.
 		cryptB64="$(etcdctl --user PROV:$provPW get "$provPrefix/CRYPT" --print-value-only 2>/dev/null)"
 		factor2="$(etcdctl --user PROV:$provPW get "$provPrefix/FACTOR2" --print-value-only 2>/dev/null)"
 		if [[ -n "$cryptB64" && -n "$factor2" ]]; then
@@ -547,7 +548,7 @@ client_provision_get_data() {
 			return 1
 		fi
 		echo "	Provision keys not ready yet (attempt $attempts), retrying.." >> "/var/home/wavelet/logs/etcdlog.log"
-		sleep 1
+		sleep 2
 	done
 
 	# This is a binary crypt, so we parse it directly.
