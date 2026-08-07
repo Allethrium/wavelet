@@ -106,15 +106,14 @@ etcd_provision_request(){
 	"$ETCDMANAGEMENTMOD" "client_provision_get_data"
 	sleep 2
 	# Wait for etcd_interaction to perform its task and write the done flag
-	while ! grep -q "^CLIENT_PROVISION_RQ_COMPLETE=1" /etc/wavelet.conf; do
+	echo "waiting for provision process to complete.."
+	while ! grep -q "^Provisioning process completed. Client ready for etcd access.." "/var/home/wavelet/logs/etcdlog.log"; do
 		sleep .1
-		echo "waiting for provision process to complete.."
 	done
 	# Test etcd interaction via the wrapper process
 	KEYNAME="PROV_TEST"; KEYVALUE="True"; write_etcd; sleep 1 ; read_etcd
 	if [[ "$printvalue" = "True" ]]; then
 		echo "Client provision request completed, client username has been generated and access to appropriate keys granted."
-		echo "CLIENT_PROVISION_COMPLETE=1" >> "/etc/wavelet.conf"
 		# We shred the etcd provision credential, as it's no longer needed
 		shred /var/home/wavelet/config/provisionpw && rm -rf /var/home/wavelet/config/provisionpw
 	else
@@ -129,7 +128,7 @@ detect_self(){
 	systemctl --user enable foot-server.socket --now
 	# We need a network connection first.
 	event_connectNetwork
-	if grep -q "^CLIENT_PROVISION_COMPLETE=1" /etc/wavelet.conf; then
+	if grep -q "^Provisioning process completed. Client ready for etcd access.." "/var/home/wavelet/logs/etcdlog.log"; then
 		echo "Provisioning completed, detecting self via etcd.."
 		# We must get a ping from the server before continuing
 		# since we are already provisioned, a wifi connection by default is available

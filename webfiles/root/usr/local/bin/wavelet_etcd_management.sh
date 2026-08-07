@@ -584,7 +584,6 @@ client_provision_get_data() {
 		etcdctl --user "PROV:$provPW" del "$provPrefix/RESPONSE"
 		etcdctl --user "PROV:$provPW" put "$provPrefix/STATUS" -- "OK: COMPLETE"
 		echo " 	Provisioning process completed. Client ready for etcd access.." >> "/var/home/wavelet/logs/etcdlog.log"
-		echo "CLIENT_PROVISION_RQ_COMPLETE=1" >> "/etc/wavelet.conf"
 		exit 0
 	else
 		echo "  Client test unsuccessful! Please see logs." >> "/var/home/wavelet/logs/etcdlog.log"
