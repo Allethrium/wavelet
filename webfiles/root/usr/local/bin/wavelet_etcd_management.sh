@@ -513,6 +513,8 @@ client_provision_get_data() {
 #	echo "\nDEBUG:	ENV"
 #	echo "$(env)"
 	# Setup
+	export ETCDCTL_ENDPOINTS="https://$SVR_HOSTNAME:2379"
+	export ETCDCTL_CACERT="/etc/ipa/ca.crt"
 	user="wavelet"
 	mkdir -p "/var/home/wavelet/logs"
 	mkdir -p "/var/home/wavelet/.ssh/secrets"
