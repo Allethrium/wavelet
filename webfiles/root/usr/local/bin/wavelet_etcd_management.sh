@@ -533,7 +533,8 @@ client_provision_get_data() {
 	# value left over from another provisioning run cannot collide or fire this client early.
 	local provPrefix="/PROV/$(hostname)"
 	echo "	Client key dump:" >> "/var/home/wavelet/logs/etcdlog.log"
-	etcdctl --user PROV:$provPW get "$provPrefix/" --prefix >> "/var/home/wavelet/logs/etcdlog.log"
+	dump="$(etcdctl --user PROV:$provPW get "$provPrefix/" --prefix)"
+	echo "$dump">> "/var/home/wavelet/logs/etcdlog.log"
 	while : ; do
 		attempts=$((attempts+1))
 		# --print-value-only + get returns empty (no error) when the key is not present yet.
