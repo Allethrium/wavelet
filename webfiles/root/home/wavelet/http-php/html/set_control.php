@@ -262,6 +262,10 @@ switch ($type) {
 					$prefixstring	=	"/UI/GROUPS/" . $hashID . "/control/" . $parts[0];
 					$keyValue = $dataValue;
 				} else {
+					# Guard against null hashID value being submitted for anything in this branch, noop.
+					if ($hashID === null) {
+						break;
+					}
 					switch ($subOperation) {
 						// These handle the non-boolean operations
 						case 'chainedToGroup':

@@ -877,6 +877,10 @@ event_create_group(){
 	# Generate a new group hash
 	# Check that this hash doesn't already exist (REALLY small chance of a collision but.. why not)
 	local newGroupHash; newGroupHash="$(sha256sum < /proc/sys/kernel/random/uuid | tr -d ' -')"
+	if [[ -z "$newGroupHash" ]]; then
+		echo "	ERR:  Failure generating a group hash value!"
+		exit 0
+	fi
 	# Declare vars locally
 	local KEYNAME
 	local KEYVALUE
@@ -957,12 +961,18 @@ event_delete_group(){
 		exit 0
 	fi
 	# We also need the hash of the primary group
+	if [[ -z "$primaryGroupHash" ]]; then
+		# We are now in an error state because primaryGroupHash wasn't in the loaded client conf file!
+		echo "	ERR: Primary group hash not populated in client conf!  Retrieving from etcd.."
+		KEYNAME="/GROUPS/$hostNameSys"; read_etcd_global; primaryGroupHash="$printvalue"
+	fi
 	# As this is always run on the server, and the server is always in the primary group:
 	if [[ "$etcdValue" == "$primaryGroupHash" ]]; then
 		echo "      Cannot delete the primary group!!"
 		exit 0
 	fi
-	KEYNAME="/UI/GROUPS/$primaryGroupHash"; read_etcd_prefix_list; primaryGroupKeys="$printvalue"
+	# TODO - dead code, we don't need this read here.
+#	KEYNAME="/UI/GROUPS/$primaryGroupHash"; read_etcd_prefix_list; primaryGroupKeys="$printvalue"
 	KEYNAME="/UI/HOSTS/"; read_etcd_prefix_keys
 	hostsGroupMemberArray=()
 	while read -r line; do

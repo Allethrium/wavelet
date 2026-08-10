@@ -831,7 +831,10 @@ async function setupUIAfterAjax() {
 	const inputPromises = [];
 	for (const group of window.root.groups.values()) {
 		// console.log("Group UI setup:", group);
-		groupPromises.push(createGroupElement(group));
+		if (group.hashID !== null) {
+			// Never create group objects with no hashID.
+			groupPromises.push(createGroupElement(group));
+		}
 	}
 	await Promise.all(groupPromises);
 	for (const group of window.root.groups.values()) {
