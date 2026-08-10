@@ -19,6 +19,16 @@ else
 	binaryPath="/usr/local/bin/ultragrid/squashfs-root/AppRun"
 fi
 
+# Load the client's exports file.  This MUST exist for normal operation.
+hostNameSys="$(hostname)"
+sourceFile="$HOME/config/$hostNameSys.conf"
+if [[ -f "$sourceFile" ]]; then
+	echo "	ERR: Client configuration file is not available!  Provisioning error."
+	exit 1
+else
+	source "$sourceFile"
+fi
+
 cleanup(){
     local sig="${1:-EXIT}"
     echo "Cleanup triggered by $sig - terminating all processes..." >&2
@@ -96,11 +106,11 @@ init_switch(){
 	local errorMessage
 	printvalue=""
 	# channelData is compound of index-sourcehash (I.E 4-123456hashvalue)
-	KEYNAME="/HOSTS/$(hostname)/control/channel-Source"; read_etcd_global; channelIndex="${printvalue%%-*}"
+	KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; read_etcd_global; channelIndex="${printvalue%%-*}"
 	if [[ -z "$channelIndex" ]]; then
 		errorMessage="ERR:  Channel Index is null, retrying read then setting to static Image channel as fallback."
 		notify-send -e "$errorMessage" & echo "$errorMessage"
-		KEYNAME="/HOSTS/$(hostname)/control/channel-Source"; read_etcd_global; channelIndex="${printvalue%%-*}"
+		KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; read_etcd_global; channelIndex="${printvalue%%-*}"
 		if [[ -z "$channelIndex" ]]; then
 			channelIndex=1
 		fi
@@ -111,7 +121,7 @@ init_switch(){
 	if [[ "$response" == *"400"* ]]; then
 		# 400 Bad Request, means the channelIndex wasn't valid
 		channelIndex=1; netCat
-		KEYNAME="/HOSTS/$(hostname)/control/healthStatus"; KEYVALUE="ERR: Invalid Channel Index"; write_etcd_global &
+		KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="ERR: Invalid Channel Index"; write_etcd_global &
 	else
 		echo -e "\033[32m	Switcher initialized, sending channel init!\033[0m" | systemd-cat -t "UltraGrid"
 	fi
@@ -137,14 +147,14 @@ inputError(){
 		if (( "$timer_elapsed" > 30 )); then
            	echo -e "\033[32m	Error: $1 exceeds 30 seconds!  Terminating process!\033[0m" | systemd-cat -t "UltraGrid"
            	# Serious > 30second error, we let the watchdog kill the process
-			sed -i "s/^UG_RESTARTING=.*/UG_RESTARTING=1/" "$HOME/config/$hostNameSys.$(dnsdomainname).conf"
+			sed -i "s/^UG_RESTARTING=.*/UG_RESTARTING=1/" "$HOME/config/$hostNameSys.conf"
 			exit 1
 		elif (( "$timer_elapsed" > 15 )); then
 			send_keepalive
 			generate_errorDisplay "ERR: $1"
 			echo -e "\033[32m	Experiencing +15s of error: $1!\033[0m" | systemd-cat -t "UltraGrid"
 		elif (( "$timer_elapsed" > 10 )); then
-			sed -i "s/^UG_ERROR_STATE=.*/UG_ERROR_STATE=$errorCase/" "$HOME/config/$hostNameSys.$(dnsdomainname).conf"
+			sed -i "s/^UG_ERROR_STATE=.*/UG_ERROR_STATE=$errorCase/" "$HOME/config/$hostNameSys.conf"
 			echo -e "\033[32m	Experiencing error: $1!\033[0m" | systemd-cat -t "UltraGrid"
 			decoder_checkSubscription
 			send_keepalive
@@ -155,14 +165,14 @@ inputError(){
 		fi
 	fi
 	if (( badCounter > 50 )); then
-		sed -i "s/^UG_ERROR_STATE=.*/UG_ERROR_STATE=BURST_ERROR/" "$HOME/config/$hostNameSys.$(dnsdomainname).conf"
+		sed -i "s/^UG_ERROR_STATE=.*/UG_ERROR_STATE=BURST_ERROR/" "$HOME/config/$hostNameSys.conf"
 		generate_errorDisplay "ERR: ERROR BURST DETECTED"
 		send_keepalive
 	fi
 }
 
 check_sourceHashStatus(){
-    KEYNAME="/UI/GROUPS/$hostNameSys/control/sourceHashStatus"; read_etcd_global
+    KEYNAME="/UI/GROUPS/$GROUP_HASH/control/sourceHashStatus"; read_etcd_global
     case "$printvalue" in
         2) echo "	Encoder is priming, waiting..."; encoderStatus=2 ;;
         1) echo "	Encoder ready."; encoderStatus=1 ;;
@@ -187,7 +197,7 @@ decoder_checkSubscription(){
 				# 400 Bad Request, means the channelIndex wasn't valid,.
 				# Don't send keepalive and let decoder process regenerate ug servicefile.
 				echo "	ERROR: supplied channel index invalid, allowing systemd unit regeneration."
-				sed -i "s/^UG_RESTARTING=.*/UG_RESTARTING=1/" "$HOME/config/$hostNameSys.$(dnsdomainname).conf"
+				sed -i "s/^UG_RESTARTING=.*/UG_RESTARTING=1/" "$HOME/config/$hostNameSys.conf"
 				exit 1
 			fi
 		else
@@ -213,10 +223,10 @@ decoder_unSub(){
 	# Send an unsubscribe request to a reflector
 	local channelData; local channelIndex; local channelSourceHash
 	# channelData is compound of index-sourcehash (I.E 4-123456hashvalue)
-	KEYNAME="/HOSTS/$(hostname)/control/channelData"; read_etcd_global; channelData="$printvalue"
+	KEYNAME="/HOSTS/$hostNameSys/control/channelData"; read_etcd_global; channelData="$printvalue"
 	channelIndex="${channelData%%-*}"
 	channelSourceHash="${channelData##*-}"
-	KEYNAME="/HOSTS/$(hostname)/unsubRequest"; KEYVALUE="$channelSourceHash"; write_etcd_global &
+	KEYNAME="/HOSTS/$hostNameSys/unsubRequest"; KEYVALUE="$channelSourceHash"; write_etcd_global &
 }
 
 switcherError(){
@@ -235,7 +245,7 @@ process_fecData(){
 
 reset_error_state(){
 #    echo "Resetting error state — stability detected" | systemd-cat -t "UltraGrid"
-    sed -i "s/^UG_ERROR_STATE=.*/UG_ERROR_STATE=0/" "$HOME/config/$hostNameSys.$(dnsdomainname).conf"
+    sed -i "s/^UG_ERROR_STATE=.*/UG_ERROR_STATE=0/" "$HOME/config/$hostNameSys.conf"
     badCounter=0
     goodCounter=0
     badSwitchCounter=0
