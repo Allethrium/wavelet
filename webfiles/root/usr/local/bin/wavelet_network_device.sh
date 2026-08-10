@@ -244,6 +244,9 @@ populate_to_etcd(){
 	# Generate a host hash and input hash from the device MACaddr, making them stable.
 	hostHash="$(sha256sum <<<"$macAddr-HOST" | tr -d ' \t\n-')"
 	inputHash="$(sha256sum <<<"$macAddr-INPUT" | tr -d ' \t\n-')"
+	# Note we also generate UI keys here.
+	# This is because a network device can't write its own etcd keys, and no wavelet logic will run on them.
+	# Therefore, everything is most simply handled here.
 	KEYDATA="
 put /HOSTS/$deviceHostName.$domainVar \"$hostHash\"
 put /HOSTS/$deviceHostName.$domainVar/inputs/$inputHash \"$interfaceEntry\"
@@ -256,6 +259,18 @@ put /HOSTS/$deviceHostName.$domainVar/uv_stream_cmd/subscribeStream \"$(base64 -
 put /HOSTS/$deviceHostName.$domainVar/control/directMode \"1\"
 put /HOSTS/$deviceHostName.$domainVar/control/GROUP \"$initGroupHash\"
 put /HOSTS/$deviceHostName.$domainVar/control/healthStatus \"0\"
+put /UI/HOSTS/$hostHash \"$deviceHostName.$domainVar\"
+put /UI/HOSTS/$hostHash/control/IP \"$ipAddr\"
+put /UI/HOSTS/$hostHash/control/type \"$type\"
+put /UI/HOSTS/$hostHash/control/label \"$deviceHostName.$domainVar\"
+put /UI/HOSTS/$hostHash/control/blankStatus \"0\"
+put /UI/HOSTS/$hostHash/control/directMode \"1\"
+put /UI/HOSTS/$hostHash/control/resetStatus \"0\"
+put /UI/HOSTS/$hostHash/control/revealStatus \"0\"
+put /UI/HOSTS/$hostHash/control/rebootStatus \"0\"
+put /UI/HOSTS/$hostHash/control/healthStatus \"0\"
+put /UI/HOSTS/$hostHash/control/UIEnable \"0\"
+put /UI/HOSTS/$hostHash/control/GROUP \"$initGroupHash\"
 del DHCP
 
 "
@@ -264,8 +279,6 @@ del DHCP
 	# Ordering here is important, the conf must be generated first.
 	KEYNAME="/HOSTS/$deviceHostName.$domainVar/control/generateConf"; KEYVALUE="1"; write_etcd_global
 	KEYNAME="/HOSTS/$deviceHostName.$domainVar/control/inputUpdate"; KEYVALUE="1"; write_etcd_global
-	sleep 2
-	KEYNAME="/HOSTS/$deviceHostName.$domainVar/control/wavelet_build_completed"; KEYVALUE="1"; write_etcd_global &
 }
 
 get_ndi_devices(){

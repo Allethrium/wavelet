@@ -84,6 +84,7 @@ event_server(){
 			[Install]
 			WantedBy=multi-user.target
 		EOF
+		systemctl start tftpd.service --now
 		if systemctl daemon-reload && configure_firewall && systemctl enable wavelet-root-autologin.service && systemctl restart etcd-quadlet.service registry.service; then
 			echo -e "\n	Security infrastructure successfully configured!" >> "$logName"
 			# We may want to now shred the administrator secret as it should no longer be necessary.
@@ -150,7 +151,6 @@ configure_dhcp(){
 	systemctl daemon-reload
 	mkdir -p /var/log/kea
 	chown -R kea:root /var/log/kea; chmod 0755 /var/log/kea
-	systemctl start kea.service tftpd.service --now
 }
 
 generate_kea_quadlet(){
