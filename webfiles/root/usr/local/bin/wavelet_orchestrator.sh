@@ -754,6 +754,23 @@ update_host_config_full() {
 		hostHash="$CLIENT_HOSTHASH"
 	fi
 	local newVersion=1
+	# Ensure wavelet.conf is sourced to load vars
+	source "/etc/wavelet.conf"
+	# Unpopulated var guards, because apparently we need them.
+	if [[ -z "$SVR_HOSTNAME" ]]; then
+		echo "	ERR: SVR_HOSTNAME not populated.  Populating from local env.."
+		SVR_HOSTNAME="$(hostname)"
+	fi
+	if [[ -z "$SERVER_HOSTHASH" ]]; then
+		echo "	ERR: SVR_HOSTHASH not populated.  Reading from etcd.."
+		KEYNAME="/HOSTS/$hostNameSys"; read_etcd_global; SERVER_HOSTHASH="$printvalue"
+		# TODO etcdctl read for server hosthash
+	fi
+	if [[ -z "$GROUP_HASH" ]]; then
+		echo "	ERR: GROUP_HASH not populated. Reading from etcd.."
+		KEYNAME="/GROUPS/$hostNameSys"; read_etcd_global; GROUP_HASH="$printvalue"
+	fi
+
 	# Here, we build the file contents properly.
 	local configFile="/var/home/wavelet/config/$keyHostName.conf"
 	local lockFile="/var/home/wavelet/config/$keyHostName.conf.lock"

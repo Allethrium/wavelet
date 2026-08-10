@@ -137,14 +137,14 @@ inputError(){
 		if (( "$timer_elapsed" > 30 )); then
            	echo -e "\033[32m	Error: $1 exceeds 30 seconds!  Terminating process!\033[0m" | systemd-cat -t "UltraGrid"
            	# Serious > 30second error, we let the watchdog kill the process
-			sed -i "s/^UG_RESTARTING=.*/UG_RESTARTING=1/" "/$HOME/config/$hostNameSys.$(dnsdomainname).conf"
+			sed -i "s/^UG_RESTARTING=.*/UG_RESTARTING=1/" "$HOME/config/$hostNameSys.$(dnsdomainname).conf"
 			exit 1
 		elif (( "$timer_elapsed" > 15 )); then
 			send_keepalive
 			generate_errorDisplay "ERR: $1"
 			echo -e "\033[32m	Experiencing +15s of error: $1!\033[0m" | systemd-cat -t "UltraGrid"
 		elif (( "$timer_elapsed" > 10 )); then
-			sed -i "s/^UG_ERROR_STATE=.*/UG_ERROR_STATE=$errorCase/" "/$HOME/config/$hostNameSys.$(dnsdomainname).conf"
+			sed -i "s/^UG_ERROR_STATE=.*/UG_ERROR_STATE=$errorCase/" "$HOME/config/$hostNameSys.$(dnsdomainname).conf"
 			echo -e "\033[32m	Experiencing error: $1!\033[0m" | systemd-cat -t "UltraGrid"
 			decoder_checkSubscription
 			send_keepalive
@@ -155,7 +155,7 @@ inputError(){
 		fi
 	fi
 	if (( badCounter > 50 )); then
-		sed -i "s/^UG_ERROR_STATE=.*/UG_ERROR_STATE=BURST_ERROR/" "/$HOME/config/$hostNameSys.$(dnsdomainname).conf"
+		sed -i "s/^UG_ERROR_STATE=.*/UG_ERROR_STATE=BURST_ERROR/" "$HOME/config/$hostNameSys.$(dnsdomainname).conf"
 		generate_errorDisplay "ERR: ERROR BURST DETECTED"
 		send_keepalive
 	fi
@@ -187,7 +187,7 @@ decoder_checkSubscription(){
 				# 400 Bad Request, means the channelIndex wasn't valid,.
 				# Don't send keepalive and let decoder process regenerate ug servicefile.
 				echo "	ERROR: supplied channel index invalid, allowing systemd unit regeneration."
-				sed -i "s/^UG_RESTARTING=.*/UG_RESTARTING=1/" "/$HOME/config/$hostNameSys.$(dnsdomainname).conf"
+				sed -i "s/^UG_RESTARTING=.*/UG_RESTARTING=1/" "$HOME/config/$hostNameSys.$(dnsdomainname).conf"
 				exit 1
 			fi
 		else
@@ -234,8 +234,8 @@ process_fecData(){
 }
 
 reset_error_state(){
-    echo "Resetting error state — stability detected" | systemd-cat -t "UltraGrid"
-    sed -i "s/^UG_ERROR_STATE=.*/UG_ERROR_STATE=0/" "/$HOME/config/$hostNameSys.$(dnsdomainname).conf"
+#    echo "Resetting error state — stability detected" | systemd-cat -t "UltraGrid"
+    sed -i "s/^UG_ERROR_STATE=.*/UG_ERROR_STATE=0/" "$HOME/config/$hostNameSys.$(dnsdomainname).conf"
     badCounter=0
     goodCounter=0
     badSwitchCounter=0
