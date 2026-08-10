@@ -256,14 +256,16 @@ put /HOSTS/$deviceHostName.$domainVar/uv_stream_cmd/subscribeStream \"$(base64 -
 put /HOSTS/$deviceHostName.$domainVar/control/directMode \"1\"
 put /HOSTS/$deviceHostName.$domainVar/control/GROUP \"$initGroupHash\"
 put /HOSTS/$deviceHostName.$domainVar/control/healthStatus \"0\"
-put /HOSTS/$deviceHostName.$domainVar/control/wavelet_build_completed \"1\"
 del DHCP
 
 "
 	echo "Attempting to write $KEYDATA"
 	write_etcd_txn "$KEYDATA"
+	# Ordering here is important, the conf must be generated first.
 	KEYNAME="/HOSTS/$deviceHostName.$domainVar/control/generateConf"; KEYVALUE="1"; write_etcd_global
-	KEYNAME="/HOSTS/$deviceHostName.$domainVar/control/inputUpdate"; KEYVALUE="1"; write_etcd_global &
+	KEYNAME="/HOSTS/$deviceHostName.$domainVar/control/inputUpdate"; KEYVALUE="1"; write_etcd_global
+	sleep 2
+	KEYNAME="/HOSTS/$deviceHostName.$domainVar/control/wavelet_build_completed"; KEYVALUE="1"; write_etcd_global &
 }
 
 get_ndi_devices(){
