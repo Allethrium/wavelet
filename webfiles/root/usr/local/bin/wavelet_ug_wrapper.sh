@@ -23,10 +23,10 @@ fi
 hostNameSys="$(hostname)"
 sourceFile="$HOME/config/$hostNameSys.conf"
 if [[ -f "$sourceFile" ]]; then
+	source "$sourceFile"
+else
 	echo "	ERR: Client configuration file is not available!  Provisioning error."
 	exit 1
-else
-	source "$sourceFile"
 fi
 
 cleanup(){
