@@ -591,7 +591,8 @@ toggle_userInterface() {
 		uiEnable_moveUGWindow
 		echo "$workspace" > "/var/home/wavelet/config/webui.enabled"
 		swaymsg -s "$swaySocket" "workspace $workspace"
-		swaymsg -s "$swaySocket" exec "/usr/bin/firefox" "https://$SVR_HOSTNAME"
+		echo "	Launching web browser with args:  /usr/bin/firefox $SVR_HOSTNAME"
+		swaymsg -s "$swaySocket" exec "/usr/bin/firefox $SVR_HOSTNAME"
 	fi
 }
 toggle_screencast(){
@@ -642,6 +643,7 @@ del \"$BASEKEYNAME/control/screencastRequest\"
 		until [[ -f "/var/home/wavelet/config/screencast/device.connected" ]]; do
 			sleep 0.1
 		done
+		# TODO change this to the local machine $HOME/config/$hostname.conf file.
 		peerInfo="$(< /var/home/wavelet/config/screencast/device.connected)"
 		KEYNAME="/HOSTS/$hostNameSys/control/screencastRequest"; KEYVALUE="$peerInfo"; write_etcd_global &
 		rm -f /var/home/wavelet/config/screencast/device.connected

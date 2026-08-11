@@ -791,5 +791,8 @@ systemctl enable --now var-wavelet_ramfs.mount var-home-wavelet-ramfs.mount wave
 
 # Generate wavelet_build.service
 generate_wavelet_userspace_services
+
+# Modify the Firefox policies.json
+sed -i "s|https://localhost|https://$SVR_HOSTNAME|g" "/etc/firefox/policies/policies.json"
 # Restart getty@tty1 to reload UI and start userland build process, which will run under the WAVELET user
 systemctl restart getty@tty1

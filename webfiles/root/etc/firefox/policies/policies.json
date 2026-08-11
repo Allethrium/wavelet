@@ -22,7 +22,7 @@
 		"Bookmarks": [
 			{
 				"Title": "Wavelet User Interface",
-				"URL": "http://192.168.1.32:8180",
+				"URL": "https://localhost",
 				"Favicon": "https://example.com/favicon.ico",
 				"Placement": "toolbar"
 			}
@@ -93,7 +93,7 @@
 		},
 		"HardwareAcceleration": true,
 		"Homepage": {
-			"URL": "http://192.168.1.32:9080/",
+			"URL": "https://localhost/",
 			"Locked": true,
 			"StartPage": "homepage-locked"
 		},
@@ -105,7 +105,7 @@
 		"NoDefaultBookmarks": true,
 		"OfferToSaveLogins": false,
 		"OfferToSaveLoginsDefault": false,
-		"OverrideFirstRunPage": "http://192.168.1.32:8180",
+		"OverrideFirstRunPage": "https://localhost",
 		"PasswordManagerEnabled": false,
 		"PDFjs": {
 			"Enabled": false,

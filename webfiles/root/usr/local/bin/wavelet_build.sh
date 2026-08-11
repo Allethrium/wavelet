@@ -336,14 +336,17 @@ event_server(){
 		wavelet_init \
 		wavelet_client_controller \
 		wavelet_network_device --now
+	echo "	Running initial device detection.."
+	/bin/bash -c "$WAVELET_DETECTV4L_MOD 'redetect'"
 	# if first run, we set UIEnable to give us the UI browser on the server to assist with setup.
 	if [[ "$SERVER_FIRSTRUN_FLAG" == 1 ]]; then
 		echo "	First run, setting UIEnable flag.."
-		KEYNAME="/HOSTS/$hostNameSys/control/UIEnable"; KEYVALUE="1"; write_etcd_global &
+		sleep 2
+		source "$HOME/config/$hostNameSys.conf"
+		# Write the UI key directly
+		KEYNAME="/UI/HOSTS/$SVR_HOSTHASH/control/UIEnable"; KEYVALUE="1"; write_etcd_global &
 		sed -i "/^export SERVER_FIRSTRUN_FLAG=/d" "/var/home/wavelet/config/$hostNameSys.conf"
 	fi
-	echo "	Running initial device detection.."
-	/bin/bash -c "$WAVELET_DETECTV4L_MOD 'redetect'"
 }
 
 setup_httpd_quadlet(){
