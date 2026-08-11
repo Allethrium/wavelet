@@ -9,7 +9,6 @@
 
 
 # Etcd Interaction hooks
-ETCDINTERACTIONHOOKS=""
 if [[ -f "/var/wavelet_ramfs/etcd_interaction_hooks.sh" ]]; then
 	source "/var/wavelet_ramfs/etcd_interaction_hooks.sh"
 	ETCDINTERACTIONMOD="/var/wavelet_ramfs/etcd_interaction_hooks.sh"
@@ -62,9 +61,9 @@ create_magewell_wavelet_user() {
 	# Delete wavelet user if already exists
 	curl -s -b /var/tmp/sid.txt \
 		"http://$ipAddr/mwapi?method=del-user&id=wavelet"
-	waveletUserPass=$(cat /home/wavelet/config/networkdevice_userpass)
+	waveletUserPass="$(sha256sum </proc/sys/kernel/random/uuid | tr -d ' -')"
 	echo -e "	Attempting to add Wavelet user.."
-	md5sumWaveletPassword=$(echo -n "${waveletUserPass}" | md5sum | cut -d' ' -f1)
+	md5sumWaveletPassword=$(echo -n "$waveletUserPass" | md5sum | cut -d' ' -f1)
 	curl -s -b /var/tmp/sid.txt \
 		"http://$ipAddr/mwapi?method=add-user&id=wavelet&pass=${md5sumWaveletPassword}"
 	# Now we login with the Wavelet User to save the cookie
@@ -226,7 +225,6 @@ event_check_multiCast(){
 populate_to_etcd(){
 	# Since we run on the server, we can populate our keys to the UI directly.
 	# Initial group is always the server group
-	local deviceResult=0
 	if [[ -z "$GROUP_HASH" ]]; then
 		KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; read_etcd_global; initGroupHash="$printvalue"
 	else
@@ -332,7 +330,6 @@ check_etcd_env(){
 		ETCD_WATCH_VALUE="${ETCD_WATCH_VALUE//\"}"
 		ipAddr="${ETCD_WATCH_VALUE%%:*}"
 		macOp="${ETCD_WATCH_VALUE#*:}"
-		operation="${macOp##*:}"
 		macAddr="${macOp%:*}"
 		parse_macaddr "$ipAddr" "$macAddr"
 	fi

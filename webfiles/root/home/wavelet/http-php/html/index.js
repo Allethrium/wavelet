@@ -37,33 +37,7 @@ class Group {
 		this.inputs = new Map(); // Initialize a map to track all inputs in this group
 		this.inputButtonMap = new Map(); // A map of input button elements within the group
 		this._sourceHash = data.controls?.sourceHash || null;
-		this.emitter = {
-			listeners: new Map(),
-			on(event, callback) {
-				if (!this.listeners.has(event)) {
-					this.listeners.set(event, []);
-				}
-				this.listeners.get(event).push(callback);
-			},
-			off(event, callback) {
-				if (this.listeners.has(event)) {
-					const callbacks = this.listeners.get(event);
-					const index = callbacks.indexOf(callback);
-					if (index !== -1) {
-						callbacks.splice(index, 1);
-					}
-					// Clean up empty arrays to prevent memory bloat
-					if (callbacks.length === 0) {
-						this.listeners.delete(event);
-					}
-				}
-			},
-			emit(event, data) {
-				if (this.listeners.has(event)) {
-					this.listeners.get(event).forEach(callback => callback(data));
-				}
-			}
-		};
+		this.emitter = new EventEmitter();
 		this.inputs.set('0', {
 			hashID: '0',
 			labelText: 'Black Screen',
@@ -122,9 +96,9 @@ class Group {
 		let shouldUpdateChain = false;
 		if (inputOwnerGroupHash !== group.hashID) {
 			// External source – chain to that group
-			if (!group.isChained() || group.chainedToGroup !== inputOwnerGroupHash) {
+			if (!group.isChained() || group.controls.chainedToGroup !== inputOwnerGroupHash) {
 				shouldUpdateChain = true;
-				sendControlRequest({
+				void window.root.controlRequestManager.send({
 					operation: "GROUPCONTROL",
 					parentHash: group.hashID,
 					parentType: "group",
@@ -132,24 +106,23 @@ class Group {
 					controlValue: inputOwnerGroupHash,
 					toggleOn: false
 				});
-				group.chainedToGroup = inputOwnerGroupHash;
 				group.controls.chainedToGroup = inputOwnerGroupHash;
 			}
 		} else {
 			// Local or self-reference – break chain if needed
 			if (group.isChained()) {
 				shouldUpdateChain = true;
-				sendControlRequest({
-					operation: "GROUPCONTROL",
-					parentHash: group.hashID,
-					parentType: "group",
-					controlKey: "chainedToGroup",
-					controlValue: null,
-					toggleOn: false
-				});
-				group.chainedToGroup = null;
 				group.controls.chainedToGroup = null;
 			}
+			// Always propagate the newly selected local source to the backend
+			void window.root.controlRequestManager.send({
+				operation: "GROUPCONTROL",
+				parentHash: group.hashID,
+				parentType: "group",
+				controlKey: "changeGroupSource",
+				controlValue: targetHash,
+				toggleOn: false
+			});
 		}
 		// Update sourceHash using the setter
 		this.controls.sourceHash = selectedValue;
@@ -175,8 +148,8 @@ class Group {
 	registerGroupInput(inputInstance) {
 		this.inputs.set(inputInstance.hashID, inputInstance);
 		// console.log(`Input ${inputInstance.labelText} registered in Group ${this.hashID}:`);
-		if (window.root && window.root.activeGroupInputsEmitter) {
-			window.root.activeGroupInputsEmitter.emit(this.hashID);
+		if (window.root && !window.root.activeGroupInputsEmitter) {
+			window.root.activeGroupInputsEmitter = new EventEmitter();
 		}
 		// Rebuild the input button cache since new inputs may have been added
 		this.inputButtonMap.clear();
@@ -186,7 +159,7 @@ class Group {
 		// If this group is chained to another group, break the chain when selecting a local source
 		if (this.controls.chainedToGroup !== null && this.inputs.has(hashID)) {
 			console.log(`Group ${this.hashID}: Breaking chain before setting local source ${hashID}`);
-			await sendControlRequest({
+			await window.root.controlRequestManager.send({
 				operation: "GROUPCONTROL",
 				parentHash: this.hashID,
 				parentType: "group",
@@ -196,7 +169,7 @@ class Group {
 			});
 			this.controls.chainedToGroup = null;
 		}
-		await sendControlRequest({
+		await window.root.controlRequestManager.send({
 			operation: "GROUPCONTROL",
 			parentHash: this.hashID,
 			parentType: "group",
@@ -280,33 +253,9 @@ class Host {
 		this.ipAddress = data.ipAddress || null;
 		this.hostType = data.controls.type;  // SVR, DEC, ENC, NDI, RTSP, other
 		this.type = data.type; // Host, net, infra
-		this.inputs = new Map(); // An input source MUST be on a host, and also must register in the group instance.
-		this.emitter = {
-			listeners: new Map(),
-			on(event, callback) {
-				if (!this.listeners.has(event)) {
-					this.listeners.set(event, []);
-				}
-				this.listeners.get(event).push(callback);
-			},
-			off(event, callback) {
-				if (this.listeners.has(event)) {
-					const callbacks = this.listeners.get(event);
-					const index = callbacks.indexOf(callback);
-					if (index !== -1) {
-						callbacks.splice(index, 1);
-					}
-					if (callbacks.length === 0) {
-						this.listeners.delete(event);
-					}
-				}
-			},
-			emit(event, data) {
-				if (this.listeners.has(event)) {
-					this.listeners.get(event).forEach(callback => callback(data));
-				}
-			}
-		};
+		this.inputs = new Map(); // An input source MUST be on a host and also must register in the group instance.
+		this.emitter = new EventEmitter();
+		this.element = null; // Assigned when createHostElement() attaches the host's DOM element
 	}
 	async changeGroup(newGroupHash) {
 		// Moves this host instance and element to another group.  Automatically registers any inputs on this host.
@@ -315,16 +264,15 @@ class Host {
 		const oldGroupInstance = window.root.groups.get(oldGroupHash);
 		// Update backend control before updating UI
 		if (newGroupHash && newGroupHash !== oldGroupHash) {
-			await sendControlRequest({
+			await window.root.controlRequestManager.send({
 				operation: "HOSTCONTROL",
 				parentHash: this.hashID,
 				parentType: "host",
 				controlKey: "changeGroup",
 				controlValue: newGroupHash,
 				toggleOn: false
-			}).then(() => {
-				this.controls.GROUP = newGroupHash;
 			});
+			this.controls.GROUP = newGroupHash;
 		}
 		// Move the host DOM element to the new group
 		if (newGroupInstance && newGroupInstance.element) {
@@ -413,7 +361,7 @@ class Host {
 		return container;
 	}
 	registerHostInput(inputInstance) {
-		// Registers the class instance with the host and group, and generates the DOM element.
+		// Registers the class instance with the host, group and generates the DOM element.
 		let newInputElement;
 		console.info("Registering new host input: ", inputInstance.hashID);
 		newInputElement = createInputElement(inputInstance);
@@ -426,7 +374,7 @@ class Host {
 			console.info("Found UI element in host, appending input element..");
 			this.uiContainer.appendChild(inputInstance.element);
 		} else {
-			console.info("No UI element found in host, creating then appending input element..");
+			console.info("No UI element found in host.  Creating it, then appending input element..");
 			const inputsDiv = document.createElement("div");
 			inputsDiv.classList.add("inputs_divider_inputs");
 			const inputsDivider_vrt = document.createElement("div");
@@ -466,7 +414,7 @@ class Host {
 		let screencastWidget;
 		screencastWidget=(generateScreencastWidget(this));
 		// ensure we have a direct reference to the widget in the host instance
-		hostInstance.screencastWidget = screencastWidget;
+		this.screencastWidget = screencastWidget;
 		this.element.appendChild(screencastWidget);
 		if (this.element) {
 			this.element.classList.add('host-updated');
@@ -476,7 +424,7 @@ class Host {
 		}
 	}
 	unregisterInput(inputInstance) {
-		// unregisters the input from the host, and deletes its DOM element
+		// unregisters the input from the host and deletes its DOM element
 		const inputElement = inputInstance.element;
 		let group = window.root.groups.get(this.controls.GROUP);
 		if (group) {
@@ -511,11 +459,167 @@ class Input {
 		// Add update tracking
 		this.lastUpdate = null; // TODO - should be timestamp
 	}
-	// update(active = this.active, direct = this.direct) {
-	// 	this.active = active;
-	// 	this.direct = direct;
-	// 	this.lastUpdate = Date.now();
-	// }
+}
+
+class EventEmitter {
+	constructor() {
+		this.listeners = new Map();
+	}
+	on(event, callback) {
+		if (!this.listeners.has(event)) {
+			this.listeners.set(event, []);
+		}
+		this.listeners.get(event).push(callback);
+	}
+	off(event, callback) {
+		if (this.listeners.has(event)) {
+			const callbacks = this.listeners.get(event);
+			const index = callbacks.indexOf(callback);
+			if (index !== -1) {
+				callbacks.splice(index, 1);
+			}
+			if (callbacks.length === 0) {
+				this.listeners.delete(event);
+			}
+		}
+	}
+	emit(event, data) {
+		if (this.listeners.has(event)) {
+			this.listeners.get(event).forEach(callback => callback(data));
+		}
+	}
+	subscribe(callback) {
+		// Subscribe to all events (event '*' or no event)
+		this.on('*', callback);
+		return () => this.off('*', callback);
+	}
+}
+
+class DragDropManager {
+	constructor() {
+		this.dragInstance = null;
+		this.root = window.root;
+		// Bind methods to preserve 'this' context
+		this.handleDragStart = this.handleDragStart.bind(this);
+		this.handleDragEnd = this.handleDragEnd.bind(this);
+		this.handleDragOver = this.handleDragOver.bind(this);
+		this.handleDrop = this.handleDrop.bind(this);
+	}
+	getInstanceFromElement(element) {
+		const type = element.dataset?.type;
+		const hashID = element.dataset?.hash;
+		if (!type || !hashID) return null;
+		let instance = null;
+		switch (type) {
+			case 'group': instance = this.root.groups?.get(hashID) || null; break;
+			case 'host': instance = this.root.hosts?.get(hashID) || null; break;
+			default: return null;
+		}
+		if (instance) {
+			const containerElement = element.closest(`[data-hash="${hashID}"][data-type="${type}"]`);
+			if (containerElement === instance.element) {
+				return instance;
+			}
+		}
+		return instance;
+	}
+	handleDragStart(event) {
+		const element = event.target.closest('[data-hash]');
+		if (!element) return;
+		const dragInstance = this.getInstanceFromElement(element);
+		if (!dragInstance || (dragInstance.type !== "group" && dragInstance.type !== "host")) {
+			return;
+		}
+		this.dragInstance = dragInstance;
+		event.dataTransfer.setData('text/hash-id', dragInstance.hashID);
+		event.dataTransfer.setData('text/object-type', dragInstance.type);
+		event.dataTransfer.effectAllowed = 'move';
+		if (dragInstance.element) {
+			dragInstance.element.classList.add('dragging');
+		}
+	}
+	handleDragEnd() {
+		if (this.dragInstance && this.dragInstance.element) {
+			this.dragInstance.element.classList.remove('dragging');
+		}
+		this.dragInstance = null;
+	}
+	handleDragOver(event) {
+		event.preventDefault();
+		event.dataTransfer.dropEffect = 'move';
+	}
+	handleDrop(event) {
+		event.preventDefault();
+		const draggedHashID = event.dataTransfer.getData('text/hash-id');
+		const draggedObjectType = event.dataTransfer.getData('text/object-type');
+		const draggedInstance = draggedObjectType === 'group'
+			? this.root.groups.get(draggedHashID)
+			: this.root.hosts.get(draggedHashID);
+		if (!draggedInstance) return;
+		const targetElement = event.target.closest('[data-hash]');
+		if (!targetElement) return;
+		const targetInstance = this.getInstanceFromElement(targetElement);
+		if (!targetInstance) return;
+		const draggedHash = draggedInstance.hashID;
+		const targetHash = targetInstance.hashID;
+		const draggedType = draggedInstance.type;
+		const targetType = targetInstance.type;
+		if (draggedType === 'group' && targetType === 'group' && targetHash !== draggedHash) {
+			const sourceHashValue = `${targetHash}:${targetInstance.controls.sourceHash || '1'}`;
+			void window.root.controlRequestManager.send({ operation: "GROUPCONTROL", parentHash: draggedHash, parentType: "group", controlKey: "chainedToGroup", controlValue: targetHash, toggleOn: false });
+			void window.root.controlRequestManager.send({ operation: "GROUPCONTROL", parentHash: draggedHash, parentType: "group", controlKey: "changeGroupSource", controlValue: sourceHashValue, toggleOn: false });
+			draggedInstance.controls.chainedToGroup = targetHash;
+			draggedInstance.sourceHash = sourceHashValue;
+		} else if (draggedType === 'host' && targetType === 'group') {
+			if (draggedInstance.controls.type !== "svr") {
+				void window.root.controlRequestManager.send({
+					operation: "HOSTCONTROL",
+					parentHash: draggedHash,
+					parentType: "host",
+					controlKey: "changeGroup",
+					controlValue: targetHash,
+					toggleOn: false
+				});
+			}
+		}
+	}
+}
+
+class ControlRequestManager {
+	async send(options) {
+		const payload = {
+			hash: options.parentHash,
+			request: options.operation,
+			data: options.extraData || null,
+			type: options.parentType.toUpperCase(),
+			parentHash: options.parentHash
+		};
+		if (options.operation === 'GROUPCONTROL' || options.operation === 'HOSTCONTROL' || options.operation === 'GLOBALSCONTROL') {
+			payload.data = options.toggleOn
+				? `${options.controlKey}:${options.controlValue}:TOGGLE`
+				: `${options.controlKey}:${options.controlValue}`;
+		}
+		try {
+			const response = await fetch('set_control.php', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(payload)
+			});
+			const contentType = response.headers.get('content-type');
+			if (!contentType || !contentType.includes('json')) {
+				const text = await response.text();
+				console.warn('Non-JSON response received:', text);
+			}
+			if (!response.ok) {
+				const errorText = await response.text();
+				console.error('Control operation failed:', errorText);
+			}
+			return await response.json();
+		} catch (error) {
+			console.log('ERROR: ', error);
+			return null;
+		}
+	}
 }
 
 class SSEManager {
@@ -550,7 +654,7 @@ class SSEManager {
 			this.reconnectAttempts = 0;
 			this.updateConnectionStatus('connected');
 		};
-		es.onerror = (event) => {
+		es.onerror = () => {
 			if (es.readyState === EventSource.CLOSED) {
 				this.updateConnectionStatus('disconnected');
 				this.scheduleReconnect();
@@ -583,7 +687,7 @@ class SSEManager {
 		// Defensive check: Ensure data is a valid object before processing
 		if (!data || typeof data !== 'object') return;
 		// Heartbeat handling with ID tracking
-		if (data.time && data.server_time) {
+		if (data.time && data['server_time']) {
 			this.trackHeartbeat();
 			return;
 		}
@@ -669,10 +773,10 @@ class SSEManager {
 						handleGroupEvents(eventData);
 						break;
 					case 'HOSTS':
-						handleHostEvents(eventData);
+						void handleHostEvents(eventData);
 						break;
 					case 'INPUTS':
-						handleInputEvents(eventData);
+						void handleInputEvents(eventData);
 						break;
 					case 'GLOBALS':
 						handleGlobalsEvents(eventData);
@@ -747,27 +851,22 @@ async function setupUIAfterAjax() {
 			console.log(`Toggle changed to: ${controlValue} (checked: ${this.checked})`);
 			// Store the desired state before reload
 			window.root.globals.pendingModeChange = controlValue;
-			try {
-				sendControlRequest({
-					operation: "GLOBALSCONTROL",
-					parentHash: "0",
-					parentType: "GLOBALS",
-					controlKey: "lowInformationMode",
-					controlValue: controlValue,
-					toggleOn: true
-				}).then(() => {
-					// Small delay to ensure backend receives the request
-					setTimeout(() => {
-						window.location.reload();
-					}, 500);
-				}).catch(error => {
-					console.error("Request failed, but reloading anyway", error);
+			window.root.controlRequestManager.send({
+				operation: "GLOBALSCONTROL",
+				parentHash: "0",
+				parentType: "GLOBALS",
+				controlKey: "lowInformationMode",
+				controlValue: controlValue,
+				toggleOn: true
+			}).then(() => {
+				// Small delay to ensure backend receives the request
+				setTimeout(() => {
 					window.location.reload();
-				});
-			} catch (error) {
+				}, 500);
+			}).catch(error => {
 				console.error("Request failed, but reloading anyway", error);
 				window.location.reload();
-			}
+			});
 		});
 	}
 	hostControlControlDiv.appendChild(container);
@@ -874,7 +973,7 @@ function fetchData() {
 		// Handle globals
 		if (data.globals) {
 			// console.log(`Globals:`, data.globals);
-			const rawLowInfoMode = data.globals?.CONTROLS?.lowInformationMode;
+			const rawLowInfoMode = data.globals?.['CONTROLS']?.lowInformationMode;
 			const lowInfoModeBoolean = rawLowInfoMode === 1 || rawLowInfoMode === '1' || rawLowInfoMode === true || rawLowInfoMode === 'true';
 			const globalData = {
 				lowInformationMode: lowInfoModeBoolean,
@@ -883,7 +982,7 @@ function fetchData() {
 			window.root.globals.lowInformationMode = lowInfoModeBoolean;
 			result.push(globalData);
 			const codecs = [];
-			for (const [name, command] of Object.entries(data.globals.CODECS)) {
+			for (const [name, command] of Object.entries(data.globals['CODECS'])) {
 				codecs.push({
 					name: name,
 					command: command
@@ -1027,7 +1126,7 @@ function createToggleBox(parentInstance, controlKey, controlLabel) {
 				operationType = "HOSTCONTROL";
 			}
 			const controlValue = this.checked ? "1" : "0";
-			sendControlRequest({
+			void window.root.controlRequestManager.send({
 				operation: operationType,
 				parentHash: parentInstance.hashID,
 				controlKey: controlKey,
@@ -1104,7 +1203,7 @@ function refreshCodecDropdown(select, groupItem) {
 		console.log("Codec changed to:", selectedCodec);
 		groupItem.activeCodec = selectedCodec; // Update the group item's activeCodec
 		let hashID = groupItem.hashID;
-		sendControlRequest({
+		void window.root.controlRequestManager.send({
 			operation: "GROUPCONTROL",
 			parentHash: hashID,
 			controlKey: "changeGroupCodec",
@@ -1136,7 +1235,8 @@ async function createSourceDropdown(groupItem) {
 	select.addEventListener("blur", handleBlur);
 	select.addEventListener("change", handleChange);
 	document.addEventListener('sourceDropdownRefresh', handleSourceDropdownRefresh);
-	// Initial build
+	// Initial build (reuse the wired-up select so listeners survive the populate pass)
+	groupItem.sourceDropdownElement = select;
 	refreshDropdown(groupItem);
 	// Subscribe to registry changes (handled by global emitter)
 	const unsubscribe = window.root.activeGroupInputsEmitter.subscribe(changedHash => {
@@ -1163,7 +1263,7 @@ function handleSourceDropdownRefresh(event) {
 	refreshDropdown(groupInstance);
 }
 
-async function refreshDropdown(groupInstance) {
+function refreshDropdown(groupInstance) {
 	// Ensure we're working with a Group class instance
 	if (!(groupInstance instanceof Group)) {
 		console.warn(`refreshDropdown: Expected Group instance, got ${groupInstance?.constructor?.name || typeof groupInstance}`);
@@ -1246,7 +1346,7 @@ function buildDropdownOptions(groupInstance) {
 	}
 	// 2: Sources from external groups
 	const otherGroupInputs = Array.from(window.root.groups.entries())
-		.filter(([hash, group]) => hash !== groupInstance.hashID)
+		.filter(([hash]) => hash !== groupInstance.hashID)
 		.map(([hash, group]) => ({
 			groupHash: hash,
 			groupLabel: group.controls.label,
@@ -1297,149 +1397,6 @@ function buildDropdownOptions(groupInstance) {
 //
 //
 
-
-function getInstanceFromElement(element, root = window.root) {
-	const type = element.dataset?.type;
-	const hashID = element.dataset?.hash;
-	if (!type || !hashID) {
-		console.warn("Element missing type or hashID for instance lookup", element);
-		return null;
-	}
-	let instance = null;
-	switch (type) {
-		case 'group':
-			instance = root.groups?.get(hashID) || null;
-			break;
-		case 'host':
-			instance = root.hosts?.get(hashID) || null;
-			break;
-		default:
-			console.warn(`Unknown element type: ${type}`);
-	}
-	// Validate that the found instance actually owns this element (or its closest ancestor with data-hash)
-	if (instance) {
-		const containerElement = element.closest(`[data-hash="${hashID}"][data-type="${type}"]`);
-		if (containerElement === instance.element) {
-			return instance;
-		}
-	}
-	return instance;
-}
-
-
-function handleDragStart(event) {
-	// console.debug("Event: ", event);
-	const element = event.target.closest('[data-hash]');
-	if (!element) return;
-	const dragInstance = getInstanceFromElement(element);
-	if (!dragInstance) {
-		console.warn("No instance found for dragged element", element);
-		return;
-	}
-	if (dragInstance.type !== "group" && dragInstance.type !== "host") {
-		console.log("Instance is not a group or a host!");
-		return;
-	}
-	_dragInstance = dragInstance;
-	// Use instance data directly instead of reparsing
-	const hashID = dragInstance.hashID;
-	const objectType = dragInstance.type;
-	event.dataTransfer.setData('text/hash-id', hashID);
-	event.dataTransfer.setData('text/object-type', objectType);
-	event.dataTransfer.effectAllowed = 'move';
-	// Add dragging class to the container element
-	if (dragInstance.element) {
-		dragInstance.element.classList.add('dragging');
-	}
-	// console.log(`Drag started: ${objectType} ${hashID}`, _dragInstance);
-}
-
-function handleDragEnd(event) {
-	// console.log(`Drag ended: ${event.dataTransfer.getData('text/object-type')} ${event.dataTransfer.getData('text/hash-id')}`, _dragInstance);
-	if (_dragInstance && _dragInstance.element) {
-		_dragInstance.element.classList.remove('dragging');
-	}
-	_dragInstance = null;
-}
-
-function handleDragOver(event) {
-	event.preventDefault();
-	event.dataTransfer.dropEffect = 'move';
-}
-
-function handleDrop(event) {
-	event.preventDefault();
-	// console.log("Drop event: ", event);
-	// Extract dragged item data from dataTransfer
-	const draggedHashID = event.dataTransfer.getData('text/hash-id');
-	const draggedObjectType = event.dataTransfer.getData('text/object-type');
-	// console.log(`Dragged object Hash: ${draggedHashID}, dragged object type: ${draggedObjectType}`);
-	// only host and group objects may be dragged, so if we are a group, we get the hashID from window.root.groups
-	const draggedInstance = draggedObjectType === 'group'
-		? window.root.groups.get(draggedHashID)
-		: window.root.hosts.get(draggedHashID);
-	if (!draggedInstance) {
-		console.warn("No dragged instance found for drop", draggedHashID, draggedObjectType);
-		return;
-	}
-	const targetElement = event.target.closest('[data-hash]');
-	if (!targetElement) {
-		console.warn("No target element found for drop", event.target);
-		return;
-	}
-	const targetInstance = getInstanceFromElement(targetElement);
-	if (!targetInstance) {
-		console.warn("No target instance found for drop", targetElement);
-		return;
-	}
-
-	const draggedHash = draggedInstance.hashID;
-	const targetHash = targetInstance.hashID;
-	const draggedType = draggedInstance.type;
-	const targetType = targetInstance.type;
-
-	if (draggedType === 'group' && targetType === 'group' && targetHash !== draggedHash) {
-		// this sets chainedToGroup control, chaining the dropped group to the target group for video sourcing
-		// Also set sourceHash to match the target group's current source
-		const sourceHashValue = `${targetHash}:${targetInstance.controls.sourceHash || '1'}`;
-		sendControlRequest({
-			operation: "GROUPCONTROL",
-			parentHash: draggedHash,
-			parentType: "group",
-			controlKey: "chainedToGroup",
-			controlValue: targetHash,
-			toggleOn: false
-		});
-		sendControlRequest({
-			operation: "GROUPCONTROL",
-			parentHash: draggedHash,
-			parentType: "group",
-			controlKey: "changeGroupSource",
-			controlValue: sourceHashValue,
-			toggleOn: false
-		});
-		// Update the dragged group instance immediately
-		draggedInstance.chainedToGroup = targetHash;
-		draggedInstance.controls.chainedToGroup = targetHash;
-		draggedInstance.sourceHash = sourceHashValue;
-		// console.log(`Group ${draggedHash} dropped onto group ${targetHash}`, draggedInstance);
-	} else if (draggedType === 'host' && targetType === 'group') {
-		// Host dropped onto group, moves the host into the target group.
-		sendControlRequest({
-			operation: "HOSTCONTROL",
-			parentHash: draggedHash,
-			parentType: "host",
-			controlKey: "changeGroup",
-			controlValue: targetHash,
-			toggleOn: false
-		});
-
-		// console.log(`Host ${draggedHash} dropped onto group ${targetHash}`, draggedInstance);
-	} else {
-		console.info("Invalid object combination for drop process.");
-	}
-}
-
 function setElementBackgroundColor(element, swatchValue) {
 	element.style.backgroundColor = swatchValue;
 }
@@ -1472,25 +1429,23 @@ function createColorSwatch(item, element) {
 		picker.click();
 	});
 	// Update colorValue and submit on selection (when user confirms via color picker)
-	picker.addEventListener('input', async (e) => {
+	picker.addEventListener('input', (e) => {
 		colorValue = e.target.value;
 		swatch.style.backgroundColor = colorValue; // Update visual color
 		// Only submit after color is selected (input event triggers on confirmation)
 		if (element) {
 			setElementBackgroundColor(element, colorValue);
 		}
-		try {
-			await sendControlRequest({
-				operation: 'GROUPCONTROL',
-				parentHash: item.hashID,
-				parentType: item.type,
-				controlKey: 'swatchValue',
-				controlValue: colorValue,
-				toggleOn: false
-			});
-		} catch (error) {
+		void window.root.controlRequestManager.send({
+			operation: 'GROUPCONTROL',
+			parentHash: item.hashID,
+			parentType: item.type,
+			controlKey: 'swatchValue',
+			controlValue: colorValue,
+			toggleOn: false
+		}).catch(error => {
 			console.error('Failed to update background color on server:', error);
-		}
+		});
 	});
 	container.style.display = ("flex");
 	container.style.width = ("100%");
@@ -1515,16 +1470,16 @@ async function createHostElement(hostInstance) {
 	// A host is contained in a div element, which is drag+droppable to group element
 	const divEntry = document.createElement("div");
 	divEntry.setAttribute("data-type", "host");
-	divEntry.setAttribute("draggable", true);
+	divEntry.setAttribute("draggable", "true");
 	divEntry.classList.add("host_divider");
 	divEntry.id = `host-${hostInstance.hashID}`;
 	divEntry.title = `Host IP Address: ${hostInstance.ipAddress}`;
 	divEntry.setAttribute("data-hash", hostInstance.hashID);
 	// Add drag events
-	divEntry.addEventListener("dragstart", handleDragStart);
-	divEntry.addEventListener("dragend", handleDragEnd);
-	divEntry.addEventListener('dragover', handleDragOver);
-	divEntry.addEventListener('drop', handleDrop);
+	divEntry.addEventListener("dragstart", window.root.dragDropManager.handleDragStart);
+	divEntry.addEventListener("dragend", window.root.dragDropManager.handleDragEnd);
+	divEntry.addEventListener('dragover', window.root.dragDropManager.handleDragOver);
+	divEntry.addEventListener('drop', window.root.dragDropManager.handleDrop);
 	hostInstance.category = "HOST";
 	// Add the host button set
 	const hostButtons = hostInstance.createHostButtonSet();
@@ -1545,7 +1500,7 @@ async function createHostElement(hostInstance) {
 		divEntry.appendChild(inputsDivider_vrt);
 		divEntry.appendChild(inputsDiv);
 	}
-	if (hostInstance.controls.enableScreenCast === "1") {
+	if (hostInstance.controls['enableScreenCast'] === "1") {
 		// we generate the screencast widget
 		hostInstance.createScreencastWidget();
 	}
@@ -1579,7 +1534,6 @@ function generateScreencastWidget(hostInstance){
 	divEntry.style.cursor = "default";
 	divEntry.style.fontWeight = "normal";
 	// Store element refs directly
-	const button = divEntry;
 	const labelSpan = document.createElement("span");
 	labelSpan.className = "btn__label";
 	labelSpan.title = "Awaiting Connection";
@@ -1595,7 +1549,7 @@ function generateScreencastWidget(hostInstance){
 	divEntry.appendChild(backgroundOuter);
 	let widgetState = 0;
 	// This is the device hostname+MAC in a single string
-	let deviceName = hostInstance.controls.screencastRequest || "";
+	let deviceName = hostInstance.controls['screencastRequest'] || "";
 	function setState(label, cursor, bgColor) {
 		textSpan.textContent = label;
 		labelSpan.title = label;
@@ -1603,22 +1557,22 @@ function generateScreencastWidget(hostInstance){
 		divEntry.style.fontWeight = cursor === 'pointer' ? 'bold' : 'normal';
 		if (bgColor) divEntry.style.backgroundColor = bgColor;
 	}
-	if (hostInstance.controls.screenActive === "1") {
+	if (hostInstance.controls['screenActive'] === "1") {
 		widgetState = 2;
 		setState("Cancel", "pointer", "#c8e6c9");
-	} else if (hostInstance.controls.screencastRequest) {
+	} else if (hostInstance.controls['screencastRequest']) {
 		widgetState = 1;
-		deviceName = hostInstance.controls.screencastRequest;
+		deviceName = hostInstance.controls['screencastRequest'];
 		setState(`Auth: ${deviceName}`, "pointer", null);
 	}
 	function watchControlChanges() {
-		const reqValue = hostInstance.controls.screencastRequest;
+		const reqValue = hostInstance.controls['screencastRequest'];
 		const reqIsPresent = reqValue != null && String(reqValue).trim() !== "";
 		if (widgetState === 2 && !reqIsPresent) {
 			widgetState = 0;
 			deviceName = "";
 			setState("Awaiting Connection", "default", null);
-		} else if (hostInstance.controls.screenActive === "1" && widgetState !== 2) {
+		} else if (hostInstance.controls['screenActive'] === "1" && widgetState !== 2) {
 			widgetState = 2;
 			setState("Cancel screencasting", "pointer", "#c8e6c9");
 		}
@@ -1652,10 +1606,10 @@ function generateScreencastWidget(hostInstance){
 				// the backend will send SSE notification that will cause the widget to mutate
 				break;
 			case 1:
-				textSpan.textContent = `${hostInstance.controls.screencastRequest}`;
+				textSpan.textContent = `${hostInstance.controls['screencastRequest']}`;
 				// the hover text should say "AUTHORIZE"
 				labelSpan.title = "A device has connected, check hostname/MAC and click to authorize it";
-				sendControlRequest({
+				window.root.controlRequestManager.send({
 					operation: "HOSTCONTROL",
 					parentHash: hostInstance.hashID,
 					parentType: "host",
@@ -1665,7 +1619,7 @@ function generateScreencastWidget(hostInstance){
 				}).then(() => {
 					widgetState = 2;
 					setState("Cancel screencasting", "pointer", "#c8e6c9");
-				}).catch(error => {
+				}).catch(() => {
 					textSpan.textContent = "Auth failed";
 					labelSpan.title = "Auth failed";
 					divEntry.style.backgroundColor = "#ffcdd2";
@@ -1677,7 +1631,7 @@ function generateScreencastWidget(hostInstance){
 			case 2:
 				textSpan.textContent = "STOP";
 				labelSpan.title = "Stop screencasting immediately";
-				sendControlRequest({
+				window.root.controlRequestManager.send({
 					operation: "HOSTCONTROL",
 					parentHash: hostInstance.hashID,
 					parentType: "host",
@@ -1687,7 +1641,7 @@ function generateScreencastWidget(hostInstance){
 				}).then(() => {
 					widgetState = 0;
 					setState("Awaiting Connection", "default", null);
-				}).catch(error => {
+				}).catch(() => {
 					textSpan.textContent = "Stop failed";
 					labelSpan.title = "Stop failed";
 					setTimeout(() => {
@@ -2025,36 +1979,27 @@ function createTextBox(itemInstance, spanText, targetAttribute) {
 			// ["parentHash"] ?? null; // the parent hash if needed
 			// ["type\"]; //  GROUP, HOST, INPUT, GLOBALS
 			if (itemInstance instanceof Group) {
-				// Use group control
-				fetch("/set_control.php", {
-					method: "POST",
-					headers: {"Content-Type": "application/json"},
-					body: JSON.stringify({
-						hash: itemInstance.hashID,
-						data: `relabel:${updatedText}`,
-						type: "GROUP",
-						request: "GROUPCONTROL",
-						hide: false
-					})
+				void window.root.controlRequestManager.send({
+					operation: "GROUPCONTROL",
+					parentHash: itemInstance.hashID,
+					parentType: "group",
+					controlKey: `relabel:${updatedText}`,
+					controlValue: "",
+					toggleOn: false
 				});
-				// groupPHPEvent("", "", objectData.hashID, "GROUPCONTROL", `${subOperation}:${updatedText}`);
 			} else {
 				// we could only be a host otherwise
-				fetch("/set_control.php", {
-					method: "POST",
-					headers: {"Content-Type": "application/json"},
-					body: JSON.stringify({
-						hash: itemInstance.hashID,
-						data: `relabel:${updatedText}`,
-						type: "HOST",
-						request: "HOSTCONTROL",
-						hide: false
-					})
-				}).catch(console.error)
-					.then(() => {
-						// For class instances, update the controls object directly
-						itemInstance.controls.labelText = updatedText;
-					});
+				window.root.controlRequestManager.send({
+					operation: "HOSTCONTROL",
+					parentHash: itemInstance.hashID,
+					parentType: "host",
+					controlKey: `relabel:${updatedText}`,
+					controlValue: "",
+					toggleOn: false
+				}).then(() => {
+					// For class instances, update the controls object directly
+					itemInstance.controls.labelText = updatedText;
+				});
 			}
 		}
 	});
@@ -2128,7 +2073,7 @@ function createFilePicker(objectData) {
 				toggleOn: false
 			};
 			// Send the request
-			sendControlRequest(payload);
+			window.root.controlRequestManager.send(payload);
 		};
 		reader.readAsDataURL(file);
 	};
@@ -2261,7 +2206,7 @@ function createMenuSet(item) {
 			}
 		],
 	};
-	let buttonList = "";
+	let buttonList;
 	if (item.hostType === "svr") {
 		console.info("Item host type is a server, generating limited menu set options.");
 		// We don't want deprovision and switch buttons for the server, they aren't valid for this host type.
@@ -2278,9 +2223,9 @@ function createMenuSet(item) {
 	menuSet.classList.add('hamburger-menu');
 	menuSet.title = "Advanced controls for object";
 	const elementDiv = document.createElement('div');
+	let groupHash;
 	for (const buttonDef of buttonList) {
 		// Handle both old string format and new object format for backward compatibility
-		let groupHash;
 		elementDiv.classList.add('detailMenu_container');
 		const label = typeof buttonDef === 'string' ? buttonDef : buttonDef.label;
 		const title = typeof buttonDef === 'string' ? label : buttonDef.title;
@@ -2290,7 +2235,7 @@ function createMenuSet(item) {
 		if (item.type === "group") {
 			groupHash = item.hashID;
 		} else if (item.type === "host") {
-			groupHash = item.groupHash;
+			groupHash = item.controls.GROUP;
 		}
 		const value = typeof buttonDef === 'object' ? buttonDef.value : '1';
 		// Skip button if condition is not met
@@ -2389,7 +2334,7 @@ function addEmitterListener(element, parentItem, controlKeyOverride) {
 		}
 	};
 	// Helper to update health indicator by replacing the DOM element
-	const updateHealthIndicator = (hostInstance, value) => {
+	const updateHealthIndicator = (hostInstance) => {
 		const parentElement = hostInstance.element;
 		if (parentElement) {
 			const hostButtonsDiv = parentElement.querySelector('.host-buttons');
@@ -2409,8 +2354,7 @@ function addEmitterListener(element, parentItem, controlKeyOverride) {
 			const valueStr = String(value);
 			const isEnabled = valueStr === "1" || value === true;
 			if (isEnabled) {
-				const newUIDiv = createUINotifier(hostInstance);
-				hostInstance.uiNotifier = newUIDiv;
+				createUINotifier(hostInstance);
 			} else {
 				uiNotifier.remove();
 			}
@@ -2430,7 +2374,7 @@ function addEmitterListener(element, parentItem, controlKeyOverride) {
 				break;
 			case 'DIV':
 				if (controlName === 'healthStatus' && element.id?.startsWith('health-')) {
-					updateHealthIndicator(parentItem, newValue);
+					updateHealthIndicator(parentItem);
 				} else if (controlName === 'UIEnable' && (element.id === 'ui-notifier' || element.dataset.control === 'UIEnable')) {
 					updateUINotifier(parentItem, newValue);
 					const textSpan = element.querySelector('.btn__label > span');
@@ -2502,7 +2446,7 @@ function createUnifiedButton(options) {
 		toggleOn: options.toggleOn || false
 	};
 	for (const [key, keyValue] of Object.entries(buttonDataSetProperties)) {
-		button.dataset[key] = keyValue;
+		button.dataset[key] = keyValue === undefined || keyValue === null ? '' : String(keyValue);
 	}
 	const innerSpan = document.createElement('span');
 	const labelSpan = document.createElement('span');
@@ -2541,7 +2485,6 @@ function createUnifiedButton(options) {
 		let newValue = null;
 		button.dataset.label = (
 			currentValue === "0" ||
-			currentValue === 0 ||
 			currentValue === "false" ||
 			currentValue === false ||
 			currentValue === null
@@ -2561,15 +2504,15 @@ function createUnifiedButton(options) {
 				console.log(`Sending ${button.dataset.control}: ${currentValue} → ${newValue}`);
 			}
 			// Update the button's label
-			sendControlRequest({
+			window.root.controlRequestManager.send({
 				operation: button.dataset.operation,
 				parentHash: button.dataset.parentHash || null,
 				parentType: button.dataset.parentType,
 				controlKey: button.dataset.control || "null-control",
 				controlValue: newValue,
 				toggleOn: isToggleType
-			}).then(response => {
-				// console.log(`Toggle request sent for ${button.dataset.control}:`, response);
+			}).then(() => {
+				// console.log(`Toggle request sent for ${button.dataset.control}:`);
 				button.dataset.value = newValue;
 				let newText = (button.dataset.value === "0")
 					? button.dataset.toggleTextOff
@@ -2645,93 +2588,6 @@ function createUnifiedButton(options) {
 	}
 	addEmitterListener(button, options.parentItem);
 	return button;
-}
-
-async function sendControlRequest(options) {
-	/**
-	 * Unified function to send control requests to the server.
-	 * Required options structure:
-	 * {
-	 *   operation: string, // One of: 'createGroup', 'deleteGroup', 'GROUPCONTROL', 'HOSTCONTROL', 'GLOBALSCONTROL'
-	 *   parentHash: string, // Hash ID of the parent element (e.g., group or host)
-	 *   parentType: string, // One of: 'GROUP', 'HOST', 'GLOBALS'
-	 *   controlKey: string, // Key for the control operation (e.g., 'audioStatus', 'relabel')
-	 *   controlValue: string, // Value to set for the control operation
-	 *   toggleOn: boolean, // Optional: If true, adds 'TOGGLE' to the data string
-	 *   extraData: string, // Optional: Used for non-toggle operations
-	 * }
-	 *
-	 * For GROUPCONTROL, HOSTCONTROL, and GLOBALSCONTROL operations:
-	 * - If toggleOn is true, data will be formatted as: `${controlKey}:${controlValue}:TOGGLE`
-	 * - If toggleOn is false, data will be formatted as: `${controlKey}:${controlValue}`
-	 *
-	 * Example usage:
-	 * // Toggle audio status (0 = off, 1 = on)
-	 * sendControlRequest({
-	 *   operation: 'GROUPCONTROL',
-	 *   parentHash: 'group123',
-	 *   parentType: 'GROUP',
-	 *   controlKey: 'audioStatus',
-	 *   controlValue: '1',
-	 *   toggleOn: true
-	 * });
-	 *
-	 * // Relabel a group (non-toggle)
-	 * sendControlRequest({
-	 *   operation: 'GROUPCONTROL',
-	 *   parentHash: 'group123',
-	 *   parentType: 'GROUP',
-	 *   controlKey: 'relabel',
-	 *   controlValue: 'New Group Name',
-	 *   toggleOn: false
-	 * });
-	 * Note: 'createGroup' and 'deleteGroup' operations don't use controlKey/controlValue
-	 **/
-	// console.log("Sending control request: ", options);
-	const payload = {
-		hash: options.parentHash,
-		request: options.operation,
-		data: options.extraData || null,
-		type: options.parentType.toUpperCase(),
-		parentHash: options.parentHash
-	};
-	// Special handling for controls
-	if (options.operation === 'GROUPCONTROL' || options.operation === 'HOSTCONTROL' || options.operation === 'GLOBALSCONTROL') {
-		// For these operations, data contains the operation and value separated by colon
-		// If we are dealing with toggles, they are prepended by TOGGLE and have three fields
-		// these data would be submitted like so: TOGGLE:{0,1}:blankStatus
-		if (options.toggleOn) {
-			payload.data = `${options.controlKey}:${options.controlValue}:TOGGLE`;
-		} else {
-			payload.data = `${options.controlKey}:${options.controlValue}`;
-		}
-	}
-	// console.log("Sending unified payload:", JSON.stringify(payload));
-	try {
-		const response = await fetch('set_control.php', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify(payload)
-		});
-
-		// Check if response is actually JSON before parsing
-		const contentType = response.headers.get('content-type');
-		if (!contentType || !contentType.includes('json')) {
-			const text = await response.text();
-			console.warn('Non-JSON response received:', text);
-		}
-
-		if (!response.ok) {
-			const errorText = await response.text();
-			console.error('Control operation failed:', errorText);
-		}
-		return await response.json();
-	} catch (error) {
-		console.log('ERROR: ', error);
-		// throw error;
-	}
 }
 
 
@@ -2881,14 +2737,14 @@ async function createGroupElement(groupItem) {
 	divEntry.classList.add('groups_divider_inner');
 	divEntry.setAttribute("title", `Group ${groupItem.controls.label}`);
 	divEntry.setAttribute("data-type", "group");
-	divEntry.setAttribute("draggable", true);
+	divEntry.setAttribute("draggable", "true");
 	divEntry.setAttribute("data-hash", groupItem.hashID);
 	hostControlDiv.appendChild(divEntry);
 	// Add drag events
-	divEntry.addEventListener("dragstart", handleDragStart);
-	divEntry.addEventListener("dragend", handleDragEnd);
-	divEntry.addEventListener('dragover', handleDragOver);
-	divEntry.addEventListener('drop', handleDrop);
+	divEntry.addEventListener("dragstart", window.root.dragDropManager.handleDragStart.bind(window.root.dragDropManager));
+	divEntry.addEventListener("dragend", window.root.dragDropManager.handleDragEnd.bind(window.root.dragDropManager));
+	divEntry.addEventListener('dragover', window.root.dragDropManager.handleDragOver.bind(window.root.dragDropManager));
+	divEntry.addEventListener('drop', window.root.dragDropManager.handleDrop.bind(window.root.dragDropManager));
     // add a silly animation pulse
     divEntry.classList.add('group-created-animation');
     // Remove the animation class after the animation completes
@@ -3039,8 +2895,8 @@ async function createGroupElement(groupItem) {
 	groupHeaderDiv.appendChild(groupStaticsDiv);
 	divEntry.appendChild(groupHeaderDiv);
 	// Ensure a drop listener exists for the element
-	divEntry.addEventListener('drop', handleDrop);
-	divEntry.addEventListener('dragover', handleDragOver);
+	divEntry.addEventListener('drop', window.root.dragDropManager.handleDrop);
+	divEntry.addEventListener('dragover', window.root.dragDropManager.handleDragOver);
 	groupItem.element = divEntry;
 }
 
@@ -3063,21 +2919,12 @@ async function handlePageLoad() {
 		};
 	}
     // This tracks groups with active inputs centrally, for quick lookups
-    window.root.activeGroupInputsEmitter = {
-        listeners: [],
-        subscribe(callback) {
-            this.listeners.push(callback);
-            return () => {
-                this.listeners = this.listeners.filter(l => l !== callback);
-            };
-        },
-        emit(changedGroupHash) {
-            this.listeners.forEach(callback => callback(changedGroupHash));
-        }
-    };
+	window.root.activeGroupInputsEmitter = new EventEmitter();
 	window.root.groups = new Map();
 	window.root.hosts = new Map();
 	window.root.inputs = new Map();
+	window.root.controlRequestManager = new ControlRequestManager();
+	window.root.dragDropManager = new DragDropManager();
 	// Add click-outside-to-close handler for hamburger menus
 	document.addEventListener("click", function (e) {
 		const isMenuElement = e.target.closest(".hostMenuElement");
@@ -3161,9 +3008,9 @@ function handleGroupEvents(event) {
 		});
 		window.root.groups.set(hashID, newGroup);
 
-		createGroupElement(newGroup).then(r => {
+		createGroupElement(newGroup).then(() => {
 			// Consume the newGroup flag on the backend
-			sendControlRequest({
+			void window.root.controlRequestManager.send({
 				operation: "GROUPCONTROL",
 				parentHash: hashID,
 				parentType: "group",
@@ -3212,13 +3059,15 @@ function handleGroupEvents(event) {
 					// console.log("Calling input activation update for input hash ID: " + event.value + " in group hash ID: " + hashID);
 					groupItem.sourceHash = event.value;
 					groupItem.updateActiveState();
-					window.root.groups.forEach((chainedGroup, chainedHash) => {
-						if (chainedGroup.controls.chainedToGroup === groupItem.hashID) {
-							console.log(`This group is the target of a chained group! Broadcasting source change to chained group: ${chainedHash}`);
+					// What defines chainedGroup and chainedHash?
+					// each group has a key which can be undefined/null: group.controls.chainedToGroup
+					window.root.groups.forEach(group => {
+						if (group.controls.chainedToGroup === groupItem.hashID) {
+							console.log(`This group is the source target of a chained group! Broadcasting source change to the chained group: ${group.hashID}`);
 							// Send changeGroupSource to the chained group
-							sendControlRequest({
+							void window.root.controlRequestManager.send({
 								operation: "GROUPCONTROL",
-								parentHash: chainedHash,
+								parentHash: group.hashID,
 								parentType: "group",
 								controlKey: "changeGroupSource",
 								controlValue: event.value,
@@ -3237,15 +3086,15 @@ function handleGroupEvents(event) {
 					// force a source dropdown refresh
 					// get the chained group's sourceHash and update our own sourceHash to match
 					const targetGroup = window.root.groups.get(event.value);
-					if (event.value !== null && targetGroup) {
-						console.log("Group chaining changed: ", event.value)
-						groupItem.controls.sourceHash = targetGroup.controls.sourceHash
-						sendControlRequest({
+					if (targetGroup) {
+						// ADDED - define chainedHash here
+						let chainedHash = targetGroup.controls.sourceHash;
+						void window.root.controlRequestManager.send({
 							operation: "GROUPCONTROL",
-							parentHash: groupItem.hashID,
+							parentHash: chainedHash,
 							parentType: "group",
 							controlKey: "changeGroupSource",
-							controlValue: groupItem.controls.sourceHash,
+							controlValue: targetGroup.controls.sourceHash,
 							toggleOn: false
 						});
 					}
@@ -3358,7 +3207,7 @@ async function handleHostEvents(event) {
 					group.updateActiveState();
 				}
 				// Consume the newHost flag
-				sendControlRequest({
+				void window.root.controlRequestManager.send({
 					operation: "HOSTCONTROL",
 					parentHash: newHostInstance.hashID,
 					parentType: "host",
@@ -3376,16 +3225,13 @@ async function handleHostEvents(event) {
 			hostInstance.unregisterHost(); // this should delete the host instance and remove its DOM element + inputs
 		}
 	} else {
+		// Handle control update
+		let controlName = parts.length > 3 ? parts[3] : null;
 		try {
 			// If hostInstance is null at this point, skip - likely still being created
 			if (!hostInstance) {
 				console.debug(`Skipping host control update (${controlName}) - host instance not yet created for ${hashID}`);
 				return;
-			}
-			// Handle control update
-			let controlName = null;
-			if (parts.length > 3) {
-				controlName = parts[3];
 			}
 			console.info("Host: " + hostInstance.controls.label + " Event for control: ", controlName);
 			if (controlName in hostInstance.controls) {
@@ -3466,7 +3312,6 @@ async function handleInputEvents(event) {
 			let hostHash = parts[1];
 			let inputHash = parts[3];
 			let valueParts = (event.value || '').split(';');
-			let hostName = valueParts[0] || '';
 			let labelText = valueParts[1] || "Input " + inputHash.substring(0, 8);
 			let subType = valueParts[4] || valueParts[3] || "net";
 			try {
@@ -3478,7 +3323,10 @@ async function handleInputEvents(event) {
 						method: "POST",
 						headers: {"Content-Type": "application/json"},
 					});
-					if (!response.ok) throw new Error('Network response was not ok');
+					if (!response.ok) {
+						console.error('Network response was not ok while fetching host data');
+						return;
+					}
 					const data = await response.json();
 					const hostItem = data.hosts?.find(h => h.hashID === hostHash);
 					if (!hostItem) {
@@ -3632,9 +3480,9 @@ function parseEventToDataObject(event) {
 if (document.readyState === 'loading') {
 	// Still loading, wait for DOMContentLoaded
 	document.addEventListener('DOMContentLoaded', function () {
-		handlePageLoad();
+		void handlePageLoad();
 	});
 } else {
 	// DOM is already loaded
-	handlePageLoad();
+	void handlePageLoad();
 }
