@@ -245,6 +245,7 @@ populate_to_etcd(){
 	hostHash="$(sha256sum <<<"$macAddr-HOST" | tr -d ' \t\n-')"
 	inputHash="$(sha256sum <<<"$macAddr-INPUT" | tr -d ' \t\n-')"
 	# Note we also generate UI keys here.
+	# To avoid the orchestrator, we do not set wavelet_build_completed -- 1 in etcd.
 	# This is because a network device can't write its own etcd keys, and no wavelet logic will run on them.
 	# Therefore, everything is most simply handled here.
 	KEYDATA="
@@ -271,6 +272,7 @@ put /UI/HOSTS/$hostHash/control/rebootStatus \"0\"
 put /UI/HOSTS/$hostHash/control/healthStatus \"0\"
 put /UI/HOSTS/$hostHash/control/UIEnable \"0\"
 put /UI/HOSTS/$hostHash/control/GROUP \"$initGroupHash\"
+put /UI/HOSTS/$hostHash/newHost \"1\"
 del DHCP
 
 "
