@@ -312,16 +312,21 @@ health_status_update(){
 		echo "health_status_update: Invalid hostHash for '$keyHostName', exiting."
 		exit 0
     fi
-    # Perform an atomic write with an etcdctl check that the key exists and it not null included
-    KEYDATA="val(\"/HOSTS/$keyHostName\") = \"$hostHash\"
+    # We perform a test to see if the healthStatus has actually changed, and only update if it has.
+    # The client itself also guards against this.
+    KEYNAME="/UI/HOSTS/$hostHash/control/healthStatus"; read_etcd_global
+    if [[ "$triggerValue" != "$printvalue" ]]; then
+    	# Perform an atomic write with an etcdctl check that the key exists and it not null included
+    	KEYDATA="val(\"/HOSTS/$keyHostName\") = \"$hostHash\"
 
 put /UI/HOSTS/$hostHash/control/healthStatus \"$triggerValue\"
 put /UI/HOSTS/$hostHash/control/lastError \"$(date +%s)\"
 put /UI/HOSTS/$hostHash/control/errorCode \"$triggerValue\"
 
 "
-    write_etcd_txn "$KEYDATA"
-    # Note, this transaction is designed to fail if the host key is NOT present in the UI (stops writing a key for a nonprovisioned device!)
+    	write_etcd_txn "$KEYDATA"
+    	# Note, this transaction is designed to fail if the host key is NOT present in the UI (stops writing a key for a nonprovisioned device!)
+    fi
 }
 
 event_network_sense(){

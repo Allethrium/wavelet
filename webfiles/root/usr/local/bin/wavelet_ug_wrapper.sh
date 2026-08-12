@@ -138,12 +138,13 @@ netCat(){
 inputError(){
 	# Handle input errors
 	errorCase="$1"
-	if [[ -z "${errorTimer_$1:-}" ]]; then
+	if [[ -z "${error_timers[$1]:-}" ]]; then
 		start_timer "errorTimer_$1"
 		error_timers["$1"]="$timer_id_out"
 		start_timer "badReset"
+		error_timers["badReset"]="$timer_id_out"
 	else
-		timer_elapsed="$(get_timer_elapsed "${errorTimer_$1}")"
+		timer_elapsed="$(get_timer_elapsed "${error_timers[$1]}")"
 		if (( "$timer_elapsed" > 30 )); then
            	echo -e "\033[32m	Error: $1 exceeds 30 seconds!  Terminating process!\033[0m" | systemd-cat -t "UltraGrid"
            	# Serious > 30second error, we let the watchdog kill the process
@@ -278,6 +279,11 @@ sampleCounter=0
 badSwitchCounter=0
 declare -gA error_timers
 
+# Ensure the error-state marker exists in the config so sed replaces are reliable.
+if ! grep -q "^UG_ERROR_STATE=" "$HOME/config/$hostNameSys.conf"; then
+	echo "UG_ERROR_STATE=0" >> "$HOME/config/$hostNameSys.conf"
+fi
+
 UG_RESTARTING="$(mktemp)"
 trap 'handle_signal SIGINT'  SIGINT
 trap 'handle_signal SIGTERM' SIGTERM
@@ -294,21 +300,29 @@ echo "	Starting up.." | systemd-cat -t "UltraGrid"
 ln -sf "$UG_LOG_FILE" /var/home/wavelet/logs/ugDirect.log
 start_ultragrid
 start_timer "badReset"
+error_timers["badReset"]="$timer_id_out"
 exec 3< <(stdbuf -oL tail -n0 -F "$UG_LOG_FILE")
 TAIL_PID=$!
 
 echo -e "Reading log outputs..\nPID: $UG_PID\nLOG: $UG_LOG_FILE\n" | systemd-cat -t "UltraGrid"
 while IFS= read -r line <&3; do
-    if [[ -n "${error_timers[badReset]}" ]]; then
+    if [[ -n "${error_timers[badReset]:-}" ]]; then
     	reset_timer_elapsed="$(get_timer_elapsed "badReset")"
     	if (( "$reset_timer_elapsed" > 30 )); then
     		badCounter=0
     		echo "Error counter reset - 30s of stability" | systemd-cat -t "UltraGrid"
+    		# Start a fresh stability window
+    		start_timer "badReset"
+    		error_timers["badReset"]="$timer_id_out"
     	fi
     fi
 	if [[ "$goodCounter" -gt 100 ]]; then
 		echo "Noting system stability is good" | systemd-cat -t "UltraGrid"
-		KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="OK: "; write_etcd_global &
+		# We only write a new keyvalue if we aren't already OK.
+		KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; read_etcd_global
+		if [[ "$printvalue" != "OK" ]]; then
+			KEYVALUE="OK"; write_etcd_global &
+		fi
 		reset_error_state
 		goodCounter=0
 	fi

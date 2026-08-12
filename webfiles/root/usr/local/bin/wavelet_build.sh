@@ -343,9 +343,10 @@ event_server(){
 		echo "	First run, setting UIEnable flag.."
 		sleep 2
 		source "$HOME/config/$hostNameSys.conf"
-		# Write the UI key directly
-		KEYNAME="/UI/HOSTS/$SVR_HOSTHASH/control/UIEnable"; KEYVALUE="1"; write_etcd_global &
 		sed -i "/^export SERVER_FIRSTRUN_FLAG=/d" "/var/home/wavelet/config/$hostNameSys.conf"
+		# Write the UI key directly
+		sleep 5
+		KEYNAME="/UI/HOSTS/$SVR_HOSTHASH/control/UIEnable"; KEYVALUE="1"; write_etcd_global &
 	fi
 }
 

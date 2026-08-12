@@ -127,18 +127,28 @@ valid_ipv4() {
 }
 
 generate_errorDisplay(){
+	# $hostNameSys populated in caller module, should be available in this subshell
 	if [[ -z "$1" ]]; then
 		exit 0
 	fi
-	notify-send -u critical -a "Wavelet Error" -r "$(( RANDOM % 1000 + 9000 ))" \
-		-h string:x-mako-align:center \
-		"WAVELET ERROR" "$1" &
-	notifyPID=$!
-	KEYNAME="/HOSTS/$(hostname)/controls/healthStatus"; KEYVALUE="$1"; write_etcd_global
-	while grep -q "^UG_ERROR_STATE=" /etc/wavelet/wavelet.conf; do
-		sleep .5
-	done
-	kill "$notifyPID" 2>/dev/null || true
+	# Notify the appliance immediately via etcd.  This MUST NOT block the caller
+	# (the UltraGrid wrapper's main loop), or video output gets disrupted.
+	KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="$1"; write_etcd_global &
+	# Desktop notification visible until the error state clears (UG_ERROR_STATE=0)
+	# or give up after 30s so the subshell
+	# Runs in a subshell so the caller is never blocked.
+	(
+		ERRORCONF="${ERRORCONF:-$HOME/config/$hostNameSys.conf}"
+		notify-send -u critical -a "Wavelet Error" -r 9000 \
+			-h string:x-mako-align:center \
+			"WAVELET ERROR" "$1"
+		for _ in $(seq 1 60); do
+			sleep .5
+			grep -q "^UG_ERROR_STATE=0" "$ERRORCONF" 2>/dev/null && break
+		done
+		# Dismiss the notification (same replace-id, instant expire).
+		notify-send -a "Wavelet Error" -r 9000 -t 1 "WAVELET ERROR" "$1"
+	) &
 }
 
 generate_timer_id(){

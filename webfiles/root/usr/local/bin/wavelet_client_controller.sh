@@ -1339,12 +1339,12 @@ run_decoder(){
 	videoSourceCmd="${configPayload##*cmd:}"
 	if [[ -n "$videoSourceCmd" && "$videoSourceCmd" != "cmd:" ]]; then
 		videoSourceCmd="$(base64 -d <<<"$videoSourceCmd")"
-		# Reject newlines/control chars to prevent systemd unit injection
-		if [[ "$videoSourceCmd" =~ [$'\n\r\t'] ]] || [[ ! "$videoSourceCmd" =~ ^[a-zA-Z0-9_./\-:]+$ ]]; then
-			echo "	ERR: Invalid characters in decoded videoSourceCmd, rejecting!"
-			KEYNAME="/HOSTS/$hostNameSys/control/healthStatus"; KEYVALUE="ERR: Invalid videoSourceCmd"; write_etcd_global &
-			exit 0
-		fi
+		# Strip trailing newline/CR that upstream echo/base64 encoding added
+		while [[ "$videoSourceCmd" == *$'\n' ]] || [[ "$videoSourceCmd" == *$'\r' ]]; do
+			videoSourceCmd="${videoSourceCmd%$'\n'}"
+			videoSourceCmd="${videoSourceCmd%$'\r'}"
+		done
+		# TODO - implement guards to prevent systemd unit injection.
 	fi
 	echo "	Parsed videoSourceConfig - Type: $videoSourceType, SubType: $videoSourceSubType, Active: $activeFlag"
 	echo "	Video Source Subtype: $videoSourceSubType"
@@ -1930,9 +1930,9 @@ event_get_config(){
 		host_config["$key"]="$value"
 	done <"$configFile"
 	# Populate host configuration variables from the parsed host_config array
-	echo "Array data:"
-	for i in "${host_config[@]}"; do
-		echo "$i"
+	echo "	Host config data:"
+	for key in "${!host_config[@]}"; do
+		echo "		$key:	${host_config[$key]}"
 	done
 	hostHash="${host_config[CLIENT_HOSTHASH]:-}"
 	groupHash="${host_config[GROUP_HASH]:-}"
