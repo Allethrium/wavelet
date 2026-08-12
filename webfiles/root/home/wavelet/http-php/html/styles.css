@@ -604,10 +604,10 @@ input.openHostMenuCheckbox[type="radio"]:checked ~ .hostMenuIconToggle > .diagon
 .toggle {
     cursor: pointer;
     display: inline-flex;
-    align-items: center;
     gap: 6px;
-    padding: 2px 0;
-    vertical-align: middle;
+    padding: 1px 10px;
+    position: relative;
+    top: -15%;
 }
 
 .toggleSwitch {
@@ -925,7 +925,7 @@ body {
     background-color: inherit;
     background-blend-mode: overlay;
     background-color: rgba(0, 0, 0, .2);
-    padding: .6em;
+    padding: .4em;
     margin: var(--margin-medium);
     border-radius: var(--border-radius-medium);
     text-transform: uppercase;
@@ -1130,7 +1130,7 @@ body {
     height: 100%;
     min-height: 1em;
     min-width: .2em;
-    padding: 1em;
+    padding: .5em;
     filter: blur(.04em);
     border: 2px solid grey;
     align-items: center;
@@ -1370,7 +1370,7 @@ body {
     }
 
     .inputTextbox {
-        padding: 12px 16px;
+        padding: .3em 3em;
         font-size: 16px;
     }
 
