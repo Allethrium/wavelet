@@ -1450,7 +1450,7 @@ set_channelIndex(){
 	echo "		Attempting to set UG decoder to channel: $channel" &
 	# Finally, we discover and set our previousVideoSourceKey data now that we have successfully started our stream.
 	# When the decoder next experiences a source state change, it will refer to the HOSTS previousVideoSourceKey data
-	echo -e "		Writing host previous video source key: $etcdValue"
+	echo -e "		Writing host previous video source key: $etcdValue" &
 	# This key tracks state so we know what to revert to if reveal/blank are enabled then turned off.
 	KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; KEYVALUE="$channel-$etcdValue"; write_etcd_global &
 	KEYNAME="/HOSTS/$hostNameSys/control/previousVideoSourceKey"; KEYVALUE="$etcdValue"; write_etcd_global &
@@ -1612,6 +1612,7 @@ start_ug(){
 		sleep .1
 		((count++))
 	done
+	# This continues the same count timer
     if [[ $count -ge $timeout ]]; then
 		echo "		Error: $ugName failed to become active within expected .5 seconds. Attempting to remediate.."
 		timeout=30
@@ -1940,7 +1941,6 @@ event_get_config(){
 	serverHostname="${host_config[SERVER_HOSTNAME]:-}"
 	clusterId="${host_config[CLUSTER_ID]:-}"
 	primaryGroupHash="${host_config[PRIMARY_GROUPHASH]:-}"
-	# This isn't populating properly for some reason?
 	serverHostHash="${host_config[SERVER_HOSTHASH]:-}"
 	hostIp="${host_config[HOST_IP]:-}"
 	inputDevicePresent="${host_config[INPUT_DEVICE_PRESENT]:-}"

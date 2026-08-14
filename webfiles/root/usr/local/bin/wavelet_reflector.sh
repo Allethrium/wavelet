@@ -55,6 +55,68 @@ list_client_port(){
     nc -w 1 127.0.0.1 6159 <<<"list-ports"
 }
 
+# Extract the IP addresses currently configured on the reflector control port.
+# The control API returns a table like:
+#   200 OK
+#   Ports:
+#
+#   Idx IP Address (AF_INET6)                      Port  Type
+#   [0] [::ffff:192.168.1.8]:5004                  5004  forwarding
+# We parse only the bracketed [N] rows and normalize the IPv4-mapped
+# [::ffff:a.b.c.d] form down to a bare dotted-quad.
+# NOTE: occurrences are NOT de-duplicated, so the deletion pass can clear every
+# stale/duplicate port for an unsubscribed IP.
+current_reflector_clients(){
+    local raw rows entry
+    raw="$(list_client_port)"
+    # Keep only the bracketed [N] data rows, then pull the dotted-quad out of
+    # the IPv4-mapped form "[::ffff:a.b.c.d]:port".
+    rows="$(sed -n 's/^\[[0-9]*\] \[::ffff:\([0-9.]*\)\].*/\1/p' <<<"$raw")"
+    while read -r entry; do
+        [[ -n "$entry" ]] && printf '%s\n' "$entry"
+    done <<<"$rows"
+}
+
+# Build the set of IPs etcd says should currently be subscribed.
+desired_reflector_clients(){
+    KEYNAME="/HOSTS/$hostNameSys/DECODER_SUB_LIST/"; read_etcd_prefix_values
+    # read_etcd_prefix_values returns one IP per line (print-value-only).
+    printf '%s\n' "$printvalue" | sed '/^[[:space:]]*$/d' | sort -u
+}
+
+# Reconcile the reflector control port against the authoritative DECODER_SUB_LIST.
+# This is the single source of truth for membership. It is idempotent and
+# self-healing: it removes stale/duplicate ports (e.g. clients whose unsubscribe
+# event was missed, or who changed IP) and adds any that are missing.
+reconcile_clients(){
+    local desired present ip
+    mapfile -t desired <<< "$(desired_reflector_clients)"
+    # Present/actual occurrences (may contain duplicates for the same IP).
+    mapfile -t present <<< "$(current_reflector_clients)"
+
+    echo "	Reconciling reflector client list against DECODER_SUB_LIST.."
+    echo "		Desired: ${desired[*]:-<none>}"
+    echo "		Actual:  ${present[*]:-<none>}"
+
+    # Delete every actual port not in the desired set. Iterating raw occurrences
+    # (not de-duplicated) ensures multiple stale/duplicate ports for the same
+    # unsubscribed IP all get removed, so the zero-client check below can fire.
+    for ip in "${present[@]:-}"; do
+        [[ -n "$ip" ]] || continue
+        if ! printf '%s\n' "${desired[@]:-}" | grep -qxF -- "$ip"; then
+            delete_client_port_patched "$ip"
+        fi
+    done
+
+    # Add any desired IP that has no port present at all (re-adds missed ones).
+    for ip in "${desired[@]:-}"; do
+        [[ -n "$ip" ]] || continue
+        if ! printf '%s\n' "${present[@]:-}" | grep -qxF -- "$ip"; then
+            add_client_port_patched "$ip"
+        fi
+    done
+}
+
 init_reflector(){
 	# Initialize reflector if not running
 	echo "$(date): Initializing reflector, clients will be added via control port API" >> "$log_file"
@@ -69,22 +131,8 @@ init_reflector(){
 
 subscribe_clients(){
 	# Called from init and runs a full list of clients in DECODER_SUB_LIST
-	KEYNAME="/HOSTS/$hostNameSys/DECODER_SUB_LIST/"; read_etcd_prefix_list
-	local clientsArray=()
-	while read -r line; do
-		# Line will be in format /HOSTS/svr.domain.com/DECODER_SUB_LIST/dec$$$$.domain.com
-		# the next line will be the IP address
-		if [[ "$line" == *"$(dnsdomainname)" ]]; then
-			# read next line to get IP
-			read -r next_line
-			clientsArray+=("$next_line")
-		fi
-	done <<<"$printvalue"
-	for client in "${clientsArray[@]}"; do
-		# The client IP value should be properly populated automatically elsewhere in the system
-		# We don't want to waste time guarding it here.
-		add_client_port_patched "$client"
-	done
+	# Full membership reconciliation against the authoritative DECODER_SUB_LIST.
+	reconcile_clients
 }
 
 generate_reflector_systemd_units(){
@@ -169,6 +217,8 @@ if [[ "$1" == "INIT" ]]; then
 	triggerValue=""
 	# bring up reflector systemd unit
 	init_reflector
+	# subscribe_clients inside init_reflector already reconciled membership.
+	reconciled=1
 else
 	# ensure the services are started
 	systemctl --user start UltraGrid.Reflector.service
@@ -176,19 +226,13 @@ else
 fi
 
 
-# We respond on-demand to put or delete requests here.  That's it.
-
-if [[ "$triggerType" == "DELETE" ]]; then
-    KEYNAME="/HOSTS/$triggerHostName/control/IP"; read_etcd_global
-    if [[ -z "$printvalue" ]]; then
-        printvalue="$(dig +short "$triggerHostName")"
-    fi
-    delete_client_port_patched "$printvalue"
-else
-	if [[ -z "$triggerValue" ]]; then
-		exit 0
-	fi
-    add_client_port_patched "$triggerValue"
+# Any put/delete on DECODER_SUB_LIST triggers a full reconciliation.
+# This is deliberately a full re-sync rather than a targeted add/delete:
+# incremental ops drift (missed events, duplicate ports, clients that changed IP
+# or unsubscribed without a clean DELETE), and the stale ports left behind then
+# fool the zero-client check below and keep the encoder running forever.
+if [[ "${reconciled:-0}" != "1" ]]; then
+	reconcile_clients
 fi
 
 # This always runs last:
