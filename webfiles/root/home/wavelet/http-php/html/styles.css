@@ -668,18 +668,17 @@ input.openHostMenuCheckbox[type="radio"]:checked ~ .hostMenuIconToggle > .diagon
 
 .htmlColorPicker{
     appearance: none;
-    width: 10em;
-    height: 1em;
     background-color: transparent;
-    border: none;
+    border: var(--border-standard);
+    border-radius: .5em;
     cursor: pointer;
 }
 .htmlColorPicker::-webkit-color-swatch {
-    border-radius: 15px;
+    border-radius: .5em;
     border: none;
 }
 .htmlColorPicker::-moz-color-swatch {
-    border-radius: 15px;
+    border-radius: .5em;
     border: none;
 }
 
@@ -999,8 +998,11 @@ body {
 .static_buttons_container {
     display: flex;
     flex-direction: column;
-    padding: var(--padding-small);
+    padding: var(--padding-large);
+    margin: var(--margin-small);
     justify-content: left;
+    border: var(--border-standard);
+    border-radius: 1em;
 }
 
 .detailMenu_container {

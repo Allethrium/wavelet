@@ -99,12 +99,10 @@ A stretch goal is to leverage IaaS techniques to support provisioning of some ta
 
 The installer will download appropriate install media and customize the images appropriately after you have intelligently answered the prompts.
 
-You can then navigate to $HOME/Downloads where the installer will have generated an ISO for the Server and Decoders (decoder image generation will soon be depreciated)
+You can then navigate to $HOME/Downloads where the installer will have generated an ISO for the Server.
 
-The server must be installed first and will soon support provisioning client devices directly from itself via PXE / HTTP boot.
+The server must be installed first.  Clients provision directly from the server via PXE/UEFI HTTPs.  Provisioning is fully automated.
 
 Boot the target machine from the server ISO and allow it to run.   As long as your environment is correctly configured with the network settings you specify in the installer and has a stable internet connection, installation is completely automated.  The machine will reboot several times during the process, and once the display shows a browser window with the control console up, it is complete.
 
-The decoders must be imaged whilst connected via ethernet to the server.  They will automatically activate Wi-Fi and disable ethernet by default once imaging is completed.   
-
-I would recommend Ruckus/CommScope APs as their unleashed software is easy to configure and latency is good.
+I would recommend Ruckus/CommScope APs as their unleashed software is easy to configure, and tested latency is good.

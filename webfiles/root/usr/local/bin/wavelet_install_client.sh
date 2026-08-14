@@ -453,6 +453,8 @@ EOF
 systemctl daemon-reload
 systemctl enable --now var-wavelet_ramfs.mount wavelet_copyfiles.service
 
+rpm-ostree initramfs --enable
+
 # Run connectwifi to configure our 802.1x WiFi connectivity.. (will fail if no EAP-TLS certs from DC1!)
 /usr/local/bin/connectwifi.sh
 echo "	Client setup steps completed, moving to start user setup steps.."

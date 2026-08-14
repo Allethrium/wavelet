@@ -34,6 +34,7 @@
 %bcond_without  jxl
 %bcond_without  zimg
 %bcond_without  svtav1
+%bcond_without  openh264
 
 # OFF by default
 %bcond_with     placebo
@@ -94,6 +95,7 @@ BuildRequires:  mesa-libGL-devel
 %{?with_placebo:BuildRequires: libplacebo-devel >= 4.192.0}
 %{?with_amr:BuildRequires:     opencore-amr-devel vo-amrwbenc-devel}
 %{?with_codec2:BuildRequires:  codec2-devel}
+%{?with_openh264:BuildRequires: openh264-devel}
 
 # ── Subpackages ───────────────────────────────────────────────────────────────
 
@@ -181,6 +183,7 @@ export FCFLAGS="${CFLAGS}"
     %{?with_placebo:     --enable-libplacebo}   \
     %{?with_amr: --enable-libopencore_amrnb --enable-libopencore_amrwb --enable-libvo_amrwbenc} \
     %{?with_codec2:      --enable-libcodec2}    \
+    %{?with_openh264:    --enable-libopenh264}  \
     %{nil}
 
 %make_build
