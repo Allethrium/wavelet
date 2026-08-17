@@ -370,7 +370,7 @@ event_reset(){
 		exit 0
 	fi
 }
-update_localconfig(){
+updatelocalConfig(){
 	configFile="/var/home/wavelet/config/$hostname.conf"
 	if grep -q "export $1=" "$configFile"; then
 		sed -i "s|export $1=$KEYVALUE|export $1=$KEYVALUE|g" "$configFile"
@@ -1442,7 +1442,7 @@ run_decoder(){
 		# we will ALAWYS set channel = 3 if blankStatus = 1
 		echo "	Blank is enabled, setting blank display and updating host channel-source control key with: $channel-$etcdValue"
 		KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; KEYVALUE="$channel-$etcdValue"; write_etcd_global &
-		channel=3
+		channel="3"
 		controlPortCmd="capture.data $channel"; netCat "6161" "$controlPortCmd" &
 	else
 		set_channelIndex
@@ -1459,11 +1459,11 @@ set_channelIndex(){
 	echo "		Writing host previous video source key: $etcdValue" &
 	# This key tracks state so we know what to revert to if reveal/blank are enabled then turned off.
 	KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; KEYVALUE="$channel-$etcdValue"; write_etcd_global &
-	update_localConfig "channel-Source"
+	updatelocalConfig "channel-Source"
 	KEYNAME="/HOSTS/$hostNameSys/control/previousVideoSourceKey"; KEYVALUE="$etcdValue"; write_etcd_global &
-	update_localConfig "previousVideoSourceKey"
+	updatelocalConfig "previousVideoSourceKey"
 	KEYNAME="/HOSTS/$hostNameSys/control/previousVideoSourceType"; KEYVALUE="$streamMode"; write_etcd_global &
-	update_localConfig "previousVideoSourceType"
+	updatelocalConfig "previousVideoSourceType"
 	# Are we in UI mode?
 	get_swaySocket
 	if [[ -f "/var/home/wavelet/config/webui.enabled" ]]; then
