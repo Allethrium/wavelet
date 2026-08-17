@@ -269,10 +269,15 @@ event_group_input_persist() {
 # HOST functionality
 event_deprovision(){
 	# Deprovision functionality
+	if [[ $hostNameSys == *"svr"* ]]; then
+		echo "	ERR:  Server may not be deprovisioned!"
+		exit 0
+	fi
 	if [[ "$etcdValue" == "1" ]]; then
 		echo "	Deprovision flag is set.  System will deprovision itself.."
 		echo "	Setting hard deprovision flag to start teardown timer.."
-		KEYNAME="/HOSTS/$hostNameSys/DEPROVISION"; KEYVALUE="1"; write_etcd_global
+		targetHostName="/UI/HOSTS/$thisHostHash"; read_etcd_global; targetHostName="$printvalue"
+		KEYNAME="/HOSTS/$targetHostName/DEPROVISION"; KEYVALUE="1"; write_etcd_global
 		security_layer_deprovision
 		echo "	Host deprovisioning.."
 		shred -u /var/home/wavelet/.ssh/secrets
@@ -284,20 +289,21 @@ event_deprovision(){
 	fi
 }
 event_deprovision_timer(){
+	if [[ $hostNameSys == *"svr"* ]]; then
+		echo "	ERROR: Server may not deprovision!"
+		exit 0
+	fi
 	if [[ "$etcdValue" == "1" ]]; then
 		# This starts a timer which will activate wavelet_deprovision_watcher to perform cleanup
-		echo "	Deprovision flag is set.  System will deprovision itself.."
-		echo "	Setting hard deprovision flag to start teardown timer.."
-		# Get the hostname here from our activation key
-		# etcdKey is like /UI/HOSTS/hostHash/control/deprovision
-		hostHash="${etcdKey#/UI/HOSTS/}"
-		hostHash="${hostHash%%/control/deprovision*}"
-		if [[ -z "$hostHash" ]]; then
+		if [[ -z "$thisHostHash" ]]; then
 			echo "	ERR: hostHash is null, cannot continue!"
 			exit 0
 		fi
+		echo "	Deprovision flag is set.  System will deprovision itself.."
+		echo "	Setting hard deprovision flag to start teardown timer.."
 		# Get hostname from the UI/HOSTS/hostHash key
-		KEYNAME="/UI/HOSTS/$hostHash"; read_etcd_global
+		# As we already know our own hostname, this is another guard to ensure etcd set everything correctly.
+		KEYNAME="/UI/HOSTS/$thisHostHash"; read_etcd_global
 		targetHostName="$printvalue"
 		if [[ -z "$targetHostName" ]]; then
 			echo "	ERR: target host name is null, cannot continue!"
@@ -364,6 +370,14 @@ event_reset(){
 		exit 0
 	fi
 }
+update_localconfig(){
+	configFile="/var/home/wavelet/config/$hostname.conf"
+	if grep -q "export $1=" "$configFile"; then
+		sed -i "s|export $1=$KEYVALUE|export $1=$KEYVALUE|g" "$configFile"
+	else
+		echo "export $1=$KEYVALUE" >> "$configFile"
+	fi
+}
 # Blank functionality
 event_blank(){
 	# Work out which subfunction to call based off our type and key value.
@@ -374,32 +388,38 @@ event_blank(){
 	# Get current channelData
 	if [[ "$etcdValue" == "0" ]]; then
 		event_unblank
+		pactl set-sink-unmute "$(pactl get-default-sink)" 1
 		KEYNAME="/HOSTS/$hostNameSys/control/blankStatus"; KEYVALUE="0"; write_etcd_global &
+		updatelocalConfig "blankStatus"
 	else
-		echo -e "	Blank flag change detected (blank), switching host to blank input channel (3)..\n"
+		echo "	Blank flag change detected (blank), switching host to blank input channel (3).."
 		# mute audio for this output as privacy is implied
 		pactl set-sink-mute "$(pactl get-default-sink)" 1
 		# Now, we switch channel to option 3 which is always the blank screen
 		controlPortCmd="capture.data 3"; netCat "6161" "$controlPortCmd"
 		KEYNAME="/HOSTS/$hostNameSys/control/blankStatus"; KEYVALUE="1"; write_etcd_global &
+		updatelocalConfig "blankStatus"
 	fi
 }
 event_unblank(){
+	# Separate function because we need to read channelData to discover our last state.
 	if [[ "$hostNameSys" == *"svr"* ]]; then
 		exit 0
 	fi
-	local channelData; local channelIndex; local channelSourceHash
+	local channelIndex; local channelSourceHash
 	echo -e "	Blank flag change detected (unblank), switching host to selected input channel..\n"
     pactl set-sink-mute "$(pactl get-default-sink)" 0
     # Get channel data from persistent key
-    KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; read_etcd_global
-    channelData="$printvalue"
-    if [[ -z "$channelData" ]]; then
-    	echo "	Warning: No channel-Source data found, defaulting to channel 1"
-    	channelData="1-1"
-    fi
-    channelIndex="${channelData%%-*}"
-    channelSourceHash="${channelData##*-}"
+    if [[ -z $channelData ]]; then
+    	KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; read_etcd_global
+    	if [[ -z "$printValue" ]]; then
+	    	echo "	Warning: No channel-Source data found, defaulting to channel 1"
+	    	KEYVALUE="1-1"
+	    fi
+	    updatelocalConfig "channelData"
+	fi
+    channelIndex="${KEYVALUE%%-*}"
+    channelSourceHash="${KEYVALUE##*-}"
     echo "	Previous video source is on channel: $channelIndex with source hash: $channelSourceHash"
 	controlPortCmd="capture.data $channelIndex"; netCat "6161" "$controlPortCmd"
 }
@@ -413,23 +433,23 @@ event_relabel(){
 	fi
 }
 event_reveal(){
-	if [[ "$hostNameSys" == *"svr"* ]]; then
+	# shows a test card on the host(s) in question for 15 seconds, then reverts to previous channel
+	if [[ "$hostNameSys" == *"svr"* ]] || [[ "$etcdValue" == "0" ]] || [[ -z "$etcdValue" ]]; then
 		exit 0
 	fi
-	if [[ "$etcdValue" == "0" ]] || [[ -z "$etcdValue" ]]; then
-		exit 0
-	fi
-   	local channelData; local channelIndex; local channelSourceHash
+   	local channelIndex; local channelSourceHash
    	echo "	Showing testcard on this client for 15 seconds.."
    	# Get channel data from persistent key
-   	KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; read_etcd_global
-   	channelData="$printvalue"
-   	if [[ -z "$channelData" ]]; then
-   		echo "	Warning: No channel-Source data found, defaulting to channel 0"
-   		channelData="0-1"
-   	fi
-   	channelIndex="${channelData%%-*}"
-   	channelSourceHash="${channelData##*-}"
+    if [[ -z $channelData ]]; then
+    	KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; read_etcd_global
+    	if [[ -z "$printValue" ]]; then
+	    	echo "	Warning: No channel-Source data found, defaulting to channel 1"
+	    	KEYVALUE="1-1"
+	    fi
+	    updatelocalConfig "channelData"
+	fi
+    channelIndex="${KEYVALUE%%-*}"
+    channelSourceHash="${KEYVALUE##*-}"
    	echo "		Previous video source is on channel: $channelIndex with source hash: $channelSourceHash"
    	controlPortCmd="capture.data 2"; netCat "6161" "$controlPortCmd"
    	sleep 15
@@ -1299,20 +1319,6 @@ run_decoder(){
 	local display; local audio; local command; local keyValue; local blankStatus
 	local streamMode; local externalArg; local activeFlag
 	local videoSourceCmd; local videoSourceType; local videoSourceSubType; local configPayload
-	blankStatus=0
-#	if [[ -n "${firstRunState:-}" ]]; then
-#		# Acquire the groupHash value.  This key is always written, if it is not, we have a badly broken installation.
-#		echo "      Decoder first run, grabbing group $groupHash video source"
-#		KEYNAME="/UI/GROUPS/$groupHash/control/sourceHash"; read_etcd_global
-#		etcdValue="$printvalue"
-#		if [[ -z "$etcdValue" ]]; then
-#			# default to initial static splash image
-#			etcdValue=1; channel=1
-#			KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; KEYVALUE="$channel-$etcdValue"; write_etcd_global &
-#		fi
-#		# Generate a configPayLoad for first run
-#		configPayload="type:static|active:0|subType:static|cmd:"
-#	else
 	KEYNAME="/HOSTS/$hostNameSys/control/videoSourceConfig"; read_etcd_global
 	if [[ -z "$printvalue" ]]; then
 		# We have an error and need to get a proper configPayload or build it from scratch here.
@@ -1431,9 +1437,9 @@ run_decoder(){
 	else
 		regenerate_decoder_ugUnit
 	fi
-	# We need to set the channel index regardless
+	# blankStatus is set from the host conf file and populated whenever this module is called
 	if [[ "$blankStatus" -eq 1 ]]; then
-		# we will always set channel = 3
+		# we will ALAWYS set channel = 3 if blankStatus = 1
 		echo "	Blank is enabled, setting blank display and updating host channel-source control key with: $channel-$etcdValue"
 		KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; KEYVALUE="$channel-$etcdValue"; write_etcd_global &
 		channel=3
@@ -1450,11 +1456,14 @@ set_channelIndex(){
 	echo "		Attempting to set UG decoder to channel: $channel" &
 	# Finally, we discover and set our previousVideoSourceKey data now that we have successfully started our stream.
 	# When the decoder next experiences a source state change, it will refer to the HOSTS previousVideoSourceKey data
-	echo -e "		Writing host previous video source key: $etcdValue" &
+	echo "		Writing host previous video source key: $etcdValue" &
 	# This key tracks state so we know what to revert to if reveal/blank are enabled then turned off.
 	KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; KEYVALUE="$channel-$etcdValue"; write_etcd_global &
+	update_localConfig "channel-Source"
 	KEYNAME="/HOSTS/$hostNameSys/control/previousVideoSourceKey"; KEYVALUE="$etcdValue"; write_etcd_global &
+	update_localConfig "previousVideoSourceKey"
 	KEYNAME="/HOSTS/$hostNameSys/control/previousVideoSourceType"; KEYVALUE="$streamMode"; write_etcd_global &
+	update_localConfig "previousVideoSourceType"
 	# Are we in UI mode?
 	get_swaySocket
 	if [[ -f "/var/home/wavelet/config/webui.enabled" ]]; then
@@ -1945,6 +1954,7 @@ event_get_config(){
 	hostIp="${host_config[HOST_IP]:-}"
 	inputDevicePresent="${host_config[INPUT_DEVICE_PRESENT]:-}"
 	modRevision="${host_config[MOD_REVISION]:-}"
+	blankStatus="${host_config[blankStatus]:-}"
 }
 
 update_config() {

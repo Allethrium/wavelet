@@ -258,6 +258,12 @@ switch ($type) {
 				$toggle      = $parts[2] ?? null; // This is a string literal "TOGGLE" to tell us it's a toggle value
 //				error_log("SET_CONTROL: DEBUG: GROUPCONTROL - subOperation: " . $subOperation . ", dataValue: " . $dataValue . ", toggle: " . $toggle);
 				if ($toggle === "TOGGLE") {
+					if ($hashID === null || $hashID === '') {
+						error_log("ERROR: Missing hashID for GROUP TOGGLE control");
+						http_response_code(400);
+						echo json_encode(["error" => "Missing hashID"]);
+						return;
+					}
 					validateValue($parts[0], $parts[1]);
 					$prefixstring	=	"/UI/GROUPS/" . $hashID . "/control/" . $parts[0];
 					$keyValue = $dataValue;

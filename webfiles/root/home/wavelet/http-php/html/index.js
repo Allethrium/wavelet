@@ -2662,13 +2662,11 @@ function createInputElement(inputInstance) {
 	// 	directMode toggle switch, sets backend directmode 0 or 1
 	if (inputInstance.subType === "NDI" || inputInstance.subType === "RTSP") {
 		const directToggle = createToggleBox(parentHost, "directMode", "DIRECT");
-		directToggle.title = "Toggles direct mode on/off.  If off, this net device will run via the UltraGrid Encoder.";
-		// TODO workshop this to make it look more recognizable as an NDI device
+		directToggle.title = "Toggles direct mode on/off.  If off, this net device will run via an UltraGrid Encoder.";
 		deviceControlsDiv.appendChild(document.createTextNode(` ${inputInstance.subType}`));
 		deviceControlsDiv.appendChild(directToggle);
 	}
 	// TODO Chrome or MiraCast or apple play devices.
-	// 	appropriate logo/notifier.
 	// 	Enable/Disable toggle + an authentication box that pops up with connecting dev's hostname via SSE
 	// 	to be implemented in backend, but want the control code in place.
 	if (inputInstance.subType === "chrome" || inputInstance.subType === "miracast" || inputInstance.subType === "appleplay") {

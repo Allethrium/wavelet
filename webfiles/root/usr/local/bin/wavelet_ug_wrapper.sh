@@ -349,10 +349,8 @@ while IFS= read -r line <&3; do
 			send_keepalive
 			;;
 		*[display]*Successfully*reconfigured*display*to*)
-			if [[ -f "$UG_RESTARTING" ]]; then
-				init_switch
-				rm -f "$UG_RESTARTING"
-			fi
+			# Remove init_switch call here which may be overwriting valid UI commands from the client_controller
+			# this would have the effect of an ignored or overwritten blank command that switches back to channel1 immediately
 			(( goodCounter++ ))
 			send_keepalive
 			;;
