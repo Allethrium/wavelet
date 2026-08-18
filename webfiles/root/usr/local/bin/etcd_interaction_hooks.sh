@@ -187,7 +187,8 @@ get_timer_elapsed() {
     fi
     start_time=${timer_start_times[$timer_id]}
     now=$(date +%s.%N)
-    echo "$now - $start_time" | bc
+    # Truncate to integer seconds so the value is safe to use in bash (( )) arithmetic.
+    echo "($now - $start_time) / 1" | bc
 }
 
 time_operation() {

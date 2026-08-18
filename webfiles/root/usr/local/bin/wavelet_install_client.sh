@@ -458,4 +458,8 @@ rpm-ostree initramfs --enable
 # Run connectwifi to configure our 802.1x WiFi connectivity.. (will fail if no EAP-TLS certs from DC1!)
 /usr/local/bin/connectwifi.sh
 echo "	Client setup steps completed, moving to start user setup steps.."
+
+# Ensure we disable this service so that it does not execute again on next reboot
+systemctl disable wavelet_install_client.service
+rm -rf /etc/systemd/system/wavelet_install_client.service
 systemctl restart getty@tty1
