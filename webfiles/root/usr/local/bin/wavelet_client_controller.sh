@@ -927,6 +927,7 @@ put \"$BASEKEYNAME/control/resetStatus\" \"0\"
 put \"$BASEKEYNAME/control/revealStatus\" \"0\"
 put \"$BASEKEYNAME/control/sourceHash\" \"1\"
 put \"$BASEKEYNAME/control/sourceHashStatus\" \"1\"
+put \"$BASEKEYNAME/control/encoderTimeout\" \"5\"
 put \"$BASEKEYNAME/control/swatchValue\" \"#0f2b39\"
 
 "

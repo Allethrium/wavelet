@@ -25,16 +25,6 @@ else
 	WAVELET_REFLECTOR_MOD="/usr/local/bin/wavelet_reflector.sh"
 fi
 
-
-#load_cpu_affinity_settings() {
-#	# Load pre-configured CPU affinity settings from installer
-#	if [[ -f /etc/wavelet/ultragrid_cpu_affinity ]]; then
-#		CPU_AFFINITY_SETTINGS=$(cat /etc/wavelet/ultragrid_cpu_affinity)
-#	else
-#		CPU_AFFINITY_SETTINGS="# No CPU affinity restrictions"
-#	fi
-#}
-
 test_newDevice(){
 	# Check to see if our host device update flag has been modified.
 	KEYNAME="/HOSTS/$hostNameSys/INPUT_DEVICE_NEW"; read_etcd_global
@@ -58,7 +48,6 @@ test_newDevice(){
 				deviceMatching=false
 			fi
 		done
-
 		if [[ "$deviceMatching" == true ]]; then
 #			echo "	Device already present in running encoder unit, setting channel index.."
 			set_channelIndex
@@ -164,7 +153,7 @@ generate_local_args(){
 	KEYNAME="/UI/GROUPS/$groupHash/control/activeCodec"; read_etcd_global
 	KEYNAME="/UI/GLOBALS/CODECS/$printvalue"; read_etcd_global
 	encoderVar="${printvalue%%;*}"
-	if [[ -n $encoderVar ]]; then
+	if [[ -n "$encoderVar" ]]; then
 		echo "	Found codec commandline: $encoderVar"
 	else
 		err="	ERR: No encoder parameters defined!"

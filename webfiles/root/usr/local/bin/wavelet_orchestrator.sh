@@ -365,11 +365,19 @@ event_update_ip(){
 
 event_encoder_primed(){
 	# Set sourceHashstatus to primed
-	KEYNAME="/UI/GROUPS/$hostGroup/control/sourceHashStatus"; KEYVALUE="2"; write_etcd_global &
+	if [[ -z "$groupHash" ]]; then
+		echo "	ERR: no group hash populated for this host's conf"
+		exit 0
+	fi
+	KEYNAME="/UI/GROUPS/$groupHash/control/sourceHashStatus"; KEYVALUE="2"; write_etcd_global &
 }
 event_encoder_ready(){
 	# Set sourceHashStatus to ready
-	KEYNAME="/UI/GROUPS/$hostGroup/control/sourceHashStatus"; KEYVALUE="1"; write_etcd_global &
+	if [[ -z "$groupHash" ]]; then
+		echo "	ERR: no group hash populated for this host's conf"
+		exit 0
+	fi
+	KEYNAME="/UI/GROUPS/$groupHash/control/sourceHashStatus"; KEYVALUE="1"; write_etcd_global &
 }
 
 event_change_group(){

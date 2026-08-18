@@ -25,7 +25,7 @@ sourceFile="$HOME/config/$hostNameSys.conf"
 if [[ -f "$sourceFile" ]]; then
 	source "$sourceFile"
 else
-	echo "	ERR: Client configuration file is not available!  Provisioning error."
+	echo "	ERR: Client configuration file is not available!  This indicates a provisioning error."
 	exit 1
 fi
 
@@ -155,7 +155,7 @@ inputError(){
 			generate_errorDisplay "ERR: $1"
 			echo -e "\033[32m	Experiencing +15s of error: $1!\033[0m" | systemd-cat -t "UltraGrid"
 		elif (( "$timer_elapsed" > 10 )); then
-			sed -i "s/^UG_ERROR_STATE=.*/UG_ERROR_STATE=$errorCase/" "$HOME/config/$hostNameSys.conf"
+			sed -i "s/export UG_ERROR_STATE=.*/export UG_ERROR_STATE=$errorCase/" "$HOME/config/$hostNameSys.conf"
 			echo -e "\033[32m	Experiencing error: $1!\033[0m" | systemd-cat -t "UltraGrid"
 			decoder_checkSubscription
 			send_keepalive
@@ -166,13 +166,18 @@ inputError(){
 		fi
 	fi
 	if (( badCounter > 50 )); then
-		sed -i "s/^UG_ERROR_STATE=.*/UG_ERROR_STATE=BURST_ERROR/" "$HOME/config/$hostNameSys.conf"
+		sed -i "s/export UG_ERROR_STATE=.*/export UG_ERROR_STATE=BURST_ERROR/" "$HOME/config/$hostNameSys.conf"
 		generate_errorDisplay "ERR: ERROR BURST DETECTED"
 		send_keepalive
 	fi
 }
 
 check_sourceHashStatus(){
+	if [[ -z "$GROUP_HASH" ]]; then
+		# The GROUP_HASH value is not populated in our conf!
+		KEYNAME="/UI/HOSTS/$CLIENT_HOSTHASH/control/GROUP"; read_etcd_global
+		echo "export GROUP_HASH" >> "/var/home/wavelet/config/$hostNameSys.conf"
+	fi
     KEYNAME="/UI/GROUPS/$GROUP_HASH/control/sourceHashStatus"; read_etcd_global
     case "$printvalue" in
         2) echo "	Encoder is priming, waiting..."; encoderStatus=2 ;;
@@ -246,7 +251,7 @@ process_fecData(){
 
 reset_error_state(){
 #    echo "Resetting error state — stability detected" | systemd-cat -t "UltraGrid"
-    sed -i "s/^UG_ERROR_STATE=.*/UG_ERROR_STATE=0/" "$HOME/config/$hostNameSys.conf"
+    sed -i "s/export UG_ERROR_STATE=.*/export UG_ERROR_STATE=0/" "$HOME/config/$hostNameSys.conf"
     badCounter=0
     goodCounter=0
     badSwitchCounter=0
@@ -281,7 +286,7 @@ declare -gA error_timers
 
 # Ensure the error-state marker exists in the config so sed replaces are reliable.
 if ! grep -q "^UG_ERROR_STATE=" "$HOME/config/$hostNameSys.conf"; then
-	echo "UG_ERROR_STATE=0" >> "$HOME/config/$hostNameSys.conf"
+	echo "export UG_ERROR_STATE=0" >> "$HOME/config/$hostNameSys.conf"
 fi
 
 UG_RESTARTING="$(mktemp)"
