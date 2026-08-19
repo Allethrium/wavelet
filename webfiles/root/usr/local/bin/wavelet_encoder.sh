@@ -65,6 +65,8 @@ generate_local_args(){
 	# Consume the device flag by resetting it
 	KEYNAME="/HOSTS/$hostNameSys/INPUT_DEVICE_NEW"; KEYVALUE="0"; write_etcd_global &
 	KEYNAME="inputs/cmd/"; read_etcd_prefix
+	# Always clear deviceMapFile so it cannot fail to reflect the current cmdline structure
+	> "$deviceMapFile"
 	local indexInt
 	indexInt=0
 	sortedLocalDevices=()
@@ -76,11 +78,7 @@ generate_local_args(){
 		echo "		${localInputsArray[*]}"
 		# Declare the master local inputs array
 		declare -A localInputDevices=(); declare -A localInputs=()
-		if [[ -z "$indexInt" ]]; then
-			# Clear device map file so we start with a blank slate
-			echo "" > "$deviceMapFile"
-		fi
-			for element in "${localInputsArray[@]}"; do
+		for element in "${localInputsArray[@]}"; do
 			# Append "-t " to make it a valid UltraGrid command
 			if [[ "$element" != *"-t"* ]];then
 				# Note the spaces before & after $element!
@@ -91,17 +89,11 @@ generate_local_args(){
 			(( indexInt++ ))
 		done
 		# Increment index by N devices present in the local inputs array
-		localInputsOffset="${#localInputs[@]}"
-		echo -e "		$localInputsOffset device(s) in array..\n"
-		(( indexInt += localInputsOffset ))
+		echo "		${#localInputs[@]} device(s) in array.."
 		# Note that here we are appending entries to deviceMapFile!
 		mapfile -d '' sortedLocalDevices < <(printf '%s\0' "${!localInputDevices[@]}" | sort -z)
 		local newEntries=()
 		for i in "${sortedLocalDevices[@]}"; do
-			if [[ "${i}" == "-t" ]]; then
-				newEntries+=("DEL:$i")
-				continue
-			fi
 			mapEntry="$i,${localInputDevices[$i]},${hostNameSys}"
 			# Use awk for faster lookup
 			if ! awk -v entry="$mapEntry" '$0==entry{found=1} END{exit !found}' "$deviceMapFile" 2>/dev/null; then
