@@ -371,7 +371,9 @@ event_reset(){
 	fi
 }
 updatelocalConfig(){
-	configFile="/var/home/wavelet/config/$hostname.conf"
+	# Takes input ARG=$KEYVALUE
+	# possible bug - ensure export KEY=VAL is always on a new line! -- may reside in ug_wrapper.sh
+	configFile="/var/home/wavelet/config/$hostNameSys.conf"
 	if grep -q "export $1=" "$configFile"; then
 		sed -i "s|export $1=$KEYVALUE|export $1=$KEYVALUE|g" "$configFile"
 	else

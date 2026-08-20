@@ -655,16 +655,17 @@ event_client_control_server(){
 }
 event_generate_codecEntries(){
     echo "  Determining platform capabilities and enabling codecs"
-    local test_video="/var/home/wavelet/config/test_input.mp4"
+    local test_video="/var/home/wavelet/config/test_input.mkv"
     local results_file="/var/home/wavelet/config/codec_scores.csv"
     echo "Generating test video..."
-    echo "Codec,Status,LogFile" > "$results_file"
+    echo "CodecCmd,Status,FPS,Bitrate,CPU,SSIM,VMAF,LogFile" > "$results_file"
     generate_test_video "$test_video"
     declare -a codecsArray=(
 #        "libavcodec:encoder=ffv1" # A true lossless FFMPEG codec - can generate up to 400mb stream!
 #        "libavcodec:encoder=prores_ks" # Apple's "perceptually lossless" codec
 #        "libavcodec:encoder=liboapv" # Samsung's "perceptually lossless" codec, default setting "medium"
         "libavcodec:encoder=mjpeg:huffman=1:q=10:safe" # Motion JPEG (CPU)
+        "libavcodec:encoder=libopenjpeg:irreversible=1:disto_alloc=1:safe" # JPEG2000 (CPU) wavelet codec - strong quality/BW tradeoff
         "libavcodec:encoder=mjpeg_qsv:safe" # Motion JPEG (GPU)
         "libavcodec:encoder=h264_qsv:gop=6:bitrate=20M" # MPEG4 (CPU)
         "libavcodec:encoder=libx265:preset=ultrafast:threads=0:safe" # HEVC fast (CPU)
@@ -678,6 +679,7 @@ event_generate_codecEntries(){
         "libavcodec:encoder=av1_qsv:safe" # AV1 (GPU) via QuickSync
         "libavcodec:encoder=libaom-av1:usage=realtime:cpu-used=8:safe" # AV1 via libaom (CPU) default
         "libavcodec:encoder=libsvtav1:preset=12" # AV1 (CPU) via libSVT
+        # "libavcodec:encoder=libaom-av2:usage=realtime:cpu-used=8:safe" # AV2 (CPU) placeholder
     )
 
     LOG_DIR="codec_logs"
@@ -686,32 +688,37 @@ event_generate_codecEntries(){
     	local codec_name; local encoded_video; local bitrate; local fps; local status; local log_file
         # Kill any pre-existing UltraGrid processes
         pkill uv
-        codec_name=$(echo "$codecCmd" | cut -d'=' -f2 | cut -d':' -f1)
+        codec_name=$(sed -E 's/.*encoder=([^:]+).*/\1/' <<<"$codecCmd")
         encoded_video="/var/home/wavelet/config/${codec_name}_output.mp4"
         bitrate="N/A"
         fps="N/A"
+        cpuPct="N/A"
+        ssim_score="N/A"
+        vmaf_score="N/A"
         status="FAILED"
         echo -e "\nTesting codec: $codec_name"
         if output=$(test_with_ug "$test_video" "$codecCmd" "$encoded_video" "$codec_name"); then
             fps=$(echo "$output" | cut -d',' -f1 | cut -d':' -f2)
             bitrate=$(echo "$output" | cut -d',' -f2 | cut -d':' -f2)
+            cpuPct=$(echo "$output" | cut -d',' -f3 | cut -d':' -f2)
             status="SUCCESS"
             case "$codec_name" in
-#                "ffv1")           	KEYVALUE="$codecCmd;FFMPEG FFV1.  High bandwidth, high quality, lossless";;
+#                "ffv1")           	KEYVALUE="$codecCmd;FFMPEG FFV1.  High bandwidth, high quality, lossless";; # cannot get BW down to usable levels
                 "prores")         	KEYVALUE="$codecCmd;Apple prores. High bandwidth, high quality, lossy.  Supports 4444+ colorspace";;
-                "apv")            	KEYVALUE="$codecCmd;Samsung APV. High bandwidth, high quality, 'Perceptually Lossless'";;
+#                "apv")            	KEYVALUE="$codecCmd;Samsung APV. High bandwidth, high quality, 'Perceptually Lossless'";; # Temp disabled re FFmpeg/openapv API mismatch
                 "mjpeg" )           KEYVALUE="$codecCmd;MPEG2 Motion-JPEG High bandwidth, high quality (DVD)";;
+                "libopenjpeg")      KEYVALUE="$codecCmd;JPEG2000 wavelet codec.  Strong quality/BW tradeoff, per-frame low latency, royalty-free.  CPU encoding";;
+                "libaom-av2")       KEYVALUE="$codecCmd;Alliance for Open Media AV2, Low bandwidth, High quality, hard on host.  Successor to AV1.  CPU encoding via libAOM";;
                 "mjpeg_qsv:safe")   KEYVALUE="$codecCmd;MPEG2 Motion-JPEG HW Accelerated High bandwidth, high quality (DVD), compatibility may be an issue";;
                 "h264_qsv")         KEYVALUE="$codecCmd;H.264 MPEG4, Low bandwidth, high compatibility, low quality (slightly worse than Youtube)";;
-                "libx265")          KEYVALUE="$codecCmd;H.265 'HEVC', Low bandwidth, Good quality, hard on host.  CPU encoding";;
-                "libsvt_hevc")      KEYVALUE="$codecCmd;H.265 'HEVC' via libSVT, Low bandwidth, Good quality, hard on host.  CPU encoding via Intel's libSVT";;
+#                "libx265")          KEYVALUE="$codecCmd;H.265 'HEVC', Low bandwidth, Good quality, hard on host.  CPU encoding";;
+#                "libsvt_hevc")      KEYVALUE="$codecCmd;H.265 'HEVC' via libSVT, Low bandwidth, Good quality, hard on host.  CPU encoding via Intel's libSVT";;
                 "hevc_qsv")         KEYVALUE="$codecCmd;H.265 'HEVC', Low bandwidth, Good quality, hard on host.  HW Accelerated encoding via Intel QuickSync, compatibility may be an issue";;
-                "hevc_vaapi")       KEYVALUE="$codecCmd;H.265 'HEVC', Low bandwidth, Good quality, hard on host.  HW Accelerated encoding via Intel VA-API, compatibility may be an issue";;
                 "libvpx-vp9")       KEYVALUE="$codecCmd;Google VP9, Low bandwidth, Good quality, hard on host. Youtube quality.";;
-                "vp9_qsv")          KEYVALUE="$codecCmd;Google VP9, Low bandwidth, Good quality, hard on host. Youtube quality via Intel QuickSync, compatibility may be an issue";;
-                "av1_qsv")          KEYVALUE="$codecCmd;Alliance for Open Media AV1, Low bandwidth, High quality, very hard on host. Superior to VP9 and HEVC in most respects.  HW Accelerated encoding via Intel QuickSync";;
+#                "vp9_qsv")          KEYVALUE="$codecCmd;Google VP9, Low bandwidth, Good quality, hard on host. Youtube quality via Intel QuickSync, compatibility may be an issue";;
+#                "av1_qsv")          KEYVALUE="$codecCmd;Alliance for Open Media AV1, Low bandwidth, High quality, very hard on host. Superior to VP9 and HEVC in most respects.  HW Accelerated encoding via Intel QuickSync";;
                 "libaom-av1")       KEYVALUE="$codecCmd;Alliance for Open Media AV1, Low bandwidth, High quality, very hard on host. Superior to VP9 and HEVC in most respects.  CPU encoding via libAOM";;
-                "libsvtav1")        KEYVALUE="$codecCmd;Alliance for Open Media AV1, Low bandwidth, High quality, very hard on host. Superior to VP9 and HEVC in most respects.  CPU encoding via Intel's libSVT";;
+#                "libsvtav1")        KEYVALUE="$codecCmd;Alliance for Open Media AV1, Low bandwidth, High quality, very hard on host. Superior to VP9 and HEVC in most respects.  CPU encoding via Intel's libSVT";;
             esac
             KEYNAME="/UI/GLOBALS/CODECS/$codec_name"; write_etcd_global &
             # We might not use this but I am going to add it here for quick reference
@@ -724,14 +731,37 @@ event_generate_codecEntries(){
         fi
         log_file="$LOG_DIR/${codec_name}_log.txt"
         echo "$output" > "$log_file"
-		echo "$codecCmd,$status,$log_file,$ssim_score,$vmaf_score" >> "$results_file"
+		echo "$codecCmd,$status,$fps,$bitrate,$cpuPct,$ssim_score,$vmaf_score,$log_file" >> "$results_file"
     done
     echo "Codec testing complete. Results in $results_file"
 }
 generate_test_video() {
     local output="$1"
-    echo "Running: ffmpeg -f lavfi -i testsrc=size=1920x1080:rate=60 -t 5 -c:v png -pix_fmt rgb24 $output"
-    ffmpeg -y -f lavfi -i testsrc=size=1920x1080:rate=60 -t 5 -c:v png -pix_fmt rgb24 "$output"
+    # Quadrant composite stress pattern (single frame, all regions inspectable):
+    #   top-left   smptehdbars  - colour-correctness anchor (detects channel swap/inversion via known RGB<->YUV values)
+    #   top-right  testsrc2     - built-in motion + moving edges (macro-blocking / ghosting)
+    #   bottom-left mandelbrot  - fine detail stress, morphs over time (ringing, sharpness rolloff)
+    #   bottom-right gradients  - smooth colour ramps, animated (banding / posterization)
+    # Each 960x540 quadrant is hstacked then vstacked into one 1920x1080 frame.
+    # All four quadrants evolve over time so the full frame exercises TEMPORAL encoding
+    # (temporal blocking on the "fast" codec modes), not just spatial.
+    # Final format=yuv420p subsamples to the 4:2:0 real NDI/RTSP/USB encodes use, so
+    # RGB-only codecs can't look flawless merely because they were only ever fed RGB.
+    echo "Running: ffmpeg -f lavfi -i smptehdbars -i testsrc2 -i mandelbrot -i gradients (animated quadrant composite) -t 5 -c:v ffv1 -pix_fmt rgb24 $output"
+    ffmpeg -y \
+        -f lavfi -i "smptehdbars=size=960x540:rate=60" \
+        -f lavfi -i "testsrc2=size=960x540:rate=60" \
+        -f lavfi -i "mandelbrot=size=960x540:rate=60:morphamp=0.02" \
+        -f lavfi -i "gradients=size=960x540:rate=60:nb_colors=4:speed=1" \
+        -filter_complex \
+        "[0:v]crop=w=iw/3*2:h=ih/3*2:x='(iw-ow)*t/5':y='(ih-oh)*t/5',scale=960:540[bars]; \
+         [1:v]crop=w=iw/3*2:h=ih/3*2:x='(iw-ow)*(1-t/5)':y='(ih-oh)*t/5',scale=960:540[src2]; \
+         [2:v]scale=960:540[mb]; \
+         [3:v]crop=w=iw/3*2:h=ih/3*2:x='(iw-ow)*t/5':y='(ih-oh)*(1-t/5)',scale=960:540[grad]; \
+         [bars][src2]hstack=inputs=2[top]; \
+         [mb][grad]hstack=inputs=2[bottom]; \
+         [top][bottom]vstack=inputs=2,format=yuv420p[out]" \
+        -map "[out]" -t 5 -c:v ffv1 -pix_fmt rgb24 "$output"
 }
 
 test_with_ug() {
@@ -752,10 +782,18 @@ test_with_ug() {
     qualityResult=0
     timeout=15
     start_time=$(date +%s)
+    cpu_accum=0
+    cpu_samples=0
     while kill -0 $ug_pid 2>/dev/null; do
     	local elapsed
         sleep .5
         elapsed=$(($(date +%s) - start_time))
+        # Sample per-stream CPU utilisation while UG runs (per-stream cost drives client-scaling)
+        cpu_now=$(ps -o %cpu= -p $ug_pid 2>/dev/null | tr -d ' ')
+        if [[ -n "$cpu_now" ]]; then
+            cpu_accum=$(echo "$cpu_accum + $cpu_now" | bc -l)
+            ((cpu_samples++))
+        fi
         if [ $elapsed -ge $timeout ]; then
             echo "	Timeout reached, killing UltraGrid process"
             kill -9 $ug_pid
@@ -768,6 +806,11 @@ test_with_ug() {
         	kill -9 $ug_pid 2>/dev/null
         fi
     done
+    if (( cpu_samples > 0 )); then
+        cpuPct=$(echo "scale=1; $cpu_accum / $cpu_samples" | bc -l)
+    else
+        cpuPct="N/A"
+    fi
     wait $ug_pid 2>/dev/null
     # Check for FATAL errors only
     if grep -q "Could not open codec for pixel format" "$temp_log" ||
@@ -783,7 +826,7 @@ test_with_ug() {
     	local fps; local bitrate
         fps=$(grep "frames in" "$temp_log" | tail -1 | sed -E 's/.* ([0-9.]+) FPS.*/\1/' || echo "N/A")
         bitrate=$(grep "Setting bitrate" "$temp_log" | sed -E 's/.* ([0-9.]+) Mbps.*/\1/' || echo "N/A")
-        echo "FPS:$fps,Bitrate:$bitrate"
+        echo "FPS:$fps,Bitrate:$bitrate,CPU:$cpuPct"
         cat "$temp_log"
         # Run quality tests
         if [[ "$vmafTesting" == 1 ]]; then
