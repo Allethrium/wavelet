@@ -107,6 +107,13 @@ class Group {
 					toggleOn: false
 				});
 				group.controls.chainedToGroup = inputOwnerGroupHash;
+				// Adopt the target group's current source immediately,
+				// if it is different from the current group sourceHash
+				const chainTarget = window.root.groups.get(inputOwnerGroupHash);
+				const chainTargetSource = chainTarget?.controls.sourceHash || chainTarget?._sourceHash;
+				if (chainTargetSource && chainTargetSource !== group.controls.sourceHash) {
+					group.sourceHash = chainTargetSource;
+				}
 			}
 		} else {
 			// Local or self-reference – break chain if needed
@@ -3085,7 +3092,6 @@ function handleGroupEvents(event) {
 					// get the chained group's sourceHash and update our own sourceHash to match
 					const targetGroup = window.root.groups.get(event.value);
 					if (targetGroup) {
-						// ADDED - define chainedHash here
 						let chainedHash = targetGroup.controls.sourceHash;
 						void window.root.controlRequestManager.send({
 							operation: "GROUPCONTROL",
