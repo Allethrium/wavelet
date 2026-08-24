@@ -44,6 +44,11 @@ event_server(){
 	triggerValue="${triggerValue//$'\r'/}"
 	triggerValue="${triggerValue//$'\t'/}"
 	keyHostName="${triggerKey#*/HOSTS/}"; keyHostName="${keyHostName%%/*}"
+	if [[ -n "$keyHostName" ]]; then
+    	# Dont attempt to work upon a null key
+    	echo "	ERR:  keyHostName is not populated."
+    	exit 0
+    fi
 	hostHash=""; hostGroup=""; primaryGroup=""
 	configFileExists=false
 	# This will strip only everything past /control, is this what we want?
@@ -199,7 +204,7 @@ compare_entries(){
         rm -rf "$deleteFile"
         # And we reset the update key to 0
 	fi
-    KEYNAME="/HOSTS/$keyHostName/control/inputUpdate"; delete_etcd_key &
+   	KEYNAME="/HOSTS/$keyHostName/control/inputUpdate"; delete_etcd_key &
 }
 
 event_subscription_request(){
