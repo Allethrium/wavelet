@@ -1952,10 +1952,10 @@ event_get_config(){
 		host_config["$key"]="$value"
 	done <"$configFile"
 	# Populate host configuration variables from the parsed host_config array
-	echo "	Host config data:"
-	for key in "${!host_config[@]}"; do
-		echo "		$key:	${host_config[$key]}"
-	done
+#	echo "	Host config data:"
+#	for key in "${!host_config[@]}"; do
+#		echo "		$key:	${host_config[$key]}"
+#	done
 	hostHash="${host_config[CLIENT_HOSTHASH]:-}"
 	groupHash="${host_config[GROUP_HASH]:-}"
 	hostType="${host_config[HOST_TYPE]:-}"
