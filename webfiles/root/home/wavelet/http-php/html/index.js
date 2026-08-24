@@ -113,6 +113,15 @@ class Group {
 				const chainTargetSource = chainTarget?.controls.sourceHash || chainTarget?._sourceHash;
 				if (chainTargetSource && chainTargetSource !== group.controls.sourceHash) {
 					group.sourceHash = chainTargetSource;
+					// dispatch update data to controller
+					void window.root.controlRequestManager.send({
+						operation: "GROUPCONTROL",
+						parentHash: group.hashID,
+						parentType: "group",
+						controlKey: "changeGroupSource",
+						controlValue: chainTargetSource,
+						toggleOn: false
+					});
 				}
 			}
 		} else {
@@ -393,13 +402,10 @@ class Host {
 			inputsDiv.appendChild(inputsDivider_local);
 			this.element.appendChild(inputsDivider_vrt);
 			this.element.appendChild(inputsDiv);
-			const observer = new MutationObserver(() => {
-				if (this.uiContainer && this.uiContainer.parentNode) {
-					this.uiContainer.appendChild(inputInstance.element);
-					observer.disconnect();
-				}
-			});
-			observer.observe(document, { childList: true, subtree: true });
+			// Append the input element to the container directly. The container is
+			// already in the DOM at this point, so a MutationObserver here would be
+			// created after the fact and never fire, silently orphaning the input.
+			this.uiContainer.appendChild(inputInstance.element);
 		}
 		let groupInstance = window.root.groups.get(this.controls.GROUP);
 		groupInstance.registerGroupInput(inputInstance);
