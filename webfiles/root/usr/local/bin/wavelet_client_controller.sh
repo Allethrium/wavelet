@@ -123,8 +123,8 @@ detect_operation_server(){
 			"sourceHash")		handler_function="event_group_set_video_source";;
 			"staticImage")		handler_function="event_group_set_staticImage";;
 			"activeCodec")		handler_function="event_group_set_codec";;
-			"GROUP-CREATE")		handler_function="event_create_group";;
-			"GROUP-DELETE")		handler_function="event_delete_group";;
+			"/UI/GLOBALS/control/GROUP-CREATE")		handler_function="event_create_group";;
+			"/UI/GLOBALS/control/GROUP-DELETE")		handler_function="event_delete_group";;
 			*) exit 0;;
 		esac
 		if [[ -n "$handler_function" ]] && declare -f "$handler_function" > /dev/null; then
@@ -157,7 +157,9 @@ event_group_enable_audio() {
 
 event_group_enable_banner() {
 	# Enables the graphical banner
-	echo "      Banner enabled"
+	# TODO - this should now be printed on the decoder side via swayimg, as wlroots will be quicker than UG
+	# This also avoids watermarking the stream
+	echo "	Banner enabled"
 	# encoder handles the rest
 }
 
@@ -1760,7 +1762,7 @@ get_hosts_in_group(){
 		fi
 	done
 	if [[ -z "${hostsInGroup[*]}" ]]; then
-		echo "		No hosts located in group!  This could indicate an issue, or just the creation of a new group"
+		echo "	No hosts located in group!  This could indicate an issue, or just the creation of a new group"
 	fi
 }
 

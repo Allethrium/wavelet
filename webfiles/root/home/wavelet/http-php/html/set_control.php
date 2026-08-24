@@ -256,22 +256,19 @@ switch ($type) {
 				$subOperation = $parts[0];
 				$dataValue    = $parts[1];
 				$toggle      = $parts[2] ?? null; // This is a string literal "TOGGLE" to tell us it's a toggle value
+				if ($hashID === null || $hashID === '') {
+					error_log("ERROR: Missing hashID for GROUP control");
+					http_response_code(400);
+					echo json_encode(["error" => "Missing hashID"]);
+					return;
+				}
 //				error_log("SET_CONTROL: DEBUG: GROUPCONTROL - subOperation: " . $subOperation . ", dataValue: " . $dataValue . ", toggle: " . $toggle);
 				if ($toggle === "TOGGLE") {
-					if ($hashID === null || $hashID === '') {
-						error_log("ERROR: Missing hashID for GROUP TOGGLE control");
-						http_response_code(400);
-						echo json_encode(["error" => "Missing hashID"]);
-						return;
-					}
 					validateValue($parts[0], $parts[1]);
 					$prefixstring	=	"/UI/GROUPS/" . $hashID . "/control/" . $parts[0];
 					$keyValue = $dataValue;
 				} else {
 					# Guard against null hashID value being submitted for anything in this branch, noop.
-					if ($hashID === null) {
-						break;
-					}
 					switch ($subOperation) {
 						// These handle the non-boolean operations
 						case 'chainedToGroup':
@@ -400,6 +397,12 @@ switch ($type) {
 				$dataValue    = $parts[1];
 				$toggle      = $parts[2] ?? null;
 //				error_log("SET_CONTROL: DEBUG: HOSTCONTROL - subOperation: " . $subOperation . ", dataValue: " . $dataValue . ", toggle: " . $toggle);
+				if ($hashID === null || $hashID === '') {
+					error_log("ERROR: Missing hashID for HOST control");
+					http_response_code(400);
+					echo json_encode(["error" => "Missing hashID"]);
+					return;
+				}
 				if ($toggle === "TOGGLE") {
 					validateValue($parts[0], $parts[1]);
 					$prefixstring	=	"/UI/HOSTS/" . $hashID . "/control/" . $parts[0];
@@ -422,6 +425,13 @@ switch ($type) {
 							// I.E svr.wavelet.allethrium;IPEVO_Ziggi-HD_Plus:USB-14.0-5.4;/dev/video2/;HOST
 							// I.E 192.168.1.3;NDI1231511Box;00:11:22:33:44;NDI
 							// explode it
+							if ($parentHash === null || $parentHash === '') {
+								// Guard against malformed writes
+								error_log("ERROR: Missing parentHash for inputRelabel");
+								http_response_code(400);
+								echo json_encode(["error" => "Missing parentHash"]);
+								return;
+							}
 							$inputParts = explode(";", $dataValue);
 							$parentHostName = $inputParts[0];
 							$label = $inputParts[1];
