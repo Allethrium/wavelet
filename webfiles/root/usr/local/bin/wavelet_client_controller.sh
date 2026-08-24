@@ -375,7 +375,8 @@ updatelocalConfig(){
 	# possible bug - ensure export KEY=VAL is always on a new line! -- may reside in ug_wrapper.sh
 	configFile="/var/home/wavelet/config/$hostNameSys.conf"
 	if grep -q "export $1=" "$configFile"; then
-		sed -i "s|export $1=$KEYVALUE|export $1=$KEYVALUE|g" "$configFile"
+		# this command needs to replace the entire line
+		sed -i "/^export $1=/c\export $1=$KEYVALUE" "$configFile"
 	else
 		echo "export $1=$KEYVALUE" >> "$configFile"
 	fi
@@ -401,6 +402,9 @@ event_blank(){
 		controlPortCmd="capture.data 3"; netCat "6161" "$controlPortCmd"
 		KEYNAME="/HOSTS/$hostNameSys/control/blankStatus"; KEYVALUE="1"; write_etcd_global &
 		updatelocalConfig "blankStatus"
+		# Update local config with the channel data so that we can switch back
+		KEYNAME="/HOSTS/$hostNameSys/control/channelData"; read_etcd_global; KEYVALUE="$printvalue"
+		updatelocalConfig "channelData"
 	fi
 }
 event_unblank(){
@@ -412,16 +416,18 @@ event_unblank(){
 	echo -e "	Blank flag change detected (unblank), switching host to selected input channel..\n"
     pactl set-sink-mute "$(pactl get-default-sink)" 0
     # Get channel data from persistent key
-    if [[ -z $channelData ]]; then
-    	KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; read_etcd_global
-    	if [[ -z "$printValue" ]]; then
-	    	echo "	Warning: No channel-Source data found, defaulting to channel 1"
-	    	KEYVALUE="1-1"
+    if [[ -z "$channelData" ]]; then
+    	KEYNAME="/HOSTS/$hostNameSys/control/channelData"; read_etcd_global
+    	channelData="$printvalue"
+    	if [[ -z "$channelData" ]]; then
+	    	echo "	Warning: No channelData value found, defaulting to channel 1"
+	    	channelData="1-1"
 	    fi
+	    KEYVALUE="$channelData"
 	    updatelocalConfig "channelData"
 	fi
-    channelIndex="${KEYVALUE%%-*}"
-    channelSourceHash="${KEYVALUE##*-}"
+    channelIndex="${channelData%%-*}"
+    channelSourceHash="${channelData##*-}"
     echo "	Previous video source is on channel: $channelIndex with source hash: $channelSourceHash"
 	controlPortCmd="capture.data $channelIndex"; netCat "6161" "$controlPortCmd"
 }
@@ -441,20 +447,22 @@ event_reveal(){
 	fi
    	local channelIndex; local channelSourceHash
    	echo "	Showing testcard on this client for 15 seconds.."
-   	# Get channel data from persistent key
-    if [[ -z $channelData ]]; then
-    	KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; read_etcd_global
-    	if [[ -z "$printValue" ]]; then
-	    	echo "	Warning: No channel-Source data found, defaulting to channel 1"
-	    	KEYVALUE="1-1"
+    # Get channel data from persistent key
+    if [[ -z "$channelData" ]]; then
+    	KEYNAME="/HOSTS/$hostNameSys/control/channelData"; read_etcd_global
+    	channelData="$printvalue"
+    	if [[ -z "$channelData" ]]; then
+	    	echo "	Warning: No channelData value found, defaulting to channel 1"
+	    	channelData="1-1"
 	    fi
+	    KEYVALUE="$channelData"
 	    updatelocalConfig "channelData"
 	fi
-    channelIndex="${KEYVALUE%%-*}"
-    channelSourceHash="${KEYVALUE##*-}"
-   	echo "		Previous video source is on channel: $channelIndex with source hash: $channelSourceHash"
+    channelIndex="${channelData%%-*}"
+    channelSourceHash="${channelData##*-}"
    	controlPortCmd="capture.data 2"; netCat "6161" "$controlPortCmd"
    	sleep 15
+    echo "	Previous video source is on channel: $channelIndex with source hash: $channelSourceHash"
 	controlPortCmd="capture.data $channelIndex"; netCat "6161" "$controlPortCmd"
 }
 event_prefix_set(){
@@ -1054,7 +1062,7 @@ get_ipValue(){
 			# Todo try to replace with bash param expansion
 			ipValue=$(nmcli -g IP4.ADDRESS con show "$uuid" | head -n1 | cut -d'/' -f1)
 			if [[ -n "$ipValue" && "$ipValue" != "--" ]]; then
-				echo -e "			Found active wired connection \"$connectionName\" with IP: $ipValue"
+				echo -e "	Found active wired connection \"$connectionName\" with IP: $ipValue"
 				break
 			fi
 		fi
@@ -1068,7 +1076,7 @@ get_ipValue(){
 				# Todo try to replace with bash param expansion
 				ipValue=$(nmcli -g IP4.ADDRESS con show "$uuid" | head -n1 | cut -d'/' -f1)
 				if [[ -n "$ipValue" && "$ipValue" != "--" ]]; then
-					echo -e "			Found active wireless connection \"$connectionName\" with IP: $ipValue"
+					echo -e "	Found active wireless connection \"$connectionName\" with IP: $ipValue"
 					break
 				fi
 			fi
@@ -1076,14 +1084,14 @@ get_ipValue(){
 	fi
 	# Null value guard
 	if [[ -z "$ipValue" || "$ipValue" == "--" ]]; then
-		echo -e "			No valid IP address found, using alternative approach.....\n"
+		echo -e "	No valid IP address found, using alternative approach.....\n"
 		# Todo try to replace with bash param expansion
 		ipValue="$(ip -4 route get 1 | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' | head -n1)"
 		return
 	fi
 	# Validate
 	if valid_ipv4 "$ipValue"; then
-		echo -e "			IP Address is valid: $ipValue, continuing.."
+		echo "	IP Address is valid: $ipValue, continuing.."
 		# Update config file with new data
 		configKey="HOST_IP"
         if grep -q "^export $configKey=" "$configFile"; then
@@ -1093,7 +1101,7 @@ get_ipValue(){
 		fi
 		KEYNAME="/HOSTS/$hostNameSys/control/IP"; KEYVALUE="$ipValue"; write_etcd_global &
 	else
-		echo -e "			IP Address '$ipValue' is not valid, retrying...\n"
+		echo -e "	IP Address '$ipValue' is not valid, retrying...\n"
 		sleep .25
 		get_ipValue
 	fi
@@ -1201,11 +1209,10 @@ check_reflector_subscription(){
 	KEYNAME="/HOSTS/$hostNameSys/control/previousVideoSourceKey"; read_etcd_global; previousVideoSourceValue="$printvalue"
 	KEYNAME="/UI/GROUPS/$groupHash/control/currentVideoSourceKey"; read_etcd_global; currentVideoSourceHash="${printvalue%%-*}"
 	if [[ "$streamMode" == "ug" ]]; then
-		echo "		Moving to an UltraGrid source, sending reflector subscription request!"
+		echo "	Moving to an UltraGrid source, sending reflector subscription request"
 		KEYNAME="/HOSTS/$hostNameSys/reflectorRequest"; KEYVALUE="$etcdValue"; write_etcd_global &
 	else
-		echo "		Moving to a non-UltraGrid source, sending a reflector unsubscribe request!"
-		# TODO - Implement a "Switching Video Source" blank image
+		echo "	UltraGrid source, sending a reflector unsubscribe request"
 		KEYNAME="/HOSTS/$hostNameSys/control/unsubRequest"; KEYVALUE="$previousVideoSourceValue"; write_etcd_global &
 		return 0
 	fi
@@ -1218,13 +1225,13 @@ check_reflector_subscription(){
 	fi
 	# We should have a source hash for our previous input
 	if [[ "$previousVideoSourceValue" =~ ^[0-3]$ ]] || [[ "$etcdValue" == "$previousVideoSourceValue" ]]; then
-		echo "		Moving from static video source or previous source is the same as current source."
+		echo "	Moving from static video source or previous source is the same as current source."
 	else
 		# Is the previous source value an UltraGrid reflector?
 		KEYNAME="/HOSTS/$hostNameSys/control/previousVideoSourceType"; read_etcd_global
-		echo "		Previous video source type: $printvalue"
+		echo "	Previous video source type: $printvalue"
 		if [[ "$printvalue" == "ug" ]]; then
-			echo "		Previous video source is an UltraGrid source, checking reflector data"
+			echo "	Previous video source is an UltraGrid source, checking reflector data"
 			# Is it the SAME reflector?
 			# need the host reflector for previous video source and current video source both!
 			previousReflectorHost="$(cat /var/home/wavelet/config/previousReflectorHost)"
@@ -1235,19 +1242,19 @@ check_reflector_subscription(){
 				echo "$printvalue" > /var/home/wavelet/config/previousReflectorHost
 			else
 				# ensure it's overwritten
-				echo "		Reflector host set to null!"
+				echo "	Reflector host set to null!"
 				echo "" > /var/home/wavelet/config/previousReflectorHost
 			fi
 
 			if [[ "$previousReflectorHost" == "$printvalue" ]]; then
-				echo "		Reflector host $previousReflectorHost the same as $printvalue, continuing.."
+				echo "	Reflector host $previousReflectorHost the same as $printvalue, continuing.."
 			else
-				echo "		Reflector host has changed, issuing unsubscribe request.."
+				echo "	Reflector host has changed, issuing unsubscribe request.."
 				KEYNAME="/HOSTS/$hostNameSys/control/unsubRequest"; KEYVALUE="$previousVideoSourceValue"; write_etcd_global &
 				KEYNAME="/HOSTS/$hostNameSys/control/currentUGReflectorHost"; delete_etcd_key_global &
 			fi
 		else
-			echo "		previous source was NOT an UltraGrid reflector.."
+			echo "	Previous source was NOT an UltraGrid reflector.."
 		fi
 	fi
 }
@@ -1259,7 +1266,7 @@ reconstruct_configPayload(){
 	if [[ -n "${firstRunState:-}" ]]; then
 		sourceHash="$etcdValue"
 	else
-		KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; read_etcd_global
+		KEYNAME="/HOSTS/$hostNameSys/control/channelData"; read_etcd_global
 		local channelData="$printvalue"
 		if [[ -z "$channelData" ]]; then
 			channelData="1-1"
@@ -1431,7 +1438,7 @@ run_decoder(){
 	# check for an already running UG systemd unit
 	if systemctl --user is-active UltraGrid.Decoder.service >/dev/null 2>&1; then
 		if [[ "$(cat "$ugPath/$ugName")" == *"${externalArg[*]}"* ]]; then
-			echo "		UGArgs match existing service, no regeneration needed"
+			echo "	UGArgs match existing service, no regeneration needed"
 		else
 			# echo "		UGArgs do not match existing service, regeneration needed"
 			regenerate_decoder_ugUnit
@@ -1443,8 +1450,8 @@ run_decoder(){
 	# blankStatus is set from the host conf file and populated whenever this module is called
 	if [[ "$blankStatus" -eq 1 ]]; then
 		# we will ALAWYS set channel = 3 if blankStatus = 1
-		echo "	Blank is enabled, setting blank display and updating host channel-source control key with: $channel-$etcdValue"
-		KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; KEYVALUE="$channel-$etcdValue"; write_etcd_global &
+		echo "	Blank is enabled, setting blank display and updating host channelData control key with: $channel-$etcdValue"
+		KEYNAME="/HOSTS/$hostNameSys/control/channelData"; KEYVALUE="$channel-$etcdValue"; write_etcd_global &
 		channel="3"
 		controlPortCmd="capture.data $channel"; netCat "6161" "$controlPortCmd" &
 	else
@@ -1461,8 +1468,8 @@ set_channelIndex(){
 	# When the decoder next experiences a source state change, it will refer to the HOSTS previousVideoSourceKey data
 	echo "		Writing host previous video source key: $etcdValue" &
 	# This key tracks state so we know what to revert to if reveal/blank are enabled then turned off.
-	KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; KEYVALUE="$channel-$etcdValue"; write_etcd_global &
-	updatelocalConfig "channel-Source"
+	KEYNAME="/HOSTS/$hostNameSys/control/channelData"; KEYVALUE="$channel-$etcdValue"; write_etcd_global &
+	updatelocalConfig "channelData"
 	KEYNAME="/HOSTS/$hostNameSys/control/previousVideoSourceKey"; KEYVALUE="$etcdValue"; write_etcd_global &
 	updatelocalConfig "previousVideoSourceKey"
 	KEYNAME="/HOSTS/$hostNameSys/control/previousVideoSourceType"; KEYVALUE="$streamMode"; write_etcd_global &
@@ -1958,6 +1965,7 @@ event_get_config(){
 	inputDevicePresent="${host_config[INPUT_DEVICE_PRESENT]:-}"
 	modRevision="${host_config[MOD_REVISION]:-}"
 	blankStatus="${host_config[blankStatus]:-}"
+	channelData="${host_config[channelData]:-}"
 }
 
 update_config() {
