@@ -106,11 +106,16 @@ init_switch(){
 	local errorMessage
 	printvalue=""
 	# channelData is compound of index-sourcehash (I.E 4-123456hashvalue)
-	KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; read_etcd_global; channelIndex="${printvalue%%-*}"
+	source "$HOME/config/$hostNameSys.conf"
+	if [[ -z "$channelData" ]]; then
+		KEYNAME="/HOSTS/$hostNameSys/control/channelData"; read_etcd_global; channelIndex="${printvalue%%-*}"
+	else
+		channelIndex="${channelData%%-*}"
+	fi
 	if [[ -z "$channelIndex" ]]; then
 		errorMessage="ERR:  Channel Index is null, retrying read then setting to static Image channel as fallback."
 		notify-send -e "$errorMessage" & echo "$errorMessage"
-		KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; read_etcd_global; channelIndex="${printvalue%%-*}"
+		KEYNAME="/HOSTS/$hostNameSys/control/channelData"; read_etcd_global; channelIndex="${printvalue%%-*}"
 		if [[ -z "$channelIndex" ]]; then
 			channelIndex=1
 		fi
