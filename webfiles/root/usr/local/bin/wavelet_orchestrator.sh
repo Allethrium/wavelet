@@ -44,11 +44,6 @@ event_server(){
 	triggerValue="${triggerValue//$'\r'/}"
 	triggerValue="${triggerValue//$'\t'/}"
 	keyHostName="${triggerKey#*/HOSTS/}"; keyHostName="${keyHostName%%/*}"
-	if [[ -n "$keyHostName" ]]; then
-    	# Dont attempt to work upon a null key
-    	echo "	ERR:  keyHostName is not populated."
-    	exit 0
-    fi
 	hostHash=""; hostGroup=""; primaryGroup=""
 	configFileExists=false
 	# This will strip only everything past /control, is this what we want?
@@ -204,7 +199,9 @@ compare_entries(){
         rm -rf "$deleteFile"
         # And we reset the update key to 0
 	fi
-   	KEYNAME="/HOSTS/$keyHostName/control/inputUpdate"; delete_etcd_key &
+   	# NOTE: this key is an absolute /HOSTS/ path, so we must use the global delete.
+   	# delete_etcd_key would re-prepend /HOSTS/$hostNameSys/ and produce a malformed double-path key.
+   	KEYNAME="/HOSTS/$keyHostName/control/inputUpdate"; delete_etcd_key_global &
 }
 
 event_subscription_request(){
@@ -680,7 +677,8 @@ event_generate_client_conf(){
 	if [[ "$triggerValue" == "1" ]] && [[ "$keyHostName" != "$hostNameSys" ]]; then
 		echo "	Generating conf file for a new client.."
 		update_host_config_full
-		KEYNAME="/HOSTS/$keyHostName/control/generateConf"; delete_etcd_key
+		# Absolute /HOSTS/ path - must use the global delete (delete_etcd_key re-prepends the host prefix).
+		KEYNAME="/HOSTS/$keyHostName/control/generateConf"; delete_etcd_key_global
 	else
 		exit 0 # noop
 	fi

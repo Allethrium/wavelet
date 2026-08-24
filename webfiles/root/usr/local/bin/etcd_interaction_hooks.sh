@@ -52,11 +52,25 @@ write_etcd(){
 	#echo -e "		Key Name: ${KEYNAME}\n		Set as: ${KEYVALUE}\n		Host: /${hostNameSys}/\n"
 }
 write_etcd_global(){
+	# Defensive guard: reject malformed keys under any /UI/ primitive (HOSTS, GROUPS, GLOBALS)
+	# that contain an empty path segment (e.g. /UI/HOSTS//control/... where the hash is empty,
+	# or /UI/GROUPS//control/...).  /UI/<primitive>/ must always be followed by a non-empty id.
+	if [[ "$KEYNAME" =~ ^/UI/[A-Za-z0-9_]+// ]]; then
+		echo "	ERR: Refusing to write malformed UI key: $KEYNAME" >&2
+		return 1
+	fi
 	"$targetFile" "write_etcd_global" "$KEYNAME" "$KEYVALUE"
 	#echo -e "		Key Name: ${KEYNAME}\n 		Set as Global Value: ${KEYVALUE}\n"
 }
 write_etcd_txn(){
-	# As this is an ATOMIC operation, multiple etcd calls may be applied, so it submits only the KEYDATA var.
+	# Defensive guard: reject txn payloads containing a malformed key under any /UI/ primitive
+	# (HOSTS, GROUPS, GLOBALS) with an empty id segment - e.g. /UI/HOSTS//control/... where the
+	# host hash is empty, or /UI/GROUPS//control/....  These corrupt the frontend keyspace.
+	if [[ "$KEYDATA" =~ /UI/[A-Za-z0-9_]+// ]]; then
+		echo "	ERR: Refusing to run txn containing malformed /UI/<primitive>// key:" >&2
+		echo "$KEYDATA" >&2
+		return 1
+	fi
 	# REF: https://github.com/etcd-io/etcd/blob/main/etcdctl/README.md#key-value-commands
 	#<Txn> ::= <CMP>* "\n" <THEN> "\n" <ELSE> "\n"
 	#<CMP> ::= (<CMPCREATE>|<CMPMOD>|<CMPVAL>|<CMPVER>|<CMPLEASE>) "\n"
