@@ -85,6 +85,19 @@ event_server(){
 			WantedBy=multi-user.target
 		EOF
 		systemctl start tftpd.service --now
+		# PTP AES67 grandmaster clock for more accurate A/V sync
+		mkdir -p "/etc/systemd/system/ptp4l.service.d/"
+		cat > "/etc/systemd/system/ptp4l.service.d/override.conf" <<-EOF
+			[Unit]
+			Description=linuxptp high-accuracy clock
+
+			[Service]
+			ExecStart=
+			ExecStart=/usr/sbin/ptp4l -f /etc/ptp4l-aes67.conf -i $active_networkInterface -m
+			# Example high accuracy hw clock
+			# ExecStart=/usr/sbin/phc2sys -s /dev/ptp0 -c CLOCK_REALTIME -m -w
+		EOF
+        systemctl enable ptp4l --now
 		if systemctl daemon-reload && configure_firewall && systemctl enable wavelet-root-autologin.service && systemctl restart etcd-quadlet.service registry.service; then
 			echo -e "\n	Security infrastructure successfully configured!" >> "$logName"
 			# We may want to now shred the administrator secret as it should no longer be necessary.
