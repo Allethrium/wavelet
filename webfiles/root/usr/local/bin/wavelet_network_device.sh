@@ -158,6 +158,8 @@ event_magewell_ndi(){
 		event_checkForSupport
 		populate_to_etcd
 	fi
+	# TODO
+	# Unsure if we need further settings and/or tweaks to these devices.  The test unit worked best in multiple feeds with these parameters.
 }
 
 event_ptz_ndiHX(){
@@ -172,10 +174,16 @@ event_ptz_ndiHX(){
 	subType="NDI"
 	# sleep 5 # We introduce a delay so mDNS can pick up the NDI source.
 	event_checkForSupport
+	# TODO
+	# Here we configure the camera ONVIF settings as far as possible
+	# phase1:  save an existing camera config into wavelet etcd keys, and enforce those settings on the device
+	# this would provide some form of automated recovery in the event of a camera reset
+	# phase2:  full PTZ control widget in the wavelet UI
 }
 
 event_checkForSupport(){
 	# This is a more general-purpose function to check for NDI and RTSP streams, and use them if available.
+	# It is called from vendor-specific functions after configuration is complete, or directly as a fallback.
 	# LibNDI should be installed on wavelet by default along with avahi mDNS (DEPENDENCY)
 	echo "	Checking for device support.."
 	local deviceHostName
@@ -197,11 +205,11 @@ event_checkForSupport(){
 			subType="NDI"
 			populate_to_etcd
 		else
-			if ffprobe -v quiet -show_streams "$UGdeviceStreamCommand"; then
+			if ffprobe -v quiet -show_streams "$deviceHostName"; then
 				deviceHostName="RTSP-$ipAddr"
 				subType="RTSP"
 				populate_to_etcd
-				echo -e "		Device RTSP configured, however it may not work without further settings.\n"
+				echo "		Device RTSP configured, however it may not work well, or at all, without further settings."
 				continue
 			else
 				echo "		Discovery error! falling back on direct IP interrogation.."
@@ -214,7 +222,9 @@ event_checkForSupport(){
 
 event_checkIP(){
 	echo "	Attempting direct device type resolution by IP address.."
-	# do some acrobatics to locate NDI or RTSP support here
+	# TODO
+	# do some acrobatics to locate a possible video feed here
+	# this might take the form of common path checks searching for any valid video stream.
 }
 
 event_check_multiCast(){
@@ -294,30 +304,6 @@ get_ndi_devices(){
 		ip="${ip%%[![:alnum:].-]*}"
 		ndiDevices+=("${name}--${ip}:${port}")
 	done <<<"$(avahi-browse -t -r -p _ndi._tcp)"
-#	local ultraGridBinaryFile
-#	if [[ -f "/var/wavelet_ramfs/ultragrid/squashfs-root/AppRun" ]]; then
-#		binaryFile="/var/wavelet_ramfs/ultragrid/squashfs-root/AppRun"
-#	else
-#		binaryFile="/usr/local/bin/ultragrid/squashfs-root/AppRun"
-#	fi
-#	blockStart=0
-#	array=()
-#	ndiDevices=()
-#	while IFS=$'\n' read -r line; do
-#		if [[ $line ==  *'available sources'* ]]; then
-#			# initialize sources
-#			sources=""
-#			blockStart=1
-#		fi
-#		if [[ $blockStart == 1 ]] && [[ $line != *'available sources'* ]] && [[ $line != *'Exit'* ]] && [[ -n $line ]]; then
-#			array+=("$(echo $line)")
-#		fi
-#	done<<<"$("$binaryFile" --tool uv -t ndi:help)"
-#	for i in "${array[@]}"; do
-#			# We need to perform regex here to extract the IP address.
-#			device="$(awk '{print $1}'<<<"$i")--$(grep -oP '\b(?:\d{1,3}\.){3}\d{1,3}'<<<"$i" | head -n 1)"
-#			ndiDevices+=( "$device" )
-#	done
 }
 
 check_etcd_env(){

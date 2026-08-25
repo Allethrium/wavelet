@@ -24,11 +24,9 @@ encoder_shutdown(){
 	exit 0
 }
 
-
 shutdown_at="$(cat /var/tmp/encoder_shutdown_at)"
 echo "Watching $KEYNAME for activity with termination time set to: $shutdown_at"
 source "$HOME/config/$(hostname).conf"
-
 KEYNAME="/UI/HOSTS/$GROUP_HASH/control/encoderTimeout"; read_etcd_global
 timerIncrement=0
 encoderTimeoutSeconds=0
