@@ -400,6 +400,21 @@ class Host {
 			this.uiContainer = inputsDiv;
 			// The _vrt divider is a visual element, not an organizational one.
 			inputsDiv.appendChild(inputsDivider_local);
+			// the host's main element may not exist yet
+			if (!this.element) {
+				console.warn("Host element not built yet, building it before appending input container");
+				this.element = document.createElement("div");
+				this.element.setAttribute("data-type", "host");
+				this.element.classList.add("host_divider");
+				this.element.id = `host-${this.hashID}`;
+				this.element.setAttribute("data-hash", this.hashID);
+				const hostButtons = this.createHostButtonSet();
+				this.element.appendChild(hostButtons);
+				const groupInstance = window.root.groups.get(this.controls.GROUP);
+				if (groupInstance?.element) {
+					groupInstance.element.appendChild(this.element);
+				}
+			}
 			this.element.appendChild(inputsDivider_vrt);
 			this.element.appendChild(inputsDiv);
 			// Append the input element to the container directly. The container is
@@ -2507,6 +2522,13 @@ function createUnifiedButton(options) {
 		// Event listener
 		button.addEventListener('click', function () {
 			console.info("Clicked button:", button.dataset.label);
+			// REVEAL is a momentary action — the device only displays the
+			// testcard for 15 seconds before reverting. Lock the button for
+			// that duration so its "on" state matches the actual reveal window.
+			if (button.dataset.control === "reveal") {
+				triggerReveal(button);
+				return;
+			}
 			// Only toggle if this is a toggle-type button
 			const isToggleType =
 				button.dataset.toggleOn === "true" ||
@@ -2601,6 +2623,51 @@ function createUnifiedButton(options) {
 	}
 	addEmitterListener(button, options.parentItem);
 	return button;
+}
+
+function triggerReveal(button) {
+	// Lock the button immediately to reflect the in-progress reveal window.
+	setRevealLocked(button, true);
+	// Request the reveal. The device will show the testcard for 15s then
+	// revert by itself, so we mirror that timing on the button.
+	window.root.controlRequestManager.send({
+		operation: button.dataset.operation,
+		parentHash: button.dataset.parentHash || null,
+		parentType: button.dataset.parentType,
+		controlKey: "revealStatus",
+		controlValue: "1",
+		toggleOn: false
+	}).catch(error => {
+		console.error(`Reveal request failed:`, error);
+		// Re-enable immediately on failure so the button isn't stuck locked.
+		setRevealLocked(button, false);
+	});
+	// Re-enable after the reveal window elapses.
+	window.setTimeout(() => {
+		setRevealLocked(button, false);
+	}, 15000);
+}
+
+function setRevealLocked(button, locked) {
+	const labelSpan = button.querySelector('.btn__label');
+	const textSpan = labelSpan?.querySelector('span');
+	if (locked) {
+		button.classList.add('btn-disabled');
+		button.dataset.value = "1";
+		const lockedText = "STOP REVEAL";
+		if (textSpan && labelSpan) {
+			textSpan.textContent = lockedText;
+			labelSpan.setAttribute('data-label', lockedText);
+		}
+	} else {
+		button.classList.remove('btn-disabled');
+		button.dataset.value = "0";
+		const idleText = button.dataset.toggleTextOff || "REVEAL";
+		if (textSpan && labelSpan) {
+			textSpan.textContent = idleText;
+			labelSpan.setAttribute('data-label', idleText);
+		}
+	}
 }
 
 
@@ -3364,6 +3431,11 @@ async function handleInputEvents(event) {
 					};
 					hostInstance = new Host(hostData);
 					window.root.hosts.set(hostHash, hostInstance);
+					// The host was just created — build its DOM element before
+					// registering inputs. Without this, hostInstance.element is
+					// null and registerHostInput() throws (see guard below),
+					// silently dropping the input div.
+					await createHostElement(hostInstance);
 				}
 				// Create and register the input (only reached if we have a valid hostInstance)
 				const newInputInstance = new Input({
