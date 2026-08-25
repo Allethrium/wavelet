@@ -30,7 +30,6 @@ reconfigure_dns(){
 #	chmod +x "/etc/NetworkManager/dispatcher.d/20-ipa-dns-update"
 	echo "  	DNS Reconfigured.."
 }
-
 join_domain(){
 	local password="$1"
 	echo "Attempting to join IPA Domain with host OTP.."
@@ -48,7 +47,6 @@ join_domain(){
         #--pkinit-identity=FILE:/etc/pki/tls/certs/provision.crt
         #--pkinit-anchor=FILE:/var/home/wavelet/root/config/ca.crt
 }
-
 request_otp(){
 	# Request domain enrollment OTP from server
 	local domainotprq; local output; local factor2
@@ -82,12 +80,10 @@ request_otp(){
 	WATCH_PID=$!
 	echo " Waiting 2 seconds for watch registration..."
 	sleep 2
-
 	# Make request via another etcdctl call
 	echo "	Writing request key at: /ENROLL/REQUEST/$hostNameSys"
 	etcdctl --user "ENROLL:$domainotprq" \
 		put "/ENROLL/REQUEST/$hostNameSys" -- "REQUEST;$myIPAddr" &
-
 	timeout=300
 	polling_threshold=101
 	elapsed=0
@@ -102,7 +98,6 @@ request_otp(){
 				break
 			fi
 		fi
-
 		# At 10 seconds, if watch hasn't fired, something has gone wrong, but attempt a direct read
 		if (( elapsed >= polling_threshold )) && [[ ! -s "$ETCD_OTPFILE" ]]; then
 			echo "	Watch silent for ${polling_threshold}s, attempting direct poll..."
@@ -118,7 +113,6 @@ request_otp(){
 		sleep .1
 		(( elapsed += 1 ))
 	done
-
 	enrollOTP="$(<"$ETCD_OTPFILE")"
 	kill "$WATCH_PID" 2>/dev/null
 	rm -f "$TMPFILE"
@@ -146,7 +140,6 @@ request_otp(){
 		request_otp_phase2
 	fi
 }
-
 request_otp_phase2(){
 	# Read the output
 	local temp_base64; local decryptResult; local finalPassword
@@ -186,7 +179,6 @@ request_otp_phase2(){
 		exit 1
 	fi
 }
-
 install_security_layer(){
 	# Joins the device to the FreeIPA domain and requests an 802.1x certificate
 	nmcli con mod "$(nmcli -g NAME con show | head -1)" ipv4.dns "$DC1_IP" ipv4.dns-search "$DOMAIN"
@@ -218,7 +210,6 @@ install_security_layer(){
 		--key-size=2048 \
 		--after-command="setfacl -m u:wavelet:r /etc/pki/tls/certs/eaptls-client-${clientHostName}.crt && setfacl -m u:wavelet:r /etc/pki/tls/private/eaptls-client-${clientHostName}.key"
 }
-
 configure_firewall(){
     # Configures NFT for kernel-native filtering
     # Note this is the client/encoder. It can serve UltraGrid, RTSP, and NDI traffic,
@@ -260,7 +251,6 @@ configure_firewall(){
     nft add rule inet wavelet input log prefix "WAVELET-INPUT " level warn
     nft add rule inet wavelet input drop
 }
-
 generate_wavelet_userspace_services(){
   # Generates the wavelet_build.service, which launches upon UI restart
   file="/home/wavelet/.config/systemd/user/wavelet_build.service"
@@ -276,6 +266,54 @@ ExecStart=/usr/local/bin/wavelet_build.sh
 [Install]
 WantedBy=sway-session.target" > "$file"
   chown wavelet:wavelet "$file"; chmod 0644 "$file"
+}
+optimize_latency(){
+	local iface="$1"
+	# This function attempts to perform some direct system optimizations
+	# Based upon what we know about discovered hardware, CPU topology, etc.
+	# Consider disabling gro on the NIC stack
+	# This will prevent the network stack from batching received packets before passing them off to the app stack
+	# May result in high CPU usage but lower latency
+	if [[ -n "$iface" ]]; then
+		ethtool -K "$iface" gro off 2>/dev/null || echo "    (gro off not supported on $iface)"
+		# also disable lro if present
+		ethtool -K "$iface" lro off 2>/dev/null || true
+	fi
+	local numCPU; local isolated
+	numCPU="$(nproc)"
+	if (( numCPU > 4 )); then
+		# integer math to get the last two CPU nodes
+		isolated="$(( ncpu -2 )), $(( ncpu -1 ))"
+		rpm-ostree kargs --append="isolcpus=$isolated" \
+						--append="nohz_full=$isolated" \
+						--append="rcu_nocbd=$isolated" \
+						--append="irqaffinity=$isolated" \
+						2>/dev/null
+		echo "	Isolated cores $isolated for media processing."
+        sed -i '/^export ISOLATED_CPU=/d' "/etc/wavelet.conf"
+        echo "export ISOLATED_CPU=\"$isolated\"" >> "/etc/wavelet.conf"
+	else
+		echo "	This device has too few CPUs to safely perform isolation.  Skipping."
+	fi
+    rpm-ostree kargs --append="nmi_watchdog=0" \
+                     --append="nowatchdog" \
+                     --append="pcie_aspm=off" 2>/dev/null || true
+    # Generate a systemD RT drop-in
+	# /etc/systemd/system/user@.service.d/override.conf
+	# Raises the rlimits ceiling for ALL systemd user managers, so user units can
+	# grant real-time scheduling and memory locking to the wavelet session.
+	cat > "/etc/systemd/system/user@.service.d/override.conf" <<-EOF
+		[Service]
+		LimitRTPRIO=55
+		LimitMEMLOCK=512M
+	EOF
+	# PAM fallback for login sessions (systemd user units use the drop-in above;
+	# this covers any PAM-authenticated session path so the grants are consistent).
+	mkdir -p "/etc/security/limits.d"
+	cat > "/etc/security/limits.d/99-wavelet.conf" <<-EOF
+		wavelet  -  rtprio    55
+		wavelet  -  memlock   512M
+	EOF
 }
 
 
@@ -453,6 +491,7 @@ EOF
 systemctl daemon-reload
 systemctl enable --now var-wavelet_ramfs.mount wavelet_copyfiles.service
 
+optimize_latency "$active_networkInterface"
 rpm-ostree initramfs --enable
 
 # Run connectwifi to configure our 802.1x WiFi connectivity.. (will fail if no EAP-TLS certs from DC1!)
