@@ -25,6 +25,10 @@ else
 	WAVELET_REFLECTOR_MOD="/usr/local/bin/wavelet_reflector.sh"
 fi
 
+# Source config files
+ISOLATED_CPU="$(awk -F'"' '/^export ISOLATED_CPU=/{print $2}' /etc/wavelet.conf 2>/dev/null)"
+#source "/var/home/wavelet/config/$hostNameSys.conf"
+
 test_newDevice(){
 	# Check to see if our host device update flag has been modified.
 	KEYNAME="/HOSTS/$hostNameSys/INPUT_DEVICE_NEW"; read_etcd_global
@@ -216,6 +220,12 @@ generate_systemd_unit(){
 		Wants=network-online.target
 
 		[Service]
+		# Pin the encoder to the isolated data-path cores (from wavelet.conf)
+		CPUAffinity=${ISOLATED_CPU:-}
+		# Raise to real-time scheduling for consistent encode/decode timing
+		LimitRTPRIO=55
+		# Bounded mlock so the hot media buffers stay resident without locking all RAM
+		LimitMEMLOCK=512M
 		ExecStart=$binaryFile $ugargs
 		KillMode=control-group
 		TimeoutStopSec=1

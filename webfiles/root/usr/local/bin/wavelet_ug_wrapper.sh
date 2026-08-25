@@ -21,6 +21,7 @@ fi
 
 # Load the client's exports file.  This MUST exist for normal operation.
 hostNameSys="$(hostname)"
+source "/etc/wavelet.conf"
 sourceFile="$HOME/config/$hostNameSys.conf"
 if [[ -f "$sourceFile" ]]; then
 	source "$sourceFile"
@@ -63,6 +64,12 @@ start_ultragrid(){
     timeout=5
     "$binaryPath" "${UG_ARGUMENTS[@]}" > /var/home/wavelet/logs/ugDirect.log 2>&1 &
     UG_PID=$!
+    if [[ -n "$ISOLATED_CPU" ]]; then
+        taskset -pc "$ISOLATED_CPU" "$UG_PID" 2>/dev/null
+    fi
+    # SCHED_FIFO, priority 60 — only on the UG child, and only if permitted.
+    # (Requires the wavelet user to hold rtprio/memlock limits.)
+    chrt -f -p 55 "$UG_PID" 2>/dev/null || true
     if [[ -z "$swaySocket" ]]; then
         local runtimeDir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
         for sock in "${runtimeDir}"/sway-ipc.*.sock; do
