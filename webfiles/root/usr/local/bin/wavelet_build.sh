@@ -473,7 +473,7 @@ nginx_quadlets(){
 		[Install]
 		WantedBy=multi-user.target
 	EOF
-	echo -e "	The control service should be available via web browser on:\n		http://$SVR_HOSTNAME\n"
+	echo -e "	The control service should be available via web browser on:\n		https://$SVR_HOSTNAME\n"
 	hostNameSys="$SVR_HOSTNAME"
 	sed -i "s/localhost/$hostNameSys/g" "/var/home/wavelet/http-php/nginx/nginx.conf"
 }
@@ -1110,6 +1110,11 @@ put /UI/GLOBALS/control/lowInformationMode \"0\"
 	echo "	Data: "
 	echo "$KEYDATA"
 	write_etcd_txn "$KEYDATA"
+}
+event_populate_infra(){
+	# Populates host entries for infrastructure devices
+	# WiFi AP, Network Switch, UPS or other devices pre-configured with SNMP credentials supplied in the wavelet conf file.
+	echo "	Configuring Infrastructure hosts..."
 }
 check_clientGroupMemberShip(){
 	# Clients only
