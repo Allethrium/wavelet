@@ -3131,8 +3131,17 @@ function handleGroupEvents(event) {
 			}
 			// Always update controls, even if the key doesn't exist yet
 			if (groupItem && groupItem.controls) {
+				// Capture the previous value so we can notify listeners
+				const previousGroupValue = groupItem.controls[controlName];
 				groupItem.controls[controlName] = event.value;
 				console.log("Updated group control", controlName, "to:", event.value);
+				if (groupItem.emitter) {
+					groupItem.emitter.emit('controlUpdate', {
+						controlName: controlName,
+						newValue: event.value,
+						oldValue: previousGroupValue
+					});
+				}
 				if (controlName === "sourceHash") {
 					// console.log("Calling input activation update for input hash ID: " + event.value + " in group hash ID: " + hashID);
 					groupItem.sourceHash = event.value;
