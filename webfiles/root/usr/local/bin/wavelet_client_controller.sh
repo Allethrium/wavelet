@@ -279,6 +279,12 @@ event_group_host_reveal() {
 	fi
 	echo "	Revealing all hosts for group $groupHash"
 	process_hostlist "revealStatus" "1"
+	(
+    	# subshell so we don't hang the rest of the process
+      	sleep 15
+		echo "	Reverting reveal keyvalue after 15s wait"
+      	KEYNAME="$etcdKey"; KEYVALUE=0; write_etcd_global &
+    ) &
 }
 event_group_liveStream() {
 	# Turns on group livestreaming (how are we going to handle this?)
@@ -489,9 +495,13 @@ event_reveal(){
     channelIndex="${channelData%%-*}"
     channelSourceHash="${channelData##*-}"
    	controlPortCmd="capture.data 2"; netCat "6161" "$controlPortCmd"
-   	sleep 15
-    echo "	Previous video source is on channel: $channelIndex with source hash: $channelSourceHash"
-	controlPortCmd="capture.data $channelIndex"; netCat "6161" "$controlPortCmd"
+   	(
+   		# subshell so we don't hang the rest of the process
+   		sleep 15
+   		KEYNAME="/HOSTS/$thisHostHash/control/revealStatus"; KEYVALUE=0; write_etcd_global &
+    	echo "	Previous video source is on channel: $channelIndex with source hash: $channelSourceHash"
+		controlPortCmd="capture.data $channelIndex"; netCat "6161" "$controlPortCmd"
+	) &
 }
 event_prefix_set(){
 	# Switches the type designator under /hostLabel/$(hostname)/control/type
