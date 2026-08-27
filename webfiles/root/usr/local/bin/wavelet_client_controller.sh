@@ -104,15 +104,20 @@ detect_operation_server(){
 	fi
 	local control_suffix="${etcdKey#/UI/HOSTS/$thisHostHash/control/}"
 	control_suffix="${control_suffix%%/*}"
-	if [[ "$etcdKey" == "/UI/GROUPS/"* ]] || [[ "$etcdKey" == *"UI/GLOBALS/"* ]]; then
-		groupHash="${etcdKey#*/UI/GROUPS/}"
+	if [[ "$etcdKey" == "/UI/GLOBALS/control/GROUP-CREATE" ]]; then
+		event_create_group
+	elif [[ "$etcdKey" == "/UI/GLOBALS/control/GROUP-DELETE" ]]; then
+		event_delete_group
+	elif [[ "$etcdKey" == "/UI/GROUPS/"* ]]; then
+		groupHash="${etcdKey#/UI/GROUPS/}"
 		local control_suffix="${groupHash##*/}"
 		groupHash="${groupHash%%/*}"
 		# Guard: a valid group key is always a full sha256 hash. Anything else
 		# is malformed/phantom data (e.g. source values like "1" or "2--2" that
 		# were once used as group keys). Delete it so it cannot pollute the UI
 		# or keep being re-emitted on every SSE reconnect.
-		if [[ ! "$groupHash" =~ ^[a-f0-9]{64}$ ]]; then
+		# Note the second if block prevents deletion of the entire groups prefix.
+		if [[ ! "$groupHash" =~ ^[a-f0-9]{64}$ ]] && [[ "$groupHash" != "/UI/GROUPS/" ]]; then
 			echo "	Auto-cleaning malformed group key: /UI/GROUPS/$groupHash"
 			KEYNAME="/UI/GROUPS/$groupHash"; delete_etcd_key_prefix_global &
 			exit 0
@@ -132,8 +137,6 @@ detect_operation_server(){
 			"sourceHash")		handler_function="event_group_set_video_source";;
 			"staticImage")		handler_function="event_group_set_staticImage";;
 			"activeCodec")		handler_function="event_group_set_codec";;
-			"GROUP-CREATE")		handler_function="event_create_group";;
-			"GROUP-DELETE")		handler_function="event_delete_group";;
 			*) exit 0;;
 		esac
 		if [[ -n "$handler_function" ]] && declare -f "$handler_function" > /dev/null; then
@@ -143,7 +146,8 @@ detect_operation_server(){
 		local thisHostHash
 		thisHostHash="${etcdKey#/UI/HOSTS/}"
 		thisHostHash="${thisHostHash%%/*}"
-    	if [[ ! "$thisHostHash" =~ ^[a-f0-9]{64}$ ]]; then
+		# Note the second if block prevents deletion of the entire groups prefix.
+    	if [[ ! "$thisHostHash" =~ ^[a-f0-9]{64}$ ]] && [[ "$thisHostHash" != "/UI/HOSTS/" ]]; then
     		# Guard: host keys are full sha256 hashes. Auto-clean malformed ones.
     		echo "	Auto-cleaning malformed host key: /UI/HOSTS/$thisHostHash"
     		KEYNAME="/UI/HOSTS/$thisHostHash"; delete_etcd_key_prefix_global &
