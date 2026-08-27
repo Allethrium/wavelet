@@ -194,14 +194,9 @@ process_hostlist() {
 	local serverReboot
 	serverReboot=0
 	write_cmds=()
-	echo "	Getting hosts in group: $groupHash"
+#	echo "	Getting hosts in group hash: $groupHash"
 	get_hosts_in_group
-	if [[ -n "${hostsInGroup[*]}" ]]; then
-		echo "	Hosts found in group (hash value):"
-		for h in "${hostsInGroup[@]}"; do
-			echo "		$h"
-		done
-	else
+	if [[ -z "${hostsInGroup[*]}" ]]; then
 		echo "	No hosts in this group."
 		return 0
 	fi
@@ -231,14 +226,17 @@ process_hostlist() {
 			echo "	ERR: Invalid characters in etcd transaction key/value, rejecting!"
 			return 1
 		fi
-		txn_buffer+="put \"$k\" \"$v\"\n"
+		txn_buffer+="put \"$k\" \"$v\""$'\n'
 	done
-	# Remove trailing newline
-	txn_buffer="${txn_buffer%$'\n'}"
 	# Execute as a single transaction
 	if [[ ${#write_cmds[@]} -gt 0 ]]; then
 		local KEYDATA
-		KEYDATA=$'mod("/UI/HOSTS/") = "0"\n\n'"$txn_buffer"$'\n\n'"$txn_buffer"$'\n'
+		KEYDATA="
+${txn_buffer}
+
+"
+#		echo "	Writing txn Data:"
+#		echo "$KEYDATA"
 		write_etcd_txn "$KEYDATA" &
 		wait
 	fi
