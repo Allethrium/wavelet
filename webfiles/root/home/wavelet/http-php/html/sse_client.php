@@ -67,11 +67,18 @@ if ($redisPassword) {
 $redisSock->select($redisDb);
 log_msg("Connected to Redis at {$redisHost}:{$redisPort}");
 
-// Get Last-Event-ID from request — this is a Redis stream ID from a previous connection
 $lastId = '0-0';
 if (isset($_SERVER['HTTP_LAST_EVENT_ID'])) {
     $lastId = $_SERVER['HTTP_LAST_EVENT_ID'];
     log_msg("Client requested replay from stream ID {$lastId}");
+} else {
+    $info = $redisSock->xInfo($redisStream);
+    if ($info !== false && isset($info['last-generated-id'])) {
+        $lastId = $info['last-generated-id'];
+    } else {
+        $lastId = '$';
+    }
+    log_msg("New client, starting at stream tail {$lastId}");
 }
 
 // Send initial connection event
