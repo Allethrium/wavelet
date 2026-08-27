@@ -676,20 +676,21 @@ event_generate_codecEntries(){
 #        "libavcodec:encoder=prores_ks" # Apple's "perceptually lossless" codec
 #        "libavcodec:encoder=liboapv" # Samsung's "perceptually lossless" codec, default setting "medium"
         "libavcodec:encoder=mjpeg:huffman=1:q=10:safe" # Motion JPEG (CPU)
-        "libavcodec:encoder=libopenjpeg:irreversible=1:disto_alloc=1:safe" # JPEG2000 (CPU) wavelet codec - strong quality/BW tradeoff
+        "jpegxs:30M" # SVT-JPEG-XS encoder
+#        "libavcodec:encoder=libavcodec:jpeg2000" # JPEG2000 (CPU) wavelet codec - strong quality/BW tradeoff
         "libavcodec:encoder=mjpeg_qsv:safe" # Motion JPEG (GPU)
-        "libavcodec:encoder=h264_qsv:gop=6:bitrate=20M" # MPEG4 (CPU)
-        "libavcodec:encoder=libx265:preset=ultrafast:threads=0:safe" # HEVC fast (CPU)
-        "libavcodec:encoder=libx265:preset=superfast:crf=40:threads=0:safe" # HEVC quality (CPU)
-        "libavcodec:encoder=libsvt_hevc:preset=7:thread_count=0:safe" # HEVC via libSVT (CPU)
-        "libavcodec:encoder=libsvt_hevc:preset=6:pred_struct=0:safe" # HEVC via libSVT (CPU)
-        "libavcodec:encoder=hevc_qsv:async_depth=4:safe" # HEVC (GPU) via QuickSync
-        "libavcodec:encoder=hevc_vaapi:low_power=1:safe" # HEVC (GPU) via VA-API
-        "libavcodec:encoder=libvpx-vp9:safe" # Google VP9 (CPU)
-        "libavcodec:encoder=vp9_qsv:safe" # Google VP9 (GPU) via QuickSync
-        "libavcodec:encoder=av1_qsv:safe" # AV1 (GPU) via QuickSync
+#        "libavcodec:encoder=h264_qsv:gop=6:bitrate=20M" # MPEG4 (CPU)
+#        "libavcodec:encoder=libx265:preset=ultrafast:threads=0:safe" # HEVC fast (CPU)
+#        "libavcodec:encoder=libx265:preset=superfast:crf=40:threads=0:safe" # HEVC quality (CPU)
+#        "libavcodec:encoder=libsvt_hevc:preset=7:thread_count=0:safe" # HEVC via libSVT (CPU)
+#        "libavcodec:encoder=libsvt_hevc:preset=6:pred_struct=0:safe" # HEVC via libSVT (CPU)
+#        "libavcodec:encoder=hevc_qsv:async_depth=4:safe" # HEVC (GPU) via QuickSync
+#        "libavcodec:encoder=hevc_vaapi:low_power=1:safe" # HEVC (GPU) via VA-API
+#        "libavcodec:encoder=libvpx-vp9:safe" # Google VP9 (CPU)
+#        "libavcodec:encoder=vp9_qsv:safe" # Google VP9 (GPU) via QuickSync
+#        "libavcodec:encoder=av1_qsv:safe" # AV1 (GPU) via QuickSync
         "libavcodec:encoder=libaom-av1:usage=realtime:cpu-used=8:safe" # AV1 via libaom (CPU) default
-        "libavcodec:encoder=libsvtav1:preset=12" # AV1 (CPU) via libSVT
+#        "libavcodec:encoder=libsvtav1:preset=12" # AV1 (CPU) via libSVT
         # "libavcodec:encoder=libaom-av2:usage=realtime:cpu-used=8:safe" # AV2 (CPU) placeholder
     )
 
@@ -714,18 +715,19 @@ event_generate_codecEntries(){
             cpuPct=$(echo "$output" | cut -d',' -f3 | cut -d':' -f2)
             status="SUCCESS"
             case "$codec_name" in
-#                "ffv1")           	KEYVALUE="$codecCmd;FFMPEG FFV1.  High bandwidth, high quality, lossless";; # cannot get BW down to usable levels
-                "prores")         	KEYVALUE="$codecCmd;Apple prores. High bandwidth, high quality, lossy.  Supports 4444+ colorspace";;
+#                "ffv1")           	KEYVALUE="$codecCmd;FFMPEG FFV1.  Excessive bandwidth, high quality, lossless";; # cannot get BW down to usable levels
+#                "prores")         	KEYVALUE="$codecCmd;Apple prores. High bandwidth, high quality, lossy.  Supports 4444+ colorspace";;
 #                "apv")            	KEYVALUE="$codecCmd;Samsung APV. High bandwidth, high quality, 'Perceptually Lossless'";; # Temp disabled re FFmpeg/openapv API mismatch
                 "mjpeg" )           KEYVALUE="$codecCmd;MPEG2 Motion-JPEG High bandwidth, high quality (DVD)";;
-                "libopenjpeg")      KEYVALUE="$codecCmd;JPEG2000 wavelet codec.  Strong quality/BW tradeoff, per-frame low latency, royalty-free.  CPU encoding";;
+#                "libopenjpeg")      KEYVALUE="$codecCmd;JPEG2000 wavelet codec.  Strong quality/BW tradeoff, per-frame low latency, royalty-free.  CPU encoding";;
+            	"jpegxs")			KEYVALUE="codecCmd;SVT-JPEGXS codec.  50Mb stream target.";;
                 "libaom-av2")       KEYVALUE="$codecCmd;Alliance for Open Media AV2, Low bandwidth, High quality, hard on host.  Successor to AV1.  CPU encoding via libAOM";;
                 "mjpeg_qsv:safe")   KEYVALUE="$codecCmd;MPEG2 Motion-JPEG HW Accelerated High bandwidth, high quality (DVD), compatibility may be an issue";;
-                "h264_qsv")         KEYVALUE="$codecCmd;H.264 MPEG4, Low bandwidth, high compatibility, low quality (slightly worse than Youtube)";;
+#                "h264_qsv")         KEYVALUE="$codecCmd;H.264 MPEG4, Low bandwidth, high compatibility, low quality (slightly worse than Youtube)";;
 #                "libx265")          KEYVALUE="$codecCmd;H.265 'HEVC', Low bandwidth, Good quality, hard on host.  CPU encoding";;
 #                "libsvt_hevc")      KEYVALUE="$codecCmd;H.265 'HEVC' via libSVT, Low bandwidth, Good quality, hard on host.  CPU encoding via Intel's libSVT";;
-                "hevc_qsv")         KEYVALUE="$codecCmd;H.265 'HEVC', Low bandwidth, Good quality, hard on host.  HW Accelerated encoding via Intel QuickSync, compatibility may be an issue";;
-                "libvpx-vp9")       KEYVALUE="$codecCmd;Google VP9, Low bandwidth, Good quality, hard on host. Youtube quality.";;
+#                "hevc_qsv")         KEYVALUE="$codecCmd;H.265 'HEVC', Low bandwidth, Good quality, hard on host.  HW Accelerated encoding via Intel QuickSync, compatibility may be an issue";;
+#               "libvpx-vp9")       KEYVALUE="$codecCmd;Google VP9, Low bandwidth, Good quality, hard on host. Youtube quality.";;
 #                "vp9_qsv")          KEYVALUE="$codecCmd;Google VP9, Low bandwidth, Good quality, hard on host. Youtube quality via Intel QuickSync, compatibility may be an issue";;
 #                "av1_qsv")          KEYVALUE="$codecCmd;Alliance for Open Media AV1, Low bandwidth, High quality, very hard on host. Superior to VP9 and HEVC in most respects.  HW Accelerated encoding via Intel QuickSync";;
                 "libaom-av1")       KEYVALUE="$codecCmd;Alliance for Open Media AV1, Low bandwidth, High quality, very hard on host. Superior to VP9 and HEVC in most respects.  CPU encoding via libAOM";;
