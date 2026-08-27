@@ -266,7 +266,6 @@ class Host {
 		this.hashID = data.hashID;
 		this.controls = data.controls || {}; // hostType and most other data are in controls
 		this.lastUpdate = Date.now();
-		this.ipAddress = data.ipAddress || null;
 		this.hostType = data.controls.type;  // SVR, DEC, ENC, NDI, RTSP, other
 		this.type = data.type; // Host, net, infra
 		this.inputs = new Map(); // An input source MUST be on a host and also must register in the group instance.
@@ -668,7 +667,9 @@ class SSEManager {
 			console.warn('SSE already connected, closing old connection');
 			this.close();
 		}
-		this.eventSource = new EventSource(this.url);
+		// Start the stream forward-only. We never want the server to replay history
+		// this is because we start from a known state via get_keys.php
+		this.eventSource = new EventSource(this.url, { lastEventId: '0' });
 		// Centralize all event binding here
 		this.setupListeners();
 		// Start the heartbeat monitor immediately
@@ -1058,7 +1059,6 @@ function fetchData() {
 				const hostData = {
 					hashID: host.hashID,
 					hostName: host.controls.label || host.key,
-					ipAddress: host.hostIP || "ERROR",
 					key: host.key,
 					hostType: host.hostType,
 					type: host.type,
@@ -1069,6 +1069,7 @@ function fetchData() {
 					controls: {
 						label: host.controls?.label || "UNKNOWN",
 						type: host.controls?.type || host.type || "UNKNOWN",
+						IP: host.controls?.IP || "ERROR",
 						blankStatus: host.controls?.blankStatus || "0",
 						rebootStatus: host.controls?.rebootStatus || "0",
 						resetStatus: host.controls?.resetStatus || "0",
@@ -1502,7 +1503,7 @@ async function createHostElement(hostInstance) {
 	divEntry.setAttribute("draggable", "true");
 	divEntry.classList.add("host_divider");
 	divEntry.id = `host-${hostInstance.hashID}`;
-	divEntry.title = `Host IP Address: ${hostInstance.ipAddress}`;
+	divEntry.title = `Host IP Address: ${hostInstance.controls?.IP}`;
 	divEntry.setAttribute("data-hash", hostInstance.hashID);
 	// Add drag events
 	divEntry.addEventListener("dragstart", window.root.dragDropManager.handleDragStart);
@@ -3107,6 +3108,9 @@ function handleGroupEvents(event) {
 		});
 	} else if (event.eventType === "DELETE") {
 		console.warn("Removing group element from DOM and dataset!");
+		// TODO
+		// first we should ensure that the group chain setting is reverted.  If the group is a chain target,
+		// the downstream groups should be reverted also.
 		if (groupItem) {
 			groupItem.unregisterGroup(hashID);
 		}
@@ -3149,8 +3153,20 @@ function handleGroupEvents(event) {
 					groupItem.updateActiveState();
 					// What defines chainedGroup and chainedHash?
 					// each group has a key which can be undefined/null: group.controls.chainedToGroup
+					// Only write to chained followers that are actually out of sync with this
+					// leader. This keeps real source changes propagating, but makes replayed
+					// events from an SSE reconnect/page-refresh no-ops — a follower that is
+					// already synced (value already reflects this leader's sourceHash, either
+					// as a raw input hash or a "leader:input" composite) won't trigger a write,
+					// so a page refresh can't disrupt video by re-emitting changeGroupSource.
+					const compositeValue = `${groupItem.hashID}:${event.value}`;
 					window.root.groups.forEach(group => {
 						if (group.controls.chainedToGroup === groupItem.hashID) {
+							const followerSource = group.controls.sourceHash;
+							if (followerSource === event.value || followerSource === compositeValue) {
+								// Already in sync — don't re-write. Prevents refresh/replay loops.
+								return;
+							}
 							console.log(`This group is the source target of a chained group! Broadcasting source change to the chained group: ${group.hashID}`);
 							// Send changeGroupSource to the chained group
 							void window.root.controlRequestManager.send({
@@ -3248,12 +3264,12 @@ async function handleHostEvents(event) {
 				if (!hostItem) return;
 				const hostData = {
 					hashID: hostItem.hashID,
-					ipAddress: hostItem.hostIP || "ERROR",
 					hostType: hostItem.hostType,
 					type: hostItem.type,
 					controls: {
 						label: hostItem.controls?.label || "UNKNOWN",
 						type: hostItem.controls?.type || hostItem.type || "UNKNOWN",
+						IP: hostItem.controls?.IP || "ERROR",
 						blankStatus: hostItem.controls?.blankStatus || "0",
 						rebootStatus: hostItem.controls?.rebootStatus || "0",
 						resetStatus: hostItem.controls?.resetStatus || "0",
@@ -3422,12 +3438,12 @@ async function handleInputEvents(event) {
 					}
 					const hostData = {
 						hashID: hostItem.hashID,
-						ipAddress: hostItem.hostIP || "ERROR",
 						hostType: hostItem.hostType,
 						type: hostItem.type,
 						controls: {
 							label: hostItem.controls?.label || "UNKNOWN",
 							type: hostItem.controls?.type || hostItem.type || "UNKNOWN",
+							IP: hostItem.controls?.IP || "ERROR",
 							blankStatus: hostItem.controls?.blankStatus || "0",
 							rebootStatus: hostItem.controls?.rebootStatus || "0",
 							resetStatus: hostItem.controls?.resetStatus || "0",
