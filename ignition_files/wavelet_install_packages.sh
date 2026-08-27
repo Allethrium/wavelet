@@ -717,8 +717,8 @@ EOF
 	# This makes using etcdctl for troubleshooting somewhat less painful
 	cat > "/etc/profile.d/etcdctl.sh" <<-EOF
 		#!/bin/bash
-		export ETCDCTL_ENDPOINTS=\"https://$SVR_HOSTNAME:2379\"
-		export ETCDCTL_CACERT=\"/etc/ipa/ca.crt\"
+		export ETCDCTL_ENDPOINTS=https://$SVR_HOSTNAME:2379
+		export ETCDCTL_CACERT=/etc/ipa/ca.crt
 	EOF
 	chmod 0644 "/etc/profile.d/etcdctl.sh"
 	chmod 0644 "/etc/sysctl.d/90-sysrq.conf"
