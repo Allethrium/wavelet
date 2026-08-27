@@ -148,6 +148,10 @@ generate_local_args(){
 	# Read the encoder selection, then pull the correct encoder cmdline
 	KEYNAME="/UI/GROUPS/$groupHash/control/activeCodec"; read_etcd_global
 	KEYNAME="/UI/GLOBALS/CODECS/$printvalue"; read_etcd_global
+	if [[ -z "$printvalue" ]]; then
+		echo "	ERR: group has no codec selected, defaulting to libaom-av1"
+		printvalue="libaom-av1"
+	fi
 	encoderVar="${printvalue%%;*}"
 	if [[ -n "$encoderVar" ]]; then
 		echo "	Found codec commandline: $encoderVar"
