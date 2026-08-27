@@ -3,10 +3,10 @@
 # Called by systemd service on interval
 
 ETCDINTERACTIONHOOKS=""
-if [[ -f /var/wavelet_ramfs/etcd_interaction_hooks.sh ]]; then
+if [[ -f "/var/wavelet_ramfs/etcd_interaction_hooks.sh" ]]; then
 	source "/var/wavelet_ramfs/etcd_interaction_hooks.sh"
 else
-	source /usr/local/bin/etcd_interaction_hooks.sh
+	source "/usr/local/bin/etcd_interaction_hooks.sh"
 fi
 
 LOGFILE="/var/home/wavelet/logs/health_monitor.log"
@@ -34,6 +34,7 @@ check_host_health() {
 
 main(){
 	declare -A hostList
+	declare -A infraList
 	local printvalue
 	# Get list of hostkeys
     KEYNAME="/HOSTS/"; read_etcd_prefix_list
@@ -50,11 +51,19 @@ main(){
            	# Extract hostname from /HOSTS/hostname/control/IP
            	hostname="${key#/HOSTS/}"
            	hostname="${hostname%/control/IP}"
+           	# Extract type
             # Check if this IP key already exists
 			if [[ -z "${hostList[$ip]+isset}" ]]; then
 				# Store IP as key, hostname as value
 				hostList["$ip"]="$hostname"
 			fi
+       	fi
+       	if [[ "$key" =~ ^/type$ ]]; then
+       		# check the type and save it to a separate array if type == infra
+       		KEYNAME="$key"; read_etcd_global
+       		if [[ "$printvalue" == "infra" ]]; then
+       			infraList["$ip"]="$hostname"
+       		fi
        	fi
 	done <<<"$printvalue"
 	for ip_addr in "${!hostList[@]}"; do
@@ -85,6 +94,16 @@ main(){
 			fi
        	fi
        	) &
+	done
+	for infraEntry in "${!infraList[@]}"; do
+		# TODO - check and report SNMP traps from infra devices and update on a status change
+		(
+			# Get the SNMP data from secure storage
+			# interrogate device
+			# parse device through appropriate filter to format data
+			# update host keys by verifying against prefix list if change
+			echo "Placeholder"
+		) &
 	done
 	wait
 }
