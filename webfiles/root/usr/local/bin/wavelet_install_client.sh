@@ -455,38 +455,38 @@ mkdir -p /var/lib/wavelet; chown wavelet:wavelet "/var/lib/wavelet"
 # Generate the persistent ramdisk
 mkdir -p "/var/wavelet_ramfs"
 cat > "/etc/systemd/system/var-wavelet_ramfs.mount" <<-EOF
-[Unit]
-Description=Wavelet user ramdisk (tmpfs) for UltraGrid binaries
+	[Unit]
+	Description=Wavelet user ramdisk (tmpfs) for UltraGrid binaries
 
-[Mount]
-What=tmpfs
-Where=/var/wavelet_ramfs
-Type=tmpfs
-RequiresMountsFor=/var/wavelet_ramfs
-# Mount options:
-#   size=1G     - cap at 1GiB (1073741824 bytes); tmpfs reports actual used
-#   mode=0755   - directory permissions after mount
-#   defaults    - standard mount options
-#   nosuid      - ignore setuid/setgid bits (security)
-#   nodev       - block creation of device files
-#   noatime     - avoid atime updates (reduces writes)
-Source=tmpfs
-Options=size=1G,nosuid,nodev,noatime,mode=0755
+	[Mount]
+	What=tmpfs
+	Where=/var/wavelet_ramfs
+	Type=tmpfs
+	RequiresMountsFor=/var/wavelet_ramfs
+	# Mount options:
+	#   size=1G     - cap at 1GiB (1073741824 bytes); tmpfs reports actual used
+	#   mode=0755   - directory permissions after mount
+	#   defaults    - standard mount options
+	#   nosuid      - ignore setuid/setgid bits (security)
+	#   nodev       - block creation of device files
+	#   noatime     - avoid atime updates (reduces writes)
+	Source=tmpfs
+	Options=size=1G,nosuid,nodev,noatime,mode=0755
 
-[Install]
-WantedBy=multi-user.target
+	[Install]
+	WantedBy=multi-user.target
 EOF
 cat > "/etc/systemd/system/wavelet_copyfiles.service" <<-EOF
-[Unit]
-Description=Copies binaries from /usr/local/bin to ramdisk
-After=var-wavelet_ramfs.mount
-Wants=var-wavelet_ramfs.mount
+	[Unit]
+	Description=Copies binaries from /usr/local/bin to ramdisk
+	After=var-wavelet_ramfs.mount
+	Wants=var-wavelet_ramfs.mount
 
-[Service]
-ExecStart=/usr/bin/bash -c 'cp -a /usr/local/bin/* /var/wavelet_ramfs/'
+	[Service]
+	ExecStart=/usr/bin/bash -c 'cp -a /usr/local/bin/* /var/wavelet_ramfs/'
 
-[Install]
-WantedBy=multi-user.target
+	[Install]
+	WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
 systemctl enable --now var-wavelet_ramfs.mount wavelet_copyfiles.service
