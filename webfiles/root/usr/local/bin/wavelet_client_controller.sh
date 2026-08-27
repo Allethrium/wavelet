@@ -196,6 +196,15 @@ process_hostlist() {
 	write_cmds=()
 	echo "	Getting hosts in group: $groupHash"
 	get_hosts_in_group
+	if [[ -n "${hostsInGroup[*]}" ]]; then
+		echo "	Hosts found in group (hash value):"
+		for h in "${hostsInGroup[@]}"; do
+			echo "		$h"
+		done
+	else
+		echo "	No hosts in this group."
+		return 0
+	fi
     for host in "${hostsInGroup[@]}"; do
         if [[ "$host" == *"svr"* ]]; then
         	if [[ "$1" =~ ^(blank|reveal|promote)$ ]] ; then
