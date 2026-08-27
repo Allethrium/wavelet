@@ -1068,6 +1068,7 @@ function fetchData() {
 					sourceFunction: 'fetchData',
 					controls: {
 						label: host.controls?.label || "UNKNOWN",
+						type: host.controls?.type || host.type || "UNKNOWN",
 						blankStatus: host.controls?.blankStatus || "0",
 						rebootStatus: host.controls?.rebootStatus || "0",
 						resetStatus: host.controls?.resetStatus || "0",
@@ -3174,10 +3175,9 @@ function handleGroupEvents(event) {
 					// get the chained group's sourceHash and update our own sourceHash to match
 					const targetGroup = window.root.groups.get(event.value);
 					if (targetGroup) {
-						let chainedHash = targetGroup.controls.sourceHash;
 						void window.root.controlRequestManager.send({
 							operation: "GROUPCONTROL",
-							parentHash: chainedHash,
+							parentHash: groupItem.hashID,
 							parentType: "group",
 							controlKey: "changeGroupSource",
 							controlValue: targetGroup.controls.sourceHash,
@@ -3253,6 +3253,7 @@ async function handleHostEvents(event) {
 					type: hostItem.type,
 					controls: {
 						label: hostItem.controls?.label || "UNKNOWN",
+						type: hostItem.controls?.type || hostItem.type || "UNKNOWN",
 						blankStatus: hostItem.controls?.blankStatus || "0",
 						rebootStatus: hostItem.controls?.rebootStatus || "0",
 						resetStatus: hostItem.controls?.resetStatus || "0",
@@ -3426,6 +3427,7 @@ async function handleInputEvents(event) {
 						type: hostItem.type,
 						controls: {
 							label: hostItem.controls?.label || "UNKNOWN",
+							type: hostItem.controls?.type || hostItem.type || "UNKNOWN",
 							blankStatus: hostItem.controls?.blankStatus || "0",
 							rebootStatus: hostItem.controls?.rebootStatus || "0",
 							resetStatus: hostItem.controls?.resetStatus || "0",

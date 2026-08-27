@@ -67,6 +67,39 @@ function set_etcd($token, $keyPrefix, $keyValue): void
 	}
 }
 
+/**
+ * Returns true if the value is a full sha256 hash (64 lowercase hex chars).
+ * Groups and hosts are keyed by such hashes.
+ */
+function is_valid_hash($value): bool
+{
+    return is_string($value) && preg_match('/^[a-f0-9]{64}$/', $value) === 1;
+}
+
+/**
+ * Input hashes are special: they may be the static placeholder options
+ * 0 (black screen), 1 (static image), 2 (test card) OR a full sha256 hash
+ * of a real input. Returns true for either.
+ */
+function is_valid_input_hash($value): bool
+{
+    return in_array($value, ['0', '1', '2'], true) || is_valid_hash($value);
+}
+
+/**
+ * Rejects the request with a 400 if $value is not a full sha256 hash.
+ * Used as a guard to prevent malformed/phantom hashes being written to etcd.
+ */
+function require_valid_hash($value): void
+{
+    if (!is_valid_hash($value)) {
+        error_log("SET_CONTROL: ERROR: Rejecting write for invalid hash: " . var_export($value, true));
+        http_response_code(400);
+        echo json_encode(["error" => "Invalid hash: must be a full sha256 hash"]);
+        exit;
+    }
+}
+
 function validateValue($function, $value): void
 {
 	// Status suffix mappings: key => expected suffix
@@ -240,6 +273,7 @@ switch ($type) {
 				// Asks Wavelet to delete the group
 				// If the group is populated, all hosts will revert to the default/server group
 //				error_log("SET_CONTROL: DEBUG: GROUP operation: deleteGroup:". $hashID);
+				require_valid_hash($hashID);
 				$prefixstring   =   "/UI/GLOBALS/control/GROUP-DELETE";
 				$keyValue       =   $hashID;
 				break;
@@ -262,6 +296,10 @@ switch ($type) {
 					echo json_encode(["error" => "Missing hashID"]);
 					return;
 				}
+				// Guard: a group hash must always be a full sha256 hash. This
+				// prevents phantom/malformed hashes (e.g. source values like
+				// "1" or "2--2" used as group keys) from being written to etcd.
+				require_valid_hash($hashID);
 //				error_log("SET_CONTROL: DEBUG: GROUPCONTROL - subOperation: " . $subOperation . ", dataValue: " . $dataValue . ", toggle: " . $toggle);
 				if ($toggle === "TOGGLE") {
 					validateValue($parts[0], $parts[1]);
@@ -403,6 +441,8 @@ switch ($type) {
 					echo json_encode(["error" => "Missing hashID"]);
 					return;
 				}
+				// Guard: host hashes must be full sha256 hashes.
+				require_valid_hash($hashID);
 				if ($toggle === "TOGGLE") {
 					validateValue($parts[0], $parts[1]);
 					$prefixstring	=	"/UI/HOSTS/" . $hashID . "/control/" . $parts[0];
@@ -430,6 +470,16 @@ switch ($type) {
 								error_log("ERROR: Missing parentHash for inputRelabel");
 								http_response_code(400);
 								echo json_encode(["error" => "Missing parentHash"]);
+								return;
+							}
+							// parentHash must be a host (full sha256 hash); hashID
+							// is an input and may be a static option (0/1/2) or a
+							// real input hash.
+							require_valid_hash($parentHash);
+							if (!is_valid_input_hash($hashID)) {
+								error_log("SET_CONTROL: ERROR: Rejecting inputRelabel for invalid input hash: " . var_export($hashID, true));
+								http_response_code(400);
+								echo json_encode(["error" => "Invalid input hash"]);
 								return;
 							}
 							$inputParts = explode(";", $dataValue);

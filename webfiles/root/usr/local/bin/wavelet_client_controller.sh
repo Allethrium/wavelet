@@ -108,6 +108,15 @@ detect_operation_server(){
 		groupHash="${etcdKey#*/UI/GROUPS/}"
 		local control_suffix="${groupHash##*/}"
 		groupHash="${groupHash%%/*}"
+		# Guard: a valid group key is always a full sha256 hash. Anything else
+		# is malformed/phantom data (e.g. source values like "1" or "2--2" that
+		# were once used as group keys). Delete it so it cannot pollute the UI
+		# or keep being re-emitted on every SSE reconnect.
+		if [[ ! "$groupHash" =~ ^[a-f0-9]{64}$ ]]; then
+			echo "	Auto-cleaning malformed group key: /UI/GROUPS/$groupHash"
+			KEYNAME="/UI/GROUPS/$groupHash"; delete_etcd_key_prefix_global &
+			exit 0
+		fi
 		case "$control_suffix" in
 			"audioStatus")		handler_function="event_group_enable_audio";;
 			"bannerStatus")		handler_function="event_group_enable_banner";;
@@ -134,6 +143,12 @@ detect_operation_server(){
 		local thisHostHash
 		thisHostHash="${etcdKey#/UI/HOSTS/}"
 		thisHostHash="${thisHostHash%%/*}"
+    	if [[ ! "$thisHostHash" =~ ^[a-f0-9]{64}$ ]]; then
+    		# Guard: host keys are full sha256 hashes. Auto-clean malformed ones.
+    		echo "	Auto-cleaning malformed host key: /UI/HOSTS/$thisHostHash"
+    		KEYNAME="/UI/HOSTS/$thisHostHash"; delete_etcd_key_prefix_global &
+    		exit 0
+    	fi
     	if [[ "$thisHostHash" == "$hostHash" ]]; then
     		echo "	HOSTS operation targeted at server, proceeding to detect_operation.."
     		detect_operation
@@ -906,6 +921,7 @@ event_set_directMode(){
 event_create_group(){
 	if [[ "$etcdValue" != "PLEASE" ]]; then
 		#..how rude!
+		KEYVALUE="$etcdKey"; delete_etcd_key_global &
 		exit 0
 	fi
 	# Generate a new group hash
@@ -944,11 +960,10 @@ put \"$BASEKEYNAME/control/sourceHash\" \"1\"
 put \"$BASEKEYNAME/control/sourceHashStatus\" \"1\"
 put \"$BASEKEYNAME/control/encoderTimeout\" \"5\"
 put \"$BASEKEYNAME/control/swatchValue\" \"$newSwatch\"
+del \"/UI/GLOBALS/control/GROUP-CREATE\"
 
 "
 	write_etcd_txn "$KEYDATA"
-	# Delete the group create request key
-	KEYNAME="/UI/GLOBALS/control/GROUP-CREATE"; delete_etcd_key_global &
 }
 
 event_change_group(){
@@ -1050,6 +1065,7 @@ event_delete_group(){
 	done
 	# delete the group prefix (this includes everything inside the group)
 	KEYNAME="/UI/GROUPS/$etcdValue"; delete_etcd_key_prefix_global &
+	KEYNAME="/UI/GLOBALS/control/GROUP-DELETE"; delete_etcd_key_global &
 	echo "		Group deleted!"
 	# SSE should pick up the changes
 }
