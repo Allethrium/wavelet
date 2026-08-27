@@ -19,6 +19,15 @@ function poll_etcd_range($keyPrefix, $keyPrefixPlusOneBit, $token) {
 	return json_decode($result, true);
 }
 
+/**
+ * Validates that a value is a full sha256 hash (64 lowercase hex chars).
+ * Groups and hosts are keyed by such hashes. Anything else is malformed
+ * (phantom) data that must not surface to the UI.
+ */
+function is_valid_hash($value) {
+	return is_string($value) && preg_match('/^[a-f0-9]{64}$/', $value) === 1;
+}
+
 function parse_groups($dataArray) {
 	if (empty($dataArray['kvs'])) {
 		return [];
@@ -30,6 +39,12 @@ function parse_groups($dataArray) {
 		if (str_starts_with($key, '/UI/GROUPS/')) {
 			$groupParts = explode('/', $key);
 			$groupName = $groupParts[3];
+			// Guard: only full sha256 hashes are valid group keys. Anything
+			// else (e.g. "1", "2--2", stray control values used as hashes) is
+			// phantom data and must be ignored so it cannot pollute the UI.
+			if (!is_valid_hash($groupName)) {
+				continue;
+			}
 			if (!isset($groups[$groupName])) {
 				$groups[$groupName] = [
 					'hashID' => $groupName,
@@ -82,7 +97,9 @@ function parse_hosts_and_inputs($dataArray) {
 		}
         $hostParts = explode('/', $key);
         $hostHash = $hostParts[3];
-
+        if (!is_valid_hash($hostHash)) {
+            continue;
+        }
         if (!isset($hosts[$hostHash])) {
             $hosts[$hostHash] = [
                 'hashID' => $hostHash,
