@@ -274,21 +274,35 @@ class Host {
 	}
 	async changeGroup(newGroupHash) {
 		// Moves this host instance and element to another group.  Automatically registers any inputs on this host.
+		// This is the interactive / SSE path: it notifies the backend so it can update the host's GROUP key.
+		await this.moveToGroup(newGroupHash, { notifyBackend: true });
+	}
+	moveToGroup(newGroupHash, { notifyBackend = false } = {}) {
+		// Reparents this host instance and element to another group, re-registering any inputs.
+		// When notifyBackend is false (used during group teardown), the DOM/registry move happens
+		// locally without issuing a HOSTCONTROL write back to the backend - the group is being
+		// destroyed, so echoing a "changeGroup" into it would be both unnecessary and racy.
 		const oldGroupHash = this.controls.GROUP;
 		const newGroupInstance = window.root.groups.get(newGroupHash);
 		const oldGroupInstance = window.root.groups.get(oldGroupHash);
 		// Update backend control before updating UI
-		if (newGroupHash && newGroupHash !== oldGroupHash) {
-			await window.root.controlRequestManager.send({
+		if (notifyBackend && newGroupHash && newGroupHash !== oldGroupHash) {
+			return window.root.controlRequestManager.send({
 				operation: "HOSTCONTROL",
 				parentHash: this.hashID,
 				parentType: "host",
 				controlKey: "changeGroup",
 				controlValue: newGroupHash,
 				toggleOn: false
+			}).then(() => {
+				this._applyGroupMove(newGroupHash, oldGroupHash, newGroupInstance, oldGroupInstance);
 			});
-			this.controls.GROUP = newGroupHash;
 		}
+		this._applyGroupMove(newGroupHash, oldGroupHash, newGroupInstance, oldGroupInstance);
+	}
+	_applyGroupMove(newGroupHash, oldGroupHash, newGroupInstance, oldGroupInstance) {
+		// Pure DOM/registry move - no backend writes.
+		this.controls.GROUP = newGroupHash;
 		// Move the host DOM element to the new group
 		if (newGroupInstance && newGroupInstance.element) {
 			newGroupInstance.element.appendChild(this.element);
@@ -3108,10 +3122,77 @@ function handleGroupEvents(event) {
 		});
 	} else if (event.eventType === "DELETE") {
 		console.warn("Removing group element from DOM and dataset!");
-		// TODO
-		// first we should ensure that the group chain setting is reverted.  If the group is a chain target,
-		// the downstream groups should be reverted also.
+		// Revert the group chain settings before removal.
+		// If this group was chained upstream (chainedToGroup set), break that chain.
+		// If this group was a chain target (leader), also break the chains of every
+		// downstream group that pointed to it, so followers don't track a deleted group.
 		if (groupItem) {
+			if (groupItem.isChained()) {
+				console.log(`Group ${hashID}: Breaking own chain to upstream group ${groupItem.controls.chainedToGroup}`);
+				groupItem.controls.chainedToGroup = null;
+				void window.root.controlRequestManager.send({
+					operation: "GROUPCONTROL",
+					parentHash: hashID,
+					parentType: "group",
+					controlKey: "chainedToGroup",
+					controlValue: null,
+					toggleOn: false
+				});
+			}
+			// Downstream followers of this group (chain target) must be reverted.
+			const REVERT_TO_STATIC_IMAGE = "1";
+			window.root.groups.forEach(follower => {
+				if (follower.controls.chainedToGroup === hashID) {
+					console.log(`Group ${follower.hashID}: Breaking chain to deleted target group ${hashID}`);
+					follower.controls.chainedToGroup = null;
+					// Notify the backend so followers stop tracking the deleted leader.
+					void window.root.controlRequestManager.send({
+						operation: "GROUPCONTROL",
+						parentHash: follower.hashID,
+						parentType: "group",
+						controlKey: "chainedToGroup",
+						controlValue: null,
+						toggleOn: false
+					});
+					// Revert the follower's source to the local Static Image option to avoid random inputs being selected
+					follower.sourceHash = REVERT_TO_STATIC_IMAGE;
+					void window.root.controlRequestManager.send({
+						operation: "GROUPCONTROL",
+						parentHash: follower.hashID,
+						parentType: "group",
+						controlKey: "changeGroupSource",
+						controlValue: REVERT_TO_STATIC_IMAGE,
+						toggleOn: false
+					});
+					// Refresh the follower's UI (dropdowns, active states, static buttons).
+					if (follower.element) {
+						document.dispatchEvent(new CustomEvent('sourceDropdownRefresh', {detail: follower}));
+					}
+					follower.updateActiveState();
+				}
+			});
+			// Re-home any remaining hosts to the SVR primary group.
+			// The backend (wavelet_client_controller.sh) normally moves hosts out of a deleted group
+			// via SSE events that are ordered BEFORE this GROUP-DELETE event on the same stream.  By
+			// the time we get here, any host still referencing this group was never told to move, so
+			// we re-home it locally.  This is a pure DOM/registry move (notifyBackend: false) - the
+			// group is being destroyed, so echoing a HOSTCONTROL "changeGroup" back into it would be
+			// both unnecessary and racy.  If SSE already re-homed every host, this loop is a noop.
+			let primaryGroupHash = null;
+			for (const group of window.root.groups.values()) {
+				if (group.controls.isPrimary || group.controls.isPrimary === "1") {
+					primaryGroupHash = group.hashID;
+					break;
+				}
+			}
+			if (primaryGroupHash && primaryGroupHash !== hashID) {
+				window.root.hosts.forEach(host => {
+					if (host.controls.GROUP === hashID) {
+						console.log(`Host ${host.hashID}: re-homing to primary group ${primaryGroupHash} during group teardown`);
+						host.moveToGroup(primaryGroupHash, { notifyBackend: false });
+					}
+				});
+			}
 			groupItem.unregisterGroup(hashID);
 		}
 		const groupElement = document.querySelector(`[data-hash="${hashID}"][data-type="group"]`);

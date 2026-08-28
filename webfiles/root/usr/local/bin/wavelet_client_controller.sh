@@ -1024,71 +1024,48 @@ event_change_group(){
 #delete a group
 event_delete_group(){
 	# Server only
-	echo "      Finding components in specified group.."
+	echo "		Finding components in specified group.."
 	# Validate etcdValue is not empty and matches hash format
 	if [[ -z "$etcdValue" ]]; then
-		echo "      Cannot delete group: etcdValue is empty!"
+		echo "		Cannot delete group: etcdValue is empty!"
 		exit 0
 	fi
 	if [[ ! "$etcdValue" =~ ^[a-f0-9]{64}$ ]]; then
-		echo "      Cannot delete group: etcdValue '$etcdValue' is not a valid hash format!"
+		echo "		Cannot delete group: etcdValue '$etcdValue' is not a valid hash format!"
 		exit 0
 	fi
 	# We also need the hash of the primary group
 	if [[ -z "$primaryGroupHash" ]]; then
 		# We are now in an error state because primaryGroupHash wasn't in the loaded client conf file!
-		echo "	ERR: Primary group hash not populated in client conf!  Retrieving from etcd.."
+		echo "		ERR: Primary group hash not populated in client conf!  Retrieving from etcd.."
 		KEYNAME="/GROUPS/$hostNameSys"; read_etcd_global; primaryGroupHash="$printvalue"
 	fi
 	# As this is always run on the server, and the server is always in the primary group:
 	if [[ "$etcdValue" == "$primaryGroupHash" ]]; then
-		echo "      Cannot delete the primary group!!"
+		echo "		Cannot delete the primary group!!"
 		exit 0
 	fi
-	# TODO - dead code, we don't need this read here.
-#	KEYNAME="/UI/GROUPS/$primaryGroupHash"; read_etcd_prefix_list; primaryGroupKeys="$printvalue"
-	KEYNAME="/UI/HOSTS/"; read_etcd_prefix_keys
+	KEYNAME="/UI/HOSTS/"; read_etcd_prefix_list
 	hostsGroupMemberArray=()
 	while read -r line; do
 		if [[ "$line" == *"GROUP"* ]]; then
 			hostsGroupMemberArray+=("$line")
 		fi
 	done <<<"$printvalue"
+	# We now have a list of /UI/HOSTS/$hash/control/GROUP keys to test.
 	for hostKey in "${hostsGroupMemberArray[@]}"; do
+		# This is slow because we must perform a read for every host on the system
 		KEYNAME="$hostKey"; read_etcd_global
 		if [[ "$etcdValue" == "$printvalue" ]]; then
 			echo "		Moving host $hostKey to primary group.."
-			KEYNAME="$hostKey"; KEYVALUE="$primaryGroupHash"; write_etcd_global &
-			declare -g -A GROUP_KEYS
-			get_group_keys "$primaryGroupHash"
-			for key in "${!GROUP_KEYS[@]}"; do
-				case $key in
-					blankStatus)
-						etcdValue="${GROUP_KEYS[$key]}"; event_blank
-						;;
-					revealStatus)
-						etcdValue="${GROUP_KEYS[$key]}"; event_reveal
-						;;
-					sourceHash)
-						echo "		SourceHash changed: ${GROUP_KEYS[$key]} (triggers wavelet_run)"
-						etcdValue="${GROUP_KEYS[$key]}"
-						# Don't exit early - continue processing other controls first
-						;;
-					*)
-						continue
-						;;
-				esac
-			done
-#			KEYNAME="/HOSTS/$hostNameSys/control/sourceCheckVersion"; KEYVALUE="$(date +%s)"; write_etcd_global &
-			KEYNAME="/HOSTS/$hostNameSys/control/GROUP"; KEYVALUE="$etcdValue"; write_etcd_global &
-			wavelet_run
+			KEYNAME="$hostKey"; KEYVALUE="$primaryGroupHash"; write_etcd_global
 		fi
 	done
-	# delete the group prefix (this includes everything inside the group)
-	KEYNAME="/UI/GROUPS/$etcdValue"; delete_etcd_key_prefix_global &
-	KEYNAME="/UI/GLOBALS/control/GROUP-DELETE"; delete_etcd_key_global &
+	# delete the group prefix (this includes every key inside the group)
+	KEYNAME="/UI/GROUPS/$etcdValue"; delete_etcd_key_prefix_global
+	KEYNAME="/UI/GLOBALS/control/GROUP-DELETE"; delete_etcd_key_global
 	echo "		Group deleted!"
-	# SSE should pick up the changes
+	# SSE should pick up the changes and apply them back to the frontend
 }
 
 get_ipValue(){
