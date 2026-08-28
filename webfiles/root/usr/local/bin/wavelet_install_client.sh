@@ -283,7 +283,7 @@ optimize_latency(){
 	numCPU="$(nproc)"
 	if (( numCPU > 4 )); then
 		# integer math to get the last two CPU nodes
-		isolated="$(( ncpu -2 )), $(( ncpu -1 ))"
+		isolated="$(( numCPU -2 )), $(( numCPU -1 ))"
 		rpm-ostree kargs --append="isolcpus=$isolated" \
 						--append="nohz_full=$isolated" \
 						--append="rcu_nocbd=$isolated" \
@@ -304,14 +304,14 @@ optimize_latency(){
 	# grant real-time scheduling and memory locking to the wavelet session.
 	cat > "/etc/systemd/system/user@.service.d/override.conf" <<-EOF
 		[Service]
-		LimitRTPRIO=55
+		LimitRTPRIO=50
 		LimitMEMLOCK=512M
 	EOF
 	# PAM fallback for login sessions (systemd user units use the drop-in above;
 	# this covers any PAM-authenticated session path so the grants are consistent).
 	mkdir -p "/etc/security/limits.d"
 	cat > "/etc/security/limits.d/99-wavelet.conf" <<-EOF
-		wavelet  -  rtprio    55
+		wavelet  -  rtprio    50
 		wavelet  -  memlock   512M
 	EOF
 }

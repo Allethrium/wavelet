@@ -1464,6 +1464,8 @@ run_decoder(){
 	ugArgs+=("$display")
 	ugArgs+=("${audio:-}")
 	ugArgs+=("--control-port 6161")
+	ugArgs+=("--param use-hw-accel")
+	ugArgs+=("--param gl-disable-10b")
 	# append -VV to enable verbose logging
 	# check for our image files, both must be present or the switcher will fail to launch.
 	if [[ ! -f "$staticImageFile" ]]; then

@@ -64,12 +64,12 @@ start_ultragrid(){
     timeout=5
     "$binaryPath" "${UG_ARGUMENTS[@]}" > /var/home/wavelet/logs/ugDirect.log 2>&1 &
     UG_PID=$!
-    if [[ -n "$ISOLATED_CPU" ]]; then
-        taskset -pc "$ISOLATED_CPU" "$UG_PID" 2>/dev/null
-    fi
-    # SCHED_FIFO, priority 60 — only on the UG child, and only if permitted.
-    # (Requires the wavelet user to hold rtprio/memlock limits.)
-    chrt -f -p 55 "$UG_PID" 2>/dev/null || true
+	if [[ -n "${ISOLATED_CPU:-}" ]]; then
+		# pin all codec threads to the isolated cores
+		for t in /proc/"$UG_PID"/task/*; do
+			taskset -p "$ISOLATED_CPU" "${t##*/}" 2>/dev/null || true
+		done
+	fi
     if [[ -z "$swaySocket" ]]; then
         local runtimeDir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
         for sock in "${runtimeDir}"/sway-ipc.*.sock; do
