@@ -271,33 +271,35 @@ optimize_latency(){
 	local iface="$1"
 	# This function attempts to perform some direct system optimizations
 	# Based upon what we know about discovered hardware, CPU topology, etc.
-	# Consider disabling gro on the NIC stack
-	# This will prevent the network stack from batching received packets before passing them off to the app stack
-	# May result in high CPU usage but lower latency
 	if [[ -n "$iface" ]]; then
 		ethtool -K "$iface" gro off 2>/dev/null || echo "    (gro off not supported on $iface)"
 		# also disable lro if present
 		ethtool -K "$iface" lro off 2>/dev/null || true
 	fi
-	local numCPU; local isolated
+	echo "	Getting CPU topology and attempting to isolate and reserve CPU cores for media encoding.."
+	local numCPU; local isolated; local want; local reserved
 	numCPU="$(nproc)"
-	if (( numCPU > 4 )); then
-		# integer math to get the last two CPU nodes
-		isolated="$(( numCPU -2 )), $(( numCPU -1 ))"
-		rpm-ostree kargs --append="isolcpus=$isolated" \
-						--append="nohz_full=$isolated" \
-						--append="rcu_nocbd=$isolated" \
-						--append="irqaffinity=$isolated" \
-						2>/dev/null
-		echo "	Isolated cores $isolated for media processing."
-        sed -i '/^export ISOLATED_CPU=/d' "/etc/wavelet.conf"
-        echo "export ISOLATED_CPU=\"$isolated\"" >> "/etc/wavelet.conf"
-	else
-		echo "	This device has too few CPUs to safely perform isolation.  Skipping."
+	want=$(( numCPU - 2 ))          # leave 2 for systemd/kernel housekeeping
+	if (( want < 2 )); then
+		echo "	This device has too few CPU cores to safely perform isolation.  Skipping."
+		want=0
+	elif (( want > 8 )); then
+		want=8                       # cap: encoders get diminishing returns past 8 threads
 	fi
-    rpm-ostree kargs --append="nmi_watchdog=0" \
-                     --append="nowatchdog" \
-                     --append="pcie_aspm=off" 2>/dev/null || true
+	want=$(( want & ~1 ))            # round down to an even number
+	if (( want > 0 )); then
+		isolated="$(seq -s ', ' $(( numCPU - want )) $(( numCPU - 1 )))"
+		# ensure irqaffinity goes to the remainder (reserved) cores
+		reserved="$(seq -s ', ' 0 $(( numCPU - want - 1 )))"
+		rpm-ostree kargs --append="isolcpus=$isolated" \
+			--append="nohz_full=$isolated" \
+			--append="rcu_nocbd=$isolated" \
+			--append="irqaffinity=$reserved" \
+			2>/dev/null
+		sed -i '/^export ISOLATED_CPU=/d' "/etc/wavelet.conf"
+		echo "export ISOLATED_CPU=\"$isolated\"" >> "/etc/wavelet.conf"
+		echo "	Isolated cores $isolated for media processing."
+	fi
     # Generate a systemD RT drop-in
 	# /etc/systemd/system/user@.service.d/override.conf
 	# Raises the rlimits ceiling for ALL systemd user managers, so user units can
