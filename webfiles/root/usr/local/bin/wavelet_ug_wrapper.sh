@@ -300,7 +300,7 @@ badSwitchCounter=0
 declare -gA error_timers
 
 # Ensure the error-state marker exists in the config so sed replaces are reliable.
-if ! grep -q "^UG_ERROR_STATE=" "$HOME/config/$hostNameSys.conf"; then
+if ! grep -q "^export UG_ERROR_STATE=" "$HOME/config/$hostNameSys.conf"; then
 	[[ -s "$HOME/config/$hostNameSys.conf" && -n "$(tail -c1 "$HOME/config/$hostNameSys.conf")" ]] && echo >> "$HOME/config/$hostNameSys.conf"
 	echo "export UG_ERROR_STATE=0" >> "$HOME/config/$hostNameSys.conf"
 fi
