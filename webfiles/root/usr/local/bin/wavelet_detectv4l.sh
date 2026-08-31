@@ -463,7 +463,7 @@ encoder_checkNetwork(){
 		touch /home/wavelet/config/NETWORK_ERROR_FLAG
 		exit 0
 	fi
-	if ping -c 3 "$SVR_IP"; then
+	if ping -c 3 "$SVR_HOSTNAME"; then
 		echo -e "Online and connected to Wavelet Server, continuing..\n"
 		detect_method "$usbPath"
 	else
@@ -555,9 +555,8 @@ hostNameSys="$(hostname)"
 
 # source conf file variables
 configFile="/var/home/wavelet/config/$hostNameSys.conf"
+source "/etc/wavelet.conf"
 source "$configFile"
-
-# TODO Here get missing data if any, or proceed
 
 for i in "$@"; do
 	case "$i" in
