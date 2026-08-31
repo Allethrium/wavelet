@@ -314,17 +314,24 @@ switch ($type) {
 							$prefixstring = "/UI/GROUPS/$hashID/control/chainedToGroup";
 							$keyValue = $dataValue;
 							break;
-						case 'changeBannerContent':
+						case 'bannerContent':
 							// in this case, keyValue is a compound ${urlData};${apiKey}
 							// The backend script expects this format and will fail if it is not correct
 							$prefixstring = "/UI/GROUPS/$hashID/control/bannerContent";
 							$keyValue = $dataValue;
 							break;
-						case 'changeBTMac':
+						case 'blueToothMAC':
 							$prefixstring = "/UI/GROUPS/$hashID/control/blueToothMAC";
-							$keyValue = $dataValue;
-							break;
-						case 'changeEncoderTimeout':
+							if (preg_match('/^[0-9a-fA-F]{2}(?:-[0-9a-fA-F]{2}){5}$/', $dataValue)) {
+								$keyValue = $dataValue;
+								break;
+							} else {
+								error_log("ERROR: Data is not a valid MAC address, rejecting.");
+								http_response_code(400);
+								echo json_encode(["error" => "ERROR: Data is not a valid MAC address, rejecting."]);
+								return;
+							}
+						case 'encoderTimeout':
 							// Validate that the value is an integer between 0 and 1440
 							$validatedTimeout = filter_var($dataValue, FILTER_VALIDATE_INT, array("options" => array("min_range" => 0, "max_range" => 1440)));
 							if ($validatedTimeout === false) {
@@ -336,29 +343,29 @@ switch ($type) {
 							$prefixstring = "/UI/GROUPS/$hashID/control/encoderTimeout";
 							$keyValue = $validatedTimeout;
 							break;
-						case 'changeGroupSource':
+						case 'sourceHash':
 							$prefixstring = "/UI/GROUPS/$hashID/control/sourceHash";
 							$keyValue = $dataValue;
 							break;
-						case 'changeGroupCodec':
+						case 'activeCodec':
 							$prefixstring = "/UI/GROUPS/$hashID/control/activeCodec";
 							$keyValue = $dataValue;
 							break;
-						case 'changeLiveStreamURL':
+						case 'liveStreamURL':
 							// We now have a URL target key and an API key object
-							$prefixstring = "/UI/GROUPS/$hashID/control/LiveStreamURL";
+							$prefixstring = "/UI/GROUPS/$hashID/control/liveStreamURL";
 							$keyValue = $dataValue;
 							break;
-						case 'changeLiveStreamKey':
+						case 'liveStreamKey':
 							// We now have a URL target key and an API key object
-							$prefixstring = "/UI/GROUPS/$hashID/control/LiveStreamKey";
+							$prefixstring = "/UI/GROUPS/$hashID/control/liveStreamKey";
 							$keyValue = $dataValue;
 							break;
 						case 'groupCreated':
 							$prefixstring = "/UI/GROUPS/$hashID/control/newGroup";
 							$keyValue = "0";
 							break;
-						case 'relabel':
+						case 'label':
 							$prefixstring = "/UI/GROUPS/$hashID/control/label";
 							$keyValue = $dataValue;
 							break;
@@ -491,7 +498,7 @@ switch ($type) {
 							$prefixstring = "/UI/HOSTS/$parentHash/inputs/$hashID";
 							$keyValue = "$parentHostName;$label;$inputPath;$inputType";
 							break;
-						case 'relabel':
+						case 'label':
 							// We relabel the host
 							$prefixstring = "/UI/HOSTS/$hashID/control/label";
 							$keyValue = $dataValue;

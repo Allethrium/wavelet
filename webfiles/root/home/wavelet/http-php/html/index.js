@@ -6,6 +6,7 @@ const REALTIME_CONFIG = {
 };
 
 function escapeHTML(val) {
+	// TODO - this must be able to handle MAC addresses and livestream URLS
 	let text = val === undefined || val === null ? '' : String(val);
 	let map = {
 		'&': '&amp;',
@@ -118,7 +119,7 @@ class Group {
 						operation: "GROUPCONTROL",
 						parentHash: group.hashID,
 						parentType: "group",
-						controlKey: "changeGroupSource",
+						controlKey: "sourceHash",
 						controlValue: chainTargetSource,
 						toggleOn: false
 					});
@@ -135,7 +136,7 @@ class Group {
 				operation: "GROUPCONTROL",
 				parentHash: group.hashID,
 				parentType: "group",
-				controlKey: "changeGroupSource",
+				controlKey: "sourceHash",
 				controlValue: targetHash,
 				toggleOn: false
 			});
@@ -608,7 +609,7 @@ class DragDropManager {
 		if (draggedType === 'group' && targetType === 'group' && targetHash !== draggedHash) {
 			const sourceHashValue = `${targetHash}:${targetInstance.controls.sourceHash || '1'}`;
 			void window.root.controlRequestManager.send({ operation: "GROUPCONTROL", parentHash: draggedHash, parentType: "group", controlKey: "chainedToGroup", controlValue: targetHash, toggleOn: false });
-			void window.root.controlRequestManager.send({ operation: "GROUPCONTROL", parentHash: draggedHash, parentType: "group", controlKey: "changeGroupSource", controlValue: sourceHashValue, toggleOn: false });
+			void window.root.controlRequestManager.send({ operation: "GROUPCONTROL", parentHash: draggedHash, parentType: "group", controlKey: "sourceHash", controlValue: sourceHashValue, toggleOn: false });
 			draggedInstance.controls.chainedToGroup = targetHash;
 			draggedInstance.sourceHash = sourceHashValue;
 		} else if (draggedType === 'host' && targetType === 'group') {
@@ -1994,10 +1995,11 @@ function createTextBox(itemInstance, spanText, targetAttribute) {
 	}
 	const placeholderText = {
 		label : itemInstance.controls.label,
-		blueToothMAC: "ex., AA:BB:CC:DD:EE:FF",
-		liveStreamURL: "ex. https://abc.com/watch?v=ID",
-		liveStreamKey: "ex. your_api_key_here",
-		bannerContent: "ex. DOC CAM",
+		encoderTimeout: itemInstance.controls.encoderTimeout || "ex. 5 (minutes)",
+		blueToothMAC: itemInstance.controls.blueToothMAC || "ex. AA:BB:CC:DD:EE:FF",
+		liveStreamURL: itemInstance.controls.liveStreamURL || "ex. https://abc.com/watch?v=ID",
+		liveStreamKey: itemInstance.controls.liveStreamKey || "ex. your_api_key_here",
+		bannerContent: itemInstance.controls.bannerContent || "ex. DOC CAM",
 	};
 	labelTextBox.setAttribute("placeholder", placeholderText[targetAttribute] || "Enter value...");
 	labelTextBox.setAttribute("type", "text");
@@ -2016,33 +2018,43 @@ function createTextBox(itemInstance, spanText, targetAttribute) {
 		if (oldLabelValue === updatedText) {
 			console.log("Values have not changed, doing nothing");
 		} else {
-			console.log("Submitting label update with values\nHash: " + itemInstance.hashID + "\nNew Label: " + updatedText);
+			console.log(
+				"Submitting text update with values:\n	Item hash: " + itemInstance.hashID +
+				"\n	Control: " + targetAttribute +
+				"\n	Data: " + updatedText
+			);
 			// ["hash"] ?? null; // hash ID of the element, can be null in case of new group rq
 			// ["request"] ?? null; // operation we are performing on the element
 			// ["data"] ?? null; // further data for suboperations and values etc.
 			// ["parentHash"] ?? null; // the parent hash if needed
 			// ["type\"]; //  GROUP, HOST, INPUT, GLOBALS
 			if (itemInstance instanceof Group) {
-				void window.root.controlRequestManager.send({
-					operation: "GROUPCONTROL",
-					parentHash: itemInstance.hashID,
-					parentType: "group",
-					controlKey: `relabel:${updatedText}`,
-					controlValue: "",
-					toggleOn: false
-				});
+				if ( targetAttribute === "label" && labelTextBox.dataset.originalValue === "SVR (Primary group)" ) {
+					console.error("ERR: Cannot rename primary group!");
+				} else	{
+					// TODO - BUG mac address is correct on console.log but only first two bytes make it to PHP.
+					void window.root.controlRequestManager.send({
+						operation: "GROUPCONTROL",
+						parentHash: itemInstance.hashID,
+						parentType: "group",
+						controlKey: `${targetAttribute}:${updatedText}`,
+						controlValue: "",
+						toggleOn: false
+					});
+				}
 			} else {
-				// we could only be a host otherwise
+				// we could only be a host otherwise, which only supports a single hostname textbox
 				window.root.controlRequestManager.send({
 					operation: "HOSTCONTROL",
 					parentHash: itemInstance.hashID,
 					parentType: "host",
-					controlKey: `relabel:${updatedText}`,
+					controlKey: `label:${updatedText}`,
 					controlValue: "",
 					toggleOn: false
 				}).then(() => {
-					// For class instances, update the controls object directly
-					itemInstance.controls.labelText = updatedText;
+					// For class instances, update the 'controls' object directly
+					// TODO - this should now reflect the target atrribute since it may not always be relabel
+					itemInstance.controls[targetAttribute] = updatedText;
 				});
 			}
 		}
@@ -2322,11 +2334,11 @@ function createMenuSet(item) {
 	menuSet.appendChild(elementDiv);
 	// Additional Group controls (textboxes, file pickers, dropdowns
 	if (item.type === "group") {
-		menuSet.appendChild(createTextBox(item, "Encoder Timeout", "encoderTimeoutSeconds", "changeEncoderTimeout"));
-		menuSet.appendChild(createTextBox(item, "📶 BlueTooth MAC", "blueToothMAC", "changeBTMac"));
-		menuSet.appendChild(createTextBox(item, "📺 Livestream URL",  "liveStreamURL", "changeLiveStreamSettings"));
-		menuSet.appendChild(createTextBox(item, "📺 Livestream Key",  "liveStreamKey", "changeLiveStreamSettings"));
-		menuSet.appendChild(createTextBox(item, "📝 Banner Text", "bannerContent", "changeBannerContent"));
+		menuSet.appendChild(createTextBox(item, "Encoder Timeout", "encoderTimeout"));
+		menuSet.appendChild(createTextBox(item, "📶 BlueTooth MAC", "blueToothMAC"));
+		menuSet.appendChild(createTextBox(item, "📺 Livestream URL",  "liveStreamURL"));
+		menuSet.appendChild(createTextBox(item, "📺 Livestream Key",  "liveStreamKey"));
+		menuSet.appendChild(createTextBox(item, "📝 Banner Text", "bannerContent"));
 		menuSet.appendChild(createFilePicker(item));
 		const codecDropdown = createCodecDropdown(item);
 		menuSet.appendChild(document.createTextNode("Codec"));
@@ -2740,9 +2752,9 @@ function createInputElement(inputInstance) {
 			groupHash: parentHost.controls.GROUP,
 			title: "Rename This Input",
 			dataLabel: "RENAME",
-			operation: "relabel",
-			value: "relabel",
-			buttonCategory: "relabel"
+			operation: "inpuRelabel",
+			value: "RENAME",
+			buttonCategory: "label"
 		});
 		divEntry.appendChild(renameButton);
 	}
@@ -3160,7 +3172,7 @@ function handleGroupEvents(event) {
 						operation: "GROUPCONTROL",
 						parentHash: follower.hashID,
 						parentType: "group",
-						controlKey: "changeGroupSource",
+						controlKey: "sourceHash",
 						controlValue: REVERT_TO_STATIC_IMAGE,
 						toggleOn: false
 					});
@@ -3232,14 +3244,6 @@ function handleGroupEvents(event) {
 					// console.log("Calling input activation update for input hash ID: " + event.value + " in group hash ID: " + hashID);
 					groupItem.sourceHash = event.value;
 					groupItem.updateActiveState();
-					// What defines chainedGroup and chainedHash?
-					// each group has a key which can be undefined/null: group.controls.chainedToGroup
-					// Only write to chained followers that are actually out of sync with this
-					// leader. This keeps real source changes propagating, but makes replayed
-					// events from an SSE reconnect/page-refresh no-ops — a follower that is
-					// already synced (value already reflects this leader's sourceHash, either
-					// as a raw input hash or a "leader:input" composite) won't trigger a write,
-					// so a page refresh can't disrupt video by re-emitting changeGroupSource.
 					const compositeValue = `${groupItem.hashID}:${event.value}`;
 					window.root.groups.forEach(group => {
 						if (group.controls.chainedToGroup === groupItem.hashID) {
@@ -3254,7 +3258,7 @@ function handleGroupEvents(event) {
 								operation: "GROUPCONTROL",
 								parentHash: group.hashID,
 								parentType: "group",
-								controlKey: "changeGroupSource",
+								controlKey: "sourceHash",
 								controlValue: event.value,
 								toggleOn: false
 							});
@@ -3276,7 +3280,7 @@ function handleGroupEvents(event) {
 							operation: "GROUPCONTROL",
 							parentHash: groupItem.hashID,
 							parentType: "group",
-							controlKey: "changeGroupSource",
+							controlKey: "sourceHash",
 							controlValue: targetGroup.controls.sourceHash,
 							toggleOn: false
 						});
