@@ -5,7 +5,7 @@
 # It concatenates any available local input devices into a switcher command line and intelligently launches them.
 
 trap 'stop_timer' EXIT
-
+set -x
 # By the time this module is called, there should already be validation that an encoder task is supposed to be running!
 
 # Etcd Interaction hooks (calls wavelet_etcd_interaction.sh, which more intelligently handles security layer functions as necessary)
@@ -26,8 +26,8 @@ else
 fi
 
 # Source config files
-ISOLATED_CPU="$(awk -F'"' '/^export ISOLATED_CPU=/{print $2}' /etc/wavelet.conf 2>/dev/null)"
-#source "/var/home/wavelet/config/$hostNameSys.conf"
+source "/etc/wavelet.conf"
+source "/var/home/wavelet/config/$(hostname).conf"
 
 test_newDevice(){
 	# Check to see if our host device update flag has been modified.
@@ -243,7 +243,6 @@ generate_systemd_unit(){
 	# Tell wavelet my encoder IP address, which is always my active network connection
 	activeConnection="$(nmcli -t -f NAME,DEVICE c s -a | head -n 1)"
 	activeConnectionIP="$(nmcli dev show "${activeConnection#*:}" | grep 'ADDRESS' | awk '{print $2}' | head -n 1)"
-	KEYNAME="ENCODER_IP_ADDRESS"; KEYVALUE="${activeConnectionIP%/*}"; write_etcd_global &
 	systemctl --user daemon-reload
 	systemctl --user enable UltraGrid.Encoder.service --now
 	echo "	Encoder systemd unit instructed to start.."
