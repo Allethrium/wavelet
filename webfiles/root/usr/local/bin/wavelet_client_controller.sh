@@ -503,90 +503,13 @@ event_reveal(){
 		controlPortCmd="capture.data $channelIndex"; netCat "6161" "$controlPortCmd"
 	) &
 }
-event_prefix_set(){
-	# Switches the type designator under /hostLabel/$(hostname)/control/type
-	# This is now checking and modifying the local host's /type key from what was set in the UI.
-		if [[ "$hostType" = "dec" ]]; then
-			echo "      I am currently a decoder, switching to an encoder"
-			KEYNAME="/HOSTS/$hostNameSys/control/type"; KEYVALUE="enc"; write_etcd_global
-			# Launch detectV4l so that we generate a list of attached devices
-			"$WAVELET_DETECTV4L_MOD" "redetect"
-			# terminate existing UG decoder tasks
-			systemctl --user disable \
-				UltraGrid.Decoder.service --now
-			# Generate reflector service
-			local targetFile
-			if [[ -f "/var/wavelet_ramfs/wavelet_reflector.sh" ]]; then
-				targetFile="/var/wavelet_ramfs/wavelet_reflector.sh"
-			else
-				targetFile="/usr/local/bin/wavelet_reflector.sh"
-			fi
-			# Note the wrapper files do not reside on the ramdisk
-			cat > /var/home/wavelet/.config/systemd/user/wavelet_reflector.service <<-EOF
-				[Unit]
-				Description=Wavelet wavelet_reflector
-				After=network-online.target
-				Wants=network-online.target
 
-				[Service]
-				Type=simple
-				ExecStart=/var/lib/wavelet/bin/wavelet/wavelet_client_controller_wrapper.sh 'wavelet' '/HOSTS/%H/DECODER_SUB_LIST' "$targetFile"
-				Restart=always
-				RestartSec=10s
-				# Security hardening
-				NoNewPrivileges=true
-				PrivateTmp=true
-				ProtectSystem=strict
-				# ProtectHome=true
-				RuntimeDirectory=wavelet_reflector
-				RuntimeDirectoryMode=0700
-				# Memory protection
-				MemoryDenyWriteExecute=true
-				SystemCallArchitectures=native
-
-				[Install]
-				WantedBy=default.target
-				EOF
-			systemctl --user daemon-reload
-			# Update config file with new data
-			configKey="HOST_TYPE"
-            if grep -q "^export $configKey=" "$configFile"; then
-            	sed -i "s/^export $configKey=.*/export $configKey=\"enc\"/" "$configFile"
-            else
-            	echo "export $configKey=\"enc\"" >> "$configFile"
-            fi
-			# launch encoder process and ensure we have the proper blank image available
-			notifyID="$(notify-send -h string:x-mako-align:center "Currently Running Encoder Process")"
-			echo "$notifyID" > /var/home/wavelet/config/notifyID
-			event_encoder
-		else
-			echo "      I am not a decoder, switching to become a decoder.."
-			# Update config file with new data
-			configKey="HOST_TYPE"
-            if grep -q "^export $configKey=" "$configFile"; then
-            	sed -i "s/^export $configKey=.*/export $configKey=\"dec\"/" "$configFile"
-            else
-            	echo "export $configKey=\"dec\"" >> "$configFile"
-            fi
-			KEYNAME="/HOSTS/$hostNameSys/control/type"; KEYVALUE="dec"; write_etcd_global
-			remove_associated_inputs
-			# Terminate encoder processes
-			systemctl --user disable \
-				UltraGrid.Encoder.service \
-				wavelet_reflector.service \
-				UltraGrid.Reflector.service --now
-			notifyID="$(cat /var/home/wavelet/config/notifyID)"
-			notify-send -r="$notifyID" -e "Encoder task stopped"
-			# Call decoder
-			run_decoder
-		fi
-}
 remove_associated_inputs(){
 	echo "      Removing input devices associated with my hostname.."
 	# Since we are running on the affected host here, all we need do is look at an array output of /hostname/inputs/devpath_lookup
 	KEYNAME="/HOSTS/$hostNameSys/inputs/devpath_lookup"; read_etcd_prefix_global; devPath=("$printvalue")
 	for i in "${devPath[@]}"; do
-		echo "      Calling d4vl to remove $i"
+		echo "      Calling wavelet_detect_v4l.sh to remove $i"
 		# Detectv4l will now handle graceful removal of all device keys from the videopath of the device I.E /dev/video0 parsed as _dev_video0
 		"$WAVELET_DETECTV4L_MOD" "delete" "${i//_\//}"; sleep 2
 	done
@@ -605,21 +528,76 @@ set_newHostName(){
 }
 # Promotion functionality
 event_promote(){
-	echo "      Host type is: $hostType"
-	case "$hostType" in
-		enc*)
-			echo -e "	I am an Encoder \n"; event_prefix_set; "$WAVELET_SCREENCAST_MOD" "capable"
-			;;
-		dec*)
-			echo -e "	I am a Decoder \n"; event_prefix_set;
-			;;
-		svr*)
-			echo -e "	I am a Server, ending process \n"; exit 0
-			;;
-		*)
-			echo -e "	This device is other, ending process\n"; exit 0
-			;;
-	esac
+	echo "	Host type is: $hostType"
+	if [[ "$hostType" == "svr" ]]; then
+		echo "	Server cannot be promoted/demoted."
+		exit 0
+	fi
+	# Switches the type designator under /hostLabel/$(hostname)/control/type
+	# This is now checking and modifying the local host's /type key from what was set in the UI.
+	if [[ "$etcdValue" = "1" ]]; then
+		echo "		Switching to an encoder"
+		update_localConfig "HOST_TYPE"
+		KEYNAME="/HOSTS/$hostNameSys/control/type"; KEYVALUE="enc"; write_etcd_global
+		# Launch detectV4l so that we generate a list of attached devices
+		"$WAVELET_DETECTV4L_MOD" "redetect"
+		# terminate existing UG decoder tasks
+		systemctl --user disable \
+			UltraGrid.Decoder.service --now
+		# Generate reflector service
+		local targetFile
+		if [[ -f "/var/wavelet_ramfs/wavelet_reflector.sh" ]]; then
+			targetFile="/var/wavelet_ramfs/wavelet_reflector.sh"
+		else
+			targetFile="/usr/local/bin/wavelet_reflector.sh"
+		fi
+		# Note the wrapper files do not reside on the ramdisk
+		cat > "/var/home/wavelet/.config/systemd/user/wavelet_reflector.service" <<-EOF
+			[Unit]
+			Description=Wavelet wavelet_reflector
+			After=network-online.target
+			Wants=network-online.target
+
+			[Service]
+			Type=simple
+			ExecStart=/var/lib/wavelet/bin/wavelet/wavelet_client_controller_wrapper.sh 'wavelet' '/HOSTS/%H/DECODER_SUB_LIST' "$targetFile"
+			Restart=always
+			RestartSec=10s
+			# Security hardening
+			NoNewPrivileges=true
+			PrivateTmp=true
+			ProtectSystem=strict
+			# ProtectHome=true
+			RuntimeDirectory=wavelet_reflector
+			RuntimeDirectoryMode=0700
+			# Memory protection
+			MemoryDenyWriteExecute=true
+			SystemCallArchitectures=native
+
+			[Install]
+			WantedBy=default.target
+		EOF
+		systemctl --user daemon-reload
+		systemctl --user restart wavelet_reflector.service
+		# launch encoder process and ensure we have the proper blank image available
+		notifyID="$(notify-send -h string:x-mako-align:center "Currently Running Encoder Process")"
+		echo "$notifyID" > "/var/home/wavelet/config/notifyID"
+		# An encoder will take no further action until it receives an actionable videoSource value from etcd.
+	else
+		echo "		Switching to become a decoder.."
+           update_localConfig "HOST_TYPE"
+		KEYNAME="/HOSTS/$hostNameSys/control/type"; KEYVALUE="dec"; write_etcd_global
+		remove_associated_inputs
+		# Terminate encoder processes
+		systemctl --user disable \
+			UltraGrid.Encoder.service \
+			wavelet_reflector.service \
+			UltraGrid.Reflector.service --now
+		notifyID="$(cat /var/home/wavelet/config/notifyID)"
+		notify-send -r="$notifyID" -e "Encoder task stopped"
+		# Call decoder
+		wavelet_run
+	fi
 }
 toggle_userInterface() {
 	# Enables the UI and switches UltraGrid from fullscreen mode to windowed mode.
@@ -1133,22 +1111,17 @@ get_ipValue(){
 	fi
 }
 
-# Replaces wavelet_run.sh
 wavelet_run(){
-	# Detect_self in this case relies on the etcd type key
+	# Processes the videoSource key provided to the host via the dispatch table
 	case "$hostType" in
 		enc*)
-			event_encoder
-			;;
-		decX.*)
-			echo -e "	    ERR: DECODER HOSTNAME NOT SET.\n	Terminating process.\n"
-			exit 0
+			run_encoder
 			;;
 		dec*)
 			run_decoder
 			;;
 		svr*)
-			run_server
+			run_encoder
 			;;
 		*)
 			echo -e "	    This device Hostname is not set appropriately, exiting\n"
@@ -1157,34 +1130,53 @@ wavelet_run(){
 	esac
 }
 
-run_server(){
+run_encoder(){
 	# Check for input devices
-	if [[ "$inputDevicePresent" -eq 1 ]]; then
-		echo "	An input device is present on this server, proceeding"
-		# Is this input on this host?
-		if [[ -z "$serverHostHash" ]]; then
-			serverHostHash="$CLIENT_HOST_HASH"
-		fi
-		KEYNAME="/UI/HOSTS/$serverHostHash/inputs/"; read_etcd_prefix_keys
-		if [[ "$etcdValue" == 0 ]] || [[ "$etcdValue" == 1 ]] || [[ "$etcdValue" == 2 ]]; then
-			# The requested input device is a static.  Taking no further action
-			exit 0
-		else
-            if [[ "$printvalue" != *"$etcdValue"* ]]; then
-                echo "	The requested input device is not present on this server.  Checking for indirect NET devices.."
-                check_ndiDirectMode
-            else
-                echo "	The requested input device: $etcdValue is not a static selection, and is present on this server, running encoder."
-                event_encoder
-            fi
-        fi
-	else
-		echo "		No detectable input devices are present on this server."
-		echo "		The server will handle only primary group streaming and system coordination tasks."
+	if [[ "$etcdValue" == 0 ]] || [[ "$etcdValue" == 1 ]] || [[ "$etcdValue" == 2 ]]; then
+		# The requested input device is a static.  Taking no further action
+		exit 0
 	fi
+	# Pull a list of any inputs available on this system's host keys
+	# This would most commonly be v4l2 devices but could be others.
+	if [[ "$INPUT_DEVICE_PRESENT" == "1" ]]; then
+		KEYNAME="/UI/HOSTS/$CLIENT_HOST_HASH/inputs/"; read_etcd_prefix_keys
+	else
+		echo "	No input devices are present on this host, ending task."
+		exit 0
+	fi
+	if [[ -z "$CLIENT_HOST_HASH" ]]; then
+		KEYNAME="/HOSTS/$hostNameSys"; read_etcd_global; CLIENT_HOST_HASH="$printvalue"
+	fi
+	KEYNAME="/UI/HOSTS/$CLIENT_HOST_HASH/inputs/"; read_etcd_prefix_keys
+    if [[ "$printvalue" != *"$etcdValue"* ]]; then
+		echo "	The requested input device is not present on this client."
+		if [[ $hostNameSys == *"svr"* ]]; then
+			echo "	Checking for indirect NET devices in this group.."
+			check_DirectMode
+		else
+			# TODO - issues with this implementation;
+			# multiple NDI devices in the same group?
+			KEYNAME="/HOSTS/$hostNameSys/netDevice"; read_etcd_global
+			if [[ -n "$printvalue" ]]; then
+				echo "	Detected a network indirect key on this system, verifying.."
+				# TODO - verify the device is current, if not; delete the key.
+			else
+				# delete the key
+				delete_etcd_key_global
+			fi
+		fi
+	else
+		echo "	The requested input device is present on this client, running encoder."
+	fi
+    if [[ "$(systemctl --user is-active wavelet_reflector.service 2>/dev/null)" != "active" ]]; then
+    	# UltraGrid reflector systemd unit launched from this service
+        systemctl --user enable wavelet_reflector.service --now
+    fi
+	"$WAVELET_ENCODER_MOD" "inputHash=$etcdValue" "groupHash=$GROUP_HASH" "netDevIngest=$1" &
 }
 
-check_ndiDirectMode() {
+check_DirectMode() {
+	# TODO - Needs updating to be more of a location-aware state store to pair indirect netdevs with free encoders.
 	# Interrogate the selected device hash to see if its parent host is in directMode.  If so, clients subscribe directly.
 	if [[ -z "${_inputDeviceMap[$etcdValue]:-}" ]]; then
 		echo "	Input device $etcdValue not found in cache."
@@ -1206,28 +1198,19 @@ check_ndiDirectMode() {
 	KEYNAME="/HOSTS/$targetHostName/control/directMode"; read_etcd_global
 	echo "directMode for device is $printvalue"
 	if [[ "$printvalue" == 1 ]]; then
-		# The NDI device is in direct mode and clients subscribe directly.
+		# The net device is in direct mode and clients will subscribe directly.
 		exit 0
 	else
 		# We regenerate our encoder process and handle this as an UltraGrid input
 		KEYNAME="/HOSTS/$targetHostName/uv_encode_cmd/inputStream"; read_etcd_global
-		echo "		NDI Device set to indirect mode!  Adding UltraGrid encoder argument (base64): $printvalue"
-		event_encoder "$printvalue"
+		echo "		Network streaming device set to indirect mode!  Searching for free encoders with SVR as fallback.."
+		# TODO - check the UI prefix for group-adjacent encoders, and update their keys to take over encoding.
+		KEYNAME="/HOSTS/$targetHostName/control/GROUP"; read_etcd_key_global; netDevGroup="$printvalue"
+		# get_hosts_in_group
+		# for host in hostsInGroup[@]; do
+		#	KEYNAME="/HOSTS/$host/netDevice"; KEYVALUE="$netDevGroup"; write_etcd_global &
+		# done
 	fi
-}
-
-event_encoder(){
-	# An encoder runs:
-	# A video compression systemd unit
-	# A reflector + reflector reload systemd unit
-	# An encoder CAN display the stream it generates, at some performance cost of running an additional display process
-	# The blank/unblank button controls that function in this context.
-	# We may want to ensure the group mass blank/unblank controls do NOT affect encoders!
-    if [[ "$(systemctl --user is-active wavelet_reflector.service 2>/dev/null)" != "active" ]]; then
-        systemctl --user enable wavelet_reflector.service --now
-    fi
-	echo -e "	Calling wavelet_encoder module with args:\n		$etcdValue\n	$thisHostHash\n			$1\n"
-	"$WAVELET_ENCODER_MOD" "inputHash=$etcdValue" "groupHash=$groupHash" "netDevIngest=$1" &
 }
 
 check_reflector_subscription(){
@@ -1437,6 +1420,9 @@ run_decoder(){
 	inputs=()
 	if [[ "$(nproc)" -le 4 ]]; then
 		echo "	Launching without eager source init due to low CPU count"
+		echo "	CRITICAL MESSAGE:  excl_init is *VERY* buggy when switching against network streams."
+		# UltraGrid needs some modifications to more reliably switch away from incoming net video streams
+		# I'm looking into generating those patches
 		inputs+=("-t switcher:excl_init")
 	else
 		inputs+=("-t switcher")
