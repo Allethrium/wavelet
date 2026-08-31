@@ -296,19 +296,10 @@ optimize_latency(){
 			--append="rcu_nocbd=$isolated" \
 			--append="irqaffinity=$reserved" \
 			2>/dev/null
-		sed -i '/^export ISOLATED_CPU=/d' "/etc/wavelet.conf"
-		echo "export ISOLATED_CPU=\"$isolated\"" >> "/etc/wavelet.conf"
+		sed -i '/^ISOLATED_CPU=/d' "/etc/wavelet.conf"
+		echo "ISOLATED_CPU=\"$isolated\"" >> "/etc/wavelet.conf"
 		echo "	Isolated cores $isolated for media processing."
 	fi
-    # Generate a systemD RT drop-in
-	# /etc/systemd/system/user@.service.d/override.conf
-	# Raises the rlimits ceiling for ALL systemd user managers, so user units can
-	# grant real-time scheduling and memory locking to the wavelet session.
-	cat > "/etc/systemd/system/user@.service.d/override.conf" <<-EOF
-		[Service]
-		LimitRTPRIO=50
-		LimitMEMLOCK=512M
-	EOF
 	# PAM fallback for login sessions (systemd user units use the drop-in above;
 	# this covers any PAM-authenticated session path so the grants are consistent).
 	mkdir -p "/etc/security/limits.d"

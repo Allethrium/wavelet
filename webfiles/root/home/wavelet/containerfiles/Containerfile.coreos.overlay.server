@@ -11,5 +11,5 @@ RUN rpm-ostree install -y -A \
         expect avahi-tools tcpdump nmap \
         buildah butane inotify-tools \
         zlib-ng-compat openssl ascii \
-        live555 && \
+        live555 net-snmp-utils && \
     ostree container commit

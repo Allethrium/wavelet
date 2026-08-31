@@ -137,6 +137,7 @@ detect_operation_server(){
 			"sourceHash")		handler_function="event_group_set_video_source";;
 			"staticImage")		handler_function="event_group_set_staticImage";;
 			"activeCodec")		handler_function="event_group_set_codec";;
+			"chainedToGroup")	handler_function="event_group_chaining";;
 			*) exit 0;;
 		esac
 		if [[ -n "$handler_function" ]] && declare -f "$handler_function" > /dev/null; then
@@ -406,13 +407,12 @@ event_reset(){
 }
 updatelocalConfig(){
 	# Takes input ARG=$KEYVALUE
-	# possible bug - ensure export KEY=VAL is always on a new line! -- may reside in ug_wrapper.sh
 	configFile="/var/home/wavelet/config/$hostNameSys.conf"
 	if grep -q "export $1=" "$configFile"; then
 		# this command needs to replace the entire line
 		sed -i "/^export $1=/c\export $1=$KEYVALUE" "$configFile"
 	else
-		echo "export $1=$KEYVALUE" >> "$configFile"
+		echo -e "\nexport $1=$KEYVALUE" >> "$configFile"
 	fi
 }
 # Blank functionality
@@ -938,6 +938,13 @@ event_set_directMode(){
 	KEYNAME="/HOSTS/$printvalue/control/directMode"; KEYVALUE="$etcdValue"; write_etcd_global &
 }
 
+event_group_chaining() {
+	# Only responsible for removing null orphan key left behind when a group is unchained
+	# This is arguably a race condition fix from the index.js implementation uncoupling groups prior to deletion
+	if [[ "$etcdValue" == "null" ]] || [[ -z "$etcdValue" ]]; then
+		KEYNAME="$etcdKey"; delete_etcd_key_global &
+	fi
+}
 # Group membership
 event_create_group(){
 	if [[ "$etcdValue" != "PLEASE" ]]; then
@@ -1428,7 +1435,12 @@ run_decoder(){
 	# this means its not usable until modifications can be made under the hood in UltraGrid
 	display=""
 	inputs=()
-	inputs+=("-t switcher")
+	if [[ "$(nproc)" -le 4 ]]; then
+		echo "	Launching without eager source init due to low CPU count"
+		inputs+=("-t switcher:excl_init")
+	else
+		inputs+=("-t switcher")
+	fi
 	inputs+=("-t testcard:pattern=blank")
 	inputs+=("-t file:$staticImageFile:loop")
 	inputs+=("-t testcard:pattern=smpte_bars")

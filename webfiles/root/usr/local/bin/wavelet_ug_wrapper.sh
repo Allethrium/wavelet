@@ -301,8 +301,6 @@ declare -gA error_timers
 
 # Ensure the error-state marker exists in the config so sed replaces are reliable.
 if ! grep -q "^UG_ERROR_STATE=" "$HOME/config/$hostNameSys.conf"; then
-	# If the file doesn't end with a newline, appending would glue the new line
-	# onto the end of the last existing line. Guarantee a trailing newline first.
 	[[ -s "$HOME/config/$hostNameSys.conf" && -n "$(tail -c1 "$HOME/config/$hostNameSys.conf")" ]] && echo >> "$HOME/config/$hostNameSys.conf"
 	echo "export UG_ERROR_STATE=0" >> "$HOME/config/$hostNameSys.conf"
 fi
