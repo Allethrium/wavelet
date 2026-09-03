@@ -190,7 +190,7 @@ class Group {
 			operation: "GROUPCONTROL",
 			parentHash: this.hashID,
 			parentType: "group",
-			controlKey: "changeGroupSource",
+			controlKey: "sourceHash",
 			controlValue: hashID,
 			toggleOn: false
 		});
@@ -3132,7 +3132,7 @@ function handleGroupEvents(event) {
 			document.dispatchEvent(new CustomEvent('sourceDropdownRefresh', {detail: newGroup}));
 			newGroup.updateActiveState();
 		});
-	} else if (event.eventType === "DELETE") {
+	} else if (event.eventType === "DELETE" && event.key && !/^\/UI\/(?:HOSTS|GROUPS)\/[^/]+\/control\/[^/]+$/) {
 		console.warn("Removing group element from DOM and dataset!");
 		// Revert the group chain settings before removal.
 		// If this group was chained upstream (chainedToGroup set), break that chain.
@@ -3253,7 +3253,7 @@ function handleGroupEvents(event) {
 								return;
 							}
 							console.log(`This group is the source target of a chained group! Broadcasting source change to the chained group: ${group.hashID}`);
-							// Send changeGroupSource to the chained group
+							// Send new source hash to the chained group
 							void window.root.controlRequestManager.send({
 								operation: "GROUPCONTROL",
 								parentHash: group.hashID,

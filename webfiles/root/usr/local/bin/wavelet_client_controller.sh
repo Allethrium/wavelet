@@ -1138,7 +1138,15 @@ run_encoder(){
 	fi
 	# Pull a list of any inputs available on this system's host keys
 	# This would most commonly be v4l2 devices but could be others.
+	# Ensure local encoder keys are correctly sourced
+	source "/var/home/wavelet/config/$hostNameSys.conf"
+	if [[ -z "$INPUT_DEVICE_PRESENT" ]]; then
+		KEYNAME="/HOSTS/$hostNameSys/INPUT_DEVICE_PRESENT"; read_etcd_global
+		echo "export INPUT_DEVICE_PRESENT=$printvalue"
+		export INPUT_DEVICE_PRESENT="$printvalue"
+	fi
 	if [[ "$INPUT_DEVICE_PRESENT" == "1" ]]; then
+		echo "	Reading etcd prefix for: /UI/HOSTS/$CLIENT_HOST_HASH/inputs/"
 		KEYNAME="/UI/HOSTS/$CLIENT_HOST_HASH/inputs/"; read_etcd_prefix_keys
 	else
 		echo "	No input devices are present on this host, ending task."
