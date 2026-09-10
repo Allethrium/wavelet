@@ -1,6 +1,6 @@
 ### Wavelet
 
-Wavelet is a local video appliance.  
+Wavelet is a local video appliance.
 
 Wavelet is designed to provide a quick 'Pop-Up' solution for low-latency video transmission at venues where running network or HDMI cables is undesirable, or impractical.
 
@@ -25,7 +25,7 @@ The core components of a switch, wireless AP and server are REQUIRED.
 
 Wavelet is implemented over several open source applications, called by system or user-level systemd units.
 
-In its current form, It uses a set of bash modules combined with the distributed keystore system etcd to control systemd services on the encoders and decoders.   These operate in response to input from a simple web server/PHP Script running on the server.   
+In its current form, It uses a set of bash modules combined with the distributed keystore system etcd to control systemd services on the encoders and decoders.   These operate in response to input from a simple web server/PHP Script running on the server.
 
 This control surface is accessible from any device connected via Wi-Fi, and any wavelet decoder device may be switched into UI Mode for access to this interface once provisioned.
 
@@ -33,12 +33,12 @@ The server by default also runs an instance of the web interface, which is usefu
 
 ## Disclaimer:
 
-Wavelet is designed as an APPLIANCE.   
+Wavelet is designed as an APPLIANCE.  
 This means that software is not supposed to be updated after installation is completed, and that the system does not connect to any networks beyond the local Wavelet Wi-Fi network.  
-If control channels for software updates or internet access for livestreaming are necessary, appropriate network segmentation should be carefully considered.   
+If control channels for software updates or internet access for livestreaming are necessary, appropriate network segmentation should be carefully considered.  
 Under no circumstances should the system be deployed on a "flat" production network.  We accept no liability for any consequences of ignoring this warning.
 
-Maintenance should be carried out on a dedicated laptop which can connect wirelessly to the system, by an individual familiar with common conventions used on this system.   
+Maintenance should be carried out on a dedicated laptop which can connect wirelessly to the system, by an individual familiar with common conventions used on this system.  
 It can also be performed by connecting a monitor and input devices to the server.
 
 Under no circumstances is the system designed to be connected to a secure production network, to be managed remotely by enterprise patching or security applications.  
@@ -50,51 +50,50 @@ The system builds upon the following projects.  Their use in this project does n
 
 (Incomplete list: If your stuff was used, and we neglected to credit you, feel free to let us know!):
 
-* UltraGrid      -  https://github.com/CESNET/UltraGrid
-* etcd           -  https://github.com/etcd-io/etcd
-* Fedora CoreOS  -  https://github.com/coreos
-* FFMPEG         -  https://git.ffmpeg.org/ffmpeg.git
-* PipeWire       -  https://github.com/PipeWire
-* ImageMagick    -  https://imagemagick.org/
-* NDI (VIDEZ)    -  https://ndi.video/
-
+* UltraGrid - https://github.com/CESNET/UltraGrid
+* etcd - https://github.com/etcd-io/etcd
+* Fedora CoreOS - https://github.com/coreos
+* FFMPEG - https://git.ffmpeg.org/ffmpeg.git
+* PipeWire - https://github.com/PipeWire
+* ImageMagick - https://imagemagick.org/
+* NDI (VIDEZ) - https://ndi.video/
 
 ## INSTALLATION
 
-To install: ```git clone``` this repo to a linux machine with internet access.  This can be a full installation, a liveCD if you are just testing, etc.
+To install: `git clone` this repo to a linux machine with internet access.  This can be a full installation, a liveCD if you are just testing, etc.
 
 My test lab, for instance, has a machine running with a static IP address (above .200) well out of the server DHCP range.  
 This allows an engineer to ssh into the server whilst it's installing and check logs for progress.
 
-Wavelet's installation scripts can cache the larger components in a local http server and container registry on your deployment environment.   
+Wavelet's installation scripts can cache the larger components in a local http server and container registry on your deployment environment.  
 This results in one large sequence of downloads but will drastically reduce bandwidth requirements and decrease installation time for further deployments.
 
 To configure the registry to cache heavy files and container layers on the deployment machine:
-run: ```./build_registry.sh $(pwd)-or-full-path-to-wavelet-git $(hostname -i)-or-my-ip-address```
+run: `./build_registry.sh $(pwd)-or-full-path-to-wavelet-git $(hostname -i)-or-my-ip-address`
 
 Then, to install the wavelet server, you can run the command below with appropriate input arguments
-run: ```./install_wavelet_server.sh```
+run: `./install_wavelet_server.sh`
 
 Full example:
-run: ```./build_registry.sh /home/user/Downloads/wavelet 192.168.0.2```
+run: `./build_registry.sh /home/user/Downloads/wavelet 192.168.0.2`
 
 The command below will configure wavelet with:
-    pull from working/dev branch
-    "labmode" to skip configuration prompts and take everything from the command line inputs
-    a username password of "testlab123" for the wavelet clients
-    downloading the UltraGrid continouous/dev package for newer features
-    a Wi-Fi BSSID (AP MAC address) matching "77:47:..."
-    a Wi-Fi PSK of "StrongPassWord1"
-    Wi-Fi AP IP Address statically set to 192.168.0.100
-    Wi-Fi AP username/pass set to waveletAPUser/password123
-    Registry IP address set to 192.168.0.2 (same as our deployment machine)
-    System gateway of 192.168.0.1
+pull from working/dev branch
+"labmode" to skip configuration prompts and take everything from the command line inputs
+a username password of "testlab123" for the wavelet clients
+downloading the UltraGrid continouous/dev package for newer features
+a Wi-Fi BSSID (AP MAC address) matching "77:47:..."
+a Wi-Fi PSK of "StrongPassWord1"
+Wi-Fi AP IP Address statically set to 192.168.0.100
+Wi-Fi AP username/pass set to waveletAPUser/password123
+Registry IP address set to 192.168.0.2 (same as our deployment machine)
+System gateway of 192.168.0.1
 
-run: ```$PWD/install_wavelet_server.sh -d -l -ugd -p=testlab123 -ws=Wavelet-1 -wb=77:47 -wp=StrongPassword1 -wip=192.168.0.100 -wap=waveletAPUser -wau=password123 --domain=wavelet.allethrium -reg=192.168.0.2 -g=192.168.0.1```
+run: `$PWD/install_wavelet_server.sh -d -l -ugd -p=testlab123 -ws=Wavelet-1 -wb=77:47 -wp=StrongPassword1 -wip=192.168.0.100 -wap=waveletAPUser -wau=password123 --domain=wavelet.allethrium -reg=192.168.0.2 -g=192.168.0.1`
 
-To configure wavelet to pull from my armelvil test branch, add a "d" argument like so: ```./install_wavelet_server.sh -d``` - given this is still under very active experimentation, if something's broken this will get new updates I haven't pushed to the main branch.
+To configure wavelet to pull from my armelvil test branch, add a "d" argument like so: `./install_wavelet_server.sh -d` - given this is still under very active experimentation, if something's broken this will get new updates I haven't pushed to the main branch.
 
-Please note it's a good idea to have your Wi-Fi access point and switch infrastructure pre-configured.   
+Please note it's a good idea to have your Wi-Fi access point and switch infrastructure pre-configured.  
 A stretch goal is to leverage IaaS techniques to support provisioning of some target devices as part of the installation process, but that is for the future.
 
 The installer will download appropriate install media and customize the images appropriately after you have intelligently answered the prompts.
