@@ -2770,7 +2770,7 @@ function createInputElement(inputInstance) {
 	// 	directMode toggle switch, sets backend directmode 0 or 1
 	if (inputInstance.subType === "NDI" || inputInstance.subType === "RTSP") {
 		const directToggle = createToggleBox(parentHost, "directMode", "DIRECT");
-		directToggle.title = "Toggles direct mode on/off.  If off, this net device will run via an UltraGrid Encoder.";
+		directToggle.title = "Toggles direct mode on/off.  If off, this net device will run via an idle UltraGrid Encoder, with a preference for this group.";
 		deviceControlsDiv.appendChild(document.createTextNode(` ${inputInstance.subType}`));
 		deviceControlsDiv.appendChild(directToggle);
 	}
@@ -3132,7 +3132,12 @@ function handleGroupEvents(event) {
 			document.dispatchEvent(new CustomEvent('sourceDropdownRefresh', {detail: newGroup}));
 			newGroup.updateActiveState();
 		});
-	} else if (event.eventType === "DELETE" && event.key && !/^\/UI\/(?:HOSTS|GROUPS)\/[^/]+\/control\/[^/]+$/) {
+	} else if (
+		event.eventType === "DELETE" &&
+		event.key &&
+		!/^\/UI\/(?:HOSTS|GROUPS)\/[^/]+\/control\/[^/]+$/ &&   // UI control sub-key (e.g. toggling a mode) — not a real delete
+		!/^GROUPS\/[^/]+\/control\/[^/]+$/                    // plain group control delete (e.g. clearing chainedToGroup) — not a real delete
+	) {
 		console.warn("Removing group element from DOM and dataset!");
 		// Revert the group chain settings before removal.
 		// If this group was chained upstream (chainedToGroup set), break that chain.
