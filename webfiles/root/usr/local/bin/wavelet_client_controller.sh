@@ -944,7 +944,7 @@ event_create_group(){
 	local BASEKEYNAME
 	BASEKEYNAME="/UI/GROUPS/$newGroupHash"
 	# Pick a random swatch color from a palette that fits the dark teal UI theme
-	local swatchColors=( "#1d5161" "#08507c" "#113b53" "#133446" "#143b51" "#4cede1" "#0f2b39" "#0a3d5c" "#1a6b8a" "#0d4f6e" )
+	local swatchColors=( "#1d5161" "#08507c" "#113b53" "#133446" "#143b51" "#0f2b39" "#0a3d5c" "#1a6b8a" "#0d4f6e" )
 	local newSwatch; newSwatch="${swatchColors[$((RANDOM % ${#swatchColors[@]}))]}"
 	# Create a txn which will complete only if the generated hash doesn't exist
 	KEYDATA="mod(\"$BASEKEYNAME\") = \"0\"
