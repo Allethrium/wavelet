@@ -417,6 +417,10 @@ nginx_quadlets(){
 		Secret=webui-enc
 		Secret=redispw
 		Pod=http-php.pod
+
+		[Service]
+		Restart=always
+		RestartSec=3
 	EOF
 	cat > "/var/home/wavelet/.config/containers/systemd/nginx.container" <<-EOF
 		[Unit]

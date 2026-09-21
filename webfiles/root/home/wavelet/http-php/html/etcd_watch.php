@@ -213,9 +213,9 @@ if ($token === false) {
     error_log("ETCD_WATCH: ERROR: NO AUTH TOKEN!");
 }
 // Watch loop with reconnection
-$maxRetries = 32;
+$maxRetries = 10;
 $retryCount = 0;
-$baseDelay = 1;
+$baseDelay = 2;
 
 while (true) {
     $watched = run_watch($token, $redisClient, $redisStream);
@@ -229,7 +229,7 @@ while (true) {
         error_log("ETCD_WATCH: ERROR: Max retries ($maxRetries) exceeded, giving up");
         exit(1);
     }
-    $delay = min($baseDelay * pow(2, $retryCount - 1), 60);
+    $delay = min($baseDelay * 2, 60);
     error_log("ETCD_WATCH: Watch connection lost, reconnecting in: $delay seconds. (attempt $retryCount/$maxRetries)");
     sleep($delay);
     // Refresh etcd auth token before reconnecting, otherwise the stale/expired
