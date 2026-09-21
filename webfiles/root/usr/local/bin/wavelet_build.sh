@@ -120,7 +120,9 @@ etcd_provision_request(){
 		echo "Client provisioning has failed.  Key value is not accessible, or does not match!"
 		exit 1
 	fi
-	rm -rf "/var/home/wavelet/.config/systemd/user/wavelet_provision_watcher.service" && systemctl --user daemon-reload
+	# Disable provision_watcher service
+    systemctl --user disable wavelet_provision_watcher.service
+	rm -f "/var/home/wavelet/.config/systemd/user/wavelet_provision_watcher.service" && systemctl --user daemon-reload
 }
 
 detect_self(){
