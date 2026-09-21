@@ -426,13 +426,13 @@ rpm_overlay_install_server(){
 
 rpm_overlay_install_client(){
 	# Pulls the client overlay and installs it.  For obvious reasons, client only.
-	oci_registry="$serverIPAddress:5000"
+	oci_registry="$SVR_IP:5000"
 	echo "Installing via container and applying as ostree overlay.."
 	until ping -c 1 "$SVR_HOSTNAME"; do
 		sleep .1
 	done
 	# add the svr host entry for early DNS resolution
-	echo "$serverIPAddress $SVR_HOSTNAME" > /etc/hosts
+	echo "$SVR_IP $SVR_HOSTNAME" > /etc/hosts
 	cat > /etc/containers/registries.conf.d/10-wavelet.conf <<- EOF
 		[[registry]]
 		prefix = "$SVR_HOSTNAME"
