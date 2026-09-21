@@ -165,8 +165,10 @@ class Group {
 	registerGroupInput(inputInstance) {
 		this.inputs.set(inputInstance.hashID, inputInstance);
 		// console.log(`Input ${inputInstance.labelText} registered in Group ${this.hashID}:`);
-		if (window.root && !window.root.activeGroupInputsEmitter) {
-			window.root.activeGroupInputsEmitter = new EventEmitter();
+		// Notify subscribers (source dropdowns) that this group's input set changed,
+		// so dynamically-added sources show up without a manual refresh.
+		if (window.root && window.root.activeGroupInputsEmitter) {
+			window.root.activeGroupInputsEmitter.emit(this.hashID);
 		}
 		// Rebuild the input button cache since new inputs may have been added
 		this.inputButtonMap.clear();
@@ -1325,6 +1327,12 @@ function refreshDropdown(groupInstance) {
 		groupInstance.sourceDropdownElement = newSelect;
 		newSelect.dataset.isRefreshing = 'false';
 		newSelect.dataset.lastSourceHash = newSelect.value;
+		// Size the freshly built dropdown to its widest option (monospace font → ch units)
+		let widestText = 0;
+		for (const opt of newSelect.options) {
+			if (opt.text.length > widestText) widestText = opt.text.length;
+		}
+		newSelect.style.width = `calc(${widestText}ch + 6em)`;
 		console.log(`refreshDropdown: Created new source dropdown for group ${groupInstance.hashID}`);
 		select = newSelect;
 	}
@@ -1340,6 +1348,13 @@ function refreshDropdown(groupInstance) {
 		select.innerHTML = newSelect.innerHTML;
 		select.value = newSelect.value;
 		select.dataset.lastSourceHash = select.value;
+		// Resize the dropdown to fit its widest option. The font is monospace, so
+		// measure the longest option text in ch units and add the horizontal padding.
+		let widestText = 0;
+		for (const opt of newSelect.options) {
+			if (opt.text.length > widestText) widestText = opt.text.length;
+		}
+		select.style.width = `calc(${widestText}ch + 6em)`;
 		// Notify all groups about the refresh
 		if (window.root && window.root.activeGroupInputsEmitter) {
 			window.root.activeGroupInputsEmitter.emit('*');
@@ -3132,92 +3147,6 @@ function handleGroupEvents(event) {
 			document.dispatchEvent(new CustomEvent('sourceDropdownRefresh', {detail: newGroup}));
 			newGroup.updateActiveState();
 		});
-	} else if (
-		event.eventType === "DELETE" &&
-		event.key &&
-		!/^\/UI\/(?:HOSTS|GROUPS)\/[^/]+\/control\/[^/]+$/ &&   // UI control sub-key (e.g. toggling a mode) — not a real delete
-		!/^GROUPS\/[^/]+\/control\/[^/]+$/                    // plain group control delete (e.g. clearing chainedToGroup) — not a real delete
-	) {
-		console.warn("Removing group element from DOM and dataset!");
-		// Revert the group chain settings before removal.
-		// If this group was chained upstream (chainedToGroup set), break that chain.
-		// If this group was a chain target (leader), also break the chains of every
-		// downstream group that pointed to it, so followers don't track a deleted group.
-		if (groupItem) {
-			if (groupItem.isChained()) {
-				console.log(`Group ${hashID}: Breaking own chain to upstream group ${groupItem.controls.chainedToGroup}`);
-				groupItem.controls.chainedToGroup = null;
-				void window.root.controlRequestManager.send({
-					operation: "GROUPCONTROL",
-					parentHash: hashID,
-					parentType: "group",
-					controlKey: "chainedToGroup",
-					controlValue: null,
-					toggleOn: false
-				});
-			}
-			// Downstream followers of this group (chain target) must be reverted.
-			const REVERT_TO_STATIC_IMAGE = "1";
-			window.root.groups.forEach(follower => {
-				if (follower.controls.chainedToGroup === hashID) {
-					console.log(`Group ${follower.hashID}: Breaking chain to deleted target group ${hashID}`);
-					follower.controls.chainedToGroup = null;
-					// Notify the backend so followers stop tracking the deleted leader.
-					void window.root.controlRequestManager.send({
-						operation: "GROUPCONTROL",
-						parentHash: follower.hashID,
-						parentType: "group",
-						controlKey: "chainedToGroup",
-						controlValue: null,
-						toggleOn: false
-					});
-					// Revert the follower's source to the local Static Image option to avoid random inputs being selected
-					follower.sourceHash = REVERT_TO_STATIC_IMAGE;
-					void window.root.controlRequestManager.send({
-						operation: "GROUPCONTROL",
-						parentHash: follower.hashID,
-						parentType: "group",
-						controlKey: "sourceHash",
-						controlValue: REVERT_TO_STATIC_IMAGE,
-						toggleOn: false
-					});
-					// Refresh the follower's UI (dropdowns, active states, static buttons).
-					if (follower.element) {
-						document.dispatchEvent(new CustomEvent('sourceDropdownRefresh', {detail: follower}));
-					}
-					follower.updateActiveState();
-				}
-			});
-			// Re-home any remaining hosts to the SVR primary group.
-			// The backend (wavelet_client_controller.sh) normally moves hosts out of a deleted group
-			// via SSE events that are ordered BEFORE this GROUP-DELETE event on the same stream.  By
-			// the time we get here, any host still referencing this group was never told to move, so
-			// we re-home it locally.  This is a pure DOM/registry move (notifyBackend: false) - the
-			// group is being destroyed, so echoing a HOSTCONTROL "changeGroup" back into it would be
-			// both unnecessary and racy.  If SSE already re-homed every host, this loop is a noop.
-			let primaryGroupHash = null;
-			for (const group of window.root.groups.values()) {
-				if (group.controls.isPrimary || group.controls.isPrimary === "1") {
-					primaryGroupHash = group.hashID;
-					break;
-				}
-			}
-			if (primaryGroupHash && primaryGroupHash !== hashID) {
-				window.root.hosts.forEach(host => {
-					if (host.controls.GROUP === hashID) {
-						console.log(`Host ${host.hashID}: re-homing to primary group ${primaryGroupHash} during group teardown`);
-						host.moveToGroup(primaryGroupHash, { notifyBackend: false });
-					}
-				});
-			}
-			groupItem.unregisterGroup(hashID);
-		}
-		const groupElement = document.querySelector(`[data-hash="${hashID}"][data-type="group"]`);
-		if (groupElement) {
-			groupElement.remove();
-		}
-		// Double-check: clear from window.root.groups if still present
-		window.root.groups.delete(hashID);
 	} else {
 		try {
             // Handle control update
@@ -3600,28 +3529,106 @@ async function handleInputEvents(event) {
 }
 
 function handleGlobalsEvents(event) {
-	// console.log("Handling event for global event: ", event);
-	// Effectively the only global controls we worry about are;
-	// Advanced/Normal UI mode
-	// Perhaps we may include some infra health status here in future
-	const allGlobalsElements = document.querySelectorAll('[data-globals="true"]');
-	let foundGlobalsElement = null;
-	const lastPart = event.key.split('/').pop();
-	allGlobalsElements.forEach(globalsElement => {
-		// Changed to case-insensitive substring match
-		if (globalsElement.id.toLowerCase().includes(lastPart.toLowerCase())) {
-			console.log("Found affected globals element, setting status update!");
-			// Only update value attribute, do NOT reload on toggle changes
-			globalsElement.value = event.value;
-			foundGlobalsElement = globalsElement;
-			// IMPORTANT: Do NOT reload the page here!
-			// The UI mode change should be applied dynamically via the UI state
-			// If reload is truly needed, it should only happen once during an initial load
-			// or be controlled by a specific reload flag.
+	// console.log("processing event:", event);
+	if (event.eventType === "UPDATE" && event.category === "GROUP-DELETE") {
+		// we have a group deletion event
+		if (event.value === null) {
+			// noop
+			return;
 		}
-	});
-	if (!foundGlobalsElement) {
-		console.log("Element not found for globals event");
+		console.warn("Removing group element from DOM and dataset!");
+		let hashID = event.value;
+		let groupItem = window.root.groups.get(hashID);
+		if (groupItem) {
+			if (groupItem.isChained()) {
+				console.log(`Group ${hashID}: Breaking own chain to upstream group ${groupItem.controls.chainedToGroup}`);
+				groupItem.controls.chainedToGroup = null;
+				void window.root.controlRequestManager.send({
+					operation: "GROUPCONTROL",
+					parentHash: hashID,
+					parentType: "group",
+					controlKey: "chainedToGroup",
+					controlValue: null,
+					toggleOn: false
+				});
+			}
+			// Downstream followers of this group (chain target) must be reverted.
+			const REVERT_TO_STATIC_IMAGE = "1";
+			window.root.groups.forEach(follower => {
+				if (follower.controls.chainedToGroup === hashID) {
+					console.log(`Group ${follower.hashID}: Breaking chain to deleted target group ${hashID}`);
+					follower.controls.chainedToGroup = null;
+					// Notify the backend so followers stop tracking the deleted leader.
+					void window.root.controlRequestManager.send({
+						operation: "GROUPCONTROL",
+						parentHash: follower.hashID,
+						parentType: "group",
+						controlKey: "chainedToGroup",
+						controlValue: null,
+						toggleOn: false
+					});
+					// Revert the follower's source to the local Static Image option to avoid random inputs being selected
+					follower.sourceHash = REVERT_TO_STATIC_IMAGE;
+					void window.root.controlRequestManager.send({
+						operation: "GROUPCONTROL",
+						parentHash: follower.hashID,
+						parentType: "group",
+						controlKey: "sourceHash",
+						controlValue: REVERT_TO_STATIC_IMAGE,
+						toggleOn: false
+					});
+					// Refresh the follower's UI (dropdowns, active states, static buttons).
+					if (follower.element) {
+						document.dispatchEvent(new CustomEvent('sourceDropdownRefresh', {detail: follower}));
+					}
+					follower.updateActiveState();
+				}
+			});
+			// Re-home any remaining hosts to the SVR primary group.
+			// The backend (wavelet_client_controller.sh) normally moves hosts out of a deleted group
+			// via SSE events that are ordered BEFORE this GROUP-DELETE event on the same stream.  By
+			// the time we get here, any host still referencing this group was never told to move, so
+			// we re-home it locally.  This is a pure DOM/registry move (notifyBackend: false) - the
+			// group is being destroyed, so echoing a HOSTCONTROL "changeGroup" back into it would be
+			// both unnecessary and racy.  If SSE already re-homed every host, this loop is a noop.
+			let primaryGroupHash = null;
+			for (const group of window.root.groups.values()) {
+				if (group.controls.isPrimary || group.controls.isPrimary === "1") {
+					primaryGroupHash = group.hashID;
+					break;
+				}
+			}
+			if (primaryGroupHash && primaryGroupHash !== hashID) {
+				window.root.hosts.forEach(host => {
+					if (host.controls.GROUP === hashID) {
+						console.log(`Host ${host.hashID}: re-homing to primary group ${primaryGroupHash} during group teardown`);
+						host.moveToGroup(primaryGroupHash, { notifyBackend: false });
+					}
+				});
+			}
+			groupItem.unregisterGroup(hashID);
+		}
+		const groupElement = document.querySelector(`[data-hash="${hashID}"][data-type="group"]`);
+		if (groupElement) {
+			groupElement.remove();
+		}
+		// Double-check: clear from window.root.groups if still present
+		window.root.groups.delete(hashID);
+	} else {
+		const allGlobalsElements = document.querySelectorAll('[data-globals="true"]');
+		let foundGlobalsElement = null;
+		const lastPart = event.key.split('/').pop();
+		allGlobalsElements.forEach(globalsElement => {
+			// Changed to case-insensitive substring match
+			if (globalsElement.id.toLowerCase().includes(lastPart.toLowerCase())) {
+				console.log("Found affected globals element, setting status update!");
+				globalsElement.value = event.value;
+				foundGlobalsElement = globalsElement;
+			}
+		})
+		if (!foundGlobalsElement) {
+			console.log("Element not found for globals event");
+		}
 	}
 }
 
