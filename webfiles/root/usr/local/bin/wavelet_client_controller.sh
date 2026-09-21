@@ -412,7 +412,7 @@ updatelocalConfig(){
 		# this command needs to replace the entire line
 		sed -i "/^export $1=/c\export $1=$KEYVALUE" "$configFile"
 	else
-		echo -e "\nexport $1=$KEYVALUE" >> "$configFile"
+		echo -e "export $1=$KEYVALUE" >> "$configFile"
 	fi
 }
 # Blank functionality
