@@ -636,7 +636,7 @@ event_configure_static_images(){
   	else
   		# Hash our current staticImage against the server's checksum
   		staticHashURL="${printvalue%*.mp4}.sha256"
-  		staticHashPath="/var/home/wavelet/config/${staticHashURL##*/}.sha256"
+  		staticHashPath="/var/home/wavelet/config/${staticHashURL##*/}"
   		wget -O "$staticHashPath" "$staticHashURL"
   		serverCheckSum="$(cat "$staticHashPath")"
 		localCheckSum=$(sha256sum "$staticImagePath" | cut -d' ' -f1)
