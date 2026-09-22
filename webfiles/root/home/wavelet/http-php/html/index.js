@@ -163,13 +163,10 @@ class Group {
 	}
 	registerGroupInput(inputInstance) {
 		this.inputs.set(inputInstance.hashID, inputInstance);
-		// console.log(`Input ${inputInstance.labelText} registered in Group ${this.hashID}:`);
-		// Notify subscribers (source dropdowns) that this group's input set changed,
-		// so dynamically-added sources show up without a manual refresh.
 		console.log(`[DIAG] registerGroupInput: input ${inputInstance.hashID} ("${inputInstance.labelText}") → group ${this.hashID}; dropdown element exists = ${!!this.sourceDropdownElement}; input count now = ${this.inputs.size}`);
-		if (window.root && window.root.activeGroupInputsEmitter) {
-			window.root.activeGroupInputsEmitter.emit(this.hashID);
-		}
+		// Notify this group's own source dropdown that its input set changed,
+		// so dynamically-added sources show up without a manual refresh.
+		this.emitter.emit('inputRegistered', inputInstance);
 		// Rebuild the input button cache since new inputs may have been added
 		this.inputButtonMap.clear();
 		this.updateActiveState();
@@ -532,23 +529,12 @@ class EventEmitter {
 	}
 	emit(event, data) {
 		const hasSpecific = this.listeners.has(event);
-		const hasWildcard = event !== '*' && this.listeners.has('*');
 		if (window.__EMITTER_DIAG__) {
-			console.log(`[DIAG] EventEmitter.emit: event="${event}" hasSpecific=${hasSpecific}(count=${hasSpecific ? this.listeners.get(event).length : 0}) hasWildcard=${hasWildcard}(count=${hasWildcard ? this.listeners.get('*').length : 0})`);
+			console.log(`[DIAG] EventEmitter.emit: event="${event}" hasSpecific=${hasSpecific}(count=${hasSpecific ? this.listeners.get(event).length : 0})`);
 		}
 		if (hasSpecific) {
 			this.listeners.get(event).forEach(callback => callback(data));
 		}
-		// Always deliver to wildcard ('*') subscribers regardless of the specific
-		// event name, so subscribe() callers receive every emit.
-		if (hasWildcard) {
-			this.listeners.get('*').forEach(callback => callback(data));
-		}
-	}
-	subscribe(callback) {
-		// Subscribe to all events (event '*' or no event)
-		this.on('*', callback);
-		return () => this.off('*', callback);
 	}
 }
 
@@ -859,19 +845,19 @@ class SSEManager {
 
 async function setupUIAfterAjax() {
 	// Generates UI elements based off previously populated data in fetchData
-    const hostControlDiv = document.getElementById('HostControlDiv');
-    let hostControlHeaderDiv = document.createElement("div");
-    let hostControlLabelDiv = document.createElement("div");
-    let hostControlControlDiv = document.createElement("div");
-    hostControlHeaderDiv.appendChild(hostControlControlDiv);
-    hostControlHeaderDiv.appendChild(hostControlLabelDiv);
-    hostControlDiv.appendChild(hostControlHeaderDiv);
-    hostControlHeaderDiv.className = 'group_header_div';
-    hostControlLabelDiv.className = 'group_control_div';
-    hostControlControlDiv.className = 'toggle_control_div';
-    let headerSpan = document.createElement("span");
-    headerSpan.classList.add("label");
-    hostControlHeaderDiv.appendChild(headerSpan);
+	const hostControlDiv = document.getElementById('HostControlDiv');
+	let hostControlHeaderDiv = document.createElement("div");
+	let hostControlLabelDiv = document.createElement("div");
+	let hostControlControlDiv = document.createElement("div");
+	hostControlHeaderDiv.appendChild(hostControlControlDiv);
+	hostControlHeaderDiv.appendChild(hostControlLabelDiv);
+	hostControlDiv.appendChild(hostControlHeaderDiv);
+	hostControlHeaderDiv.className = 'group_header_div';
+	hostControlLabelDiv.className = 'group_control_div';
+	hostControlControlDiv.className = 'toggle_control_div';
+	let headerSpan = document.createElement("span");
+	headerSpan.classList.add("label");
+	hostControlHeaderDiv.appendChild(headerSpan);
 
 	// Create global options and groups first
 	// console.log("First group type:", typeof groupsData[0], "Is instance?:", groupsData[0] instanceof Group);
@@ -1020,7 +1006,7 @@ async function setupUIAfterAjax() {
 	for (const group of window.root.groups.values()) {
 		group.updateActiveState();
 	}
-    console.log("UI setup completed");
+	console.log("UI setup completed");
 }
 
 function fetchData() {
@@ -1298,24 +1284,29 @@ async function createSourceDropdown(groupItem) {
 	select.addEventListener("focus", handleFocus);
 	select.addEventListener("blur", handleBlur);
 	select.addEventListener("change", handleChange);
-	document.addEventListener('refreshDropdownListener', refreshDropdown);
 	// Initial build (reuse the wired-up select so listeners survive the populate pass)
 	groupItem.sourceDropdownElement = select;
 	console.log(`[DIAG] createSourceDropdown: built initial dropdown for group ${groupHash} with ${Array.from(groupItem.inputs.keys()).length} inputs registered at build time`);
 	refreshDropdown(groupItem);
-	// Subscribe to registry changes (handled by global emitter)
-	const unsubscribe = window.root.activeGroupInputsEmitter.subscribe(changedHash => {
-		if (changedHash === '*' || changedHash === groupHash) {
-			console.log(`[DIAG] createSourceDropdown: emitter fired for group ${groupHash} (changedHash=${changedHash}); refreshing`);
-			refreshDropdown(groupItem);
-		}
+	// Subscribe to this group's OWN local emitter, so its dropdown rebuilds
+	// whenever an input is registered to this group (e.g. during initial load).
+	const unsubscribeInputRegistered = groupItem.emitter.on('inputRegistered', () => {
+		console.log(`[DIAG] createSourceDropdown: inputRegistered fired for group ${groupHash}; refreshing`);
+		refreshDropdown(groupItem);
+	});
+	// Local: rebuild this group's dropdown when its own active source changes, so the
+	// selected value / active marker in the dropdown reflects the current selection.
+	const unsubscribeActiveInputChange = groupItem.emitter.on('activeInputChange', () => {
+		console.log(`[DIAG] createSourceDropdown: activeInputChange fired for group ${groupHash}; refreshing`);
+		refreshDropdown(groupItem);
 	});
 	// Cleanup helper
 	select.cleanup = () => {
 		select.removeEventListener("focus", handleFocus);
 		select.removeEventListener("blur", handleBlur);
 		select.removeEventListener("change", handleChange);
-		unsubscribe();
+		unsubscribeInputRegistered();
+		unsubscribeActiveInputChange();
 	};
 	return select;
 }
@@ -1371,10 +1362,6 @@ function refreshDropdown(groupInstance) {
 			if (opt.text.length > widestText) widestText = opt.text.length;
 		}
 		select.style.width = `calc(${widestText}ch + 6em)`;
-		// Notify all groups about the refresh
-		if (window.root && window.root.activeGroupInputsEmitter) {
-			window.root.activeGroupInputsEmitter.emit('*');
-		}
 		// console.log(`refreshDropdown: Refreshed source dropdown for group ${groupInstance.hashID}, active=${select.value}`);
 	} finally {
 		select.dataset.isRefreshing = 'false';
@@ -1585,7 +1572,7 @@ async function createHostElement(hostInstance) {
 	if (groupInstance.element) {
 		groupInstance.element.appendChild(divEntry);
 	} else {
-			console.warn("No group element after creation attempt!");
+		console.warn("No group element after creation attempt!");
 	}
 	hostInstance.element = divEntry;
 	requestAnimationFrame(() => {
@@ -2882,12 +2869,12 @@ async function createGroupElement(groupItem) {
 	divEntry.addEventListener("dragend", window.root.dragDropManager.handleDragEnd.bind(window.root.dragDropManager));
 	divEntry.addEventListener('dragover', window.root.dragDropManager.handleDragOver.bind(window.root.dragDropManager));
 	divEntry.addEventListener('drop', window.root.dragDropManager.handleDrop.bind(window.root.dragDropManager));
-    // add a silly animation pulse
-    divEntry.classList.add('group-created-animation');
-    // Remove the animation class after the animation completes
-    setTimeout(() => {
-        divEntry.classList.remove('group-created-animation');
-    }, 500);
+	// add a silly animation pulse
+	divEntry.classList.add('group-created-animation');
+	// Remove the animation class after the animation completes
+	setTimeout(() => {
+		divEntry.classList.remove('group-created-animation');
+	}, 500);
 	// Generates a header div, and two subdivs for proper position of control elements
 	let groupHeaderDiv = document.createElement("div");
 	groupHeaderDiv.className = 'group_header_div';
@@ -3055,7 +3042,7 @@ async function handlePageLoad() {
 			}
 		};
 	}
-    // This tracks groups with active inputs centrally, for quick lookups
+	// This tracks groups with active inputs centrally, for quick lookups
 	window.__EMITTER_DIAG__ = true; // TEMP: enable EventEmitter diagnostics
 	window.root.activeGroupInputsEmitter = new EventEmitter();
 	window.root.groups = new Map();
@@ -3166,11 +3153,11 @@ function handleGroupEvents(event) {
 		});
 	} else {
 		try {
-            // Handle control update
+			// Handle control update
 			let controlName = null;
-            if (parts.length > 3) {
-                controlName = parts[3];
-            }
+			if (parts.length > 3) {
+				controlName = parts[3];
+			}
 			if (
 				controlName === "staticImage" ||
 				controlName === "previousVideoSourceKey" ||
@@ -3327,19 +3314,19 @@ async function handleHostEvents(event) {
 				// Process inputs if available
 				if (hostItem.inputs && Array.isArray(hostItem.inputs)) {
 					hostItem.inputs.forEach(input => {
-					const inputData = {
-						hashID: input.hashID,
-						keyFull: input.keyFull,
-						labelText: input.labelText,
-						type: "input",
-						subType: input.subType || "net",
-						hostHash: hashID,
-						isActive: input.isActive || false,
-						directMode: input.directMode ?? 1
-					};
-					const inputInstance = new Input(inputData);
-					window.root.inputs.set(inputInstance.hashID, inputInstance);
-					newHostInstance.registerHostInput(inputInstance);
+						const inputData = {
+							hashID: input.hashID,
+							keyFull: input.keyFull,
+							labelText: input.labelText,
+							type: "input",
+							subType: input.subType || "net",
+							hostHash: hashID,
+							isActive: input.isActive || false,
+							directMode: input.directMode ?? 1
+						};
+						const inputInstance = new Input(inputData);
+						window.root.inputs.set(inputInstance.hashID, inputInstance);
+						newHostInstance.registerHostInput(inputInstance);
 					});
 				}
 				// Notify active group inputs emitter if needed
@@ -3677,11 +3664,11 @@ function parseEventToDataObject(event) {
 		};
 		// Validate section
 		if (eventData.section !== "GROUPS" &&
-            eventData.section !== "HOSTS" &&
-            eventData.section !== "HASH_ACTIVE" &&
-            eventData.section !== "GLOBALS" &&
-            eventData.section !== "INPUTS"
-        ) {
+			eventData.section !== "HOSTS" &&
+			eventData.section !== "HASH_ACTIVE" &&
+			eventData.section !== "GLOBALS" &&
+			eventData.section !== "INPUTS"
+		) {
 			return null;
 		}
 		// Special handling for host-input relationship
