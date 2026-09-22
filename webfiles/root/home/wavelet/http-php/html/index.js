@@ -73,9 +73,11 @@ class Group {
 			newValue: value,
 			oldValue: previousHash
 		});
-		// Notify global listeners (dropdown refresh, registry updates, etc.)
+		// Notify other groups' source dropdowns that this group's active
+		// source changed, so they update their "Other Chainable Inputs" section.
+		// Payload = this group's hash, so a subscriber can no-op if it's itself.
 		if (window.root?.activeGroupInputsEmitter) {
-			window.root.activeGroupInputsEmitter.emit(this.hashID);
+			window.root.activeGroupInputsEmitter.emit('groupNeighbors', this.hashID);
 		}
 
 	}
@@ -138,8 +140,10 @@ class Group {
 				toggleOn: false
 			});
 		}
-		// Update sourceHash using the setter
-		this.controls.sourceHash = selectedValue;
+		// TEMPORARILY DISABLED for testing: this local provisional write is commented out
+		// so the frontend does not mutate sourceHash before the backend confirms it via SSE.
+		// Will be removed entirely if there isn't a good reason to keep it around.
+		// this.controls.sourceHash = selectedValue;
 		// update this group's source DropDown.
 		if (window.root?.activeGroupInputsEmitter) {
 			window.root.activeGroupInputsEmitter.emit(group.hashID);
@@ -163,7 +167,6 @@ class Group {
 	}
 	registerGroupInput(inputInstance) {
 		this.inputs.set(inputInstance.hashID, inputInstance);
-		console.log(`[DIAG] registerGroupInput: input ${inputInstance.hashID} ("${inputInstance.labelText}") → group ${this.hashID}; dropdown element exists = ${!!this.sourceDropdownElement}; input count now = ${this.inputs.size}`);
 		// Notify this group's own source dropdown that its input set changed,
 		// so dynamically-added sources show up without a manual refresh.
 		this.emitter.emit('inputRegistered', inputInstance);
@@ -511,9 +514,6 @@ class EventEmitter {
 			this.listeners.set(event, []);
 		}
 		this.listeners.get(event).push(callback);
-		if (window.__EMITTER_DIAG__) {
-			console.log(`[DIAG] EventEmitter.on: registered under "${event}"; total listeners now = ${this.listeners.get(event).length}`);
-		}
 	}
 	off(event, callback) {
 		if (this.listeners.has(event)) {
@@ -529,9 +529,6 @@ class EventEmitter {
 	}
 	emit(event, data) {
 		const hasSpecific = this.listeners.has(event);
-		if (window.__EMITTER_DIAG__) {
-			console.log(`[DIAG] EventEmitter.emit: event="${event}" hasSpecific=${hasSpecific}(count=${hasSpecific ? this.listeners.get(event).length : 0})`);
-		}
 		if (hasSpecific) {
 			this.listeners.get(event).forEach(callback => callback(data));
 		}
@@ -981,7 +978,6 @@ async function setupUIAfterAjax() {
 		}
 	}
 	await Promise.all(groupPromises);
-	console.log("[DIAG] setupUIAfterAjax: group elements built (group dropdowns subscribed to emitter)");
 	for (const group of window.root.groups.values()) {
 		// Find all hosts belonging to this group
 		for (const host of window.root.hosts.values()) {
@@ -991,7 +987,6 @@ async function setupUIAfterAjax() {
 		}
 	}
 	await Promise.all(hostPromises);
-	console.log("[DIAG] setupUIAfterAjax: host elements built, registering inputs now");
 	for (const input of window.root.inputs.values()) {
 		const inputParentHostInstance = window.root.hosts.get(input.hostHash);
 		if (inputParentHostInstance) {
@@ -1001,7 +996,6 @@ async function setupUIAfterAjax() {
 		}
 	}
 	await Promise.all(inputPromises);
-	console.log("[DIAG] setupUIAfterAjax: all inputs registered");
 	await new Promise(resolve => requestAnimationFrame(resolve));
 	for (const group of window.root.groups.values()) {
 		group.updateActiveState();
@@ -1128,7 +1122,6 @@ function fetchData() {
 				}
 			});
 		}
-		console.log(`[DIAG] fetchData: parsed ${window.root.groups.size} groups, ${window.root.hosts.size} hosts, ${window.root.inputs.size} inputs`);
 		return result;
 	}).catch(error => {
 		console.error("Fetch error: ", error);
@@ -1286,18 +1279,15 @@ async function createSourceDropdown(groupItem) {
 	select.addEventListener("change", handleChange);
 	// Initial build (reuse the wired-up select so listeners survive the populate pass)
 	groupItem.sourceDropdownElement = select;
-	console.log(`[DIAG] createSourceDropdown: built initial dropdown for group ${groupHash} with ${Array.from(groupItem.inputs.keys()).length} inputs registered at build time`);
 	refreshDropdown(groupItem);
 	// Subscribe to this group's OWN local emitter, so its dropdown rebuilds
 	// whenever an input is registered to this group (e.g. during initial load).
 	const unsubscribeInputRegistered = groupItem.emitter.on('inputRegistered', () => {
-		console.log(`[DIAG] createSourceDropdown: inputRegistered fired for group ${groupHash}; refreshing`);
 		refreshDropdown(groupItem);
 	});
 	// Local: rebuild this group's dropdown when its own active source changes, so the
 	// selected value / active marker in the dropdown reflects the current selection.
 	const unsubscribeActiveInputChange = groupItem.emitter.on('activeInputChange', () => {
-		console.log(`[DIAG] createSourceDropdown: activeInputChange fired for group ${groupHash}; refreshing`);
 		refreshDropdown(groupItem);
 	});
 	// Cleanup helper
@@ -1318,7 +1308,6 @@ function refreshDropdown(groupInstance) {
 		return;
 	}
 	let select = groupInstance.sourceDropdownElement;
-	console.log(`[DIAG] refreshDropdown: entering for group ${groupInstance.hashID}; element exists = ${!!select}; inputs in group = ${groupInstance.inputs.size}; sourceHash = ${groupInstance.controls.sourceHash}`);
 	if (!select) {
 		// CREATE mode: build new dropdown if element doesn't exist yet
 		const newSelect = buildDropdownOptions(groupInstance);
@@ -1354,7 +1343,6 @@ function refreshDropdown(groupInstance) {
 		// the innerHTML write actually took effect on the live <select>.
 		const attachedCount = select.options.length;
 		const isInDocument = select.isConnected;
-		console.log(`[DIAG] refreshDropdown: rebuilt dropdown for group ${groupInstance.hashID}; ATTACHED <select> has ${attachedCount} options (isConnected=${isInDocument}); select.value now = "${select.value}"`);
 		// Resize the dropdown to fit its widest option. The font is monospace, so
 		// measure the longest option text in ch units and add the horizontal padding.
 		let widestText = 0;
@@ -3043,9 +3031,19 @@ async function handlePageLoad() {
 		};
 	}
 	// This tracks groups with active inputs centrally, for quick lookups
-	window.__EMITTER_DIAG__ = true; // TEMP: enable EventEmitter diagnostics
 	window.root.activeGroupInputsEmitter = new EventEmitter();
 	window.root.groups = new Map();
+	// When a group's active source changes authoritatively
+	// (Group.sourceHash setter emits 'groupNeighbors' with that group's hash), refresh
+	// every OTHER group's dropdown so its "Other Chainable Inputs" section reflects the
+	// changed group's new active option. Guard: skip the group that changed — it already
+	// refreshes itself via its own local 'activeInputChange' subscription.
+	window.root.activeGroupInputsEmitter.on('groupNeighbors', (changedGroupHash) => {
+		window.root.groups.forEach(group => {
+			if (group.hashID === changedGroupHash) return; // noop for self
+			refreshDropdown(group);
+		});
+	});
 	window.root.hosts = new Map();
 	window.root.inputs = new Map();
 	window.root.controlRequestManager = new ControlRequestManager();
