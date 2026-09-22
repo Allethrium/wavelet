@@ -77,10 +77,7 @@ class Group {
 		if (window.root?.activeGroupInputsEmitter) {
 			window.root.activeGroupInputsEmitter.emit(this.hashID);
 		}
-		// Dispatch a global event for DOM-bound logic
-		if (this.element) {
-			document.dispatchEvent(new CustomEvent('sourceDropdownRefresh', {detail: this}));
-		}
+
 	}
 	handleSourceChange(selectedValue) {
 		// Handles the logic for switching to a new source (input or another group)
@@ -144,14 +141,16 @@ class Group {
 		// Update sourceHash using the setter
 		this.controls.sourceHash = selectedValue;
 		// update this group's source DropDown.
-		document.dispatchEvent(new CustomEvent('sourceDropdownRefresh', {detail: this}));
+		if (window.root?.activeGroupInputsEmitter) {
+			window.root.activeGroupInputsEmitter.emit(group.hashID);
+		}
 		// Refresh external group if chained
 		if (shouldUpdateChain && inputOwnerGroupHash && inputOwnerGroupHash !== group.hashID) {
 			const externalGroup = window.root.groups.get(inputOwnerGroupHash);
 			if (externalGroup) {
 				externalGroup.updateActiveState();
-				if (externalGroup.element) {
-					document.dispatchEvent(new CustomEvent('sourceDropdownRefresh', {detail: externalGroup}));
+				if (externalGroup.element && window.root?.activeGroupInputsEmitter) {
+					window.root.activeGroupInputsEmitter.emit(externalGroup.hashID);
 				}
 			}
 		}
@@ -167,6 +166,7 @@ class Group {
 		// console.log(`Input ${inputInstance.labelText} registered in Group ${this.hashID}:`);
 		// Notify subscribers (source dropdowns) that this group's input set changed,
 		// so dynamically-added sources show up without a manual refresh.
+		console.log(`[DIAG] registerGroupInput: input ${inputInstance.hashID} ("${inputInstance.labelText}") → group ${this.hashID}; dropdown element exists = ${!!this.sourceDropdownElement}; input count now = ${this.inputs.size}`);
 		if (window.root && window.root.activeGroupInputsEmitter) {
 			window.root.activeGroupInputsEmitter.emit(this.hashID);
 		}
@@ -514,6 +514,9 @@ class EventEmitter {
 			this.listeners.set(event, []);
 		}
 		this.listeners.get(event).push(callback);
+		if (window.__EMITTER_DIAG__) {
+			console.log(`[DIAG] EventEmitter.on: registered under "${event}"; total listeners now = ${this.listeners.get(event).length}`);
+		}
 	}
 	off(event, callback) {
 		if (this.listeners.has(event)) {
@@ -528,8 +531,18 @@ class EventEmitter {
 		}
 	}
 	emit(event, data) {
-		if (this.listeners.has(event)) {
+		const hasSpecific = this.listeners.has(event);
+		const hasWildcard = event !== '*' && this.listeners.has('*');
+		if (window.__EMITTER_DIAG__) {
+			console.log(`[DIAG] EventEmitter.emit: event="${event}" hasSpecific=${hasSpecific}(count=${hasSpecific ? this.listeners.get(event).length : 0}) hasWildcard=${hasWildcard}(count=${hasWildcard ? this.listeners.get('*').length : 0})`);
+		}
+		if (hasSpecific) {
 			this.listeners.get(event).forEach(callback => callback(data));
+		}
+		// Always deliver to wildcard ('*') subscribers regardless of the specific
+		// event name, so subscribe() callers receive every emit.
+		if (hasWildcard) {
+			this.listeners.get('*').forEach(callback => callback(data));
 		}
 	}
 	subscribe(callback) {
@@ -982,6 +995,7 @@ async function setupUIAfterAjax() {
 		}
 	}
 	await Promise.all(groupPromises);
+	console.log("[DIAG] setupUIAfterAjax: group elements built (group dropdowns subscribed to emitter)");
 	for (const group of window.root.groups.values()) {
 		// Find all hosts belonging to this group
 		for (const host of window.root.hosts.values()) {
@@ -991,6 +1005,7 @@ async function setupUIAfterAjax() {
 		}
 	}
 	await Promise.all(hostPromises);
+	console.log("[DIAG] setupUIAfterAjax: host elements built, registering inputs now");
 	for (const input of window.root.inputs.values()) {
 		const inputParentHostInstance = window.root.hosts.get(input.hostHash);
 		if (inputParentHostInstance) {
@@ -1000,6 +1015,7 @@ async function setupUIAfterAjax() {
 		}
 	}
 	await Promise.all(inputPromises);
+	console.log("[DIAG] setupUIAfterAjax: all inputs registered");
 	await new Promise(resolve => requestAnimationFrame(resolve));
 	for (const group of window.root.groups.values()) {
 		group.updateActiveState();
@@ -1126,6 +1142,7 @@ function fetchData() {
 				}
 			});
 		}
+		console.log(`[DIAG] fetchData: parsed ${window.root.groups.size} groups, ${window.root.hosts.size} hosts, ${window.root.inputs.size} inputs`);
 		return result;
 	}).catch(error => {
 		console.error("Fetch error: ", error);
@@ -1281,13 +1298,15 @@ async function createSourceDropdown(groupItem) {
 	select.addEventListener("focus", handleFocus);
 	select.addEventListener("blur", handleBlur);
 	select.addEventListener("change", handleChange);
-	document.addEventListener('sourceDropdownRefresh', handleSourceDropdownRefresh);
+	document.addEventListener('refreshDropdownListener', refreshDropdown);
 	// Initial build (reuse the wired-up select so listeners survive the populate pass)
 	groupItem.sourceDropdownElement = select;
+	console.log(`[DIAG] createSourceDropdown: built initial dropdown for group ${groupHash} with ${Array.from(groupItem.inputs.keys()).length} inputs registered at build time`);
 	refreshDropdown(groupItem);
 	// Subscribe to registry changes (handled by global emitter)
 	const unsubscribe = window.root.activeGroupInputsEmitter.subscribe(changedHash => {
 		if (changedHash === '*' || changedHash === groupHash) {
+			console.log(`[DIAG] createSourceDropdown: emitter fired for group ${groupHash} (changedHash=${changedHash}); refreshing`);
 			refreshDropdown(groupItem);
 		}
 	});
@@ -1301,15 +1320,6 @@ async function createSourceDropdown(groupItem) {
 	return select;
 }
 
-function handleSourceDropdownRefresh(event) {
-	const groupInstance = event?.detail?.detail || event?.detail || event;
-	if (!(groupInstance instanceof Group)) {
-		console.warn(`handleSourceDropdownRefresh: Expected Group instance, got ${groupInstance?.constructor?.name || typeof groupInstance}`);
-		return;
-	}
-	refreshDropdown(groupInstance);
-}
-
 function refreshDropdown(groupInstance) {
 	// Ensure we're working with a Group class instance
 	if (!(groupInstance instanceof Group)) {
@@ -1317,6 +1327,7 @@ function refreshDropdown(groupInstance) {
 		return;
 	}
 	let select = groupInstance.sourceDropdownElement;
+	console.log(`[DIAG] refreshDropdown: entering for group ${groupInstance.hashID}; element exists = ${!!select}; inputs in group = ${groupInstance.inputs.size}; sourceHash = ${groupInstance.controls.sourceHash}`);
 	if (!select) {
 		// CREATE mode: build new dropdown if element doesn't exist yet
 		const newSelect = buildDropdownOptions(groupInstance);
@@ -1348,6 +1359,11 @@ function refreshDropdown(groupInstance) {
 		select.innerHTML = newSelect.innerHTML;
 		select.value = newSelect.value;
 		select.dataset.lastSourceHash = select.value;
+		// Inspect the ATTACHED DOM element (not the detached newSelect) to confirm
+		// the innerHTML write actually took effect on the live <select>.
+		const attachedCount = select.options.length;
+		const isInDocument = select.isConnected;
+		console.log(`[DIAG] refreshDropdown: rebuilt dropdown for group ${groupInstance.hashID}; ATTACHED <select> has ${attachedCount} options (isConnected=${isInDocument}); select.value now = "${select.value}"`);
 		// Resize the dropdown to fit its widest option. The font is monospace, so
 		// measure the longest option text in ch units and add the horizontal padding.
 		let widestText = 0;
@@ -3040,6 +3056,7 @@ async function handlePageLoad() {
 		};
 	}
     // This tracks groups with active inputs centrally, for quick lookups
+	window.__EMITTER_DIAG__ = true; // TEMP: enable EventEmitter diagnostics
 	window.root.activeGroupInputsEmitter = new EventEmitter();
 	window.root.groups = new Map();
 	window.root.hosts = new Map();
@@ -3144,7 +3161,7 @@ function handleGroupEvents(event) {
 				window.root.activeGroupInputsEmitter.emit('*');
 			}
 			// Also trigger source dropdown refresh event for immediate UI update
-			document.dispatchEvent(new CustomEvent('sourceDropdownRefresh', {detail: newGroup}));
+			document.dispatchEvent(new CustomEvent('refreshDrop', {detail: newGroup}));
 			newGroup.updateActiveState();
 		});
 	} else {
@@ -3221,7 +3238,9 @@ function handleGroupEvents(event) {
 					}
 					// Rebuild input button cache since chainable inputs changed
 					groupItem.inputButtonMap.clear();
-					document.dispatchEvent(new CustomEvent('sourceDropdownRefresh', {detail: groupItem}));
+					if (window.root?.activeGroupInputsEmitter) {
+						window.root.activeGroupInputsEmitter.emit(groupItem.hashID);
+					}
 				}
 				if (controlName === "swatchValue") {
 					// Update group element background color
@@ -3578,8 +3597,8 @@ function handleGlobalsEvents(event) {
 						toggleOn: false
 					});
 					// Refresh the follower's UI (dropdowns, active states, static buttons).
-					if (follower.element) {
-						document.dispatchEvent(new CustomEvent('sourceDropdownRefresh', {detail: follower}));
+					if (follower.element && window.root?.activeGroupInputsEmitter) {
+						window.root.activeGroupInputsEmitter.emit(follower.hashID);
 					}
 					follower.updateActiveState();
 				}
