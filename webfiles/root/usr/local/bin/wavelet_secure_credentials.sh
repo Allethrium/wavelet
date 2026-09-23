@@ -267,6 +267,7 @@ create_secure_etcd_wrapper() {
 	echo "	user_home = $homedir" >> "$log_file"
 
 	mkdir -p "/var/lib/wavelet/bin/$user_context"
+	# The wrapper script is generated below
 	wrapper_script="/var/lib/wavelet/bin/${user_context}/${service_name}_wrapper.sh"
 	# Update user's PATH only if not already done
 	if ! grep -q 'PATH="/var/lib/wavelet/bin/'$user_context':$PATH"' "$user_home/.bashrc" 2>/dev/null; then
@@ -305,6 +306,7 @@ create_secure_etcd_wrapper() {
 			export ETCDCTL_ENDPOINTS=https://${SVR_HOSTNAME}:2379
 			export ETCDCTL_CACERT=/etc/ipa/ca.crt
 			export ADDITIONAL_ARGS
+    		systemd-notify --ready 2>/dev/null || true
 			exec etcdctl watch \$ETCD_KEY --prefix -w simple -- /usr/bin/bash -c "\$SCRIPT_TO_RUN \$ADDITIONAL_ARGS"
 		)
 	EOF
