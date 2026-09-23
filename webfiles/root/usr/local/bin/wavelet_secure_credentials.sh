@@ -348,8 +348,8 @@ generate_secure_systemd_service() {
 	# Ensure systemd user directory exists
 	mkdir -p "$(dirname "${service_file}")"
 	if [[ "$(hostname)" == *"svr"* ]]; then
-		afterBlock="After=network-online.target etcd-quadlet.service"
-		wantsBlock="Wants=network-online.target etcd-quadlet.service"
+		afterBlock="After=NetworkManager-wait-online.service network-online.target etcd-quadlet.service"
+		wantsBlock="Requires=network-online.target etcd-quadlet.service"
 	else
 		afterBlock="After=network-online.target"
 		wantsBlock="Wants=network-online.target"
@@ -382,9 +382,10 @@ generate_secure_systemd_service() {
 		${wantsBlock}
 
 		[Service]
-		Type=simple
+		Type=notify
+		NotifyAccess=all
 		ExecStart=/var/lib/wavelet/bin/${user_context}/${service_name}_wrapper.sh "${user_context}" "${etcd_key}" "${script_path}" "${additional_args}"
-		Restart=always
+		Restart=on-failure
 		RestartSec=10s
 		# Security hardening
 		NoNewPrivileges=true
