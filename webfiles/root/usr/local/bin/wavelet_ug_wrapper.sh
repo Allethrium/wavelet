@@ -120,6 +120,13 @@ init_switch(){
 		channelIndex="${channelData%%-*}"
 	fi
 	if [[ -z "$channelIndex" ]]; then
+		printvalue=""
+		KEYNAME="/HOSTS/$hostNameSys/control/channel-Source"; read_etcd_global
+		if [[ -n "$printvalue" ]]; then
+			decoder_checkSubscription
+		fi
+	fi
+	if [[ -z "$channelIndex" ]]; then
 		errorMessage="ERR:  Channel Index is null, retrying read then setting to static Image channel as fallback."
 		notify-send -e "$errorMessage" & echo "$errorMessage"
 		KEYNAME="/HOSTS/$hostNameSys/control/channelData"; read_etcd_global; channelIndex="${printvalue%%-*}"
@@ -148,35 +155,61 @@ netCat(){
 }
 
 inputError(){
-	# Handle input errors
-	errorCase="$1"
+	local errorCase="$1"
+	local timer_elapsed stage level
 	if [[ -z "${error_timers[$1]:-}" ]]; then
 		start_timer "errorTimer_$1"
 		error_timers["$1"]="$timer_id_out"
 		start_timer "badReset"
 		error_timers["badReset"]="$timer_id_out"
-	else
-		timer_elapsed="$(get_timer_elapsed "${error_timers[$1]}")"
-		if (( "$timer_elapsed" > 30 )); then
-           	echo -e "\033[32m	Error: $1 exceeds 30 seconds!  Terminating process!\033[0m" | systemd-cat -t "UltraGrid"
-           	# Serious > 30second error, we let the watchdog kill the process
-			sed -i "s/^UG_RESTARTING=.*/UG_RESTARTING=1/" "$HOME/config/$hostNameSys.conf"
-			exit 1
-		elif (( "$timer_elapsed" > 15 )); then
-			send_keepalive
-			generate_errorDisplay "ERR: $1"
-			echo -e "\033[32m	Experiencing +15s of error: $1!\033[0m" | systemd-cat -t "UltraGrid"
-		elif (( "$timer_elapsed" > 10 )); then
-			sed -i "s/export UG_ERROR_STATE=.*/export UG_ERROR_STATE=$errorCase/" "$HOME/config/$hostNameSys.conf"
-			echo -e "\033[32m	Experiencing error: $1!\033[0m" | systemd-cat -t "UltraGrid"
-			decoder_checkSubscription
-			send_keepalive
-		elif (( "$timer_elapsed" > 5 )); then
-			echo -e "\033[32m	Experiencing error: $1!\033[0m" | systemd-cat -t "UltraGrid"
-		else
-			send_keepalive
-		fi
+		error_stages["$1"]=1
+		send_keepalive
+		return
 	fi
+
+	timer_elapsed="$(get_timer_elapsed "${error_timers[$1]}")"
+	# Map elapsed time to an escalation level (1..5).  5 = fatal, let watchdog restart us.
+	if (( timer_elapsed > 30 )); then
+		level=5
+	elif (( timer_elapsed > 15 )); then
+		level=4
+	elif (( timer_elapsed > 10 )); then
+		level=3
+	elif (( timer_elapsed > 5 )); then
+		level=2
+	else
+		level=1
+	fi
+
+	stage="${error_stages[$1]:-1}"
+	# Step up through any newly-reached levels, running each stage's actions once.
+	while (( stage < level )); do
+		(( stage++ ))
+		error_stages["$1"]=$stage
+		case "$stage" in
+			2)
+				echo -e "\033[32m	Experiencing error: $1!\033[0m" | systemd-cat -t "UltraGrid"
+				;;
+			3)
+				sed -i "s/export UG_ERROR_STATE=.*/export UG_ERROR_STATE=$errorCase/" "$HOME/config/$hostNameSys.conf"
+				echo -e "\033[32m	Experiencing error: $1!\033[0m" | systemd-cat -t "UltraGrid"
+				decoder_checkSubscription
+				;;
+			4)
+				generate_errorDisplay "ERR: $1"
+				echo -e "\033[32m	Experiencing +15s of error: $1!\033[0m" | systemd-cat -t "UltraGrid"
+				;;
+			5)
+				echo -e "\033[32m	Error: $1 exceeds 30 seconds!  Terminating process!\033[0m" | systemd-cat -t "UltraGrid"
+				# Serious > 30second error, we let the watchdog kill the process
+				sed -i "s/^UG_RESTARTING=.*/UG_RESTARTING=1/" "$HOME/config/$hostNameSys.conf"
+				exit 1
+				;;
+		esac
+	done
+
+	# Keep the watchdog alive while we're still attempting to run.
+	send_keepalive
 	if (( badCounter > 50 )); then
 		sed -i "s/export UG_ERROR_STATE=.*/export UG_ERROR_STATE=BURST_ERROR/" "$HOME/config/$hostNameSys.conf"
 		generate_errorDisplay "ERR: ERROR BURST DETECTED"
@@ -275,6 +308,8 @@ reset_error_state(){
         stop_timer "${error_timers[$key]}"
         unset "error_timers[$key]"
     done
+    # Reset the per-error escalation stages so a future error starts fresh.
+    error_stages=()
     systemd-notify "STATUS=Stable"
 }
 
@@ -298,6 +333,7 @@ badCounter=0
 sampleCounter=0
 badSwitchCounter=0
 declare -gA error_timers
+declare -gA error_stages
 
 # Ensure the error-state marker exists in the config so sed replaces are reliable.
 if ! grep -q "^export UG_ERROR_STATE=" "$HOME/config/$hostNameSys.conf"; then
