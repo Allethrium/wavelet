@@ -351,7 +351,7 @@ generate_secure_systemd_service() {
 	mkdir -p "$(dirname "${service_file}")"
 	if [[ "$(hostname)" == *"svr"* ]]; then
 		afterBlock="After=NetworkManager-wait-online.service network-online.target etcd-quadlet.service"
-		wantsBlock="Requires=network-online.target etcd-quadlet.service"
+		wantsBlock="Wants=network-online.target etcd-quadlet.service"
 	else
 		afterBlock="After=network-online.target"
 		wantsBlock="Wants=network-online.target"
