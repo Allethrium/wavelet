@@ -61,7 +61,6 @@ detect_operation(){
 	thisHostHash="${thisHostHash%%/*}"
 	local control_suffix="${etcdKey#/UI/HOSTS/$thisHostHash/control/}"
 	control_suffix="${control_suffix##*/}"
-
 	if [[ "$thisHostHash" != "$hostHash" ]]; then
 		# Not meant for this machine
 		echo "	No match for this host hash: $thisHostHash"
@@ -1346,6 +1345,7 @@ run_decoder(){
 	local display; local audio; local command; local keyValue; local blankStatus
 	local streamMode; local externalArg; local activeFlag
 	local videoSourceCmd; local videoSourceType; local videoSourceSubType; local configPayload
+	source "/var/home/wavelet/config/$hostNameSys.conf"
 	KEYNAME="/HOSTS/$hostNameSys/control/videoSourceConfig"; read_etcd_global
 	if [[ -z "$printvalue" ]]; then
 		# We have an error and need to get a proper configPayload or build it from scratch here.
@@ -1428,7 +1428,6 @@ run_decoder(){
 	inputs=()
 	if [[ "$(nproc)" -le 4 ]]; then
 		echo "	Launching without eager source init due to low CPU count"
-		echo "	CRITICAL MESSAGE:  excl_init is *VERY* buggy when switching against network streams."
 		# UltraGrid needs some modifications to more reliably switch away from incoming net video streams
 		# I'm looking into generating those patches
 		inputs+=("-t switcher:excl_init")
@@ -1457,10 +1456,6 @@ run_decoder(){
 	if [[ ! -f "$blankImageFile" ]]; then
 		regenerate_blankImage
 	fi
-	if [[ "$blankStatus" == "1" ]] && [[ "$hostNameSys" == *"svr"* ]]; then
-		# We don't want the server displaying anything unless it's specifically unblanked.
-		exit 0
-	fi
 	# check for an already running UG systemd unit
 	if systemctl --user is-active UltraGrid.Decoder.service >/dev/null 2>&1; then
 		if [[ "$(cat "$ugPath/$ugName")" == *"${externalArg[*]}"* ]]; then
@@ -1473,9 +1468,14 @@ run_decoder(){
 	else
 		regenerate_decoder_ugUnit
 	fi
-	# blankStatus is set from the host conf file and populated whenever this module is called
-	if [[ "$blankStatus" -eq 1 ]]; then
-		# we will ALAWYS set channel = 3 if blankStatus = 1
+	# Finally check for the blankstatus flag
+	echo "	Checking for blankStatus: $blankStatus"
+	if [[ "$blankStatus" == "1" ]]; then
+		if [[ "$hostNameSys" == *"svr"* ]]; then
+			# The server does not perform video output.
+			exit 0
+		fi
+		# we will ALAWYS set channel = 3
 		echo "	Blank is enabled, setting blank display and updating host channelData control key with: $channel-$etcdValue"
 		KEYNAME="/HOSTS/$hostNameSys/control/channelData"; KEYVALUE="$channel-$etcdValue"; write_etcd_global &
 		channel="3"
