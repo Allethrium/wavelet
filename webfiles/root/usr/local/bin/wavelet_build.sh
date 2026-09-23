@@ -289,6 +289,10 @@ put /HOSTS/$hostNameSys/control/generateConf \"1\"
 		printf '%s' "$confData" > "$configFile"
 	fi
 	event_configure_static_images
+	# Check for HW encode flag (low core count situations)
+	if grep "USE_HW_ENCODE=1" "/etc/wavelet.conf"; then
+		echo "	Attempting to detect available HW video encoding options.."
+	fi
 	# Initiate further configuration by calling new_host in orchestrator to populate UI keys.
 	# the client controller on this device will then pick up those key configs and start the host processes.
 	KEYNAME="/HOSTS/$hostNameSys/wavelet_build_completed"; KEYVALUE="1"; write_etcd_global &
@@ -766,7 +770,7 @@ generate_test_video() {
     # (temporal blocking on the "fast" codec modes), not just spatial.
     # Final format=yuv420p subsamples to the 4:2:0 real NDI/RTSP/USB encodes use, so
     # RGB-only codecs can't look flawless merely because they were only ever fed RGB.
-    echo "Running: ffmpeg -f lavfi -i smptehdbars -i testsrc2 -i mandelbrot -i gradients (animated quadrant composite) -t 5 -c:v ffv1 -pix_fmt rgb24 $output"
+    echo "Running: ffmpeg -f lavfi -i smptehdbars -i testsrc2 -i mandelbrot -i gradients (animated quadrant composite) -t 5 -c:v mjpeg -pix_fmt rgb24 $output"
     ffmpeg -y \
         -f lavfi -i "smptehdbars=size=960x540:rate=60" \
         -f lavfi -i "testsrc2=size=960x540:rate=60" \
@@ -780,9 +784,52 @@ generate_test_video() {
          [bars][src2]hstack=inputs=2[top]; \
          [mb][grad]hstack=inputs=2[bottom]; \
          [top][bottom]vstack=inputs=2,format=yuv420p[out]" \
-        -map "[out]" -t 5 -c:v ffv1 -pix_fmt rgb24 "$output"
+        -map "[out]" -t 5 -c:v mjpeg -pix_fmt rgb24 "$output"
 }
-
+event_detect_hw_encode() {
+    # Called in low-core count situations to check for viable hardware accelerated codecs.
+    local test_video="test_1.mp4"
+    generate_test_video "$test_video"
+    local hw_codecs=(
+        "libavcodec:encoder=av1_qsv:safe"
+        "libavcodec:encoder=av1_vulkan:tune=ll:rc_mode=cqp:qp=30"
+        "libavcodec:encoder=mjpeg_qsv:safe"
+    )
+    local ssim_threshold=0.90
+    for codecCmd in "${hw_codecs[@]}"; do
+        local codec_name; codec_name=$(sed -E 's/.*encoder=([^:]+).*/\1/' <<<"$codecCmd")
+        local out_file="/var/home/wavelet/config/hw_test_${codec_name}.mp4"
+        echo "  Testing HW codec: $codec_name"
+        if output=$(test_with_ug "$test_video" "$codecCmd" "$out_file" "$codec_name"); then
+            local fps; fps=$(echo "$output" | cut -d',' -f1 | cut -d':' -f2)
+            echo "  $codec_name succeeded (FPS: $fps)"
+            if [[ -n "$fps" ]] && (( $(echo "$fps >= 20" | bc -l) )); then
+                # Quick SSIM check to catch pixel format / conversion issues
+                if ssim_test "$test_video" "$out_file" "$codec_name"; then
+                    local ssim_result; ssim_result=$(echo "$output_ssim" | grep -oP 'SSIM\s*=\s*[\d.]+' | awk '{print $3}')
+                    if (( $(echo "$ssim_result >= $ssim_threshold" | bc -l) )); then
+                        KEYNAME="/HOSTS/$hostNameSys/control/hwEncode"; KEYVALUE="$codecCmd"; write_etcd_global
+                        echo "  Hardware encode enabled with $codec_name (SSIM: $ssim_result)"
+                        rm -f "$out_file"
+                        return 0
+                    else
+                        echo "  $codec_name SSIM too low ($ssim_result), trying next."
+                    fi
+                else
+                    echo "  SSIM test failed for $codec_name – likely conversion issues."
+                fi
+            else
+                echo "  $codec_name too slow (FPS: $fps), trying next."
+            fi
+        else
+            echo "  $codec_name failed or unsupported."
+        fi
+        rm -f "$out_file"
+    done
+    echo "  No usable hardware encoder found; falling back to software."
+    KEYNAME="/HOSTS/$hostNameSys/control/hwEncode"; KEYVALUE=""; write_etcd_global
+    rm -f "$test_video"
+}
 test_with_ug() {
 	local input; local codec_config; local output_file; local codec_name; local temp_log;
 	local command; local ug_pid; local qualityResult; local timeout; local start_time
