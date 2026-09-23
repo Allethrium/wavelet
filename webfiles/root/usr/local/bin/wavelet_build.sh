@@ -1178,75 +1178,27 @@ ping_server(){
 		nmcli con up "$wifiSSID"
 	fi
 }
-event_connectNetwork(){
-	ethernetCIDRValue=""; wirelessCIDRValue=""; ipValue=""
-	while read -r line; do
-		case "$line" in
-			*802-3-ethernet*)
-				ethernetCIDRValue="$(nmcli -g IP4.ADDRESS con show "${line%%:*}")"
-				ethernetUUID="${line##*:}"
-				ipValue="${ethernetCIDRValue%/*}"
-				;;
-			*802-11-wireless*)
-				wirelessCIDRValue="$(nmcli -g IP4.ADDRESS con show "${line%%:*}")"
-				wirelessUUID="${line##*:}"
-				ipValue="${wirelessCIDRValue%/*}"
-				;;
-		esac
-	done < <(nmcli -t -f NAME,TYPE,UUID con show)
-	# Attempts to list and connect a wavelet Wi-Fi connection
-	# Note that the wavelet user has NetworkManager permissions via configured polkit rules
-	if [[ "$hostNameSys" == "$SVR_HOSTNAME" ]] || [[ $ENABLE_WIFI != 1 ]]; then
-		echo "	Wi-FI has been disabled for this host.  Set WIFI_MODE_ENABLED=1 in /etc/wavelet/wavelet.conf to enable this feature."
-		return 0
-	else
-		# Disable ethernet
-		echo "	Disabling ethernet connectivity: "
-		nmcli con show "$ethernetUUID"
-		nmcli con down "$ethernetUUID"
-		nmcli con mod "$ethernetUUID" connection.autoconnect no
-		echo "	The primary ethernet connection with UUID $ethernetUUID has been disabled."
-		echo -e "  To re-enable, you can use:\nnmcli con up $ethernetUUID\nOr:\nnmtui\nFor a gui interface."
-		nmcli devi wifi rescan
-		if [[ "$hostNameSys" = *"svr."* ]]; then
-			echo -e "	If you want to run the server via a WiFi connection, this should be configured and enabled manually via nmtui or nmcli."
-			echo -e "	Performance will likely suffer as a result."
-			exit 0
-		fi
-	fi
+event_connectNetwork() {
+     # Let NetworkManager decide which connection to use (WiFi preferred by priority)
+     local ipValue=""
+     for i in {1..30}; do
+         ipValue="$(nmcli -g IP4.ADDRESS con show --active | head -n1 | cut -d'/' -f1)"
+         [[ -n "$ipValue" ]] && break
+         sleep 1
+     done
+      if [[ -z "$ipValue" ]]; then
+         echo "ERROR: No active network connection after 30s"
+         return 1
+     fi
 
-	wifiSSID="$WIFI_SSID"
-	# Note on a client, the hostname is always appended to the wifi SSID for the connection ID.
-	if [[ -n "$wirelessUUID" ]]; then
-		echo "	Found WiFi connection, proceeding.."
-	else
-		echo "	Missing WiFi connection!  connectwifi.sh should have configured this on client bootstrap."
-		exit 0
-	fi
-
-	# Check if we already have an active Wi-Fi connection (avoid unnecessary cycling)
-	nmcli con up "$wirelessUUID"
-	attempts=0
-	until [[ attempts -gt 128 ]]; do
-		ping_server
-		if [[ "$connected" == true ]]; then
-			break
-		fi
-	done
-	if [[ "$connected" == false ]]; then
-		echo "	ERROR: Enterprise connection failed after 128 attempts, rebooting client."
-		systemctl -i reboot
-	fi
-	echo "	WiFi connection established successfully."
-	# We should now have a single, stable connection available for this client
-    if valid_ipv4 "$ipValue"; then
-    	echo -e "			IP Address is valid: $ipValue, continuing.."
-    	KEYNAME="/HOSTS/$hostNameSys/control/IP"; KEYVALUE="$ipValue"; write_etcd_global &
-    else
-    	echo -e "			IP Address '$ipValue' is not valid, retrying...\n"
-    	sleep .25
-    fi
-}
+     if valid_ipv4 "$ipValue"; then
+         echo "IP Address is valid: $ipValue, continuing.."
+         KEYNAME="/HOSTS/$hostNameSys/control/IP"; KEYVALUE="$ipValue"; write_etcd_global &
+     else
+         echo "ERROR: Invalid IP: $ipValue"
+         return 1
+     fi
+ }
 
 
 #####

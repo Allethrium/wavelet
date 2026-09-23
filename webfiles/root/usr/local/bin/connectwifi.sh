@@ -132,7 +132,7 @@ type=wifi
 interface-name=${ifname}
 autoconnect=true
 autoconnect-priority=100
-autoconnect-retries=0
+autoconnect-retries=3
 wait-activation-delay=30
 
 [wifi]
@@ -181,31 +181,6 @@ EOF
       echo "Failed to create WPA2-Enterprise connection profile"
       echo "You can manually retry by issuing the following terminal command: nmcli con up $conn_id"
       return 1
-}
-
-detect_disable_ethernet(){
-    # Check for other active network connections (e.g., Wi-Fi, Mobile Data, Secondary Ethernet) before disabling
-    # We exclude standard ethernet types and the specific UUID we are targeting to ensure we don't block other Ethernet links
-    local ethernet_activeUUID; local wifi_activeUUID
-    ethernet_activeUUID="$(nmcli -t -f UUID,TYPE,STATE con show --active | grep '802-3-ethernet' | awk -F ':' '{print $1}')"
-    wifi_activeUUID="$(nmcli -t -f UUID,TYPE,STATE con show --active | grep '802-11-wireless' | awk -F ':' '{print $1}')"
-    if [[ -n "$ethernet_activeUUID" ]] && [[ -z "$wifi_activeUUID" ]]; then
-        echo "  There is an active ethernet network connection detected, but no active WiFi."
-        echo "  Disabling ethernet will offline this device and provisioning will block, therefore we end the process here."
-        echo "  Please verify the Wireless Access Point is configured correctly, ignore these messages to continue in a wired mode."
-        exit 0
-    fi
-    # Check for a manual no-wifi flag as set in the installer
-    flag_value=$(grep "^${WIFI_MODE_ENABLED}=" /etc/wavelet/wavelet.conf | cut -d'=' -f2 | tr -d '\r')
-	if [[ "$flag_value" == 1 ]]; then
-		echo -e "	The WIFI_MODE_ENABLED flag is disabled.  Please enable this if this host should utilize wireless connectivity."
-		exit 0
-	else
-		nmcli con down "$ethernet_activeUUID"
-		nmcli con mod "$ethernet_activeUUID" connection.autoconnect no
-		echo "	The primary ethernet connection with UUID $ethernet_activeUUID has been disabled."
-		echo -e "	To re-enable, you can use:\n	nmcli con up $ethernet_activeUUID\n	Or:\n	nmtui\n	For a gui interface."
-	fi
 }
 
 set_ethernet_mtu(){
@@ -258,6 +233,3 @@ else
 	echo "	No flags with module call, disabling ethernet connection."
 	connectwifi_enterprise
 fi
-
-# Attempt to disable ethernet, or leave on if it's the only available connection
-detect_disable_ethernet
