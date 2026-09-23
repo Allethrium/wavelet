@@ -68,17 +68,14 @@ class Group {
 		// console.log(`Group ${this.hashID}: sourceHash changed from ${previousHash || 'null'} → ${value}`);
 		// Update UI state (DOM elements, active buttons, etc.)
 		this.updateActiveState();
-		// Emit local event for subscribers
+		// Emit local event for subscribers. The 'activeInputChange' subscription in
+		// createSourceDropdown calls refreshDropdown(this, true), which rebuilds THIS
+		// group's dropdown and broadcasts 'groupNeighbors' so every OTHER group updates
+		// its "Other Chainable Inputs" section.
 		this.emitter.emit('activeInputChange', {
 			newValue: value,
 			oldValue: previousHash
 		});
-		// Notify other groups' source dropdowns that this group's active
-		// source changed, so they update their "Other Chainable Inputs" section.
-		// Payload = this group's hash, so a subscriber can no-op if it's itself.
-		if (window.root?.activeGroupInputsEmitter) {
-			window.root.activeGroupInputsEmitter.emit('groupNeighbors', this.hashID);
-		}
 
 	}
 	handleSourceChange(selectedValue) {
@@ -107,8 +104,7 @@ class Group {
 					toggleOn: false
 				});
 				group.controls.chainedToGroup = inputOwnerGroupHash;
-				// Adopt the target group's current source immediately,
-				// if it is different from the current group sourceHash
+				// Adopt the target group's current source if it is different from the current group sourceHash
 				const chainTarget = window.root.groups.get(inputOwnerGroupHash);
 				const chainTargetSource = chainTarget?.controls.sourceHash || chainTarget?._sourceHash;
 				if (chainTargetSource && chainTargetSource !== group.controls.sourceHash) {
@@ -140,22 +136,10 @@ class Group {
 				toggleOn: false
 			});
 		}
-		// TEMPORARILY DISABLED for testing: this local provisional write is commented out
-		// so the frontend does not mutate sourceHash before the backend confirms it via SSE.
-		// Will be removed entirely if there isn't a good reason to keep it around.
-		// this.controls.sourceHash = selectedValue;
-		// update this group's source DropDown.
-		if (window.root?.activeGroupInputsEmitter) {
-			window.root.activeGroupInputsEmitter.emit(group.hashID);
-		}
-		// Refresh external group if chained
 		if (shouldUpdateChain && inputOwnerGroupHash && inputOwnerGroupHash !== group.hashID) {
 			const externalGroup = window.root.groups.get(inputOwnerGroupHash);
 			if (externalGroup) {
 				externalGroup.updateActiveState();
-				if (externalGroup.element && window.root?.activeGroupInputsEmitter) {
-					window.root.activeGroupInputsEmitter.emit(externalGroup.hashID);
-				}
 			}
 		}
 	}
@@ -167,8 +151,7 @@ class Group {
 	}
 	registerGroupInput(inputInstance) {
 		this.inputs.set(inputInstance.hashID, inputInstance);
-		// Notify this group's own source dropdown that its input set changed,
-		// so dynamically-added sources show up without a manual refresh.
+		// Notify this group's own source dropdown that its input set changed
 		this.emitter.emit('inputRegistered', inputInstance);
 		// Rebuild the input button cache since new inputs may have been added
 		this.inputButtonMap.clear();
@@ -240,9 +223,11 @@ class Group {
 		}
 		// Clear the emitter itself to release all stored callbacks
 		this.emitter.listeners.clear();
-		// Notify global listeners to refresh ALL source dropdowns
-		if (window.root && window.root.activeGroupInputsEmitter) {
-			window.root.activeGroupInputsEmitter.emit('*');
+		// Notify every remaining group's dropdown that this group is gone, so they drop
+		// it from their "Other Chainable Inputs" section. This group is already out of
+		// the map, so the subscriber's self-guard matches nothing — all others refresh.
+		if (window.root?.activeGroupInputsEmitter) {
+			window.root.activeGroupInputsEmitter.emit('groupNeighbors', this.hashID);
 		}
 		// Remove the group from local inputs as well
 		this.inputs.clear();
@@ -254,12 +239,10 @@ class Group {
 		if (inputInstance.element && inputInstance.element._cleanupEmitter) {
 			inputInstance.element._cleanupEmitter();
 		}
-		// Emit event for input removal
+		// Emit event for input removal. The 'inputUnregistered' subscription in
+		// createSourceDropdown calls refreshDropdown(this, true) → 'groupNeighbors'
+		// broadcast, so neighbors drop this input from their list.
 		this.emitter.emit('inputUnregistered', inputInstance.hashID);
-		// Notify global listeners to refresh source dropdowns
-		if (window.root && window.root.activeGroupInputsEmitter) {
-			window.root.activeGroupInputsEmitter.emit(this.hashID);
-		}
 	}
 }
 
@@ -281,10 +264,7 @@ class Host {
 		await this.moveToGroup(newGroupHash, { notifyBackend: true });
 	}
 	moveToGroup(newGroupHash, { notifyBackend = false } = {}) {
-		// Reparents this host instance and element to another group, re-registering any inputs.
-		// When notifyBackend is false (used during group teardown), the DOM/registry move happens
-		// locally without issuing a HOSTCONTROL write back to the backend - the group is being
-		// destroyed, so echoing a "changeGroup" into it would be both unnecessary and racy.
+		// Reparents this host instance and element to another group, re-registering any inputs
 		const oldGroupHash = this.controls.GROUP;
 		const newGroupInstance = window.root.groups.get(newGroupHash);
 		const oldGroupInstance = window.root.groups.get(oldGroupHash);
@@ -440,10 +420,7 @@ class Host {
 		}
 		let groupInstance = window.root.groups.get(this.controls.GROUP);
 		groupInstance.registerGroupInput(inputInstance);
-		// Notify global listeners if this input is active
-		if (window.root?.activeGroupInputsEmitter) {
-			window.root.activeGroupInputsEmitter.emit(this.hashID);
-		}
+		// registerGroupInput emits 'inputRegistered' → refreshDropdown(this, true) → 'groupNeighbors' broadcast.
 		// Force UI update for the host element
 		if (this.element) {
 			this.element.classList.add('host-updated');
@@ -1280,15 +1257,19 @@ async function createSourceDropdown(groupItem) {
 	// Initial build (reuse the wired-up select so listeners survive the populate pass)
 	groupItem.sourceDropdownElement = select;
 	refreshDropdown(groupItem);
-	// Subscribe to this group's OWN local emitter, so its dropdown rebuilds
-	// whenever an input is registered to this group (e.g. during initial load).
 	const unsubscribeInputRegistered = groupItem.emitter.on('inputRegistered', () => {
-		refreshDropdown(groupItem);
+		refreshDropdown(groupItem, true);
 	});
 	// Local: rebuild this group's dropdown when its own active source changes, so the
 	// selected value / active marker in the dropdown reflects the current selection.
+	// broadcast=true so neighbors learn of the new active source.
 	const unsubscribeActiveInputChange = groupItem.emitter.on('activeInputChange', () => {
-		refreshDropdown(groupItem);
+		refreshDropdown(groupItem, true);
+	});
+	// Local: rebuild when an input is removed from this group. broadcast=true so
+	// neighbors drop it from their "Other Chainable Inputs" section.
+	const unsubscribeInputUnregistered = groupItem.emitter.on('inputUnregistered', () => {
+		refreshDropdown(groupItem, true);
 	});
 	// Cleanup helper
 	select.cleanup = () => {
@@ -1297,6 +1278,7 @@ async function createSourceDropdown(groupItem) {
 		select.removeEventListener("change", handleChange);
 		unsubscribeInputRegistered();
 		unsubscribeActiveInputChange();
+		unsubscribeInputUnregistered();
 	};
 	return select;
 }
@@ -1329,8 +1311,11 @@ function refreshDropdown(groupInstance) {
 	}
 	if (select.dataset.isRefreshing === 'true') return;
 	select.dataset.isRefreshing = 'true';
+	const previousActive = select.dataset.lastSourceHash;
+	let newActive = null;
 	try {
 		const newSelect = buildDropdownOptions(groupInstance);
+		newActive = newSelect.value;
 		if (!newSelect || newSelect.tagName !== 'SELECT') {
 			console.warn(`refreshDropdown: buildDropdownOptions returned ${newSelect?.tagName || typeof newSelect} instead of <select>`);
 			return;
@@ -1353,6 +1338,14 @@ function refreshDropdown(groupInstance) {
 		// console.log(`refreshDropdown: Refreshed source dropdown for group ${groupInstance.hashID}, active=${select.value}`);
 	} finally {
 		select.dataset.isRefreshing = 'false';
+	}
+	if (previousActive !== newActive) {
+		// Emit a dropdown refresh notice for other groups
+		if (window.root?.activeGroupInputsEmitter) {
+			// would a build array from group in window.root.groups -> remove self -> forEach hashID in array, emit directly
+			// work in a better manner here?
+			window.root.activeGroupInputsEmitter.emit('groupNeighbors', groupInstance.hashID);
+		}
 	}
 	// console.log("Refreshed sourceDropDown for group: ", groupInstance.hashID);
 }
@@ -3040,8 +3033,13 @@ async function handlePageLoad() {
 	// refreshes itself via its own local 'activeInputChange' subscription.
 	window.root.activeGroupInputsEmitter.on('groupNeighbors', (changedGroupHash) => {
 		window.root.groups.forEach(group => {
-			if (group.hashID === changedGroupHash) return; // noop for self
-			refreshDropdown(group);
+			// this guard does not appear to fire.  Why?
+			if (group.hashID === changedGroupHash) {
+				console.log("NOOP for own nonlocal input update, hashID:", changedGroupHash);
+				return; // noop for self
+			} else {
+				refreshDropdown(group);
+			}
 		});
 	});
 	window.root.hosts = new Map();
@@ -3141,12 +3139,10 @@ function handleGroupEvents(event) {
 				controlValue: 0,
 				toggleOn: false
 			});
-			// Notify ALL dropdowns to rebuild since a new group
-			if (window.root?.activeGroupInputsEmitter) {
-				window.root.activeGroupInputsEmitter.emit('*');
-			}
-			// Also trigger source dropdown refresh event for immediate UI update
-			document.dispatchEvent(new CustomEvent('refreshDrop', {detail: newGroup}));
+			// Rebuild the new group's own dropdown AND broadcast 'groupNeighbors' so every
+			// existing group adds it to its "Other Chainable Inputs" section.
+			// The subscriber skips this group (it's already built here) and refreshes the rest.
+			refreshDropdown(newGroup, true);
 			newGroup.updateActiveState();
 		});
 	} else {
@@ -3202,13 +3198,11 @@ function handleGroupEvents(event) {
 					});
 				}
 				if (controlName === "label") {
-					// Trigger a source dropdown refresh for all groups
-					if (window.root?.activeGroupInputsEmitter) {
-						window.root.activeGroupInputsEmitter.emit('*');
-					}
+					// Label change alters every group's "Other Chainable Inputs" text.
+					// Rebuild this group's dropdown and broadcast 'groupNeighbors'
+					refreshDropdown(groupItem, true);
 				}
 				if (controlName === "chainedToGroup") {
-					// force a source dropdown refresh
 					// get the chained group's sourceHash and update our own sourceHash to match
 					const targetGroup = window.root.groups.get(event.value);
 					if (targetGroup) {
@@ -3223,9 +3217,9 @@ function handleGroupEvents(event) {
 					}
 					// Rebuild input button cache since chainable inputs changed
 					groupItem.inputButtonMap.clear();
-					if (window.root?.activeGroupInputsEmitter) {
-						window.root.activeGroupInputsEmitter.emit(groupItem.hashID);
-					}
+					// Chain target change alters which option is selected and what neighbors show.
+					// Rebuild this group's dropdown and broadcast 'groupNeighbors'.
+					refreshDropdown(groupItem, true);
 				}
 				if (controlName === "swatchValue") {
 					// Update group element background color
@@ -3242,9 +3236,10 @@ function handleGroupEvents(event) {
 						}
 					}
 				}
-				if (window.root && window.root.activeGroupInputsEmitter) {
-					window.root.activeGroupInputsEmitter.emit(hashID);
-				}
+				// NOTE: no blanket global emit here. The sourceHash setter (→'activeInputChange'
+				// →refreshDropdown(this,true)) and the label/chainedToGroup handlers above each
+				// broadcast 'groupNeighbors' as appropriate. Other control names
+				// (e.g. swatchValue) don't affect the chainable-inputs list, so no refresh.
 			}
 		} catch (error) {
 			console.error("Error parsing group data:", error);
@@ -3582,9 +3577,8 @@ function handleGlobalsEvents(event) {
 						toggleOn: false
 					});
 					// Refresh the follower's UI (dropdowns, active states, static buttons).
-					if (follower.element && window.root?.activeGroupInputsEmitter) {
-						window.root.activeGroupInputsEmitter.emit(follower.hashID);
-					}
+					// follower.sourceHash above already triggered 'activeInputChange' →
+					// refreshDropdown(this,true) → 'groupNeighbors' broadcast.
 					follower.updateActiveState();
 				}
 			});
