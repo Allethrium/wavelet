@@ -288,20 +288,20 @@ optimize_latency(){
 	fi
 	want=$(( want & ~1 ))            # round down to an even number
 	if (( want > 0 )); then
-		isolated="$(seq -s ', ' $(( numCPU - want )) $(( numCPU - 1 )))"
+		isolated="$(seq -s ',' $(( numCPU - want )) $(( numCPU - 1 )))"
 		# ensure irqaffinity goes to the remainder (reserved) cores
-		reserved="$(seq -s ', ' 0 $(( numCPU - want - 1 )))"
+		reserved="$(seq -s ',' 0 $(( numCPU - want - 1 )))"
 		rpm-ostree kargs --append="isolcpus=$isolated" \
 			--append="nohz_full=$isolated" \
 			--append="rcu_nocbd=$isolated" \
 			--append="irqaffinity=$reserved" \
 			2>/dev/null
 		sed -i '/^ISOLATED_CPU=/d' "/etc/wavelet.conf"
-		echo "ISOLATED_CPU=\"$isolated\"" >> "/etc/wavelet.conf"
+		echo "	ISOLATED_CPU=\"$isolated\"" >> "/etc/wavelet.conf"
 		echo "	Isolated cores $isolated for media processing."
 		# Consider having the client use hardware media encoding if we have a very low core count available
 		# In my testing, HW encoding is appreciably worse, hence the preference for software encoding.
-		echo "USE_HW_ENCODE=1" >> "/etc/wavelet.conf"
+		echo "	USE_HW_ENCODE=1" >> "/etc/wavelet.conf"
 	fi
 	# PAM fallback for login sessions (systemd user units use the drop-in above;
 	# this covers any PAM-authenticated session path so the grants are consistent).
