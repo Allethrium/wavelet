@@ -494,6 +494,9 @@ rpm-ostree initramfs --enable
 /usr/local/bin/connectwifi.sh
 echo "	Client setup steps completed, moving to start user setup steps.."
 
+# Add wavelet to the vide/render usergroups
+usermod -a -G render wavelet
+usermod -a -G video wavelet
 # Ensure we disable this service so that it does not execute again on next reboot
 systemctl disable wavelet_install_client.service
 rm -rf /etc/systemd/system/wavelet_install_client.service

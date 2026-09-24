@@ -795,6 +795,10 @@ generate_wavelet_userspace_services
 # Enable initramfs
 rpm-ostree initramfs --enable
 
+# Add wavelet user to groups for hw acceleration
+usermod -a -G render wavelet
+usermod -a -G video wavelet
+
 # Modify the Firefox policies.json
 sed -i "s|https://localhost|https://$SVR_HOSTNAME|g" "/etc/firefox/policies/policies.json"
 # Restart getty@tty1 to reload UI and start userland build process, which will run under the WAVELET user
