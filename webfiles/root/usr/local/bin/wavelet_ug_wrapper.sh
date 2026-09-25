@@ -105,11 +105,9 @@ start_ultragrid(){
 
 send_keepalive(){
 	# Rate-limited watchdog keepalive
-	set -x
 	(( EPOCHSECONDS - lastkeepalive < WATCHDOG_INTERVAL )) && return 0
 	lastkeepalive=$EPOCHSECONDS
 	systemd-notify "WATCHDOG=1"
-	set +x
 }
 
 note_good(){
@@ -488,44 +486,44 @@ exec 3< <(stdbuf -oL tail -n0 -F "$UG_LOG_FILE")
 TAIL_PID=$!
 
 echo -e "Reading log outputs..\nPID: $UG_PID\nLOG: $UG_LOG_FILE\n" | systemd-cat -t "UltraGrid"
-while :; do
-	if ! IFS= read -r -t 1 line <&3; then
-		# Idle ticks are effectively NOOPS because we *need* an output from UltraGrid
-		# If there is no UltraGrid log output then the assumption is a crash, hang and need to restart.
-		rc=$?
-		(( rc > 128 )) || break            # rc<=128 means EOF on the tail pipe
-		# --- idle tick: no log line for 1s ---
-		if ! kill -0 "$UG_PID" 2>/dev/null; then
-			echo "UltraGrid child exited unexpectedly" | systemd-cat -t "UltraGrid"
-			exit 1
-		fi
-		maintenanceTask
-		continue
-	fi
+while IFS= read -r line <&3; do
 	if (( ++lineCount % ROTATE_CHECK_LINES == 0 )); then
 		rotate_ug_log
 		rotate_log_file "/var/home/wavelet/logs/UltraGrid.log"
 	fi
 	maintenanceTask
-	echo "	UltraGrid log output at $EPOCHSECONDS"
 	case "$line" in
-		*\[switcher\]*frames*seconds*FPS*)                 note_good ;;
-		*\[File*cap\.\]*Rewinding*the*file\.*)              note_good ;;
-		*\[video\ dec\.\]*New*incoming*video*format*)      note_good ;;
-		*\[Pbuf\]*\[video\]*packets*received*0*lost,*max*loss*0) note_good ;;
-		*\[display\]*Successfully*reconfigured*display*to*) note_good ;;
-		*Setting*GL*size*\.)                                note_good ;;
-		*\[switcher\]*Switched*from*device*to*device*)      note_good ;;
-		*NDI*cap*frames*in*seconds)                         note_good ;;
-		*Vulkan*SDL3*frames*in*seconds*)                    note_good ;;
+		*\[switcher\]*frames*seconds*FPS*)
+			note_good ;;
+		*\[File*cap\.\]*Rewinding*the*file\.*)
+			note_good ;;
+		*video*dec\.*New*incoming*video*format*)
+			note_good ;;
+		*Resinding*the*file*)
+			note_good ;;
+		*Pbuf*video*packets*received*0*lost,*max*loss*0)
+			note_good ;;
+		*\[display\]*Successfully*reconfigured*display*to*)
+			note_good ;;
+		*Setting*GL*size*\.)
+			note_good ;;
+		*\[switcher\]*Switched*from*device*to*device*)
+			note_good ;;
+		*NDI*cap*)
+			note_good ;;
+		*Vulkan*SDL3*frames*in*seconds*)
+			note_good ;;
 		*WARNING:*Selected*capture*card*was*not*found*)
 			echo -e "\033[33m	UltraGrid is unable to start with bad command line!\033[0m" | systemd-cat -t "UltraGrid"
 			generate_errorDisplay "FTL: BAD ULTRAGRID COMMAND LINE"
 			exit 1
 			;;
-		*\[ug_input\]*Dropping*frame!)                      inputError "UG_FRAMEDROP" ;;
-		*\[lavd\]*Invalid*data*found*when*processing*input*) inputError "LAVC_DATA" ;;
-		*Video*dec*stats*cumulative*)                       process_fecData "$line" ;;
+		*\[ug_input\]*Dropping*frame!)
+			inputError "UG_FRAMEDROP" ;;
+		*\[lavd\]*Invalid*data*found*when*processing*input*)
+			inputError "LAVC_DATA" ;;
+		*video*dec*stats*cumulative*)
+			process_fecData "$line" ;;
 		*Error*while*decoding*frame*Invalid*data*found*when*processing*input.)
 			generate_errorDisplay "ERR: MAJOR CODEC ERROR"
 			echo -e "\033[33m	UltraGrid reports corrupted codec data for input stream!\033[0m" | systemd-cat -t "UltraGrid"
