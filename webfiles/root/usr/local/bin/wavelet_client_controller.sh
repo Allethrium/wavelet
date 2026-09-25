@@ -1447,6 +1447,9 @@ run_decoder(){
 	ugArgs+=("${audio:-}")
 	ugArgs+=("--control-port 6161")
 	ugArgs+=("--param use-hw-accel")
+	# This will only be necessary if we can't massage UltraGrid into performing
+	# proper HW decode->SW decode functionality
+	# ugArgs+=("--param force-ladv-decoder=$hwDecoderArg")
 	ugArgs+=("--param gl-disable-10b")
 	# append -VV to enable verbose logging
 	# check for our image files, both must be present or the switcher will fail to launch.
