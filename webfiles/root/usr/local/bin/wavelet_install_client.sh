@@ -494,9 +494,12 @@ rpm-ostree initramfs --enable
 /usr/local/bin/connectwifi.sh
 echo "	Client setup steps completed, moving to start user setup steps.."
 
-# Add wavelet to the vide/render usergroups
-usermod -a -G render wavelet
-usermod -a -G video wavelet
+
+# Add wavelet to the vide/render usergroups for access to GPU resources
+# An upcoming patch to UltraGrid will alter the codec fallback order
+# to prefer available HW acceleration
+usermod -a -G render wavelet; usermod -a -G video wavelet
+usermod -a -G render wavelet-present; usermod -a -G video wavelet-present
 # Ensure we disable this service so that it does not execute again on next reboot
 systemctl disable wavelet_install_client.service
 rm -rf /etc/systemd/system/wavelet_install_client.service

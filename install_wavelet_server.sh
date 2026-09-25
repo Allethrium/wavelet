@@ -201,7 +201,11 @@ automatic_setup() {
 	fi
 	INPUTFILES="server_custom.yml decoder_custom.yml"
 	init_users_yaml
-	users=("wavelet-root" "wavelet")
+	# wavelet-root has sudo and handles system management tasks out of the root account (root, shell)
+	# wavelet handles userspace tasks which do not require root (shell)
+	# TODO - implement no-password low-privilege presentation account
+	# wavelet-present is the logged-on seat that provides a video output in the production system (no shell)
+	users=("wavelet-root" "wavelet" "wavelet-present")
 	for user in "${users[@]}"; do
 		mkpasswd --method=yescrypt "${PASSWORD}" > "${user}.pw.secure"
 		ssh-keygen -t ed25519 -C "${user}@wavelet.allethrium" -N '' <<< $'\ny' >/dev/null 2>&1
