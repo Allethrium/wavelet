@@ -41,13 +41,14 @@ RUN curl -o /etc/yum.repos.d/swayfx.repo https://copr.fedorainfracloud.org/coprs
             alsa-firmware alsa-sof-firmware realtek-firmware \
             etcd sha \
             libv4l v4l-utils pipewire-v4l2 pipewire-gstreamer pulseaudio-utils ImageMagick \
-            mesa-dri-drivers mesa-vulkan-drivers libdrm mesa-libEGL mesa-libgbm mesa-libGL \
+            mesa-dri-drivers mesa-vulkan-drivers mesa-va-drivers libdrm \
+            mesa-libEGL mesa-libgbm mesa-libGL \
             alsa-lib pipewire-alsa alsa-plugins-speex bluez-tools nmap-ncat \
             tuned realtime-tests rtkit jo linuxptp linuxptp-selinux \
-            intel-gpu-tools intel-compute-runtime intel-gmmlib intel-opencl \
+            intel-gpu-tools intel-gmmlib \
             intel-level-zero libvpl \
             libva libva-utils libva-v4l2-request libvdpau \
-            oneVPL-intel-gpu oneapi-level-zero opencl-headers mpv libsrtp \
+            oneVPL-intel-gpu opencl-headers mpv libsrtp \
             fastfetch btop mesa-libOpenCL srt srt-libs pipewire-utils usbutils \
             plymouth plymouth-system-theme plymouth-theme-fade-in plymouth-theme-spinfinity \
             plymouth-plugin-script plymouth-scripts \
