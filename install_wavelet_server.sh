@@ -58,7 +58,10 @@ generate_user_yaml(){
 	elif [[ "${name}" = "wavelet" ]]; then
 #		echo -e "\n	wavelet user, setting UID to 1337"
 		uid="1337"
-	else 
+	elif [[ "${name}" = "wavelet-present" ]]; then
+#		echo -e "\n	wavelet user, setting UID to 1337"
+		uid="1336"
+	else
 		echo -e "			User ID not preset, system will assign them."
 	fi
 	if [[ -n ${uid} ]]; then

@@ -41,7 +41,8 @@ RUN curl -o /etc/yum.repos.d/swayfx.repo https://copr.fedorainfracloud.org/coprs
             alsa-firmware alsa-sof-firmware realtek-firmware \
             etcd sha \
             libv4l v4l-utils pipewire-v4l2 pipewire-gstreamer pulseaudio-utils ImageMagick \
-            mesa-dri-drivers mesa-vulkan-drivers mesa-va-drivers libdrm \
+            mesa-dri-drivers mesa-vulkan-drivers mesa-vulkan-drivers-freeworld \
+            mesa-va-drivers mesa-va-drivers-freeworld libdrm \
             mesa-libEGL mesa-libgbm mesa-libGL \
             alsa-lib pipewire-alsa alsa-plugins-speex bluez-tools nmap-ncat \
             tuned realtime-tests rtkit jo linuxptp linuxptp-selinux \
@@ -55,6 +56,6 @@ RUN curl -o /etc/yum.repos.d/swayfx.repo https://copr.fedorainfracloud.org/coprs
             rkhunter clamav clamd clamav-freshclam firefox \
             intel-media-driver libndi-sdk ndi-sdk ndi-sdk-documentation \
             libva-intel-driver vlc \
-            gstreamer1-plugin-libav gstreamer1-plugins-bad-freeworld \
+            gstreamer1-plugin-libav libavcodec-freeworld gstreamer1-plugins-bad-freeworld \
             libheif-freeworld && \
     ostree container commit
