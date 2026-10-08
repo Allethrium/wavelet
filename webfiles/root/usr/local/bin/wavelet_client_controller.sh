@@ -1660,7 +1660,7 @@ start_ug(){
 	# Poll until active or timeout
 	local timeout=30
 	local count=0
-	until systemctl --user is-active "$ugName" || [[ $count -ge $timeout ]]; do
+	until [[ "$(systemctl --user is-active "$ugName")" == "active" ]] || [[ $count -ge $timeout ]]; do
 		sleep .1
 		((count++))
 	done
@@ -1668,7 +1668,7 @@ start_ug(){
     if [[ $count -ge $timeout ]]; then
 		echo "		Error: $ugName failed to become active within expected .5 seconds. Attempting to remediate.."
 		timeout=30
-		until systemctl --user is-active "$ugName" || [[ $count -ge $timeout ]]; do
+		until [[ "$(systemctl --user is-active "$ugName")" == "active" ]] || [[ $count -ge $timeout ]]; do
 			sleep .1
 			(( count++ ))
 		done
@@ -1892,12 +1892,12 @@ uiEnable_moveUGWindow(){
         echo "	Warning: UltraGrid window no longer exists, skipping move commands."
         return 0
     fi
-    swaymsg -s "$swaySocket" "[con_id=$ugId] floating enable"
-    swaymsg -s "$swaySocket" "[con_id=$ugId] fullscreen disable"
-    swaymsg -s "$swaySocket" "[con_id=$ugId] resize set $targetWidth $targetHeight"
+    swaymsg -s "$swaySocket" "[con_id=$ugId] floating enable" >/dev/null
+    swaymsg -s "$swaySocket" "[con_id=$ugId] fullscreen disable" >/dev/null
+    swaymsg -s "$swaySocket" "[con_id=$ugId] resize set $targetWidth $targetHeight" >/dev/null
     echo "	Moving UltraGrid container to workspace $workspace.."
-    swaymsg -s "$swaySocket" "[con_id=$ugId] move container to workspace $workspace"
-    swaymsg -s "$swaySocket" "[con_id=$ugId] move position 1400 0"
+    swaymsg -s "$swaySocket" "[con_id=$ugId] move container to workspace $workspace" >/dev/null
+    swaymsg -s "$swaySocket" "[con_id=$ugId] move position 1400 0" >/dev/null
 }
 
 uiDisable_moveUGWindow(){
@@ -1943,13 +1943,13 @@ uiDisable_moveUGWindow(){
             return 0
         fi
         echo "	Moving UltraGrid output container to workspace $workspace.."
-        swaymsg -s "$swaySocket" "[con_id=$ugId] move container to workspace $workspace"
+        swaymsg -s "$swaySocket" "[con_id=$ugId] move container to workspace $workspace" >/dev/null
         echo "	Resizing UltraGrid output container to fullscreen.."
-        swaymsg -s "$swaySocket" "[con_id=$ugId] floating disable"
-        swaymsg -s "$swaySocket" "[con_id=$ugId] resize set $width $height"
-        swaymsg -s "$swaySocket" "[con_id=$ugId] fullscreen enable"
+        swaymsg -s "$swaySocket" "[con_id=$ugId] floating disable" >/dev/null
+        swaymsg -s "$swaySocket" "[con_id=$ugId] resize set $width $height" >/dev/null
+        swaymsg -s "$swaySocket" "[con_id=$ugId] fullscreen enable" >/dev/null
         # Switch sway back to workspace
-        swaymsg -s "$swaySocket" "workspace $workspace"
+        swaymsg -s "$swaySocket" "workspace $workspace" >/dev/null
     fi
 }
 
