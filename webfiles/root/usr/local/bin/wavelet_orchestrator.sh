@@ -568,18 +568,14 @@ resolve_group_source_for_host(){
 				KEYNAME="/HOSTS/$srcHost/uv_encode_cmd/inputStream"; read_etcd_global || true
 			fi
 			local streamCmd="$printvalue"
+			KEYNAME="/HOSTS/$targetHost/control/videoSourceConfig"
+			KEYVALUE=""
 			if [[ -n "$streamCmd" ]]; then
-				local encodedCmd="$(printf '%s' "$streamCmd" | base64)"
-				KEYNAME="/HOSTS/$targetHost/control/videoSourceType"; KEYVALUE="network"; write_etcd_global &
-				KEYNAME="/HOSTS/$targetHost/control/videoSourceActive"; KEYVALUE="1"; write_etcd_global &
-				KEYNAME="/HOSTS/$targetHost/control/videoSourceSubType"; KEYVALUE="$subType"; write_etcd_global &
-				KEYNAME="/HOSTS/$targetHost/VIDEO_SOURCE_CMD"; KEYVALUE="$encodedCmd"; write_etcd_global &
+				KEYVALUE="type:network|active:1|subType:$subType|cmd:$(printf '%s' "$streamCmd" | base64)"
 			else
-				# No stream command available, fall back to UG mode (mirrors event_process_group_videoSource_hosts else branch)
-				KEYNAME="/HOSTS/$targetHost/control/videoSourceType"; KEYVALUE="ug"; write_etcd_global &
-				KEYNAME="/HOSTS/$targetHost/control/videoSourceActive"; KEYVALUE="1"; write_etcd_global &
-				KEYNAME="/HOSTS/$targetHost/control/videoSourceSubType"; KEYVALUE="ug"; write_etcd_global &
+				KEYVALUE="type:ug|active:1|subType:ug|cmd:"
 			fi
+			write_etcd_global &
 		else
 			# Local input - no special keys needed; run_decoder handles this via sourceHash directly
 			return 0
@@ -786,7 +782,8 @@ update_host_config_full() {
 		echo "	ERR: GROUP_HASH not populated. Reading from etcd.."
 		KEYNAME="/GROUPS/$hostNameSys"; read_etcd_global; GROUP_HASH="$printvalue"
 	fi
-
+	KEYNAME="/UI/GROUPS/$GROUP_HASH/control/blankStatus"; read_etcd_global; blankStatus="$printvalue"
+	KEYNAME="/HOSTS/$hostNameSys/control/blankStatus"; write_etcd_global &
 	# Here, we build the file contents properly.
 	local configFile="/var/home/wavelet/config/$keyHostName.conf"
 	local lockFile="/var/home/wavelet/config/$keyHostName.conf.lock"
@@ -804,6 +801,7 @@ update_host_config_full() {
 		export HOST_IP="$HOST_IP"
 		export INPUT_DEVICE_PRESENT="$INPUT_DEVICE_PRESENT"
 		export MOD_REVISION="$newVersion"
+		export blankStatus="$blankStatus"
 	EOF
 	# Release file lock
 	flock -u 200

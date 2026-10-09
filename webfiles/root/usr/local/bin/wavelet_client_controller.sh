@@ -1280,7 +1280,7 @@ reconstruct_configPayload(){
 	local configPayload=""
 	# Determine sourceHash
 	if [[ -n "${firstRunState:-}" ]]; then
-		sourceHash="$etcdValue"
+		sourceHash="${sourceHash:-$etcdValue}"
 	else
 		KEYNAME="/HOSTS/$hostNameSys/control/channelData"; read_etcd_global
 		local channelData="$printvalue"
@@ -1346,6 +1346,12 @@ run_decoder(){
 	local streamMode; local externalArg; local activeFlag
 	local videoSourceCmd; local videoSourceType; local videoSourceSubType; local configPayload
 	source "/var/home/wavelet/config/$hostNameSys.conf"
+	if [[ -f "/var/home/wavelet/config/firstrun_token" ]]; then
+		# This is a new device and we need to reconstruct our config payload anyway
+		KEYNAME="/UI/GROUPS/$groupHash/control/sourceHash"; read_etcd_global
+		sourceHash="$printvalue"
+		configPayload="$(reconstruct_configPayload)"
+	fi
 	KEYNAME="/HOSTS/$hostNameSys/control/videoSourceConfig"; read_etcd_global
 	if [[ -z "$printvalue" ]]; then
 		# We have an error and need to get a proper configPayload or build it from scratch here.
@@ -1380,10 +1386,10 @@ run_decoder(){
 	fi
 	echo "	Parsed videoSourceConfig - Type: $videoSourceType, SubType: $videoSourceSubType, Active: $activeFlag"
 	echo "	Video Source Subtype: $videoSourceSubType"
-   	if [[ "$etcdValue" =~ ^[0-3]$ ]]; then
+   	if [[ "$etcdValue" =~ ^[0-3]$ ]] || [[ "${sourceHash:-}" =~ ^[0-3]$ && -n "${firstRunState:-}" ]]; then
    		# Static image - no subscription needed
    		streamMode="static"
-   		channel="$etcdValue"
+   		channel="${etcdValue:-$sourceHash}"
    	elif [[ "$videoSourceSubType" == "NDI" ]] || [[ "$videoSourceSubType" == "RTSP" ]]; then
    		echo "	Checking video source type: $videoSourceCmd (explicit type: $videoSourceType)"
   		# Architectural note:
@@ -1485,6 +1491,9 @@ run_decoder(){
 		controlPortCmd="capture.data $channel"; netCat "6161" "$controlPortCmd" &
 	else
 		set_channelIndex
+	fi
+	if [[ -f "/var/home/wavelet/config/firstrun_token" ]]; then
+		rm -f "/var/home/wavelet/config/firstrun_token"
 	fi
 }
 
