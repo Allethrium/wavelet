@@ -143,6 +143,7 @@ DEPLOYMENT_IP=${DEPLOYMENT_IP}
 REGISTRY=${svr_ip:-192.168.1.32}
 # Additional system build state flags
 UG_BUILD_TYPE=${dev_flag:-release}
+UNATTENDED_INSTALL=${UNATTENDED_INSTALL:-0}
 EOF
 
 	echo "	Generating wavelet_keys.csv.."
@@ -522,6 +523,10 @@ for i in "$@"
             	;;
 			-c=*|--config=*)
 				configFile=${i#*=}; echo -e "	Extracting configuration from defined config file: ${configFile}"
+				;;
+			-u=*|--unattend=*)
+				UNATTENDED_INSTALL="1"
+				echo "	Unattend flag enabled, server will not wait to setup DHCP, DNS and IdM services during bootstrap!"
 				;;
 			*)
 				echo "bad input argument: $i";

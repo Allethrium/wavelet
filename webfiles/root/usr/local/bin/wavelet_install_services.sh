@@ -537,6 +537,63 @@ EOF
 }
 
 
+wavelet_isolation_prompt(){
+    # Opt-out flag in /etc/wavelet.conf (ISO_PROMPT=0)
+    local logName="/var/roothome/logs/isolation_prompt.log"
+    mkdir -p "$(dirname "$logName")"; touch "$logName"
+    if [[ "${UNATTENDED_INSTALL}" != "1" ]]; then
+        echo "	ISO_PROMPT=0 set in wavelet.conf, skipping isolation prompt." >> "$logName"
+        return 0
+    fi
+    local timeout="${ISO_PROMPT_TIMEOUT:-600}"
+    # Talk directly to the console so the prompt is visible on tty1 even
+    # though this script's stdout is redirected to a log.
+    {
+        echo ""
+        echo "================================================================"
+        echo "  WAVELET NETWORK ISOLATION CHECKPOINT"
+        echo "================================================================"
+        echo ""
+        echo "  Wavelet is about to start its own DHCP, DNS and identity"
+        echo "  services (FreeIPA)."
+        echo ""
+        echo "  IMPORTANT:  This machine must now be connected to its OWN"
+        echo "  isolated switch/network segment - NOT the corporate LAN."
+        echo ""
+        echo "  If this machine is still plugged into the corporate network,"
+        echo "  UNPLUG IT NOW and connect it to the dedicated wavelet switch"
+        echo "  or isolated VLAN drop."
+        echo ""
+        echo "  When ready, type:  UNDERSTAND"
+        echo ""
+        echo "  (Proceeding automatically in $(( timeout / 60 )) minutes if"
+        echo "   no input is received.)"
+        echo "================================================================"
+    } > /dev/tty1 2>/dev/null || true
+    echo "	Isolation prompt displayed on console, waiting up to ${timeout}s for confirmation.." >> "$logName"
+    local answer=""
+    if read -t "$timeout" -r -p "" answer < /dev/tty1 2>/dev/null; then
+        answer="${answer,,}"
+    else
+        echo "	No input received within ${timeout}s, proceeding automatically." >> "$logName"
+        return 0
+    fi
+    case "$answer" in
+        UNDERSTAND)
+            echo "	Engineer confirmed network isolation, proceeding with hardening." >> "$logName"
+            return 0
+            ;;
+        n|no)
+            echo "	Engineer requested wait - prompting again.." >> "$logName"
+            wavelet_isolation_prompt
+            ;;
+        *)
+            echo "	Unrecognized input '$answer', re-prompting.." >> "$logName"
+            wavelet_isolation_prompt
+            ;;
+    esac
+}
+
 #####
 #
 # Main
@@ -639,6 +696,15 @@ PXE_SUBPID=$!
 
 HARDENING_SUBPID=0
 (
+	# Ensure the machine is on its own physical network BEFORE the domain
+	# controller, DHCP and DNS services come up (see docs/WINDOWS_DEPLOYMENT_OPTIONS.md
+	# Part 2).  Prompt is skipped when ISO_PROMPT=0 in /etc/wavelet.conf.
+	if [[ ! -f "/var/unattend.flag" ]]; then echo "	Waiting for network isolation confirmation on console (logs in: /var/roothome/logs/isolation_prompt.log).."
+		if ! wavelet_isolation_prompt; then
+			echo "	ERR: Isolation prompt failed, aborting DC provisioning."
+			exit 1
+		fi
+	fi
 	# Setup Domain Controller, PKI and provision service principals
 	echo "	Calling hardening module to install security layer in subshell.."
 	echo "	logs in: /var/roothome/logs/hardening.log"
