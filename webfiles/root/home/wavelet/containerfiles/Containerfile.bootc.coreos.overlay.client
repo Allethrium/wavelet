@@ -1,0 +1,102 @@
+#	Bootc-era client base layer ("base layer" for client systems).
+#	Companion to Containerfile.coreos.overlay.client
+#   this variant builds for the bootc/F45 model where packages are installed at IMAGE BUILD time with dnf.
+#   initramfs is baked here rather than regenerated at runtime.
+#
+#	References:
+#	https://docs.fedoraproject.org/en-US/bootc/building-gs/
+#	https://github.com/coreos/fedora-coreos-tracker/issues/1726 (roadmap)
+#
+#	Base: quay.io/fedora/fedora-coreos is now itself a bootc OCI image
+#	(F43 change BuildFCOSUsingContainerfile - FCOS is built FROM
+#	fedora-bootc), there is no rpm-ostree / ostree container commit step.
+#
+#	Build sequence (see build_registry.sh):
+#	  1. podman build -f Containerfile.bootc.coreos.overlay.client -t localhost/coreos_overlay_client .
+#	  2. podman build -f Containerfile.bootc.coreos.overlay.server -t localhost/coreos_overlay_server .
+
+## FCOS 44/45 notes:
+## - fedora-coreos:stable now ships dnf5 and is a bootc image
+##      runtime dnf install does NOT work on image-mode systems (expected dnf errors)
+##      all layering happens here, in the build.
+## - The initramfs is baked via 'bootc initramfs --enable'
+##      Plymouth + capture-card kmods are included HERE.
+
+FROM quay.io/fedora/fedora-coreos:next
+
+# Adjust args as appropriate (build_registry.sh should modify them dynamically)
+ARG FFMPEG_VERSION=7.1.4
+ARG FCOS_VERSION=45
+
+# Copy local FFmpeg RPMs
+COPY rpms/ffmpeg-${FFMPEG_VERSION}-*.fc${FCOS_VERSION}.x86_64.rpm /tmp/ffmpeg.rpm
+COPY rpms/ffmpeg-libs-${FFMPEG_VERSION}-*.fc${FCOS_VERSION}.x86_64.rpm /tmp/ffmpeg-libs.rpm
+
+# Configure repos, override ffmpeg with custom 7.1.4 build to prevent rpmfusion ffmpeg 8.1 from being installed, and install all dependencies
+# NOTE: the fedora-cisco-openh264 repo is REQUIRED - our LGPL ffmpeg build links libopenh264 for H.264 encode
+# (libx264 is GPL and not available).  It was previously removed for being slow; it is kept now because the
+# livestream pipeline depends on openh264's H.264 encoder.  Only the openh264 libs are pulled from it.
+#
+# rpm-ostree override replace is not available in the bootc model; the local
+# ffmpeg rpms are installed with --allowerasing so they replace the
+# rpmfusion ffmpeg/ffmpeg-libs in the same transaction.
+RUN curl -o /etc/yum.repos.d/swayfx.repo https://copr.fedorainfracloud.org/coprs/swayfx/swayfx/repo/fedora-${FCOS_VERSION}/swayfx-swayfx-fedora-${FCOS_VERSION}.repo && \
+    dnf install -y \
+            https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${FCOS_VERSION}.noarch.rpm \
+            https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FCOS_VERSION}.noarch.rpm && \
+    dnf install -y --allowerasing /tmp/ffmpeg.rpm /tmp/ffmpeg-libs.rpm && \
+    dnf install -y openh264 && \
+    dnf install -y wget fontawesome-fonts-all wl-clipboard nnn mako swayfx swayimg bemenu rofi-wayland lxsession nfs-utils \
+            xwayland-run waybar chrony foot vim powerline powerline-fonts vim-powerline greetd \
+            NetworkManager-wifi iw wireless-regdb wpa_supplicant nfs-utils \
+            avahi nss-mdns rdma freeipa-client haveged rng-tools \
+            iwlwifi-dvm-firmware.noarch iwlwifi-mvm-firmware.noarch \
+            intel-audio-firmware intel-gpu-firmware intel-vsc-firmware \
+            alsa-firmware alsa-sof-firmware realtek-firmware \
+            sha \
+            libv4l v4l-utils pipewire-v4l2 pipewire-gstreamer pulseaudio-utils ImageMagick \
+            mesa-dri-drivers mesa-vulkan-drivers \
+            mesa-va-drivers libdrm \
+            mesa-libEGL mesa-libgbm mesa-libGL \
+            alsa-lib pipewire-alsa alsa-plugins-speex bluez-tools nmap-ncat \
+            tuned realtime-tests rtkit jo linuxptp linuxptp-selinux \
+            intel-gpu-tools intel-gmmlib \
+            intel-level-zero libvpl \
+            libva libva-utils libva-v4l2-request libvdpau \
+            oneVPL-intel-gpu opencl-headers mpv libsrtp \
+            fastfetch btop mesa-libOpenCL srt srt-libs pipewire-utils usbutils \
+            plymouth plymouth-system-theme plymouth-theme-fade-in plymouth-theme-spinfinity \
+            plymouth-plugin-script plymouth-scripts \
+            rkhunter clamav clamd clamav-freshclam firefox \
+            intel-media-driver libndi-sdk ndi-sdk ndi-sdk-documentation \
+            libva-intel-driver vlc \
+            gstreamer1-plugin-libav libavcodec-freeworld gstreamer1-plugins-bad-freeworld \
+            libheif-freeworld && \
+    dnf clean all
+
+# etcd is not currently packaged for F45
+ENV ETCD_VER=v3.7.2
+RUN curl -fL --retry 5 --retry-delay 3 \
+        -o /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz \
+        https://storage.googleapis.com/etcd/${ETCD_VER}/etcd-${ETCD_VER}-linux-amd64.tar.gz && \
+    tar xzf /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz -C /tmp --strip-components=1 --no-same-owner && \
+    mv /tmp/etcd /tmp/etcdctl /tmp/etcdutl /usr/local/bin/ && \
+    rm -f /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz
+
+# TODO(bootc): AJA / DeckLink capture card support.
+# Blackmagic DeckLink ships a binary RPM (no Fedora package); AJA provides
+# a driver tarball.  When added: install the kmod packages HERE (above,
+# before dnf clean all) and ensure dracut picks the modules into the
+# initramfs via the drivers line below (add '--add-drivers "aja blackmagic"').
+
+# Bake the initramfs: regenerates with the full package set present in the
+# image (plymouth, firmware, kmods).  This is the bootc equivalent of the
+# old runtime 'rpm-ostree initramfs enable'.
+# NOTE: verified 2026-10: bootc 1.16.13 (fedora-coreos:next) has NO
+# 'bootc initramfs' subcommand yet - the dracut invocation is the primary
+# path.  --no-hostonly so the initramfs is machine-independent (it is baked
+# once and deployed to many different hosts); plymouth explicitly added.
+# TODO: switch to 'bootc initramfs --enable' when upstream ships it.
+RUN KERNELVER=$(ls /usr/lib/modules | head -n1) && \
+    dracut --no-hostonly --add "plymouth" \
+        --force /usr/lib/modules/${KERNELVER}/initramfs.img ${KERNELVER}

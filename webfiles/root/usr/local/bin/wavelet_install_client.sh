@@ -291,11 +291,35 @@ optimize_latency(){
 		isolated="$(seq -s ',' $(( numCPU - want )) $(( numCPU - 1 )))"
 		# ensure irqaffinity goes to the remainder (reserved) cores
 		reserved="$(seq -s ',' 0 $(( numCPU - want - 1 )))"
-		rpm-ostree kargs --append="isolcpus=$isolated" \
-			--append="nohz_full=$isolated" \
-			--append="rcu_nocbd=$isolated" \
-			--append="irqaffinity=$reserved" \
-			2>/dev/null
+		if [[ "${USE_BOOTC:-0}" == "1" || "$(bootc status >/dev/null 2>&1; echo $?)" == "0" ]]; then
+			# bootc-era: per-machine kargs written directly to the boot loader entry
+			karg_opts=()
+			karg_opts+=("--append=isolcpus=$isolated" "--append=nohz_full=$isolated" \
+				"--append=rcu_nocbd=$isolated" "--append=irqaffinity=$reserved")
+			mounted_boot=0
+			if ! mountpoint -q /boot; then mount /boot && mounted_boot=1; fi
+			if grep -qE '^GRUB_ENABLE_BLSCFG=true' /etc/default/grub 2>/dev/null || ls /boot/loader/entries/*.conf >/dev/null 2>&1; then
+				# BLS: append kargs to every current boot entry
+				for entry in /boot/loader/entries/*.conf; do
+					# strip any previous wavelet kargs to stay idempotent
+					sed -i '/isolcpus=\|nohz_full=\|rcu_nocbd=\|irqaffinity=/d' "$entry"
+					for kv in "${karg_opts[@]}"; do
+						sed -i "s|^\(options .*\)|\1 $kv|" "$entry"
+					done
+				done
+			else
+				# GRUB2 native: grubenv-based kargs
+				grub2-editenv - unset kernelopts 2>/dev/null || true
+				grub2-editenv - set "kernelopts=isolcpus=$isolated nohz_full=$isolated rcu_nocbd=$isolated irqaffinity=$reserved"
+			fi
+			(( mounted_boot )) && umount /boot
+		else
+			rpm-ostree kargs --append="isolcpus=$isolated" \
+				--append="nohz_full=$isolated" \
+				--append="rcu_nocbd=$isolated" \
+				--append="irqaffinity=$reserved" \
+				2>/dev/null
+		fi
 		sed -i '/^ISOLATED_CPU=/d' "/etc/wavelet.conf"
 		echo "	ISOLATED_CPU=\"$isolated\"" >> "/etc/wavelet.conf"
 		echo "	Isolated cores $isolated for media processing."
@@ -488,7 +512,10 @@ systemctl daemon-reload
 systemctl enable --now var-wavelet_ramfs.mount wavelet_copyfiles.service
 
 optimize_latency "$active_networkInterface"
-rpm-ostree initramfs --enable
+if [[ "${USE_BOOTC:-0}" != "1" ]]; then
+	# bootc-era: initramfs is baked into the overlay image
+	rpm-ostree initramfs --enable
+fi
 
 # Run connectwifi to configure our 802.1x WiFi connectivity.. (will fail if no EAP-TLS certs from DC1!)
 /usr/local/bin/connectwifi.sh

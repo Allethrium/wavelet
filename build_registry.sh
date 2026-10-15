@@ -11,9 +11,15 @@ export_container_image(){
     local imageTarget="$1"
     # Get registry address
     local registry_addr
-    registry_addr=$(hostname -f)
+    registry_addr="${REGISTRY_ADDR:-$(hostname -f)}"
     local registry_url="$registry_addr:5000"
     echo -e "\n	Exporting $imageTarget to registry $registry_url"
+    # Stamp a push-time epoch into the image annotations so
+    # rebuild_container_image can do freshness checks
+    if podman image exists "localhost/$imageTarget"; then
+        buildah config --annotation "wavelet.pushed=$(date +%s)" "localhost/$imageTarget" 2>/dev/null || \
+            echo "	(note: could not stamp push-time annotation)"
+    fi
     # Tag and push
     if podman tag "localhost/$imageTarget" "$registry_addr/$imageTarget:latest"; then
         if podman push --format oci "localhost/$imageTarget" "$registry_url/$imageTarget:latest"; then
@@ -31,23 +37,45 @@ export_container_image(){
     fi
 }
 
-build_container_image_if_needed(){
+rebuild_container_image(){
     local imageTarget="$1"
     local containerFile="$2"
     local env="$3"
 
-    # Check if image already exists in the local registry
-    local registry_addr
-    registry_addr=$(hostname -f)
-    local registry_url="$registry_addr:5000"
-
-    # Check if image exists in registry
-    if curl -s -q "http://${registry_url}/v2/${imageTarget}/manifests/latest" | grep -q "schemaVersion"; then
-        echo -e "${GREEN}	Image $imageTarget already exists in registry, skipping build.${NC}"
-        return 0
+    # Force a rebuild regardless of freshness (e.g. after Containerfile changes)
+    if [[ "${FORCE_BUILD:-0}" == "1" ]]; then
+        build_container_image "$imageTarget" "$containerFile" "$env"
+        return $?
     fi
 
-    # If not in registry, build it
+    local registry_addr
+    registry_addr="${REGISTRY_ADDR:-$(hostname -f)}"
+    local registry_url="$registry_addr:5000"
+
+    # Check if image exists in registry.
+    # NOTE: the registry is TLS-only (configure_registry), so this must be https with -k.
+    # Also: distribution v3 requires an explicit Accept header on manifest requests or it 404's.
+    local manifest pushed_ts age_days
+    manifest="$(curl -sk -H "Accept: application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json" \
+        "https://${registry_url}/v2/${imageTarget}/manifests/latest" 2>/dev/null)"
+    if echo "$manifest" | grep -q "schemaVersion"; then
+        # Image exists; check freshness via the wavelet.pushed annotation
+        # (stamped by export_container_image at push time).
+        pushed_ts="$(echo "$manifest" | jq -r '.annotations["wavelet.pushed"] // empty' 2>/dev/null)"
+        if [[ -n "$pushed_ts" && "$pushed_ts" =~ ^[0-9]+$ ]]; then
+            age_days=$(( ( $(date +%s) - pushed_ts ) / 86400 ))
+            if (( age_days < MAX_IMAGE_AGE_DAYS )); then
+                echo -e "${GREEN}	Image $imageTarget exists in registry and is ${age_days}d old (< ${MAX_IMAGE_AGE_DAYS}d), skipping build.${NC}"
+                return 0
+            fi
+            echo -e "	Image $imageTarget is ${age_days}d old (>= ${MAX_IMAGE_AGE_DAYS}d), rebuilding."
+        else
+            echo -e "${GREEN}	Image $imageTarget already exists in registry (no push stamp), skipping build.${NC}"
+            return 0
+        fi
+    fi
+
+    # If not in registry (or stale), build it
     build_container_image "$imageTarget" "$containerFile" "$env"
 }
 
@@ -354,19 +382,23 @@ EOF
 	echo "Downloading UltraGrid AppImages (patched Continuous, and current targeted upstream release)"
 	wget -nc https://github.com/armelvil/UltraGrid/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage
 	wget -nc https://github.com/CESNET/UltraGrid/releases/download/v1.10.1/UltraGrid-1.10.1-x86_64.AppImage
-	# CoreOS ISO files
+	# CoreOS ISO files.  The install media must match the target stream:
+	# next (F45) is bootc-era, stable (F44) is rpm-ostree-era; USE_BOOTC in
+	# wavelet.conf must agree with this stream.
 	REGISTRY_REF="quay.io/coreos/coreos-installer:latest"
+	local fcos_stream="${FCOS_STREAM:-stable}"
+	(( USE_BOOTC )) && fcos_stream="next"
 	podman run --security-opt label=disable \
 		--pull=always \
 		--rm \
 		-v .:/data -w /data \
-		"$REGISTRY_REF" download -s stable -a x86_64 -f pxe
+		"$REGISTRY_REF" download -s "$fcos_stream" -a x86_64 -f pxe
 	# And we need to download the baremetal ISO so our initial install media can get created.
 	podman run --security-opt label=disable \
 		--pull=always \
 		--rm \
 		-v .:/data -w /data \
-		"$REGISTRY_REF" download -s stable -a x86_64 -p metal -f iso
+		"$REGISTRY_REF" download -s "$fcos_stream" -a x86_64 -p metal -f iso
 	cd "$waveletdir" || return
 }
 
@@ -408,6 +440,11 @@ build_ffmpeg_rpm(){
     local ffmpeg_dir="$waveletdir/webfiles/root/home/wavelet/containerfiles"
     local output_dir="$HOME/.config/var/www/rpms"
     local containerfile="Containerfile.build-ffmpeg-$ffmpeg_version"
+    # Bootc pathway (>=F45): build against the matching Fedora release so the
+    # RPMs land as fc45+ and the bootc overlay COPY globs resolve.
+    if (( USE_BOOTC )); then
+        containerfile="${containerfile}-fc${FCOS_VERSION}"
+    fi
     local image_name="ffmpeg-builder"
     echo -e "\n${GREEN}Building FFmpeg $ffmpeg_version RPM...${NC}"
     mkdir -p "$output_dir"
@@ -544,7 +581,9 @@ check_required_packages(){
 }
 
 detect_fcos_version(){
-    local fcos_image="quay.io/fedora/fedora-coreos:stable"
+    # Override with FCOS_STREAM=next (etc.) to force-detect against a specific
+    # stream, e.g. to exercise the bootc pathway on this workbench.
+    local fcos_image="quay.io/fedora/fedora-coreos:${FCOS_STREAM:-stable}"
     # Pull the image if not present
     podman pull "$fcos_image" >/dev/null 2>&1
     # Try to get the version from /etc/os-release by running a container
@@ -569,6 +608,10 @@ detect_fcos_version(){
 waveletdir=$(pwd)
 mkdir -p "$waveletdir/logs"
 exec >"$waveletdir/logs/build_registry.log" 2>&1
+
+# Max age (days) of an image in the registry before it is rebuilt.
+# Set MAX_IMAGE_AGE_DAYS=0 to always rebuild; FORCE_BUILD=1 forces one run.
+MAX_IMAGE_AGE_DAYS="${MAX_IMAGE_AGE_DAYS:-30}"
 #if [[ "$EUID" -ne 0 ]]; then
 #  	echo "	This script must be run with root access"
 #  	exit 1
@@ -594,6 +637,11 @@ if [[ "$1" == */ ]]; then
   waveletdir="${1%/*}"
 else
   waveletdir="$1"
+fi
+# Resolve to an absolute path: configure_httpd() cds elsewhere mid-run, and
+# a relative waveletdir (e.g. '.') then breaks every log redirect afterwards.
+if [[ ! "$waveletdir" = /* ]]; then
+  waveletdir="$(cd "$waveletdir" && pwd)"
 fi
 
 if [[ -n $2 ]]; then
@@ -622,6 +670,25 @@ systemctl --user restart registry.service
 # Detect FCOS version from the latest FCOS image
 FCOS_VERSION=$(detect_fcos_version)
 
+# FCOS >= 45 is a bootc image, it uses the dnf-based bootc Containerfiles instead of rpm-ostree
+# Override with USE_BOOTC=1 (or FCOS_STREAM=next) to force the bootc pathway,
+USE_BOOTC="${USE_BOOTC:-0}"
+if (( FCOS_VERSION >= 45 )) || [[ "${FCOS_STREAM:-stable}" == "next" ]]; then
+    USE_BOOTC=1
+fi
+if (( USE_BOOTC )) && (( FCOS_VERSION < 45 )); then
+    FCOS_VERSION=$(FCOS_STREAM=next detect_fcos_version)
+fi
+if (( USE_BOOTC )); then
+    echo -e "${GREEN}FCOS ${FCOS_VERSION} detected - using bootc Containerfiles.${NC}"
+fi
+# Bootc overlays are labeled distinctly so both generations can coexist in
+# the registry (docs/UPDATE_TO_BOOTC.md).
+OVERLAY_SUFFIX=""
+if (( USE_BOOTC )); then
+    OVERLAY_SUFFIX="_bootc"
+fi
+
 # Build the FFMPEG 7.1.4 package
 # ffmpeg_version currently @ 7.1.4 until NDI compatibility/ABI issues resolved with 8.1
 ffmpeg_version="7.1.4"
@@ -646,15 +713,22 @@ cp "$output_dir"/ffmpeg-libs-${ffmpeg_version}-*.fc${FCOS_VERSION}.x86_64.rpm "$
 
 # Build the OCI container layers for the client, then utilize that as a base for the server layer.
 # Check if containers already exist in registry before building
-build_container_image_if_needed "coreos_overlay_client" "Containerfile.coreos.overlay.client"
-build_container_image_if_needed "coreos_overlay_server" "Containerfile.coreos.overlay.server"
+# On bootc-era FCOS (>=45) use the dnf-based bootc Containerfiles with baked initramfs,
+# tagged with a _bootc suffix so they coexist with rpm-ostree-era images.
+if (( USE_BOOTC )); then
+    rebuild_container_image "coreos_overlay_client${OVERLAY_SUFFIX}" "Containerfile.bootc.coreos.overlay.client"
+    rebuild_container_image "coreos_overlay_server${OVERLAY_SUFFIX}" "Containerfile.bootc.coreos.overlay.server"
+else
+    rebuild_container_image "coreos_overlay_client${OVERLAY_SUFFIX}" "Containerfile.coreos.overlay.client"
+    rebuild_container_image "coreos_overlay_server${OVERLAY_SUFFIX}" "Containerfile.coreos.overlay.server"
+fi
 
 # Build additional container images.  Many of these had to be from-scratch due to limitations in the official containers.
-build_container_image_if_needed "tftpd" "Containerfile.tftpd"
-build_container_image_if_needed "tftpboot" "Containerfile.tftpboot"
-build_container_image_if_needed "isc-kea" "Containerfile.isc-kea"
-build_container_image_if_needed "radiusd" "Containerfile.radiusd"
-build_container_image_if_needed "php-fpm-redis" "Containerfile.php-fpm-redis"
+rebuild_container_image "tftpd" "Containerfile.tftpd"
+rebuild_container_image "tftpboot" "Containerfile.tftpboot"
+rebuild_container_image "isc-kea" "Containerfile.isc-kea"
+rebuild_container_image "radiusd" "Containerfile.radiusd"
+rebuild_container_image "php-fpm-redis" "Containerfile.php-fpm-redis"
 
 pull_registry_images
 echo -e "${GREEN}Registry base images generated and stored in the registry on this host."

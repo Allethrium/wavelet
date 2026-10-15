@@ -859,7 +859,10 @@ systemctl enable --now var-wavelet_ramfs.mount var-home-wavelet-ramfs.mount wave
 generate_wavelet_userspace_services
 
 # Enable initramfs
-rpm-ostree initramfs --enable
+if [[ "${USE_BOOTC:-0}" != "1" ]]; then
+	# bootc-era: initramfs is baked into the overlay image
+	rpm-ostree initramfs --enable
+fi
 
 # Add wavelet user to groups for hw acceleration
 usermod -a -G render wavelet

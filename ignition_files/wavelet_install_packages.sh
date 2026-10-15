@@ -110,11 +110,12 @@ event_server(){
 	setup_registry_quadlet
 	pull_registry_images
 	# Pull these images in serial as they are heavy
-	pull_overlay "coreos_overlay_client"
-	podman tag coreos_overlay_client:latest "$hostNameSys/coreos_overlay_client"
-	podman push "$hostNameSys/coreos_overlay_client" "$hostNameSys:5000/coreos_overlay_client"
+	pull_overlay "coreos_overlay_client${OVERLAY_SUFFIX}"
+	podman tag "coreos_overlay_client${OVERLAY_SUFFIX}:latest" "$hostNameSys/coreos_overlay_client${OVERLAY_SUFFIX}"
+	podman push "$hostNameSys/coreos_overlay_client${OVERLAY_SUFFIX}" "$hostNameSys:5000/coreos_overlay_client${OVERLAY_SUFFIX}"
 	# Remove nameserver karg if it exists
-	if rpm-ostree kargs | grep -q 'nameserver'; then
+	# bootc-era: rpm-ostree kargs is unavailable on bootc systems
+	if [[ "${USE_BOOTC:-0}" != "1" ]] && rpm-ostree kargs | grep -q 'nameserver'; then
 	  rpm-ostree kargs --delete nameserver
 	fi
 	rpm_overlay_install_server
@@ -199,8 +200,8 @@ check_registry(){
 		echo "Container images will be pulled from internet."
 		count=0
 		# Export implied in build function
-		build_container_image "coreos_overlay_client" "Containerfile.coreos.overlay.client"
-		build_container_image "coreos_overlay_server" "Containerfile.coreos.overlay.server"
+		build_container_image "coreos_overlay_client${OVERLAY_SUFFIX}" "Containerfile.coreos.overlay.client"
+		build_container_image "coreos_overlay_server${OVERLAY_SUFFIX}" "Containerfile.coreos.overlay.server"
 	else
 		echo "Deployment server is defined in wavelet.conf, utilizing external registry.."
 		# Define the LAN registry conf
@@ -400,15 +401,25 @@ rpm_overlay_install_server(){
 	# a GPG sig is "correct" but overkill, as we aren't doing mass deployments.
 	if [[ "$externalReg" == "0" ]]; then
 		echo "	Rebasing from local containers-storage..."
-#		bootc switch --transport containers-storage "$storage/coreos_overlay_server:latest"
-		rpm-ostree rebase "ostree-unverified-image:containers-storage:localhost/coreos_overlay_server:latest"
+		if [[ "${USE_BOOTC:-0}" == "1" ]]; then
+			bootc switch --transport containers-storage "localhost/coreos_overlay_server${OVERLAY_SUFFIX}:latest"
+		else
+			rpm-ostree rebase "ostree-unverified-image:containers-storage:localhost/coreos_overlay_server${OVERLAY_SUFFIX}:latest"
+		fi
 	else
 		storage="$oci_registry"
 		echo "	Rebasing from registry: $storage..."
-#		bootc switch --transport registry "$storage/coreos_overlay_server:latest"
-		rpm-ostree rebase "ostree-unverified-image:registry:$storage/coreos_overlay_server"
+		if [[ "${USE_BOOTC:-0}" == "1" ]]; then
+			bootc switch --transport registry "$storage/coreos_overlay_server${OVERLAY_SUFFIX}:latest"
+		else
+			rpm-ostree rebase "ostree-unverified-image:registry:$storage/coreos_overlay_server${OVERLAY_SUFFIX}"
+		fi
 	fi
-	rpm-ostree initramfs enable
+	if [[ "${USE_BOOTC:-0}" != "1" ]]; then
+		# bootc-era: initramfs is baked into the overlay image itself
+		# (Containerfile.bootc.coreos.overlay.client, 'bootc initramfs --enable')
+		rpm-ostree initramfs enable
+	fi
 #	# ── DIAGNOSTICS: capture staged deployment state immediately after rebase ──
 #	echo "=== POST-REBASE DIAGNOSTIC: rpm-ostree status ==="
 #	rpm-ostree status --json 2>&1
@@ -442,9 +453,12 @@ rpm_overlay_install_client(){
 	mkdir -p "/etc/containers/certs.d/$SVR_HOSTNAME:5000"
 	cp "/var/home/wavelet/config/ca.crt" "/etc/containers/certs.d/$SVR_HOSTNAME:5000/ca.crt"
 	chmod 0644 "/etc/containers/certs.d/$SVR_HOSTNAME:5000/ca.crt"
-	echo "	Pulling from $REGISTRY/coreos_overlay_client"
-#	bootc switch --transport registry "$serverHostName/coreos_overlay_client"
-	rpm-ostree rebase "ostree-unverified-image:registry:$SVR_HOSTNAME/coreos_overlay_client"
+	echo "	Pulling from $REGISTRY/coreos_overlay_client${OVERLAY_SUFFIX}"
+	if [[ "${USE_BOOTC:-0}" == "1" ]]; then
+		bootc switch --transport registry "$SVR_HOSTNAME/coreos_overlay_client${OVERLAY_SUFFIX}:latest"
+	else
+		rpm-ostree rebase "ostree-unverified-image:registry:$SVR_HOSTNAME/coreos_overlay_client${OVERLAY_SUFFIX}"
+	fi
 	echo "RPM package updates completed, finishing installer task.."
 	echo "Generating client install service systemd entry.."
 	cat > "/etc/systemd/system/wavelet_install_client.service" <<-EOF
@@ -780,6 +794,14 @@ source "/etc/wavelet.conf"
 #DEPLOYMENT_REGISTRY
 #REGISTRY
 #UG_BUILD_TYPE
+#USE_BOOTC
+# Overlay image suffix: bootc-era images are labeled distinctly so both
+# generations coexist in the registry (docs/UPDATE_TO_BOOTC.md)
+if [[ "${USE_BOOTC:-0}" == "1" ]]; then
+	OVERLAY_SUFFIX="_bootc"
+else
+	OVERLAY_SUFFIX=""
+fi
 # Set timezone correctly for locale
 echo "Setting timezone to appropriate locale."
 echo "Please ensure other devices (switch, AP, network video sources) are correctly set to either use NTP for the server."

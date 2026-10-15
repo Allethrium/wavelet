@@ -1,0 +1,21 @@
+#	Bootc-era server layer: builds on the locally-built bootc client image,
+#	adding only server-specific packages.
+#	Companion to Containerfile.coreos.overlay.server
+#
+#	Build sequence (see build_registry.sh):
+#	  1. podman build -f Containerfile.bootc.coreos.overlay.client -t localhost/coreos_overlay_client .
+#	  2. podman build -f Containerfile.bootc.coreos.overlay.server -t localhost/coreos_overlay_server .
+
+# NOTE: builds on the _bootc-suffixed client image produced by Containerfile.bootc.coreos.overlay.client
+
+FROM containers-storage:localhost/coreos_overlay_client_bootc:latest AS server
+
+# dnf (image-build-time layering, bootc model) replaces
+# 'rpm-ostree install -A ... && ostree container commit'.
+# Server packages don't touch the kernel/initramfs, so no rebake needed here.
+RUN dnf install -y \
+        expect avahi-tools tcpdump nmap \
+        buildah butane inotify-tools \
+        zlib-ng-compat openssl ascii \
+        live555 net-snmp-utils && \
+    dnf clean all
