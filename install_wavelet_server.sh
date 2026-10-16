@@ -143,6 +143,9 @@ DEPLOYMENT_IP=${DEPLOYMENT_IP}
 REGISTRY=${svr_ip:-192.168.1.32}
 # Additional system build state flags
 UG_BUILD_TYPE=${dev_flag:-release}
+# Bootc flag used by wavelet_install_packages.sh at first boot.
+# Must match the install-media FCOS stream (next/F45 = 1, stable/F44 = 0).
+USE_BOOTC=${USE_BOOTC:-0}
 UNATTENDED_INSTALL=${UNATTENDED_INSTALL:-0}
 EOF
 
@@ -440,6 +443,7 @@ parse_config_file() {
 			DEPLOYMENT_IP) DEPLOYMENT_IP="$value" ;;
 			PATCH_MODE) patchMode="$value" ;;
 			UG_BUILD_TYPE|UGDEV) dev_flag="DEV" ;;
+			USE_BOOTC) USE_BOOTC="$value" ;;
 			CODEC_TEST) codec_testing="1";;
 		esac
 	done < "$config_file"
