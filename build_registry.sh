@@ -121,7 +121,7 @@ pull_registry_images(){
 	podman image prune -f >/dev/null 2>&1
 #	podman untag "localhost/$imageTarget"
 	sourceList=()
-  	sourceList+=("quay.io/coreos/etcd:v3.6.4")
+  	sourceList+=("quay.io/coreos/etcd:v3.7.2")
 	sourceList+=("quay.io/coreos/coreos-installer:release")
 	sourceList+=("registry.fedoraproject.org/fedora:latest")
 	# sourceList+=("registry.fedoraproject.org/fedora:42") # needed to avoid RADIUSD bug
