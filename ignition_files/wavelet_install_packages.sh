@@ -170,8 +170,9 @@ full_iso_install(){
 	fi
 	echo "	Package extraction complete."
 
-	# Server-side only: full ISO is server-only for now (hostname prefix
-	# svr*).  generate_files was already run before the branch (Main).
+	cd "/root" || return; rm .bashrc .bash_profile; cp /etc/skel/{.bashrc,.bash_profile} .
+	cd "/var/home/wavelet-root" || return; rm .bashrc .bash_profile; cp /etc/skel/{.bashrc,.bash_profile} .
+	hostnamectl set-hostname "$SVR_HOSTNAME" --pretty
 	# Registry: local-only; pull_registry_images() branches on FULL_ISO_ACTIVE
 	# to push the media-loaded localhost images instead of pulling remotely.
 	if ! check_registry; then
@@ -218,6 +219,26 @@ full_iso_install(){
 		return 1
 	fi
 	echo "	rpm_overlay_install_server complete."
+
+	# Make etcd datadir and copy nonsecure yaml to conf file, and update with server IP address.
+	mkdir -p "/var/lib/etcd-data"
+	# Generate and enable systemd units
+	# Therefore, they will start on next boot, run, and disable themselves
+	cat > "/etc/systemd/system/wavelet_install_services.service" <<-EOF
+		[Unit]
+		Description=Install Server additional services
+		After=multi-user.target
+
+		[Service]
+		Type=oneshot
+		ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_services.sh'
+		ExecStartPost=systemctl disable wavelet_install_services.service
+
+		[Install]
+		WantedBy=multi-user.target
+	EOF
+	echo "	Generated wavelet_install_services.service systemd unit."
+
 	if systemctl enable wavelet_install_services.service; then
 		echo "	Enabled wavelet_install_services.service."
 	else
@@ -616,6 +637,7 @@ rpm_overlay_install_server(){
 		echo "	Rebasing from local containers-storage..."
 		if [[ "${USE_BOOTC:-0}" == "1" ]]; then
 			echo "	Using bootc path.."
+			# We must briefly disable SELinux here or bootc will fail in every instance.  I have yet to find a workaround.
 			setenforce 0
 			bootc switch --transport containers-storage "localhost/coreos_overlay_server${OVERLAY_SUFFIX}:latest"
 			setenforce 1
