@@ -40,9 +40,35 @@ main() {
         echo -e "ERROR: coreos-installer failed! System will NOT reboot." >&2
         return 1
     else
-	    echo -e "Installation successful. Rebooting into installed system..."
+        # Force the NEXT boot onto the installed disk so the machine cannot loop back into PXE/USB after reboot.
+        set_efi_bootnext
+        echo -e "Installation successful. Rebooting into installed system..."
     	/usr/bin/systemctl --no-block reboot
     fi
+}
+
+set_efi_bootnext(){
+    if ! command -v efibootmgr >/dev/null 2>&1; then
+        echo -e "efibootmgr not available (BIOS install?) - skipping BootNext."
+        return 0
+    fi
+    local esp_uuid next_entry
+    esp_uuid="$(blkid -s PARTUUID -o value /dev/disk/by-partlabel/EFI-SYSTEM 2>/dev/null || true)"
+    if [[ -z "$esp_uuid" ]]; then
+        echo -e "WARNING: could not resolve installed ESP PARTUUID; BootNext not set."
+        return 0
+    fi
+    next_entry="$(efibootmgr -v 2>/dev/null | sed -n "s/^Boot\([0-9A-Fa-f]\{4\}\).*${esp_uuid}.*/\1/p" | head -n1)"
+    if [[ -z "$next_entry" ]]; then
+        echo -e "WARNING: no efibootmgr entry references ESP PARTUUID $esp_uuid."
+        return 0
+    fi
+    if efibootmgr --bootnext "$next_entry" >/dev/null 2>&1; then
+        echo -e "EFI BootNext set to Boot$next_entry (installed disk)."
+    else
+        echo -e "WARNING: failed to set EFI BootNext (firmware may boot the wrong device)."
+    fi
+    return 0
 }
 
 
