@@ -121,7 +121,10 @@ systemd:
         After=network-online.target
         [Service]
         Type=oneshot
-        ExecStart=/usr/bin/bash -c '/usr/local/bin/wavelet_install_packages.sh "master.tar.gz" "/var/wavelet_keys.csv"'
+        SELinuxContext=system_u:system_r:unconfined_service_t:s0
+        ExecStartPre=-/usr/sbin/restorecon -v /usr/local/bin/wavelet_install_packages.sh
+        ExecStartPre=-/usr/bin/ls -Z /usr/local/bin/wavelet_install_packages.sh /usr/bin/bootc
+        ExecStart=/usr/local/bin/wavelet_install_packages.sh "master.tar.gz" "/var/wavelet_keys.csv"
         ExecStartPost=-systemctl reboot
         [Install]
         WantedBy=multi-user.target
