@@ -7,6 +7,12 @@ RED="\033[0;31m"
 GREEN="\033[0;32m"
 NC="\033[0m"
 
+# FCOS stream.  F45+ is bootc-era.  MUST be passed as the 3rd argument:
+# stable | testing | next  (validated in Main, below).
+#export FCOS_STREAM
+
+USE_BOOTC="${USE_BOOTC:-1}"
+
 export_container_image(){
     local imageTarget="$1"
     # Get registry address
@@ -35,6 +41,27 @@ export_container_image(){
         echo -e "${RED}		Failed to tag $imageTarget${NC}"
         return 1
     fi
+}
+
+pull_from_registry(){
+    # When we skip a build because the image already exists in the LAN
+    # registry, ensure it also exists in the LOCAL podman store (tagged as
+    # localhost/<name>) - build_full_iso.sh saves local images with
+    # 'podman save localhost/<name>'.
+    local imageTarget="$1"
+    local registry_addr
+    registry_addr="${REGISTRY_ADDR:-$(hostname -f)}"
+    local registry_url="$registry_addr:5000"
+    if podman image exists "localhost/$imageTarget"; then
+        return 0
+    fi
+    echo "	Pulling $imageTarget from registry into local podman store.."
+    if podman pull --tls-verify=false "$registry_url/$imageTarget:latest" >> "$waveletdir/logs/build_registry_$imageTarget.log" 2>&1; then
+        podman tag "$registry_url/$imageTarget:latest" "localhost/$imageTarget"
+        return 0
+    fi
+    echo -e "${RED}		Failed to pull $imageTarget from registry.${NC}"
+    return 1
 }
 
 rebuild_container_image(){
@@ -66,11 +93,13 @@ rebuild_container_image(){
             age_days=$(( ( $(date +%s) - pushed_ts ) / 86400 ))
             if (( age_days < MAX_IMAGE_AGE_DAYS )); then
                 echo -e "${GREEN}	Image $imageTarget exists in registry and is ${age_days}d old (< ${MAX_IMAGE_AGE_DAYS}d), skipping build.${NC}"
+                pull_from_registry "$imageTarget"
                 return 0
             fi
             echo -e "	Image $imageTarget is ${age_days}d old (>= ${MAX_IMAGE_AGE_DAYS}d), rebuilding."
         else
             echo -e "${GREEN}	Image $imageTarget already exists in registry (no push stamp), skipping build.${NC}"
+            pull_from_registry "$imageTarget"
             return 0
         fi
     fi
@@ -91,10 +120,7 @@ build_container_image(){
         done
     fi
     echo -e "\n	Building container: $imageTarget"
-    # Build
-	#   	--security-opt label=disable \
     if podman build -t "localhost/$imageTarget" \
-    	--security-opt label=disable \
     	--network=host \
         "${podman_env_args[@]}" \
         -v="$waveletdir/webfiles/root/home/wavelet/containerfiles:/mount:z" \
@@ -377,29 +403,27 @@ EOF
 	else
 		echo "HTTPD server is not functional with IP address, TLS connections using anything other than hostname may fail!"
 	fi
-	cd "$HOME/.config/var/www" || exit
 	# UltraGrid AppImage (continuous + version)
 	echo "Downloading UltraGrid AppImages (patched Continuous, and current targeted upstream release)"
-	wget -nc https://github.com/armelvil/UltraGrid/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage
-	wget -nc https://github.com/CESNET/UltraGrid/releases/download/v1.10.1/UltraGrid-1.10.1-x86_64.AppImage
-	# CoreOS ISO files.  The install media must match the target stream:
-	# next (F45) is bootc-era, stable (F44) is rpm-ostree-era; USE_BOOTC in
-	# wavelet.conf must agree with this stream.
+	wget -nc -P "$HOME/.config/var/www" https://github.com/armelvil/UltraGrid/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage
+	wget -nc -P "$HOME/.config/var/www" https://github.com/CESNET/UltraGrid/releases/download/v1.10.1/UltraGrid-1.10.1-x86_64.AppImage
+	# CoreOS ISO files.  The install media must match the target stream
+	# passed as the 3rd argument.  Mount the download dir explicitly so this
+	# works regardless of the script's CWD (relative waveletdir must survive).
 	REGISTRY_REF="quay.io/coreos/coreos-installer:latest"
-	local fcos_stream="${FCOS_STREAM:-stable}"
-	(( USE_BOOTC )) && fcos_stream="next"
+	local fcos_stream="$FCOS_STREAM"
+	local www_dir="$HOME/.config/var/www"
 	podman run --security-opt label=disable \
 		--pull=always \
 		--rm \
-		-v .:/data -w /data \
+		-v "$www_dir":/data -w /data \
 		"$REGISTRY_REF" download -s "$fcos_stream" -a x86_64 -f pxe
 	# And we need to download the baremetal ISO so our initial install media can get created.
 	podman run --security-opt label=disable \
 		--pull=always \
 		--rm \
-		-v .:/data -w /data \
+		-v "$www_dir":/data -w /data \
 		"$REGISTRY_REF" download -s "$fcos_stream" -a x86_64 -p metal -f iso
-	cd "$waveletdir" || return
 }
 
 get_registry_reference(){
@@ -581,19 +605,24 @@ check_required_packages(){
 }
 
 detect_fcos_version(){
-    # Override with FCOS_STREAM=next (etc.) to force-detect against a specific
-    # stream, e.g. to exercise the bootc pathway on this workbench.
-    local fcos_image="quay.io/fedora/fedora-coreos:${FCOS_STREAM:-stable}"
+    # Detects the FCOS major version of the stream in $FCOS_STREAM by reading
+    # VERSION_ID from /etc/os-release inside the stream's container image.
+    local fcos_image="quay.io/fedora/fedora-coreos:${FCOS_STREAM}"
+    # Log lines go to stderr so the caller's $(...) capture stays clean.
+    echo "	Detecting FCOS version of stream '${FCOS_STREAM}' (image: $fcos_image).." >&2
     # Pull the image if not present
     podman pull "$fcos_image" >/dev/null 2>&1
     # Try to get the version from /etc/os-release by running a container
     local fcos_version
     fcos_version=$(podman run --rm "$fcos_image" cat /etc/os-release 2>/dev/null | grep ^VERSION_ID= | cut -d= -f2 | tr -d '"')
-    # Ensure it's just the major version number (e.g., "44" from "44.20240101.3.0" or "44")
-    fcos_version="${fcos_version%%.*}"
-    if [[ -z "$fcos_version" || ! "$fcos_version" =~ ^[0-9]+$ ]]; then
-        fcos_version="44"
+    if [[ -z "$fcos_version" ]]; then
+        echo -e "${RED}	Could not detect FCOS version for stream '${FCOS_STREAM}'.${NC}" >&2
+        exit 1
     fi
+    # Keep the full version (e.g. "45.20261010.1.1") for the log; major only
+    # (e.g. "45") for the caller.
+    echo "	Detected FCOS stream '${FCOS_STREAM}' = version $fcos_version" >&2
+    fcos_version="${fcos_version%%.*}"
     echo "$fcos_version"
 }
 
@@ -605,7 +634,30 @@ detect_fcos_version(){
 #####
 
 
-waveletdir=$(pwd)
+if [[ -z "${1:-}" ]]; then
+	echo "	Wavelet registry build usage:"
+	echo "	./build_registry.sh <path-to-wavelet-git> <registry-IP-address> <fcos-stream: stable|testing|next>"
+	exit 1
+fi
+# Resolve the wavelet dir BEFORE opening the log file, so a bad path fails
+# fast with a clear message instead of blowing up on every log redirect later.
+# Relative paths are allowed (resolved against the caller's CWD), so the
+# checkout can live anywhere.
+if [[ "$1" == */ ]]; then
+  echo "    Removing trailing / from directory arg"
+  waveletdir="${1%/*}"
+else
+  waveletdir="$1"
+fi
+if [[ ! -d "$waveletdir" ]]; then
+  echo "	Wavelet path not found: $waveletdir (relative to $(pwd))"
+  exit 1
+fi
+# Resolve to an absolute path: podman -v mounts reject relative host paths.
+# The ARGUMENT may be relative; what we store internally must not be.
+if [[ ! "$waveletdir" = /* ]]; then
+  waveletdir="$(cd "$waveletdir" && pwd)"
+fi
 mkdir -p "$waveletdir/logs"
 exec >"$waveletdir/logs/build_registry.log" 2>&1
 
@@ -626,23 +678,24 @@ fi
 # shellcheck disable=SC2199
 if [[ -z "${@}" ]]; then
 	echo "	Wavelet registry build usage:"
-	echo "	./build_registry.sh <path-to-wavelet-git> <registry-IP-address>"
+	echo "	./build_registry.sh <path-to-wavelet-git> <registry-IP-address> <fcos-stream: stable|testing|next>"
 	exit 1
 fi
 
-echo "  Container build and pull logs are available in the generated logfiles, in the execution dir."
+# FCOS stream is now a required 3rd argument.
+case "${3:-}" in
+  stable|testing|next)
+    FCOS_STREAM="$3"
+    ;;
+  *)
+    echo -e "${RED}	Missing or invalid FCOS stream argument: '$3'${NC}"
+    echo "	Usage: ./build_registry.sh <path-to-wavelet-git> <registry-IP-address> <fcos-stream: stable|testing|next>"
+    exit 1
+    ;;
+esac
+export FCOS_STREAM
 
-if [[ "$1" == */ ]]; then
-  echo "    Removing trailing / from directory arg"
-  waveletdir="${1%/*}"
-else
-  waveletdir="$1"
-fi
-# Resolve to an absolute path: configure_httpd() cds elsewhere mid-run, and
-# a relative waveletdir (e.g. '.') then breaks every log redirect afterwards.
-if [[ ! "$waveletdir" = /* ]]; then
-  waveletdir="$(cd "$waveletdir" && pwd)"
-fi
+echo "  Container build and pull logs are available in the generated logfiles, in the execution dir."
 
 if [[ -n $2 ]]; then
   echo "  Setting registry IP to user definition!"
@@ -667,20 +720,24 @@ configure_httpd
 # Registry seems problematic unless restarted twice?
 systemctl --user restart registry.service
 
-# Detect FCOS version from the latest FCOS image
-FCOS_VERSION=$(detect_fcos_version)
+# Detect the FCOS version of the CHOSEN stream (not a hardcoded threshold -
+# stable will eventually roll onto bootc-era Fedora releases itself).
+FCOS_VERSION=$(FCOS_STREAM="$FCOS_STREAM" detect_fcos_version)
 
-# FCOS >= 45 is a bootc image, it uses the dnf-based bootc Containerfiles instead of rpm-ostree
-# Override with USE_BOOTC=1 (or FCOS_STREAM=next) to force the bootc pathway,
-USE_BOOTC="${USE_BOOTC:-0}"
-if (( FCOS_VERSION >= 45 )) || [[ "${FCOS_STREAM:-stable}" == "next" ]]; then
-    USE_BOOTC=1
-fi
-if (( USE_BOOTC )) && (( FCOS_VERSION < 45 )); then
-    FCOS_VERSION=$(FCOS_STREAM=next detect_fcos_version)
+# Bootc-era FCOS uses dnf-based bootc Containerfiles instead of rpm-ostree.
+# Override with USE_BOOTC=0/1 to force either pathway.
+USE_BOOTC="${USE_BOOTC:-}"
+if [[ -z "$USE_BOOTC" ]]; then
+    if (( FCOS_VERSION >= 45 )); then
+        USE_BOOTC=1
+    else
+        USE_BOOTC=0
+    fi
 fi
 if (( USE_BOOTC )); then
-    echo -e "${GREEN}FCOS ${FCOS_VERSION} detected - using bootc Containerfiles.${NC}"
+    echo -e "${GREEN}FCOS ${FCOS_VERSION} (${FCOS_STREAM}) detected - using bootc Containerfiles.${NC}"
+else
+    echo -e "FCOS ${FCOS_VERSION} (${FCOS_STREAM}) detected - using rpm-ostree Containerfiles.${NC}"
 fi
 # Bootc overlays are labeled distinctly so both generations can coexist in
 # the registry (docs/UPDATE_TO_BOOTC.md).

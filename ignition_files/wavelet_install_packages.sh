@@ -74,6 +74,191 @@ set_ethernet_mtu(){
 	done
 }
 
+full_iso_install(){
+	# FULL_ISO_MODE=1 (wavelet.conf, full ISO builds only).  All provisioning
+	# data lives on the install USB's "wavelet-offline" partition (appended
+	# by build_full_iso.sh).  Mirrors the normal bootstrap flow exactly, but
+	# every network source is replaced by the mounted media:
+	logfile="/var/log/wavelet/offline_install.log"
+	mkdir -p /var/log/wavelet
+	(
+		echo "===== full_iso_install START $(date -Is) host=$(hostname) DEVELOPER_MODE=${DEVELOPER_MODE:-unset} USE_BOOTC=${USE_BOOTC:-unset} ====="
+		local FULL_ISO_MEDIA="/mnt/wavelet-offline"
+		if [[ ! -e "/dev/disk/by-label/wavelet-offline" ]]; then
+			echo "	ERROR: FULL_ISO_MODE set but no wavelet-offline partition found!"
+			return 1
+		fi
+		mkdir -p "$FULL_ISO_MEDIA"
+		if ! mount -o ro /dev/disk/by-label/wavelet-offline "$FULL_ISO_MEDIA"; then
+			echo "	ERROR: mount of wavelet-offline partition failed!"
+			return 1
+		fi
+		echo "	Mounted $FULL_ISO_MEDIA; contents:"
+		ls -laR "$FULL_ISO_MEDIA"
+
+	# Tarball: name must match DEVELOPER_MODE; install_packages() expects
+	# it at /var/<name>.
+	local packageTarball="master.tar.gz"
+	if [[ "$DEVELOPER_MODE" -eq 1 ]]; then
+		packageTarball="armelvil-working.tar.gz"
+	fi
+	if [[ -f "$FULL_ISO_MEDIA/wavelet.tar.gz" ]]; then
+		echo "	Copying wavelet tarball from install media.."
+		if ! cp -f "$FULL_ISO_MEDIA/wavelet.tar.gz" "/var/$packageTarball"; then
+			echo "	ERROR: failed to copy wavelet tarball to /var/$packageTarball!"
+			umount "$FULL_ISO_MEDIA"
+			return 1
+		fi
+	else
+		echo "	ERROR: $FULL_ISO_MEDIA/wavelet.tar.gz not found on install media!"
+		umount "$FULL_ISO_MEDIA"
+		return 1
+	fi
+	# AppImage + RPMs: copied to the paths the tarball/containerfiles expect.
+	if [[ -f "$FULL_ISO_MEDIA/UltraGrid.AppImage" ]]; then
+		echo "	Copying UltraGrid AppImage from install media.."
+		cp "$FULL_ISO_MEDIA/UltraGrid.AppImage" "/usr/local/bin/UltraGrid.AppImage"
+		chmod 0755 "/usr/local/bin/UltraGrid.AppImage"
+	else
+		echo "	WARNING: UltraGrid.AppImage not found on install media, skipping."
+	fi
+	if ls "$FULL_ISO_MEDIA"/rpms/*.rpm >/dev/null 2>&1; then
+		mkdir -p "/var/home/wavelet/containerfiles/rpms"
+		cp "$FULL_ISO_MEDIA"/rpms/*.rpm "/var/home/wavelet/containerfiles/rpms/" || true
+		echo "	Copied RPMs from install media:"
+		ls -l "/var/home/wavelet/containerfiles/rpms/"
+	else
+		echo "	WARNING: no RPMs found on install media (rpms/ dir)."
+	fi
+	local archive name
+	for archive in "$FULL_ISO_MEDIA"/images/*.oci.tar; do
+		[[ -f "$archive" ]] || continue
+		name="$(basename "$archive" .oci.tar)"
+		echo "	Loading $name from install media.."
+		local retry=1
+		while (( retry <= 3 )); do
+			if podman load -i "$archive"; then
+				echo "	Successfully loaded $name (attempt $retry)."
+				break
+			fi
+			echo "	podman load attempt $retry failed for $name, retrying.."
+			sleep 5
+			retry=$((retry + 1))
+		done
+		if (( retry > 3 )); then
+			echo "	ERROR: failed to load $name after 3 attempts!"
+			umount "$FULL_ISO_MEDIA"
+			return 1
+		fi
+	done
+	echo "	Images loaded into local store:"
+	podman images --format '{{.Repository}}:{{.Tag}}' | grep '^localhost/' || echo "	WARNING: no localhost/ images present after load!"
+	umount "$FULL_ISO_MEDIA" && echo "	Unmounted $FULL_ISO_MEDIA." || echo "	ERROR: umount of $FULL_ISO_MEDIA failed (continuing)."
+	echo "	Offline data installed; install USB may be removed now."
+	FULL_ISO_ACTIVE=1
+
+	# From here on, the flow is the NORMAL bootstrap in order, just with
+	# every source being local.  See branch points in the functions above.
+	echo "	Extracting wavelet packages.."
+	if ! install_packages "$1"; then
+		echo "	ERROR: install_packages failed!"
+		return 1
+	fi
+	if ! chown -R wavelet:wavelet /var/home/wavelet; then
+		echo "	ERROR: chown of /var/home/wavelet failed!"
+		return 1
+	fi
+	echo "	Package extraction complete."
+
+	# Server-side only: full ISO is server-only for now (hostname prefix
+	# svr*).  generate_files was already run before the branch (Main).
+	# Registry: local-only; pull_registry_images() branches on FULL_ISO_ACTIVE
+	# to push the media-loaded localhost images instead of pulling remotely.
+	if ! check_registry; then
+		echo "	ERROR: check_registry failed!"
+		return 1
+	fi
+	echo "	check_registry complete (oci_registry=$oci_registry externalReg=${externalReg:-unset})."
+	if ! setup_registry_quadlet; then
+		echo "	ERROR: setup_registry_quadlet failed!"
+		return 1
+	fi
+	echo "	setup_registry_quadlet complete."
+	if ! pull_registry_images; then
+		echo "	ERROR: pull_registry_images failed!"
+		return 1
+	fi
+	echo "	pull_registry_images complete."
+	if ! pull_overlay "coreos_overlay_client${OVERLAY_SUFFIX}"; then
+		echo "	ERROR: pull_overlay of coreos_overlay_client${OVERLAY_SUFFIX} failed!"
+		return 1
+	fi
+	echo "	pull_overlay complete."
+	if podman tag "coreos_overlay_client${OVERLAY_SUFFIX}:latest" "$hostNameSys/coreos_overlay_client${OVERLAY_SUFFIX}"; then
+		echo "	Tagged overlay client image as $hostNameSys/coreos_overlay_client${OVERLAY_SUFFIX}."
+	else
+		echo "	ERROR: podman tag of coreos_overlay_client${OVERLAY_SUFFIX} failed!"
+		return 1
+	fi
+	if podman push "$hostNameSys/coreos_overlay_client${OVERLAY_SUFFIX}" "$hostNameSys:5000/coreos_overlay_client${OVERLAY_SUFFIX}"; then
+		echo "	Pushed $hostNameSys/coreos_overlay_client${OVERLAY_SUFFIX} to local registry."
+	else
+		echo "	ERROR: podman push of coreos_overlay_client${OVERLAY_SUFFIX} failed!"
+		return 1
+	fi
+	# Nameserver karg cleanup (bootc-era: rpm-ostree kargs unavailable)
+	if [[ "${USE_BOOTC:-0}" != "1" ]] && rpm-ostree kargs | grep -q 'nameserver'; then
+		echo "	Removing nameserver karg.."
+		rpm-ostree kargs --delete nameserver
+	else
+		echo "	No nameserver karg present (or bootc), skipping karg cleanup."
+	fi
+	if ! rpm_overlay_install_server; then
+		echo "	ERROR: rpm_overlay_install_server failed!"
+		return 1
+	fi
+	echo "	rpm_overlay_install_server complete."
+	if systemctl enable wavelet_install_services.service; then
+		echo "	Enabled wavelet_install_services.service."
+	else
+		echo "	ERROR: failed to enable wavelet_install_services.service!"
+		return 1
+	fi
+
+	# Tarball copy to webserver + sha512 (mirrors the tail of event_server).
+	local waveletFiles_sha512
+	if ! cp "/var/$packageTarball" "/var/home/wavelet/http/ignition/wavelet_files.tar.gz"; then
+		echo "	ERROR: failed to copy $packageTarball to webserver directory!"
+		return 1
+	fi
+	if ! cp "/usr/local/bin/wavelet_install_packages.sh" "/var/home/wavelet/http/ignition/"; then
+		echo "	ERROR: failed to copy wavelet_install_packages.sh to webserver directory!"
+		return 1
+	fi
+	waveletFiles_sha512="$(sha512sum <"/var/home/wavelet/http/ignition/wavelet_files.tar.gz" | cut -d ' ' -f 1)"
+	echo "	wavelet_files.tar.gz sha512: $waveletFiles_sha512"
+	if ! echo "$waveletFiles_sha512" > "/var/secrets/waveletFiles_sha512.txt"; then
+		echo "	ERROR: failed to write /var/secrets/waveletFiles_sha512.txt!"
+		return 1
+	fi
+	chown -R root:wavelet-root "/var/secrets"
+	chmod 0750 "/var/secrets"; chmod 0640 /var/secrets/*
+	if set_ethernet_mtu; then
+		echo "	set_ethernet_mtu complete."
+	else
+		echo "	WARNING: set_ethernet_mtu returned non-zero."
+	fi
+	return 0
+	) 2>&1 | tee -a "$logfile"
+	local rc=${PIPESTATUS[0]}
+	if (( rc != 0 )); then
+		echo "===== full_iso_install FAILED (rc=$rc) $(date -Is) — see $logfile =====" | tee -a "$logfile"
+	else
+		echo "===== full_iso_install COMPLETE $(date -Is) — see $logfile =====" | tee -a "$logfile"
+	fi
+	return "$rc"
+}
+
 event_server(){
 	# generate proper RC files for root/wavelet-root which gives us aliases and powerline
 	cd "/root" || return; rm .bashrc .bash_profile; cp /etc/skel/{.bashrc,.bash_profile} .
@@ -191,6 +376,14 @@ check_registry(){
 	# Do we have an external registry or no?
 	# DEPLOYMENT_REGISTRY should be defined in the conf file
 	# DEPLOYMENT_IP may be used as a backup
+	# FULL_ISO install: media images are already podman-loaded locally by
+	# full_iso_mode(); treat as local-only build regardless of conf.
+	if [[ "${FULL_ISO_ACTIVE:-0}" == "1" ]]; then
+		echo "	FULL_ISO install: images loaded from install media, local-only registry."
+		oci_registry="svr.$DOMAIN"
+		externalReg=0
+		return 0
+	fi
 	if [[ -z "$DEPLOYMENT_IP" ]]; then
 		echo "	Registry IP not set in config file, this is a local-only deployment."
 		oci_registry="svr.$DOMAIN"
@@ -233,6 +426,24 @@ pull_registry_images() {
   # Sets vars for appropriate package sources and places them in the wavelet server's local registry
   # In my lab environment, I setup a local registry that updates and tags everything with a cronjob
   # The process saves bandwidth and having to download gbs of container images every test
+  # FULL_ISO install: images are already podman-loaded locally (full_iso_mode)
+  # as localhost/<shortname>; just push them into the local registry.
+  if [[ "${FULL_ISO_ACTIVE:-0}" == "1" ]]; then
+    echo "FULL_ISO install: pushing media-loaded images into local registry.."
+    local loaded
+    for loaded in etcd coreos-installer fedora nginx php redis httpd registry freeipa-server \
+                  coreos_overlay_client"${OVERLAY_SUFFIX}" coreos_overlay_server"${OVERLAY_SUFFIX}" \
+                  tftpd tftpboot isc-kea radiusd php-fpm-redis; do
+      if podman image exists "localhost/$loaded"; then
+        echo "	Pushing localhost/$loaded -> $hostNameSys:5000/$loaded"
+        podman push "localhost/$loaded" "$hostNameSys:5000/$loaded" || \
+          echo "	ERROR: push of localhost/$loaded failed (may already exist in registry)."
+      else
+        echo "	WARNING: localhost/$loaded not in local store, skipping push."
+      fi
+    done
+    return 0
+  fi
   local max_parallel=4
   local counter=0
   local timeout=180  # 3 minute timeout for each operation
@@ -396,14 +607,20 @@ rpm_overlay_install_server(){
 	rpm-ostree status
 	echo -e "\n	Current bootc status: "
 	bootc status
+	sel_context="$(cat /proc/self/attr/current)"
+	echo "Running in SELinux context: $sel_context)"
 	# We are not using GPG signing for our ostree commits, so we still use ostree-unverified-image in the refspec
 	# Given even a deployment server here is largely ephemeral,
 	# a GPG sig is "correct" but overkill, as we aren't doing mass deployments.
 	if [[ "$externalReg" == "0" ]]; then
 		echo "	Rebasing from local containers-storage..."
 		if [[ "${USE_BOOTC:-0}" == "1" ]]; then
+			echo "	Using bootc path.."
+			setenforce 0
 			bootc switch --transport containers-storage "localhost/coreos_overlay_server${OVERLAY_SUFFIX}:latest"
+			setenforce 1
 		else
+			echo "	Using rpm-ostree path..."
 			rpm-ostree rebase "ostree-unverified-image:containers-storage:localhost/coreos_overlay_server${OVERLAY_SUFFIX}:latest"
 		fi
 	else
@@ -420,19 +637,6 @@ rpm_overlay_install_server(){
 		# (Containerfile.bootc.coreos.overlay.client, 'bootc initramfs --enable')
 		rpm-ostree initramfs enable
 	fi
-#	# ── DIAGNOSTICS: capture staged deployment state immediately after rebase ──
-#	echo "=== POST-REBASE DIAGNOSTIC: rpm-ostree status ==="
-#	rpm-ostree status --json 2>&1
-#	echo "=== POST-REBASE DIAGNOSTIC: bootc status ==="
-#	bootc status 2>&1
-#	echo "=== POST-REBASE DIAGNOSTIC: ostree admin status ==="
-#	ostree admin status 2>&1
-#	echo "=== POST-REBASE DIAGNOSTIC: staged deployment origin ==="
-#	ostree admin status --print-current-dir 2>&1 || true
-#	echo "=== POST-REBASE DIAGNOSTIC: /boot/loader/entries ==="
-#	ls -la /boot/loader/entries/ 2>&1
-#	cat /boot/loader/entries/*.conf 2>&1
-#	echo "=== END DIAGNOSTICS ==="
 }
 
 rpm_overlay_install_client(){
@@ -775,6 +979,12 @@ generate_files(){
 #####
 
 
+# Create directories for wavelet configuration
+echo "Creating additional directories.."
+mkdir -p /etc/wavelet
+mkdir -p /var/log/wavelet
+chown wavelet:wavelet /var/log/wavelet
+echo "Getting available repository data.."
 mkdir -p /var/home/wavelet/logs
 exec >/var/home/wavelet/logs/installer.log 2>&1
 systemctl disable zincati.service --now
@@ -795,6 +1005,7 @@ source "/etc/wavelet.conf"
 #REGISTRY
 #UG_BUILD_TYPE
 #USE_BOOTC
+#FULL_ISO_MODE
 # Overlay image suffix: bootc-era images are labeled distinctly so both
 # generations coexist in the registry (docs/UPDATE_TO_BOOTC.md)
 if [[ "${USE_BOOTC:-0}" == "1" ]]; then
@@ -802,6 +1013,19 @@ if [[ "${USE_BOOTC:-0}" == "1" ]]; then
 else
 	OVERLAY_SUFFIX=""
 fi
+
+# FULL ISO MODE: all provisioning data lives on the install USB's
+# "wavelet-offline" partition.
+if [[ "${FULL_ISO_MODE:-0}" == "1" ]]; then
+	echo "	FULL_ISO_MODE=1: running offline-first install path.."
+	if ! full_iso_install "$1"; then
+		echo "	FULL_ISO_MODE install failed!  See log above."
+		exit 1
+	fi
+	echo "	FULL_ISO_MODE install complete."
+	systemctl reboot
+fi
+
 # Set timezone correctly for locale
 echo "Setting timezone to appropriate locale."
 echo "Please ensure other devices (switch, AP, network video sources) are correctly set to either use NTP for the server."
@@ -812,12 +1036,6 @@ timedatectl set-timezone "$timeZone"
 echo "Processing inline file generation.."
 generate_files "$2"
 
-# Create directories for wavelet configuration
-echo "Creating additional directories.."
-mkdir -p /etc/wavelet
-mkdir -p /var/log/wavelet
-chown wavelet:wavelet /var/log/wavelet
-echo "Getting available repository data.."
 # This is the LAN deployment registry (from config file)
 registry="${DEPLOYMENT_REGISTRY:-${REGISTRY}}"
 
