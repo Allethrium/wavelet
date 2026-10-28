@@ -306,7 +306,6 @@ download_wavelet_git(){
 	commitSha=$(echo "$branchInfo" | grep -oP '"sha":\s*"\K[0-9a-f]{40}' | head -1)
 	if [[ -z "$commitSha" ]]; then
 		echo "	Error: Could not fetch commit SHA for branch $GH_BRANCH from GitHub API!"
-		exit 1
 	fi
 	echo "	Branch $GH_BRANCH commit SHA: $commitSha"
 

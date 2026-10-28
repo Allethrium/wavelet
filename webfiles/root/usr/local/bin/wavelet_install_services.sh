@@ -81,7 +81,21 @@ generate_tftpboot() {
 		echo "	ERR: TFTPboot generation failed after $max_retries attempts, aborting."
 		return 1
 	fi
-	if [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
+	# FULL_ISO: all container images were podman-loaded from the install media
+	# during first boot and pushed into the local registry.  Do not build or
+	# fetch from an external registry - just run the already-present image.
+	if [[ "${FULL_ISO_MODE:-0}" == "1" ]]; then
+		echo "	FULL_ISO: running preloaded tftpboot image from local storage.."
+		if podman run --privileged --security-opt label=disable -v /var/lib:/tmp/ "localhost/tftpboot"; then
+			echo "	TFTPboot directory generated! Continuing.."
+			return 0
+		else
+			echo "	ERR:  issue running preloaded tftpboot image.  Attempting again.."
+			(( retry_count++ ))
+			generate_tftpboot "$retry_count"
+			return $?
+		fi
+	elif [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
 		echo "	Pulling prebuilt container image from LAN registry server.."
 		if podman run --privileged --security-opt label=disable -v /var/lib:/tmp/ "$DEPLOYMENT_REGISTRY/tftpboot"; then
 			echo "	TFTPboot directory generated! Continuing.."
@@ -188,10 +202,12 @@ verify_coreos_signatures() {
 }
 
 pull_coreos_files() {
-	# Copy coreos ISO files from the server (or download from internet sources)
+	# Acquires all the container layers either pre-built or constructs them locally.
 	dir="/var/home/wavelet/setup"
 	mkdir -p "/var/home/wavelet/http/pxe"
-	if [[ -n $DEPLOYMENT_REGISTRY ]]; then
+	# Determine our installation mode
+	if [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
+		# We are running a deployment from a deployment server, and pull everything from there.
 		# Get httpd contents
 		cp "/etc/docker/certs.d/$DEPLOYMENT_IP:5000/ca.crt" "/var/home/wavelet/config/deployment_ca.crt"
 		caCertLocation="/var/home/wavelet/config/deployment_ca.crt"
@@ -255,6 +271,52 @@ pull_coreos_files() {
 			echo "  ERR: CoreOS image verification failed, clearing download state for retry."
 			kernel=""; rootfs=""; initrd=""
 		fi
+	elif [[ -n "$FULL_ISO_MODE" ]]; then
+		# FULL ISO: all provisioning data lives on the install USB "wavelet-offline" partition
+		local media="/mnt/wavelet-offline"
+		local media_dev="/dev/disk/by-label/wavelet-offline"
+		if [[ ! -e "$media_dev" ]]; then
+			echo "  ERR: FULL_ISO_MODE set but no wavelet-offline partition found!"
+			echo "  ERR: Ensure the install USB is still plugged in.  Aborting CoreOS image setup."
+			return 1
+		fi
+		mkdir -p "$media"
+		if ! mountpoint -q "$media"; then
+			if ! mount -o ro "$media_dev" "$media"; then
+				echo "  ERR: mount of $media_dev failed!"
+				return 1
+			fi
+		fi
+		# Verify the bundled CoreOS ISO(s) against their detached signatures.
+		if ! verify_coreos_signatures "$media/iso"; then
+			echo "  ERR: CoreOS ISO signature verification failed, aborting."
+			umount "$media" 2>/dev/null || true
+			return 1
+		fi
+		local iso
+		iso="$(find "$media/iso" -maxdepth 1 -name '*.iso' 2>/dev/null | sort -V | tail -n1)"
+		if [[ -z "$iso" ]]; then
+			echo "  ERR: No CoreOS live ISO found in $media/iso!"
+			umount "$media" 2>/dev/null || true
+			return 1
+		fi
+		echo "	FULL_ISO: extracting PXE files from $(basename "$iso") with coreos-installer.."
+		if ! podman run --security-opt label=disable --rm -v "$dir":/data -w /data \
+				"localhost/coreos-installer" iso extract pxe "$iso"; then
+			echo "  ERR: coreos-installer iso extract pxe failed!"
+			umount "$media" 2>/dev/null || true
+			return 1
+		fi
+		# Match the same naming the deployment-registry branch sets.
+		kernel="$(find "$dir" -maxdepth 1 -name '*live-kernel*' | head -n1)"
+		rootfs="$(find "$dir" -maxdepth 1 -name '*live-rootfs*.img' | head -n1)"
+		initrd="$(find "$dir" -maxdepth 1 -name '*live-initramfs*.img' | head -n1)"
+		# Serve the PXE files from both the tftp and http roots.
+		cp "$kernel" "$rootfs" "$initrd" /var/home/wavelet/http/pxe/
+		cp "$kernel" "$rootfs" "$initrd" /var/lib/tftpboot/
+		chown -R wavelet:wavelet /var/home/wavelet/http/pxe
+		echo "	FULL_ISO: CoreOS PXE files staged from local media."
+		umount "$media" 2>/dev/null || true
 	else
 		echo "	Attempting to pull CoreOS images from internet sources.."
 		# This can fail, hence gets it's own function with a retry
@@ -373,38 +435,6 @@ EOF
     cp /var/lib/tftpboot/grub.cfg "/var/home/wavelet/http/pxe/"
     cp /var/lib/tftpboot/EFI/fedora/{grubx64.efi,grubia32.efi,mmx64.efi,shimx64.efi,shim.efi} "/var/home/wavelet/http/pxe/"
     cp "/var/lib/tftpboot/pxelinux.cfg/default" "/var/home/wavelet/http/pxe/pxelinux.cfg/"
-}
-
-generate_bootc_image() {
-	# TODO - Develop full bootc container image now that it seems to be stabilizing 2H 2026
-	local bootc_image_name="decoder-bootc-${coreosVersion:-latest}"
-	podman build \
-		--tag "$bootc_image_name" \
-		-f /home/wavelet/containerfiles/Containerfile.bootc-decoder \
-		/home/wavelet/containerfiles/
-	# NOTE: --privileged is used here for the bootc-image-builder container to allow it to build bootable images.
-	# This is necessary for the bootc-image-builder process but should be documented as a security consideration.
-	podman run --rm -it --privileged \
-		-v "$(pwd)":/output \
-		-v /var/lib/containers/storage:/var/lib/containers/storage \
-		registry.redhat.io/rhel9/bootc-image-builder:latest \
-		--type pxe \
-		--with-plymouth \
-		--with-bootloader-entry \
-		"$bootc_image_name"
-	mkdir -p "/home/wavelet/http/pxe/bootc" "/var/lib/tftpboot/bootc"
-	cp /output/*.efi "/home/wavelet/http/pxe/bootc/"
-	cp /output/vmlinuz /output/initramfs.img "/var/lib/tftpboot/bootc/"
-    coreOSbootCEntry="menuentry 'Decoder BootC V.${coreosVersion} PXE' --class fedora --class gnu-linux {
-echo 'Loading BootC kernel...'
-linuxefi (http,$SVR_HOSTNAME:8080)/pxe/bootc/vmlinuz \
-	bootc.install.image=${REGISTRY}:5000/bootc-decoder:latest \
-	bootc.install.pxe \
-	bootc.install.pxe.kernel-args=console=tty0 \
-	ignition.firstboot ignition.platform.id=metal
-echo 'Loading BootC initramfs...'
-initrdefi (http,$SVR_HOSTNAME:8080)/pxe/bootc/initramfs.img
-}"
 }
 
 generate_wavelet_userspace_services(){
@@ -594,6 +624,7 @@ wavelet_isolation_prompt(){
     esac
 }
 
+
 #####
 #
 # Main
@@ -605,10 +636,9 @@ exec >"/var/home/wavelet/logs/services.log" 2>&1
 
 # Set server hostname for network sense.  
 sed -i "s|hostnamegoeshere|\"$(hostname)\"|g" "/usr/local/bin/wavelet_network_sense.sh"
-ip="$(hostname -I | cut -d " " -f 1)"
 mkdir -p "/var/home/wavelet/setup"
 
-if vim --help; then
+if vim --help 2>/dev/null; then
 	echo "  Packages are available, Container overlay succeeded, continuing to install dependencies.."
 else
 	echo "  Required packages are not available, installation has failed!  Please see logs/installer.log to troubleshoot."
@@ -799,8 +829,7 @@ freshclam
 
 # Generate UltraGrid squashfs dir so we don't need to worry about FUSE for some uses (reflector/hd-rum-translator)
 mkdir -p "/usr/local/bin/ultragrid" && cd "/usr/local/bin/ultragrid"
-# TODO - silence this to keep the log clean unless error
-/usr/local/bin/UltraGrid.AppImage --appimage-extract
+/usr/local/bin/UltraGrid.AppImage --appimage-extract >/dev/null
 echo "	Extracted AppImage contents available in /usr/local/bin/ultragrid/squashfs-root/"
 echo "	to invoke call the AppRun binary from this location or the /var/wavelet_ramfs dir"
 

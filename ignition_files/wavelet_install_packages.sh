@@ -170,6 +170,20 @@ full_iso_install(){
 	fi
 	echo "	Package extraction complete."
 
+	# Process wavelet_keys.csv to create directories/files the tarball copy
+	# below relies on (e.g. /var/home/wavelet/http/ignition).  In the normal
+	# flow this runs in Main; full ISO returns before reaching that line.
+	if ! generate_files "$2"; then
+		echo "	ERROR: generate_files failed!"
+		return 1
+	fi
+	echo "	generate_files complete."
+
+	# Set timezone correctly for locale (mirrors Main).
+	echo "	Setting timezone to appropriate locale."
+	timeZone="${TIME_ZONE:-America/New_York}"
+	timedatectl set-timezone "$timeZone"
+
 	cd "/root" || return; rm .bashrc .bash_profile; cp /etc/skel/{.bashrc,.bash_profile} .
 	cd "/var/home/wavelet-root" || return; rm .bashrc .bash_profile; cp /etc/skel/{.bashrc,.bash_profile} .
 	hostnamectl set-hostname "$SVR_HOSTNAME" --pretty
@@ -190,12 +204,17 @@ full_iso_install(){
 		return 1
 	fi
 	echo "	pull_registry_images complete."
-	if ! pull_overlay "coreos_overlay_client${OVERLAY_SUFFIX}"; then
-		echo "	ERROR: pull_overlay of coreos_overlay_client${OVERLAY_SUFFIX} failed!"
+	# FULL_ISO: the overlay is already loaded into local storage from the
+	# install media (see loop above) and pushed to the local registry by
+	# pull_registry_images.  Skip the shared pull_overlay() network fetch
+	# (which targets svr.$DOMAIN on HTTPS:443) and verify the local image
+	# is present instead.
+	if ! podman image exists "localhost/coreos_overlay_client${OVERLAY_SUFFIX}:latest"; then
+		echo "	ERROR: coreos_overlay_client${OVERLAY_SUFFIX} not found in local storage!"
 		return 1
 	fi
-	echo "	pull_overlay complete."
-	if podman tag "coreos_overlay_client${OVERLAY_SUFFIX}:latest" "$hostNameSys/coreos_overlay_client${OVERLAY_SUFFIX}"; then
+	echo "	Overlay image present in local storage."
+	if podman tag "localhost/coreos_overlay_client${OVERLAY_SUFFIX}:latest" "$hostNameSys/coreos_overlay_client${OVERLAY_SUFFIX}"; then
 		echo "	Tagged overlay client image as $hostNameSys/coreos_overlay_client${OVERLAY_SUFFIX}."
 	else
 		echo "	ERROR: podman tag of coreos_overlay_client${OVERLAY_SUFFIX} failed!"
@@ -269,6 +288,26 @@ full_iso_install(){
 	else
 		echo "	WARNING: set_ethernet_mtu returned non-zero."
 	fi
+	# Systemd early unit to set plymouth theme next boot (mirrors Main).
+	cat > "/etc/systemd/system/set-plymouth-theme.service" <<-EOF
+		[Unit]
+		Description=Set Plymouth Boot Theme
+		Before=plymouth-start.service
+		DefaultDependencies=no
+		Conflicts=shutdown.target
+		After=local-fs.target
+
+		[Service]
+		Type=oneshot
+		ExecStart=-/usr/bin/plymouth-set-default-theme -R tribar
+		RemainAfterExit=yes
+		ExecStartPost=/bin/systemctl disable set-plymouth-theme.service
+
+		[Install]
+		WantedBy=sysinit.target
+	EOF
+	systemctl daemon-reload
+	systemctl enable set-plymouth-theme.service
 	return 0
 	) 2>&1 | tee -a "$logfile"
 	local rc=${PIPESTATUS[0]}
@@ -991,6 +1030,7 @@ generate_files(){
 		# Set ownership (skip if empty or root)
 		[[ "$owner" != "" && "$owner" != "root" ]] && chown "$owner:$group" "$path" 2>/dev/null
 	done < "$1"
+	return 0
 }
 
 
@@ -1040,7 +1080,7 @@ fi
 # "wavelet-offline" partition.
 if [[ "${FULL_ISO_MODE:-0}" == "1" ]]; then
 	echo "	FULL_ISO_MODE=1: running offline-first install path.."
-	if ! full_iso_install "$1"; then
+	if ! full_iso_install "$1" "$2"; then
 		echo "	FULL_ISO_MODE install failed!  See log above."
 		exit 1
 	fi
