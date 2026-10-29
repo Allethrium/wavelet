@@ -168,6 +168,7 @@ save_registry_images(){
     for name in "${built_images[@]}"; do
         if podman image exists "localhost/$name"; then
             echo "	  -> localhost/$name  =>  $name.oci.tar"
+            # oci-archive keeps the gzip-compressed layer blobs small for the USB.
             podman save --format oci-archive -o "$dest/$name.oci.tar" "localhost/$name" || failed=1
         else
             echo -e "${RED}	Image localhost/$name not present (run build_registry.sh first).${NC}"
