@@ -88,13 +88,28 @@ generate_full_ignition(){
 }
 
 save_iso_images(){
-	# Saves the coreos installer images to the installer drive
+	# Save the newest coreos installer image set (.iso/.img + .sig) to the installer drive.
 	mkdir -p "$ISO_ROOT/offline/iso"
 	curl -fsSL https://fedoraproject.org/fedora.gpg | gpg --import
-	 for file in ~/.config/var/www/fedora-coreos-*; do
+	local newest_ver=""
+	# Determine the newest base version across cached coreos images.
+	for file in ~/.config/var/www/fedora-coreos-*; do
 		[[ -f "$file" ]] || continue
-			case "$file" in
-				*.img|*.iso)
+		[[ "$file" == *.sig ]] && continue
+		local ver
+		ver="$(basename "$file" | sed -n 's/^fedora-coreos-\([0-9.]*\)\..*/\1/p')"
+		[[ -n "$ver" ]] || continue
+		# version-sort comparison keeps only the highest cached version.
+		if [[ -z "$newest_ver" ]] || [[ "$(printf '%s\n%s\n' "$ver" "$newest_ver" | sort -V | tail -n1)" == "$ver" ]]; then
+			newest_ver="$ver"
+		fi
+	done
+	[[ -n "$newest_ver" ]] || { echo -e "${RED}	No cached fedora-coreos image found in ~/.config/var/www.${NC}"; return 1; }
+	echo "	Copying newest cached CoreOS image set (version $newest_ver).."
+	for file in ~/.config/var/www/fedora-coreos-${newest_ver}.*; do
+		[[ -f "$file" ]] || continue
+		case "$file" in
+			*.img|*.iso)
 				 if [[ ! -f "${file}.sig" ]]; then
 					echo "	ERROR: no .sig file provided with this img, cannot verify file integrity!"
 					exit 1
@@ -106,7 +121,7 @@ save_iso_images(){
 				# copy to ISO
 				cp "$file" "$ISO_ROOT/offline/iso"; cp "${file}.sig" "$ISO_ROOT/offline/iso"
 				;;
-			esac
+		esac
 	done
 }
 

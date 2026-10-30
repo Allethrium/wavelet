@@ -57,7 +57,7 @@ etcd_create_roles(){
 	# Certificates should already be generated from wavelet_install_hardening
 	sed -i "s|svrIP|$SVR_IP|g" "/etc/etcd.yaml.conf"
 	sed -i "s|svrHostName|$SVR_HOSTNAME|g" "/etc/etcd.yaml.conf"
-	mv "/etc/etcd.yaml.conf" "/etc/etcd/etcd.conf"
+	mkdir -p /etc/etcd; mv "/etc/etcd.yaml.conf" "/etc/etcd/etcd.conf"
 	echo "	Waiting for etcd service to spin up.."
 	until systemctl start etcd-quadlet.service; do
 		sleep .1
@@ -206,7 +206,53 @@ pull_coreos_files() {
 	dir="/var/home/wavelet/setup"
 	mkdir -p "/var/home/wavelet/http/pxe"
 	# Determine our installation mode
-	if [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
+	if [[ -n "$FULL_ISO_MODE" ]]; then
+		# All provisioning data lives on the install USB "wavelet-offline" partition
+		local media="/mnt/wavelet-offline"
+		local media_dev="/dev/disk/by-label/wavelet-offline"
+		if [[ ! -e "$media_dev" ]]; then
+			echo "  ERR: FULL_ISO_MODE set but no wavelet-offline partition found!"
+			echo "  ERR: Ensure the install USB is still plugged in.  Aborting CoreOS image setup."
+			return 1
+		fi
+		mkdir -p "$media"
+		if ! mountpoint -q "$media"; then
+			if ! mount -o ro "$media_dev" "$media"; then
+				echo "  ERR: mount of $media_dev failed!"
+				return 1
+			fi
+		fi
+		# Verify the bundled CoreOS ISO(s) against their detached signatures.
+		if ! verify_coreos_signatures "$media/iso"; then
+			echo "  ERR: CoreOS ISO signature verification failed, aborting."
+			umount "$media" 2>/dev/null || true
+			return 1
+		fi
+		local iso
+		iso="$(find "$media/iso" -maxdepth 1 -name '*.iso' 2>/dev/null | sort -V | tail -n1)"
+		if [[ -z "$iso" ]]; then
+			echo "  ERR: No CoreOS live ISO found in $media/iso!"
+			umount "$media" 2>/dev/null || true
+			return 1
+		fi
+		echo "	FULL_ISO: extracting PXE files from $(basename "$iso") with coreos-installer.."
+		if ! podman run --security-opt label=disable --rm -v "$dir":/data -w /data \
+				"localhost/coreos-installer" iso extract pxe "$iso"; then
+			echo "  ERR: coreos-installer iso extract pxe failed!"
+			umount "$media" 2>/dev/null || true
+			return 1
+		fi
+		# Match the same naming the deployment-registry branch sets.
+		kernel="$(find "$dir" -maxdepth 1 -name '*live-kernel*' | head -n1)"
+		rootfs="$(find "$dir" -maxdepth 1 -name '*live-rootfs*.img' | head -n1)"
+		initrd="$(find "$dir" -maxdepth 1 -name '*live-initramfs*.img' | head -n1)"
+		# Serve the PXE files from both the tftp and http roots.
+		cp "$kernel" "$rootfs" "$initrd" /var/home/wavelet/http/pxe/
+		cp "$kernel" "$rootfs" "$initrd" /var/lib/tftpboot/
+		chown -R wavelet:wavelet /var/home/wavelet/http/pxe
+		echo "	FULL_ISO: CoreOS PXE files staged from local media."
+		umount "$media" 2>/dev/null || true
+	elif [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
 		# We are running a deployment from a deployment server, and pull everything from there.
 		# Get httpd contents
 		cp "/etc/docker/certs.d/$DEPLOYMENT_IP:5000/ca.crt" "/var/home/wavelet/config/deployment_ca.crt"
@@ -271,52 +317,6 @@ pull_coreos_files() {
 			echo "  ERR: CoreOS image verification failed, clearing download state for retry."
 			kernel=""; rootfs=""; initrd=""
 		fi
-	elif [[ -n "$FULL_ISO_MODE" ]]; then
-		# FULL ISO: all provisioning data lives on the install USB "wavelet-offline" partition
-		local media="/mnt/wavelet-offline"
-		local media_dev="/dev/disk/by-label/wavelet-offline"
-		if [[ ! -e "$media_dev" ]]; then
-			echo "  ERR: FULL_ISO_MODE set but no wavelet-offline partition found!"
-			echo "  ERR: Ensure the install USB is still plugged in.  Aborting CoreOS image setup."
-			return 1
-		fi
-		mkdir -p "$media"
-		if ! mountpoint -q "$media"; then
-			if ! mount -o ro "$media_dev" "$media"; then
-				echo "  ERR: mount of $media_dev failed!"
-				return 1
-			fi
-		fi
-		# Verify the bundled CoreOS ISO(s) against their detached signatures.
-		if ! verify_coreos_signatures "$media/iso"; then
-			echo "  ERR: CoreOS ISO signature verification failed, aborting."
-			umount "$media" 2>/dev/null || true
-			return 1
-		fi
-		local iso
-		iso="$(find "$media/iso" -maxdepth 1 -name '*.iso' 2>/dev/null | sort -V | tail -n1)"
-		if [[ -z "$iso" ]]; then
-			echo "  ERR: No CoreOS live ISO found in $media/iso!"
-			umount "$media" 2>/dev/null || true
-			return 1
-		fi
-		echo "	FULL_ISO: extracting PXE files from $(basename "$iso") with coreos-installer.."
-		if ! podman run --security-opt label=disable --rm -v "$dir":/data -w /data \
-				"localhost/coreos-installer" iso extract pxe "$iso"; then
-			echo "  ERR: coreos-installer iso extract pxe failed!"
-			umount "$media" 2>/dev/null || true
-			return 1
-		fi
-		# Match the same naming the deployment-registry branch sets.
-		kernel="$(find "$dir" -maxdepth 1 -name '*live-kernel*' | head -n1)"
-		rootfs="$(find "$dir" -maxdepth 1 -name '*live-rootfs*.img' | head -n1)"
-		initrd="$(find "$dir" -maxdepth 1 -name '*live-initramfs*.img' | head -n1)"
-		# Serve the PXE files from both the tftp and http roots.
-		cp "$kernel" "$rootfs" "$initrd" /var/home/wavelet/http/pxe/
-		cp "$kernel" "$rootfs" "$initrd" /var/lib/tftpboot/
-		chown -R wavelet:wavelet /var/home/wavelet/http/pxe
-		echo "	FULL_ISO: CoreOS PXE files staged from local media."
-		umount "$media" 2>/dev/null || true
 	else
 		echo "	Attempting to pull CoreOS images from internet sources.."
 		# This can fail, hence gets it's own function with a retry
@@ -638,7 +638,7 @@ exec >"/var/home/wavelet/logs/services.log" 2>&1
 sed -i "s|hostnamegoeshere|\"$(hostname)\"|g" "/usr/local/bin/wavelet_network_sense.sh"
 mkdir -p "/var/home/wavelet/setup"
 
-if vim --help 2>/dev/null; then
+if vim --help >/dev/null 2>&1; then
 	echo "  Packages are available, Container overlay succeeded, continuing to install dependencies.."
 else
 	echo "  Required packages are not available, installation has failed!  Please see logs/installer.log to troubleshoot."
@@ -662,6 +662,7 @@ systemctl enable haveged --now
 
 # Wavelet modules are now preprovisioned on both the server and clients, and processed in the installer script
 # So we don't need to handle them here.
+# This function is largely inactive now, since the appImage provides its own libraries on pinned versions.
 install_ug_depends
 
 echo "	Setting wavelet homedir permissions.."
@@ -701,7 +702,7 @@ PXE_SUCCESS=0
 	# We don't need tftp files to be executable, maybe not even writable..
 	find "/var/lib/tftpboot" -type f -print0 | xargs -0 chmod 644
 	# Restore SElinux contexts or we will get an AVC denial when DHCP attempts to serve tftp requests
-	restorecon -Rv "/var/lib/tftpboot"
+	restorecon -Rv "/var/lib/tftpboot" >/dev/null 2>&1
 	# Copy EFI files to http pxe
 	if ! cp -R /var/lib/tftpboot/* "/var/home/wavelet/http/pxe"; then
 		echo "	ERR: Copying EFI files to http pxe failed, aborting PXE infrastructure setup."
