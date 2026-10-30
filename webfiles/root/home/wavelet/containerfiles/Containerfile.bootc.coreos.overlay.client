@@ -80,7 +80,7 @@ RUN curl -fL --retry 5 --retry-delay 3 \
         -o /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz \
         https://storage.googleapis.com/etcd/${ETCD_VER}/etcd-${ETCD_VER}-linux-amd64.tar.gz && \
     tar xzf /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz -C /tmp --strip-components=1 --no-same-owner && \
-    mv /tmp/etcd /tmp/etcdctl /tmp/etcdutl /usr/local/bin/ && \
+    install -m 0755 /tmp/etcd /tmp/etcdctl /tmp/etcdutl /usr/bin/ && \
     rm -f /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz
 
 # TODO(bootc): AJA / DeckLink capture card support.

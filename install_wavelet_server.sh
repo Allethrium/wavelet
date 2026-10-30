@@ -183,6 +183,7 @@ cat > ./ignition_files/wavelet_keys.csv <<-EOF
 	dir,/var/home/wavelet-root/.ssh/secrets,0700,,wavelet-root,wavelet-root,
 	dir,/var/roothome/logs,0700,,wavelet-root,wavelet-root,
 	dir,/var/lib/tftpboot,0755,,root,root,
+	dir,/etc/etcd,0700,,root,root,
 	dir,/etc/systemd/resolved.conf.d,0755,,root,root,
 	dir,/etc/ssh/ssh_config.d,0755,,root,root,
 	dir,/usr/local/backgrounds/sway,0755,,root,root,
