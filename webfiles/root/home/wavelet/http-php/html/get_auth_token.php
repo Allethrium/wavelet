@@ -110,9 +110,9 @@ function get_prefix_range_end($prefix): string
 
 function etcd_healthCheck(): bool{
 	// Health check
-	$HOST_NAME = "svr.wavelet.allethrium";
 	$ch = setCurl();
-	curl_setopt($ch, CURLOPT_URL, 'https://' . ($HOST_NAME) . ':2379/health');
+	curl_setopt($ch, CURLOPT_URL, 'https://' . (HOST_NAME) . ':2379/health');
+	curl_exec($ch);
 	$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 	if ($httpCode !== 200) {
 		return false;
