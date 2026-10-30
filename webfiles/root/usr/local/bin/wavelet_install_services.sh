@@ -236,8 +236,11 @@ pull_coreos_files() {
 			return 1
 		fi
 		echo "	FULL_ISO: extracting PXE files from $(basename "$iso") with coreos-installer.."
-		if ! podman run --security-opt label=disable --rm -v "$dir":/data -w /data \
-				"localhost/coreos-installer" iso extract pxe "$iso"; then
+		local iso_in_media="${iso#"$media"}"
+		if ! podman run --security-opt label=disable --rm \
+				-v "$dir":/data -w /data \
+				-v "$media":/media:ro \
+				"localhost/coreos-installer" iso extract pxe "/media$iso_in_media"; then
 			echo "  ERR: coreos-installer iso extract pxe failed!"
 			umount "$media" 2>/dev/null || true
 			return 1

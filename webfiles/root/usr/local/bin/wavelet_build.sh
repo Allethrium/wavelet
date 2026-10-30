@@ -553,7 +553,7 @@ server_bootstrap(){
 	local newVersion; local encodedConfig; local checksum; local configContent
 	currentVersion=0
 	newVersion=$((currentVersion + 1))
-	serverIPAddress="$(<"/var/home/wavelet/config/etcd_ip")"
+	serverIPAddress="$SVR_IP"
 	# Build our initial server.conf file
 	# Note this isn't created via the orchestrator like all other hosts.
 	configContent="/var/home/wavelet/config/$hostNameSys.conf"
@@ -1229,7 +1229,7 @@ event_connectNetwork() {
      # Let NetworkManager decide which connection to use (WiFi preferred by priority)
      local ipValue=""
      for i in {1..30}; do
-         ipValue="$(nmcli -g IP4.ADDRESS con show --active | head -n1 | cut -d'/' -f1)"
+         ipValue="$(nmcli -g IP4.ADDRESS device show | sed '/^$/d' | head -n1 | cut -d'/' -f1)"
          [[ -n "$ipValue" ]] && break
          sleep 1
      done

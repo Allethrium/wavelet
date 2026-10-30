@@ -41,6 +41,9 @@ function get_etcd_authtoken($username, $password) {
 	curl_setopt($ch, CURLOPT_POSTFIELDS, $post_data);
 	$response = curl_exec($ch);
 	$responseArray = json_decode($response, true);
+	if (!is_array($responseArray) || !isset($responseArray['token'])) {
+		return false;
+	}
 	return $responseArray['token'];
 }
 

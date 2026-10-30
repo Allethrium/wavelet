@@ -204,8 +204,7 @@ if ($redisClient->ping()) {
 
 $redisClient->select($redisDb);
 // Ensure the stream exists
-// Old: $redisClient->xAdd($redisStream, '*', ['data' => '[]'], ['MAXLEN', '~', 0]);
-$redisClient->xAdd($redisStream, '*', ['data' => '[]'], 0, true);
+$redisClient->xAdd($redisStream, '*', ['data' => '[]']);
 error_log("ETCD_WATCH: Stream '$redisStream' ready");
 // Get etcd auth token
 $token = get_etcd_auth_token();
