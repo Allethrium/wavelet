@@ -26,7 +26,6 @@ else
 fi
 
 # Source settings
-# TODO - reduce etcd calls based on data that are available from wavelet.conf now.
 source "/etc/wavelet.conf"
 
 #Etcd Interaction global variables
@@ -127,7 +126,7 @@ generate_etcd_core_users(){
 	PassWord="$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')"
 	encrypt_credential "wavelet-root" "root" "${PassWord}" "etcd"
 	# TODO - disable in prod deployment
-	echo "	Root credential generated: root:$PassWord" >> "/var/home/$user/logs/testCreds.log"
+	echo "	Root credential generated: root:$PassWord" >> "/var/roothome/logs/testCreds.log"
 	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" user add root --new-user-password "${PassWord}"
 	etcdctl --endpoints="${ETCDENDPOINT}" --cacert="${certificateAuthorityFile}" user grant-role root root
 	# Server
@@ -215,6 +214,9 @@ test_coreUserContexts(){
 		    echo "  Failed to execute etcd command for $context" >&2
 		    return 1
 	    fi
+	    # TODO - in production deployment we disable this.
+	    # Test successful, ensure we output to /var/roothome/logs
+	    echo -e "		User:	$etcdUser\n		Password:$etcd_password" >> "/var/roothome/logs/testCreds.log"
 	    # Clean up: Remove the memory file after testing
 	    echo " Removing test key.."
 	    ETCDCTL_USER="$etcdUser" ETCDCTL_PASSWORD="$etcd_password" etcdctl --endpoints="$ETCDENDPOINT" --cacert="$certificateAuthorityFile" del "$etcdpath"
@@ -428,8 +430,6 @@ generate_etcd_host_role() {
 		etcdctl user grant-role "$clientHostNameShort" "$clientHostNameShort"
 		clientArg="$clientHostNameShort:$result"
 		if etcdctl put "/HOSTS/$clientHostName/test" -- "test"; then
-			echo "	Etcd put with generated credentials:  $clientArg success!" >> "/var/home/wavelet-root/logs/etcdlog.log"
-			# TODO - disable when deploying to prod
 			echo "	Credential generated: $clientArg" >> "/var/home/$user/logs/testCreds.log"
 		else
 			echo "	Etcd failure!  Please check logs."
@@ -540,7 +540,6 @@ client_provision_get_data() {
 	while : ; do
 		attempts=$((attempts+1))
 		# --print-value-only + get returns empty (no error) when the key is not present yet.
-		# TODO - this is NOT working in-script.
 		cryptB64="$(etcdctl --user PROV:$provPW get "$provPrefix/CRYPT" --print-value-only 2>/dev/null)"
 		factor2="$(etcdctl --user PROV:$provPW get "$provPrefix/FACTOR2" --print-value-only 2>/dev/null)"
 		if [[ -n "$cryptB64" && -n "$factor2" ]]; then

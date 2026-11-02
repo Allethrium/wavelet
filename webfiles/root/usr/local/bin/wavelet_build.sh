@@ -469,6 +469,7 @@ nginx_quadlets(){
 		[Pod]
 		PublishPort=9080:80
 		PublishPort=443:443
+		AddHost=%H:169.254.1.2
 		Volume=/var/home/wavelet/config/certs/httpd.crt:/etc/pki/tls/certs/httpd.crt:z
 		Volume=/var/home/wavelet/config/certs/httpd.key:/etc/pki/tls/private/httpd.key:z
 		Volume=/var/home/wavelet/config/php/php-fpm.d/www.conf:/usr/local/etc/php-fpm.d/www.conf:z

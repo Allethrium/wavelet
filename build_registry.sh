@@ -46,8 +46,7 @@ export_container_image(){
 pull_from_registry(){
     # When we skip a build because the image already exists in the LAN
     # registry, ensure it also exists in the LOCAL podman store (tagged as
-    # localhost/<name>) - build_full_iso.sh saves local images with
-    # 'podman save localhost/<name>'.
+    # localhost/<name>)
     local imageTarget="$1"
     local registry_addr
     registry_addr="${REGISTRY_ADDR:-$(hostname -f)}"
