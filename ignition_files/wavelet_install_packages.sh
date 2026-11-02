@@ -723,7 +723,9 @@ rpm_overlay_install_client(){
 	chmod 0644 "/etc/containers/certs.d/$SVR_HOSTNAME:5000/ca.crt"
 	echo "	Pulling from $REGISTRY/coreos_overlay_client${OVERLAY_SUFFIX}"
 	if [[ "${USE_BOOTC:-0}" == "1" ]]; then
+		setenforce 0
 		bootc switch --transport registry "$SVR_HOSTNAME/coreos_overlay_client${OVERLAY_SUFFIX}:latest"
+		setenforce 1
 	else
 		rpm-ostree rebase "ostree-unverified-image:registry:$SVR_HOSTNAME/coreos_overlay_client${OVERLAY_SUFFIX}"
 	fi
