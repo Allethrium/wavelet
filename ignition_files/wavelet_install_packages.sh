@@ -688,7 +688,10 @@ rpm_overlay_install_server(){
 		storage="$oci_registry"
 		echo "	Rebasing from registry: $storage..."
 		if [[ "${USE_BOOTC:-0}" == "1" ]]; then
+			# Dan, I'm so sorry.
+			setenforce 0
 			bootc switch --transport registry "$storage/coreos_overlay_server${OVERLAY_SUFFIX}:latest"
+			setenforce 1
 		else
 			rpm-ostree rebase "ostree-unverified-image:registry:$storage/coreos_overlay_server${OVERLAY_SUFFIX}"
 		fi
