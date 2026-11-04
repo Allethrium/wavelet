@@ -48,7 +48,7 @@ cleanup_secure_storage() {
   # Memory-mapped secure storage for runtime credentials
   RUNTIME_CREDS_DIR="/run/user/$(id -u)/wavelet"
   # SHARED_MEMORY_DIR is now set by init_secure_storage via mktemp -d
-  if [[ -n "${SHARED_MEMORY_DIR}" && -d "${SHARED_MEMORY_DIR}" ]]; then
+  if [[ -n "${SHARED_MEMORY_DIR:-}" && -d "${SHARED_MEMORY_DIR:-}" ]]; then
     find "${SHARED_MEMORY_DIR}" -type f -exec shred -vfz -n 3 {} \; 2>/dev/null
     rm -rf "${SHARED_MEMORY_DIR}"
   fi

@@ -903,5 +903,10 @@ usermod -a -G video wavelet
 
 # Modify the Firefox policies.json
 sed -i "s|https://localhost|https://$SVR_HOSTNAME|g" "/etc/firefox/policies/policies.json"
+
+# Remove the wavelet_installer.service arg from getty
+# Note we do not daemon-reload here as we care about it getting picked up next boot for the first operational bootcycle.
+sed -i '/^After=wavelet_installer.service$/d' /etc/systemd/system/getty@tty1.service.d/autologin-core.conf
+
 # Restart getty@tty1 to reload UI and start userland build process, which will run under the WAVELET user
 systemctl restart getty@tty1
