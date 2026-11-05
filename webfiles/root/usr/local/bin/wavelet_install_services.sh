@@ -904,9 +904,14 @@ usermod -a -G video wavelet
 # Modify the Firefox policies.json
 sed -i "s|https://localhost|https://$SVR_HOSTNAME|g" "/etc/firefox/policies/policies.json"
 
-# Remove the wavelet_installer.service arg from getty
-# Note we do not daemon-reload here as we care about it getting picked up next boot for the first operational bootcycle.
-sed -i '/^After=wavelet_installer.service$/d' /etc/systemd/system/getty@tty1.service.d/autologin-core.conf
+# Remove the wavelet_installer.service arg from the kmscon autologin dropin.
+# FCOS45 moves the default terminal from getty/VT to kmscon, so the dropin lives under kmsconvt@tty1.service.d.
 
-# Restart getty@tty1 to reload UI and start userland build process, which will run under the WAVELET user
-systemctl restart getty@tty1
+# Note we do not daemon-reload here as we care about it getting picked up next boot for the first operational bootcycle.
+sed -i '/^Description=Wait for wavelet packages to install before starting autologin/Description=Login to account automatically/g' /etc/systemd/system/kmsconvt@tty1.service.d/autologin-core.conf
+sed -i '/^After=wavelet_installer.service$/d' /etc/systemd/system/kmsconvt@tty1.service.d/autologin-core.conf
+# enable for next boot
+systemctl enable kmsconvt@tty1.service
+
+# Restart kmsconvt@tty1 to reload UI and start userland build process, which will run under the WAVELET user
+systemctl restart kmsconvt@tty1

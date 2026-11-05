@@ -163,7 +163,12 @@ systemd:
     - name: NetworkManager-wait-online.service
       mask: true
     # Autologin dropin service
-    - name: getty@tty1.service
+    # FCOS45 moved the default VT console from getty/fbcon to kmscon.
+    # The default VT is now owned by kmsconvt@tty1.service (not getty@tty1.service).
+    # As per CoreOS's own autologin generator, we override ExecStart to run
+    # agetty --autologin directly (the stock kmscon unit conflicts with getty
+    # and falls back to it on failure).
+    - name: kmsconvt@tty1.service
       dropins:
         - name: autologin-core.conf
           contents: |
