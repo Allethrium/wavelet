@@ -530,4 +530,5 @@ usermod -a -G render wavelet-present; usermod -a -G video wavelet-present
 # Ensure we disable this service so that it does not execute again on next reboot
 systemctl disable wavelet_install_client.service
 rm -rf /etc/systemd/system/wavelet_install_client.service
-systemctl restart getty@tty1
+# Manually restart console to launch userspace build process
+systemctl restart kmsconvt@tty1
