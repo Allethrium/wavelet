@@ -4,6 +4,8 @@
 # https://dustymabe.com/2020/04/04/automating-a-custom-install-of-fedora-coreos/
 # It attempts to detect common block devices and configure the initial automation live installer for that device.
 
+# 11/2026 Update - we now handle the ignition customization pass here
+
 main() {
     # We tell the SECOND boot after installation is completed to utilize the client device ignition file.
     ignition_file="/home/decoder.ign"
@@ -70,6 +72,15 @@ set_efi_bootnext(){
     fi
     return 0
 }
+
+mount_conf_partition(){
+	# Mounts the configuration partition on the boot media
+	echo "Mounting boot partition, and searching for configuration file.."
+	source  "/mnt/conf/wavelet.conf"
+
+}
+
+
 
 
 ####
