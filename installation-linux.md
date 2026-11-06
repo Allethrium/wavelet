@@ -132,10 +132,12 @@ Find your machine's IP address if you don't know it:
 hostname -I
 ```
 
-Then run the registry build (replace `192.168.1.252` with *your* deployment machine's IP):
+Then run the registry build 
+Note the third argument specifying the coreos stream to utilize.  This is useful for targeting Fedora's 6 month rolling release cycle.
+(replace `192.168.1.252` with *your* deployment machine's IP):
 
 ```bash
-./build_registry.sh $(pwd) 192.168.1.252
+./build_registry.sh $(pwd) 192.168.1.252 stable
 ```
 
 Wait for it to finish. If you skip this step, the installer will download everything directly — this still works, it's just slower and will repeat each time you deploy a new Wavelet server.
@@ -144,8 +146,13 @@ Wait for it to finish. If you skip this step, the installer will download everyt
 
 ## 8. Run the installer
 
+### 8.a network installation:
 ```bash
 ./install_wavelet_server.sh -c=mywavelet.conf
+```
+### 8.b full ISO generation:
+```bash
+./build_full_iso.sh "$(pwd)"
 ```
 
 The installer will now:
@@ -247,3 +254,9 @@ Common options:
 - If you need internet access for livestreaming, or remote management, you must segment the network yourself. Wavelet does not handle this for you.
 
 We accept no liability for any consequences of ignoring these warnings.
+
+---
+
+## Common installation issues:
+
+- if your device firmware is very out of date, there may be UEFI bootloader signature issues.  This will show up in wavelet's installation as a bootloader-update.service failure after the first boot.  Ensure devices are updated with fwupdmgr from a linux live USB environment, or with an appropriate tool for another operating system prior to attempting Wavelet setup.

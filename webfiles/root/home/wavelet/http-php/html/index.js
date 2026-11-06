@@ -1001,11 +1001,17 @@ function fetchData() {
 			window.root.globals.lowInformationMode = lowInfoModeBoolean;
 			result.push(globalData);
 			const codecs = [];
-			for (const [name, command] of Object.entries(data.globals['CODECS'])) {
-				codecs.push({
-					name: name,
-					command: command
-				});
+			// add guard against an empty codecs list - this means system installation has gone wrong,
+			// so maybe the failure ought to be louder.
+			if (data.globals['CODECS'] && typeof data.globals['CODECS'] === 'object') {
+				for (const [name, command] of Object.entries(data.globals['CODECS'])) {
+					codecs.push({
+						name: name,
+						command: command
+					});
+				}
+			} else {
+				console.warn('get_keys.php returned no CODECS — codec dropdowns will be empty.');
 			}
 			window.root.codecs = codecs;
 		}

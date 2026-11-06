@@ -1,0 +1,44 @@
+# This file supplies an automated installer which will install CoreOS
+# for initial server bootstrap.
+# NOTE - it will overwrite any existing hard drives, and won't ask permission!
+# ignition:
+# version: 3.5.0
+---
+variant: fcos
+version: 1.7.0
+storage:
+  # The installer script is all that is required here
+  files:
+    - path: /usr/local/bin/automated_coreos_deployment.sh
+      mode: 0755
+      contents:
+        local: automated_coreos_deployment.sh
+# Configure SYSTEM systemd units
+systemd:
+  units:
+    - name: automated_coreos_deployment.service
+      enabled: true
+      contents: |
+        [Unit]
+        Before=systemd-user-sessions.service
+        OnFailure=rescue.target
+        OnFailureJobMode=replace-irreversibly
+        
+        [Service]
+        RemainAfterExit=yes
+        Type=oneshot
+        ExecStart=/usr/local/bin/automated_coreos_deployment.sh "server"
+        StandardOutput=journal+console
+        StandardError=journal+console
+        
+        [Install]
+        WantedBy=multi-user.target
+# Add a login-able user
+passwd:
+  users:
+    - name: core
+      password_hash: "$6$HCjAEqz60vPQMPf3$HlDrWd7ww6S504c8MGP3srC6e5DDjCV6u2VWYJQocZklNfi3q8LhExS8.kD8JO9kRe28eJmBZO2W3pMmb0r9z."
+      groups:
+        - sudo
+        - wheel
+      shell: /bin/bash

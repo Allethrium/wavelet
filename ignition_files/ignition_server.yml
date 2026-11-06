@@ -54,16 +54,16 @@ storage:
       contents:
         local: decoder_custom.yml
     # Wavelet master zipfile, decompressed immediately upon ignition systemd units starting
-    - path: /var/master.tar.gz
+    - path: /var/wavelet_files.tar.gz
       mode: 0644
       contents:
         source: https://github.com/Allethrium/wavelet/archive/refs/heads/master.tar.gz
     # Client automated installer ignition
-    - path: /home/wavelet/config/automated_installer.yml
+    - path: /home/wavelet/config/automated_client_installer.yml
       mode: 0644
       overwrite: true
       contents:
-        local: automated_installer.yml
+        local: automated_client_installer.yml
     # Client automated installer script
     - path: /home/wavelet/config/automated_coreos_deployment.sh
       mode: 0755
@@ -124,7 +124,7 @@ systemd:
         SELinuxContext=system_u:system_r:unconfined_service_t:s0
         ExecStartPre=-/usr/sbin/restorecon -v /usr/local/bin/wavelet_install_packages.sh
         ExecStartPre=-/usr/bin/ls -Z /usr/local/bin/wavelet_install_packages.sh /usr/bin/bootc
-        ExecStart=/usr/local/bin/wavelet_install_packages.sh "master.tar.gz" "/var/wavelet_keys.csv"
+        ExecStart=/usr/local/bin/wavelet_install_packages.sh "wavelet_files.tar.gz "/var/wavelet_keys.csv"
         ExecStartPost=-systemctl reboot
         [Install]
         WantedBy=multi-user.target
