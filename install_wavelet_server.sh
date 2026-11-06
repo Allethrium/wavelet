@@ -82,6 +82,7 @@ customization(){
 	INPUTFILES="server_custom.yml decoder_custom.yml"
 	DOMAIN_ADMIN_PASSWORD="DomainAdminPasswordGoesHere"
 	serverHostName="svr.${domain:-wavelet.allethrium}"
+	releaseVer=""
 	if [[ "$developerMode" -eq "1" ]]; then
 		# Direct ignition sed
 		echo -e "${RED}	Injecting dev branch into files..${NC}"
@@ -110,7 +111,7 @@ customization(){
         fi
 	else
 		echo -e "\n	${GREEN}Tracking UltraGrid release build.\n${NC}"
-		releaseVer="1.10.6"
+		releaseVer="1.10.8"
 	fi
 	# Set default values if none
 	svr_ip="${svr_ip:-192.168.1.32}"
@@ -143,6 +144,7 @@ DEPLOYMENT_IP=${DEPLOYMENT_IP}
 REGISTRY=${svr_ip:-192.168.1.32}
 # Additional system build state flags
 UG_BUILD_TYPE=${dev_flag:-release}
+UG_VERSION=$releaseVer
 # Bootc flag used by wavelet_install_packages.sh at first boot.
 # Must match the install-media FCOS stream (next/F45 = 1, stable/F44 = 0).
 USE_BOOTC=${USE_BOOTC:-0}
@@ -1016,7 +1018,7 @@ coreos_installer(){
 	embedDir="./ignition_files/"
 	ymlSource="./ignition_files/server_custom.yml"
 	outputIgn="./ignition_files/server.ign"
-	output="$(butane --pretty --files-dir "$embedDir" "$ymlSource" --output "$outputIgn")"
+	butane --pretty --files-dir "$embedDir" "$ymlSource" --output "$outputIgn"
 	echo "	Customizing ISO files with Ignition"
 	# This will only want to be switched on if we are using an isolated system, it will significantly speed up boot time;
 	if [[ "${isoMode}" = "1" ]]; then
@@ -1049,7 +1051,6 @@ coreos_installer(){
 waveletdir="$(pwd)"
 # We generally want stdout here instead of a log.
 #exec >$waveletdir/logs/server_bootstrap.log 2>&1
-secActive=0
 echo "	Input Args: "; echo "	${*}"
 timeZone=""
 
@@ -1131,6 +1132,7 @@ for i in "$@"
 				;;
 		esac
 done
+
 if [[ -z "$timeZone" ]]; then
 	timeZone="America/New_York"
 fi
@@ -1178,7 +1180,9 @@ if [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
 	if [[ -z "$DEPLOYMENT_IP" ]]; then
 		# We specified a registry, but not a deployment registry IP.  resolve ithere
 		Echo "	Determining deployment IP address from registry argument.."
+		# TODO - fix this so we get the one proper gateway route IP.
 		# make sure we get the IP address from the correct subnet if we have a server on multiple subnets
+		result="$(hostname -I)"
 		DEPLOYMENT_IP="$result"
 	fi
 	validate_ip_port "$DEPLOYMENT_IP"
