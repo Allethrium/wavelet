@@ -77,29 +77,31 @@ mount_conf_partition(){
 	# Mounts the configuration partition on the boot media
 	echo "Mounting boot partition, and searching for configuration file.."
 	source  "/mnt/conf/wavelet.conf"
-
 }
 
 test_tools(){
 	# Small function to test for necessary tools
 	# Shove this into an array
 	toolsArray=(
-		sedIsHere
-		mountIsHere
-		butaneIsHere
-		tarIsHere
-		gzIsHere
-		mkpasswdIsHere
-		sshkeygenIsHere
+		sed
+		mount
+		butane
+		tar
+		gz
+		mkpasswd
+		ssh-keygen
+		coreos-installer
 	)
-	for i in "${toolsArray[@]}"; do
-		if bash -c "$i"; then
-			echo "	Tool $i available!"
-		else
-			echo "	ERROR:  Critical tool, $i, is unavailable!"
-			exit 1
-		fi
-	done
+    for i in "$@"; doe
+        if command -v "$i" >/dev/null 2>&1; then
+            echo "	Tool $i available!"
+        else
+            echo "	ERROR:  Critical tool, $i, is unavailable!" >&2
+            exit 1
+        fi
+    done
+	echo "	Tool tests passed, continuing boot."
+	echo -e "\033[33m*****\tTOOL TESTS PASSED, CONTINUING INSTALLATION	*****\033[0m" | systemd-cat -p 5 -t automated_coreos_deployment.sh
 }
 
 
