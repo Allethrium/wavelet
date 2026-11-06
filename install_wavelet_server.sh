@@ -554,6 +554,8 @@ EOF
     echo "	Source ISO: $SRC_ISO"
     echo "	Output ISO: $OUT_ISO"
 
+	ISO_ROOT="/var/tmp/offline"; mkdir -p "$ISO_ROOT"
+	echo "	Temporary folder located at: $ISO_ROOT"
     mkdir -p "$ISO_ROOT/offline"
 
     save_iso_images
@@ -1120,9 +1122,9 @@ for i in "$@"
 				UNATTENDED_INSTALL="1"
 				echo "	Unattend flag enabled, server will not wait to setup DHCP, DNS and IdM services during bootstrap!"
 				;;
-			--full=*|--build_full_iso)
+			--full|--build_full_iso)
 				echo "	Building full offline installation!"
-				build_full_iso
+				build_full_iso_main
 				;;
 			*)
 				echo "bad input argument: $i";
