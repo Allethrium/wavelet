@@ -213,7 +213,7 @@ automatic_setup() {
 	init_users_yaml
 	# wavelet-root has sudo and handles system management tasks out of the root account (root, shell)
 	# wavelet handles userspace tasks which do not require root (shell)
-	# TODO - implement no-password low-privilege presentation account
+	# TODO - implement no-password low-privilege presentation account for final release
 	# wavelet-present is the logged-on seat that provides a video output in the production system (no shell)
 	users=("wavelet-root" "wavelet" "wavelet-present")
 	for user in "${users[@]}"; do
@@ -891,7 +891,7 @@ append_offline_partition(){
 }
 
 #
-## previous in coreos_installer.sh
+## previously in coreos_installer.sh
 #
 
 coreos_installer(){
@@ -1040,6 +1040,7 @@ coreos_installer(){
 	echo -e "\n 	Image(s) generated,\n	If this is initial setup, please write wavelet_server.iso to a suitable boot media."
 	echo "	You may then proceed to launch installation by booting from it on your target machine."
 }
+
 
 ####
 #

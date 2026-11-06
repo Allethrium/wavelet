@@ -80,6 +80,28 @@ mount_conf_partition(){
 
 }
 
+test_tools(){
+	# Small function to test for necessary tools
+	# Shove this into an array
+	toolsArray=(
+		sedIsHere
+		mountIsHere
+		butaneIsHere
+		tarIsHere
+		gzIsHere
+		mkpasswdIsHere
+		sshkeygenIsHere
+	)
+	for i in "${toolsArray[@]}"; do
+		if bash -c "$i"; then
+			echo "	Tool $i available!"
+		else
+			echo "	ERROR:  Critical tool, $i, is unavailable!"
+			exit 1
+		fi
+	done
+}
+
 
 
 
@@ -89,5 +111,5 @@ mount_conf_partition(){
 #
 ####
 
-
+test_tools
 main
