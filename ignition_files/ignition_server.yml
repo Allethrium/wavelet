@@ -59,11 +59,11 @@ storage:
       contents:
         source: https://github.com/Allethrium/wavelet/archive/refs/heads/master.tar.gz
     # Client automated installer ignition
-    - path: /home/wavelet/config/automated_installer.yml
+    - path: /home/wavelet/config/automated_client_installer.yml
       mode: 0644
       overwrite: true
       contents:
-        local: automated_installer.yml
+        local: automated_client_installer.yml
     # Client automated installer script
     - path: /home/wavelet/config/automated_coreos_deployment.sh
       mode: 0755

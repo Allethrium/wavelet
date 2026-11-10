@@ -2,10 +2,10 @@
 # then install CoreOS to the client machine hard drive with decoder.ign
 # NOTE - it will overwrite any existing hard drives, and won't ask permission!
 # ignition:
-# version: 3.0.0
+# version: 3.5.0
 ---
 variant: fcos
-version: 1.6.0
+version: 1.7.0
 ignition:
   security:
     tls:
@@ -46,7 +46,7 @@ systemd:
         [Service]
         RemainAfterExit=yes
         Type=oneshot
-        ExecStart=/usr/local/bin/automated_coreos_deployment.sh
+        ExecStart=/usr/local/bin/automated_coreos_deployment.sh "client"
         StandardOutput=kmsg+console
         StandardError=kmsg+console
         

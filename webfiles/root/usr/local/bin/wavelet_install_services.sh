@@ -358,8 +358,8 @@ generate_coreos_image() {
 	# Pull coreOS PXE
 	attempt=0
 	pull_coreos_files
-	cp /var/home/wavelet/config/automated_installer.yml ./
-	butane --pretty --files-dir ./ automated_installer.yml --output automated_installer.ign
+	cp /var/home/wavelet/config/automated_client_installer.yml ./
+	butane --pretty --files-dir ./automated_client_installer.yml --output automated_installer.ign
 	cp ./automated_installer.ign /var/home/wavelet/http/ignition/automated_installer.ign
 	cp /usr/local/bin/wavelet_install_client.sh /var/home/wavelet/http/ignition
 	# Customize for PXE boot automation
@@ -372,7 +372,7 @@ generate_coreos_image() {
 	# Copy IP CA Cert so that it is available to the decoders on spinup (this should be changed once we enable HTTPS for apache!)
 	# Generate the ignition file for the automated Live Installer, then generate the initial ignition file
 	# Files required;
-	#		automated_installer.yml (FCCT/Butane YML config for initial boot)
+	#		automated_client_installer.yml (FCCT/Butane YML config for initial boot)
 	#		automated_coreos_deployment.sh (HDD Detection script)
 	#		decoder.ign (should be pre-provisioned from initial setup script prior to installing the server)
 	# TODO - https implementation, does Grub even support this?
