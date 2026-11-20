@@ -339,7 +339,19 @@ EOF
 save_iso_images(){
 	# Save the newest coreos installer image set (.iso/.img + .sig) to the offline layer.
 	mkdir -p "$WORKDIR/offline/iso"
-	curl -fsSL https://fedoraproject.org/fedora.gpg | gpg --import
+	# Download the Fedora signing key once, stage it on the offline media so the
+	# next boot phase (no internet) can import it, then import it here too.
+	# Fail hard if the download or import is incomplete - an empty keyring would
+	# silently disable signature verification on the target.
+	local keyfile="$WORKDIR/offline/iso/fedora.gpg"
+	if ! curl -fsSL https://fedoraproject.org/fedora.gpg -o "$keyfile"; then
+		echo "	ERROR: failed to download Fedora GPG signing key to $keyfile" >&2
+		return 1
+	fi
+	if ! gpg --import "$keyfile"; then
+		echo "	ERROR: failed to import Fedora GPG signing key from $keyfile" >&2
+		return 1
+	fi
 	local newest_ver=""
 	# Determine the newest base version across cached coreos images.
 	for file in ~/.config/var/www/fedora-coreos-*; do

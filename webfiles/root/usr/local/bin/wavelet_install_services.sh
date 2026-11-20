@@ -128,6 +128,8 @@ fedora_gpg_import() {
 	# Imports Fedora GPG signing keys for CoreOS image verification.
 	# These are the official Fedora release keys used to sign Fedora CoreOS
 	# PXE images. The keyring is stored persistently for re-use.
+	# If a keyring is bundled on the install media (FULL/offline mode) it is
+	# imported from there first, so this works with no internet access.
 	local keyring_dir="/var/home/wavelet/config/gpg"
 	local keyring="$keyring_dir/fedora-coreos.gpg"
 	mkdir -p "$keyring_dir"
@@ -135,18 +137,27 @@ fedora_gpg_import() {
 	if [[ -f "$keyring" ]] && gpg --no-default-keyring --keyring="$keyring" --list-keys 2>/dev/null | grep -q '^pub'; then
 		return 0
 	fi
+	# Work in a writable tmpdir in all cases: gpg may create lock/scratch files,
+	# and the FULL-mode media key sits on a read-only (ro) mount.
+	local media_key="$1"
 	local tmpdir
 	tmpdir="$(mktemp -d)"
-	echo "	Downloading Fedora GPG signing key from fedoraproject.org..."
-	if ! curl -fsSL --retry 3 --retry-delay 5 \
-		-o "$tmpdir/fedora.gpg" \
-		"https://fedoraproject.org/fedora.gpg"; then
-		echo "  ERR: Failed to download Fedora GPG key for signature verification!"
-		rm -rf "$tmpdir"
-		return 1
+	local keyfile="$tmpdir/fedora.gpg"
+	if [[ -n "$media_key" && -f "$media_key" ]]; then
+		echo "	Using Fedora GPG signing key from install media: $media_key"
+		cp -f "$media_key" "$keyfile"
+	else
+		echo "	Downloading Fedora GPG signing key from fedoraproject.org..."
+		if ! curl -fsSL --retry 3 --retry-delay 5 \
+			-o "$keyfile" \
+			"https://fedoraproject.org/fedora.gpg"; then
+			echo "  ERR: Failed to download Fedora GPG key for signature verification!"
+			rm -rf "$tmpdir"
+			return 1
+		fi
 	fi
 	# Import into keyring format usable by gpgv
-	if ! gpg --no-default-keyring --keyring="$keyring" --import "$tmpdir/fedora.gpg" 2>/dev/null; then
+	if ! gpg --no-default-keyring --keyring="$keyring" --import "$keyfile" 2>/dev/null; then
 		echo "  ERR: Failed to import Fedora GPG key into keyring!"
 		rm -rf "$tmpdir"
 		return 1
@@ -159,10 +170,12 @@ fedora_gpg_import() {
 verify_coreos_signatures() {
 	# Verifies downloaded CoreOS PXE images against their detached .sig files
 	# using gpgv. Corrupted/mismatched files are removed so the caller can retry.
+	# $2 is optional: a Fedora GPG keyring bundled on the install media (FULL mode).
 	local verify_dir="$1"
+	local media_key="$2"
 	local keyring="/var/home/wavelet/config/gpg/fedora-coreos.gpg"
 	if [[ ! -f "$keyring" ]] || ! gpg --no-default-keyring --keyring="$keyring" --list-keys 2>/dev/null | grep -q '^pub'; then
-		if ! fedora_gpg_import; then
+		if ! fedora_gpg_import "$media_key"; then
 			echo "  ERR: Cannot verify CoreOS image signatures -- Fedora GPG key unavailable."
 			echo "  ERR: Supply chain verification disabled for this run."
 			return 0
@@ -183,7 +196,12 @@ verify_coreos_signatures() {
 			(( verified_count++ ))
 		else
 			echo "    FAIL: $(basename "$datafile") -- signature INVALID! Removing corrupted file."
-			rm -f "$datafile" "$sigfile"
+			# Only removable if the source is writable; FULL mode mounts media read-only.
+			if [[ -w "$verify_dir" ]]; then
+				rm -f "$datafile" "$sigfile"
+			else
+				echo "    WARN: $(basename "$datafile") is on read-only media, cannot remove."
+			fi
 			all_valid=1
 		fi
 	done
@@ -220,10 +238,13 @@ pull_coreos_files() {
 			if ! mount -o ro "$media_dev" "$media"; then
 				echo "  ERR: mount of $media_dev failed!"
 				return 1
+			else
+				echo "	INFO: Media USB offline partition mounted at: $media"
 			fi
 		fi
-		# Verify the bundled CoreOS ISO(s) against their detached signatures.
-		if ! verify_coreos_signatures "$media/iso"; then
+		# Verify the bundled CoreOS ISO(s) against their detached signatures,
+		# using the Fedora keyring staged on the same media (offline-safe).
+		if ! verify_coreos_signatures "$media/iso" "$media/iso/fedora.gpg"; then
 			echo "  ERR: CoreOS ISO signature verification failed, aborting."
 			umount "$media" 2>/dev/null || true
 			return 1
@@ -492,7 +513,7 @@ generate_decoder_ignition(){
 	cp "/etc/ipa/ca.crt" "/var/home/wavelet/config/"
 	cp "/etc/wavelet.conf" "/var/home/wavelet/config/"
 	# Generate the CA sha256 hash
-	caHash="$(sha256sum <"/etc/ipa/ca.crt" | tr -d \"[:space:]-\")"
+	caHash="$(sha256sum <"/etc/ipa/ca.crt" | tr -d '[:space:]-')"
 	cat > /var/home/wavelet/config/wavelet_decoder_keys.csv <<-EOF
 		type,path,mode,overwrite,owner,group,content
 		file,/etc/systemd/logind.conf.d/inhibit-suspend.conf,0644,,,[Login]\nHandleLidSwitch=ignore
@@ -642,9 +663,9 @@ sed -i "s|hostnamegoeshere|\"$(hostname)\"|g" "/usr/local/bin/wavelet_network_se
 mkdir -p "/var/home/wavelet/setup"
 
 if vim --help >/dev/null 2>&1; then
-	echo "  Packages are available, Container overlay succeeded, continuing to install dependencies.."
+	echo "	Packages are available, Container overlay succeeded, continuing to install dependencies.."
 else
-	echo "  Required packages are not available, installation has failed!  Please see logs/installer.log to troubleshoot."
+	echo "	Required packages are not available, installation has failed!  Please see logs/installer.log to troubleshoot."
 	exit 1
 fi
 
@@ -682,7 +703,6 @@ chown -R wavelet-root:wavelet-root "/var/home/wavelet-root/"
 
 # Generate TFTPBOOT folder along with appropriate entries for our populated boot options
 # We can run this in a parallel subshell as it's independent of the hardening process
-PXE_SUCCESS=0
 (
 	echo "	Generating PXE and UEFI/HTTPS Boot infrastructure in subshell.."
 	mkdir -p "/var/lib/tftpboot/pxelinux.cfg"
@@ -724,15 +744,12 @@ PXE_SUCCESS=0
 		exit 1
 	fi
 	echo "	PXE infrastructure setup completed successfully."
-	PXE_SUCCESS=1
 ) &
 PXE_SUBPID=$!
 
 HARDENING_SUBPID=0
 (
-	# Ensure the machine is on its own physical network BEFORE the domain
-	# controller, DHCP and DNS services come up (see docs/WINDOWS_DEPLOYMENT_OPTIONS.md
-	# Part 2).  Prompt is skipped when ISO_PROMPT=0 in /etc/wavelet.conf.
+	# TODO - this is critical and doesn't currently work.  why?
 	if [[ ! -f "/var/unattend.flag" ]]; then echo "	Waiting for network isolation confirmation on console (logs in: /var/roothome/logs/isolation_prompt.log).."
 		if ! wavelet_isolation_prompt; then
 			echo "	ERR: Isolation prompt failed, aborting DC provisioning."
@@ -832,7 +849,7 @@ freshclam
 # Rkhunter doesn't expect proper coreos directories so that might be more problematic here.  The propupd function would be nice, however.
 
 # Generate UltraGrid squashfs dir so we don't need to worry about FUSE for some uses (reflector/hd-rum-translator)
-mkdir -p "/usr/local/bin/ultragrid" && cd "/usr/local/bin/ultragrid"
+mkdir -p "/usr/local/bin/ultragrid" && cd "/usr/local/bin/ultragrid" || exit 1
 /usr/local/bin/UltraGrid.AppImage --appimage-extract >/dev/null
 echo "	Extracted AppImage contents available in /usr/local/bin/ultragrid/squashfs-root/"
 echo "	to invoke call the AppRun binary from this location or the /var/wavelet_ramfs dir"
