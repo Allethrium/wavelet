@@ -223,7 +223,10 @@ pull_coreos_files() {
 	# Acquires all the container layers either pre-built or constructs them locally.
 	dir="/var/home/wavelet/setup"
 	mkdir -p "/var/home/wavelet/http/pxe"
-	# Determine our installation mode
+	# The single source artifact in every mode is the CoreOS live ISO.  Each
+	# branch below obtains that one ISO from its source, then we converge on a
+	# single "iso extract pxe" step to derive the boot files.
+	local iso_path=""
 	if [[ "$DEPLOYMENT_MODE" == "FULL" ]]; then
 		# All provisioning data lives on the install USB "wavelet-offline" partition
 		local media="/mnt/wavelet-offline"
@@ -242,7 +245,7 @@ pull_coreos_files() {
 				echo "	INFO: Media USB offline partition mounted at: $media"
 			fi
 		fi
-		# Verify the bundled CoreOS ISO(s) against their detached signatures,
+		# Verify the bundled CoreOS live ISO against its detached signature,
 		# using the Fedora keyring staged on the same media (offline-safe).
 		if ! verify_coreos_signatures "$media/iso" "$media/iso/fedora.gpg"; then
 			echo "  ERR: CoreOS ISO signature verification failed, aborting."
@@ -256,101 +259,93 @@ pull_coreos_files() {
 			umount "$media" 2>/dev/null || true
 			return 1
 		fi
-		echo "	FULL_ISO: extracting PXE files from $(basename "$iso") with coreos-installer.."
-		local iso_in_media="${iso#"$media"}"
-		if ! podman run --security-opt label=disable --rm \
-				-v "$dir":/data -w /data \
-				-v "$media":/media:ro \
-				"localhost/coreos-installer" iso extract pxe "/media$iso_in_media"; then
-			echo "  ERR: coreos-installer iso extract pxe failed!"
-			umount "$media" 2>/dev/null || true
-			return 1
-		fi
-		# Match the same naming the deployment-registry branch sets.
-		kernel="$(find "$dir" -maxdepth 1 -name '*live-kernel*' | head -n1)"
-		rootfs="$(find "$dir" -maxdepth 1 -name '*live-rootfs*.img' | head -n1)"
-		initrd="$(find "$dir" -maxdepth 1 -name '*live-initramfs*.img' | head -n1)"
-		# Serve the PXE files from both the tftp and http roots.
-		cp "$kernel" "$rootfs" "$initrd" /var/home/wavelet/http/pxe/
-		cp "$kernel" "$rootfs" "$initrd" /var/lib/tftpboot/
-		chown -R wavelet:wavelet /var/home/wavelet/http/pxe
-		echo "	FULL_ISO: CoreOS PXE files staged from local media."
-		umount "$media" 2>/dev/null || true
+		echo "	FULL_ISO: using CoreOS live ISO from install media."
+		# Copy the ISO into the writable setup dir so the shared extract step can
+		# read it (the offline media is mounted read-only).
+		iso_path="$dir/$(basename "$iso")"
+		cp "$iso" "$iso_path"
 	elif [[ -n "$DEPLOYMENT_REGISTRY" ]]; then
-		# We are running a deployment from a deployment server, and pull everything from there.
-		# Get httpd contents
+		# We are running a deployment from a deployment server, build_registry.sh stages the
+		# ISO into the httpd www root, so we only ever fetch that one file.
 		cp "/etc/docker/certs.d/$DEPLOYMENT_IP:5000/ca.crt" "/var/home/wavelet/config/deployment_ca.crt"
 		caCertLocation="/var/home/wavelet/config/deployment_ca.crt"
 		HTTPD_SERVER="https://$DEPLOYMENT_IP:8443"
-		echo "	Running external httpd initialization server, pulling from LAN source: $HTTPD_SERVER"
-		result="$(curl --cacert "$caCertLocation" -s "$HTTPD_SERVER" | sed -n 's/.*href="\([^"]*\)".*/\1/p' | grep -E '\.[^/]+$')"
-		echo -e "	Result:\n$result"
-		# Generate our file candidate list
-		declare -a files=()
-		declare -a pids=()
-		kernel=""; rootfs=""; initrd=""
-		while IFS= read -r line; do
-			filename="$(basename "$line")"
-			# Include .sig files for verification
-			if [[ "$filename" == *.sig ]]; then
-				# Download .sig files as well
-				sigFile="$line"
-				echo "	Downloading signature: $HTTPD_SERVER/$sigFile"
-				rm -rf "$dir/${sigFile##*/:-}"
-				(
-					until curl -f \
-						--cacert "$caCertLocation" -s \
-						-o "$dir/$(basename "$sigFile")" \
-						--retry 3 --retry-delay 1 \
-						"$HTTPD_SERVER/$sigFile"; do
-						sleep .1;
-					done
-				) &
-				pids+=($!)
-				continue
+		echo "	Pulling CoreOS live ISO from LAN httpd server: $HTTPD_SERVER"
+		# Find the newest live-iso in the httpd root listing.
+		local iso_name
+		iso_name="$(curl --cacert "$caCertLocation" -s "$HTTPD_SERVER" | sed -n 's/.*href="\([^"]*\)".*/\1/p' | grep -E 'fedora-coreos-.*-live-iso\.x86_64\.iso$' | sort -V | tail -n1)"
+		if [[ -z "$iso_name" ]]; then
+			echo "  ERR: No CoreOS live ISO found on LAN httpd server $HTTPD_SERVER!"
+			return 1
+		fi
+		echo "	Downloading ISO: $HTTPD_SERVER/$iso_name"
+		rm -f "$dir/$iso_name"
+		if ! curl --cacert "$caCertLocation" -s -o "$dir/$iso_name" "$HTTPD_SERVER/$iso_name"; then
+			echo "  ERR: Failed to download CoreOS live ISO from LAN server!"
+			return 1
+		fi
+		# Fetch the detached signature for the ISO and verify it
+		if ! curl --cacert "$caCertLocation" -s -o "$dir/$iso_name.sig" "$HTTPD_SERVER/$iso_name.sig"; then
+			echo "  WARN: Could not fetch .sig for $iso_name from LAN server."
+		fi
+		iso_path="$dir/$iso_name"
+		# Verify the LAN-downloaded ISO against its detached signature.  Use the
+		# Fedora keyring (imported from the config dir, or fetched if absent).
+		if [[ -f "$dir/$iso_name.sig" ]]; then
+			if ! verify_coreos_signatures "$dir"; then
+				echo "  ERR: CoreOS ISO verification failed, clearing download state for retry."
+				rm -f "$iso_path" "$iso_path.sig"
+				iso_path=""
+				return 1
 			fi
-			case "$(basename "$line")" in
-                *live-rootfs*.img)	rootfs="$line"; files+=("$line");;
-                *live-kernel.x86_64)	kernel="$line"; files+=("$line");;
-                *live-initramfs*.img)	initrd="$line"; files+=("$line");;
-				*)	: ;;
-			esac
-		done <<<"$result"
-		for file in "${files[@]}"; do
-			echo "	Downloading: $HTTPD_SERVER/$file"
-			rm -rf "$dir/${file##*/:-}"
-			(
-					until curl -f \
-					--cacert "$caCertLocation" -s \
-					-o "$dir/$(basename "$file")" \
-					--retry 3 --retry-delay 1 \
-					"$HTTPD_SERVER/$file"; do
-					sleep .1;
-				done
-				cp "$dir/${file##*/}" "/var/home/wavelet/http/pxe/" &
-				cp "$dir/${file##*/}" "/var/lib/tftpboot/"
-			) &
-			pids+=($!)
-		done
-		for pid in "${pids[@]}"; do
-			wait "$pid"
-		done
-		chown -R wavelet:wavelet "/var/home/wavelet/http/pxe"
-		# Verify downloaded CoreOS images against their detached GPG signatures
-		if ! verify_coreos_signatures "$dir"; then
-			echo "  ERR: CoreOS image verification failed, clearing download state for retry."
-			kernel=""; rootfs=""; initrd=""
+		else
+			echo "  WARN: No .sig for $iso_name, skipping ISO signature verification."
 		fi
 	else
-		echo "	Attempting to pull CoreOS images from internet sources.."
-		# This can fail, hence gets it's own function with a retry
+		echo "	Downloading CoreOS live ISO from internet sources.."
+		# This can fail, hence gets it's own function with a retry.
 		# We need to "jog" DNS resolution
 		ping -c 4 quad9.org
-		# Download using coreos-installer (signature verification is enabled by default, use --insecure to disable)
-		podman run --security-opt label=disable --pull=always --rm -v .:/data -w /data \
-			"$(hostname -f)/coreos-installer:latest" download -f pxe
-		echo "	CoreOS Image files downloaded with default signature verification, continuing to generate client machine ISO files.."
+		# Download the ISO (signature verification enabled by default).
+		podman run --security-opt label=disable --pull=always --rm -v "$dir":/data -w /data \
+			"$(hostname -f)/coreos-installer:latest" download -s stable -a x86_64 -p metal -f iso
+		iso_path="$(find "$dir" -maxdepth 1 -name 'fedora-coreos-*-live-iso.x86_64.iso' | sort -V | tail -n1)"
 	fi
+	# Converge: extract the PXE boot files from the ISO we have on hand.
+	# coreos-installer is not idempotent here, so clear any stale extracted files.
+	rm -f "$dir"/fedora-coreos-*-vmlinuz \
+	      "$dir"/fedora-coreos-*-initrd.img \
+	      "$dir"/fedora-coreos-*-rootfs.img
+	local extract_tmp
+	extract_tmp="$(mktemp -d)"
+	if podman run --security-opt label=disable --rm \
+			-v "$extract_tmp":/data -w /data \
+			-v "$dir":/www:ro \
+			"$(hostname -f)/coreos-installer:latest" iso extract pxe "/www/$(basename "$iso_path")"; then
+		# iso extract pxe emits:
+		# 	*-live-iso.x86_64-vmlinuz
+		# 	*-initrd.img
+		# 	*-rootfs.img
+		local base
+		base="$(basename "$iso_path" .iso)"
+		base="${base%-live-iso.x86_64}"   # -> fedora-coreos-<version>
+		kernel="$dir/${base}-live-kernel.x86_64"
+		rootfs="$dir/${base}-live-rootfs.x86_64.img"
+		initrd="$dir/${base}-live-initramfs.x86_64.img"
+		mv "$extract_tmp"/${base}-live-iso.x86_64-vmlinuz   "$kernel"
+		mv "$extract_tmp"/${base}-live-iso.x86_64-initrd.img "$initrd"
+		mv "$extract_tmp"/${base}-live-iso.x86_64-rootfs.img "$rootfs"
+		rm -rf "$extract_tmp"
+	else
+		rm -rf "$extract_tmp"
+		echo "  ERR: coreos-installer iso extract pxe failed!"
+		kernel=""; rootfs=""; initrd=""
+		# Fall through so the retry logic below can re-run.
+	fi
+	# Serve the PXE files from both the tftp and http roots.
+	cp "$kernel" "$rootfs" "$initrd" /var/home/wavelet/http/pxe/
+	cp "$kernel" "$rootfs" "$initrd" /var/lib/tftpboot/
+	chown -R wavelet:wavelet "/var/home/wavelet/http/pxe"
 	# Check the generated files exist
 	coreosVersion="$(find $dir/*fedora* | head -n 1)"
 	coreosVersion="${coreosVersion##*coreos-}"
@@ -376,7 +371,8 @@ generate_coreos_image() {
 	###
 	# Remove custom-initramfs if already exists
 	rm -rf /var/home/wavelet/pxe/custom-initramfs.img
-	# Pull coreOS PXE
+	# Obtain the CoreOS live ISO and extract the PXE boot files from it
+	# (the unified convergence point for all deployment modes).
 	attempt=0
 	pull_coreos_files
 	cp /var/home/wavelet/config/automated_client_installer.yml ./

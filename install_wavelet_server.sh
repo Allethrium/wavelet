@@ -113,50 +113,65 @@ download_wavelet_git(){
 	echo "$commitSha" > "$cached_sha_file"
 }
 
-check_and_update_ultragrid_continuous(){
-	# Checks the UltraGrid continuous build checksum against a cached local copy.
-	# Downloads and overwrites the local file if the local checksum differs or file is missing.
+is_valid_ultragrid_appimage(){
+	local file="$1"
+	[[ -f "$file" ]] || return 1
+	# Must be an ELF binary...
+	[[ "$(head -c 4 "$file" 2>/dev/null)" == "$(printf '\x7fELF')" ]] || return 1
+	# ...and a real UltraGrid AppImage is tens of MB; anything smaller is an
+	# error/redirect page or truncated download.
+	local size
+	size="$(stat -c %s "$file" 2>/dev/null || stat -f %z "$file" 2>/dev/null)"
+	[[ -n "$size" ]] && (( size >= 50000000 )) || return 1
+	return 0
+}
+
+get_ultragrid_appimage(){
+	# Obtains the UltraGrid continuous AppImage, reusing a valid cached copy.
 	local ug_release_repo="${UG_RELEASE_REPO:-armelvil/UltraGrid}"
 	local ug_download_url="https://github.com/${ug_release_repo}/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage"
 	local ug_cached_checksum="$HOME/.config/var/www/ultragrid_continuous.sha256"
 	local ug_local_file="$HOME/.config/var/www/UltraGrid-continuous-x86_64.AppImage"
-	local local_sha256=""
-	# Check if the local file exists and compute its checksum
-	if [[ ! -f "$ug_local_file" ]]; then
-		echo -e "${GREEN}	UltraGrid continuous build not found locally. Downloading...${NC}"
-		mkdir -p "$(dirname "$ug_local_file")"
-		if ! curl -sL --max-time 120 -o "$ug_local_file" "$ug_download_url"; then
-			echo -e "${RED}	Error downloading UltraGrid continuous build! Aborting.${NC}"
-			return 1
-		fi
-		chmod +x "$ug_local_file"
+	mkdir -p "$(dirname "$ug_local_file")"
+
+	# Reuse the existing copy when it's valid and (unless forced) matches the
+	# cached checksum.
+	if [[ "${1:-}" != "force" ]] && [[ -f "$ug_local_file" ]] && is_valid_ultragrid_appimage "$ug_local_file"; then
+		local local_sha256=""
+		local cached_sha256=""
 		local_sha256=$(sha256sum "$ug_local_file" | cut -d' ' -f1)
-		echo "$local_sha256" > "$ug_cached_checksum"
-		echo -e "${GREEN}	UltraGrid continuous build downloaded and cached with checksum: ${local_sha256}${NC}"
-		return 0
-	fi
-	# Compute local checksum and compare with cached checksum
-	local_sha256=$(sha256sum "$ug_local_file" | cut -d' ' -f1)
-	if [[ -f "$ug_cached_checksum" ]]; then
-		cached_sha256=$(cat "$ug_cached_checksum")
-		echo -e "	Local checksum:  ${local_sha256}"
-		echo -e "	Cached checksum: ${cached_sha256}"
-		if [[ "$local_sha256" == "$cached_sha256" ]]; then
+		if [[ -f "$ug_cached_checksum" ]]; then
+			cached_sha256=$(cat "$ug_cached_checksum")
+		fi
+		if [[ -n "$cached_sha256" && "$local_sha256" == "$cached_sha256" ]]; then
 			echo -e "${GREEN}	UltraGrid continuous build is verified and up to date.${NC}"
 			return 0
 		fi
+		# Valid but checksum mismatch
+		echo -e "${RED}	UltraGrid continuous build checksum mismatch; refreshing if possible.${NC}"
 	fi
-	echo -e "${RED}	UltraGrid checksum mismatch or no cached checksum! New version available. Downloading...${NC}"
 
-
-	if ! curl -sL --max-time 120 -o "$ug_local_file" "$ug_download_url"; then
-		echo -e "	${RED}	Error downloading UltraGrid continuous build! Aborting.${NC}"
+	# Download to a temp file; only accept a real ELF AppImage.
+	echo "	Downloading UltraGrid continuous build from GitHub ($ug_release_repo).."
+	local ug_tmp="$ug_local_file.tmp"
+	if ! curl -fsSL --max-time 120 -o "$ug_tmp" "$ug_download_url" || ! is_valid_ultragrid_appimage "$ug_tmp"; then
+		echo -e "${RED}	UltraGrid continuous build not available, keeping existing valid copy.${NC}"
+		rm -f "$ug_tmp"
+		# If we already hold a valid ELF AppImage, keep it rather than aborting.
+		if [[ -f "$ug_local_file" ]] && is_valid_ultragrid_appimage "$ug_local_file"; then
+			local_sha256=$(sha256sum "$ug_local_file" | cut -d' ' -f1)
+			echo "$local_sha256" > "$ug_cached_checksum"
+			echo -e "${GREEN}	Using existing valid UltraGrid continuous AppImage (checksum updated: ${local_sha256}).${NC}"
+			return 0
+		fi
 		return 1
 	fi
+	mv -f "$ug_tmp" "$ug_local_file"
 	chmod +x "$ug_local_file"
 	local_sha256=$(sha256sum "$ug_local_file" | cut -d' ' -f1)
 	echo "$local_sha256" > "$ug_cached_checksum"
-	echo -e "${GREEN}	UltraGrid continuous build updated successfully with new checksum: ${local_sha256}${NC}"
+	echo -e "${GREEN}	UltraGrid continuous build downloaded and cached with checksum: ${local_sha256}${NC}"
+	return 0
 }
 
 parse_config_file() {
@@ -217,9 +232,6 @@ parse_config_file() {
 # The ESP does nothing but chain into the LIVE ISO partition (hardcoded (hd0,gpt3))
 
 cleanup(){
-    # WORKDIR holds the staged offline tree plus every partition image, which
-    # for a FULL build is several times the size of the final media.  The
-    # deliverable is written to ~/Downloads, so this is always safe to drop.
     [[ -n "$WORKDIR" && -d "$WORKDIR" ]] && rm -rf "$WORKDIR"
 }
 trap cleanup EXIT
@@ -233,9 +245,6 @@ populate_conf(){
 		echo -e "${RED}	mkfs.vfat failed for CONF partition. Aborting.${NC}"
 		return 1
 	fi
-	# Manifest must match what configure_ignition() reads out of /mnt/conf:
-	# the yaml templates at the root, and bin/{butane,mkpasswd,
-	# automated_coreos_deployment.sh,wavelet_install_packages.sh}.
 	mmd -i "$conf_img" ::/bin
 	mcopy -i "$conf_img" -s "./ignition_files/ignition_server.yml" ::/
 	mcopy -i "$conf_img" -s "./ignition_files/ignition_decoder.yml" ::/
@@ -254,9 +263,7 @@ populate_conf(){
 	else
 		echo "	No .conf file provided; place one on the CONF partition before install."
 	fi
-	# The CA must land at the root of CONF: automated_coreos_deployment.sh
-	# copies /mnt/conf/ca.crt into the butane scratch dir for the LAN registry
-	# trust anchors, so a subdirectory here silently breaks registry TLS.
+	# The CA must be in CONF
 	if [[ -f "$CAcert" ]]; then
 		mcopy -i "$conf_img" -s "$CAcert" ::/
 	fi
@@ -339,10 +346,7 @@ EOF
 save_iso_images(){
 	# Save the newest coreos installer image set (.iso/.img + .sig) to the offline layer.
 	mkdir -p "$WORKDIR/offline/iso"
-	# Download the Fedora signing key once, stage it on the offline media so the
-	# next boot phase (no internet) can import it, then import it here too.
-	# Fail hard if the download or import is incomplete - an empty keyring would
-	# silently disable signature verification on the target.
+	# Download the Fedora signing key, stage it on the offline media so the next boot can import it
 	local keyfile="$WORKDIR/offline/iso/fedora.gpg"
 	if ! curl -fsSL https://fedoraproject.org/fedora.gpg -o "$keyfile"; then
 		echo "	ERROR: failed to download Fedora GPG signing key to $keyfile" >&2
@@ -366,11 +370,26 @@ save_iso_images(){
 		fi
 	done
 	[[ -n "$newest_ver" ]] || { echo -e "${RED}	No cached fedora-coreos image found in ~/.config/var/www.${NC}"; return 1; }
+	# build_registry.sh derives The PXE boot files (kernel/initrd/rootfs) from the single ISO.
 	echo "	Copying newest cached CoreOS image set (version $newest_ver).."
+	mkdir -p "$WORKDIR/offline/pxe"
 	for file in ~/.config/var/www/fedora-coreos-${newest_ver}.*; do
 		[[ -f "$file" ]] || continue
 		case "$file" in
-			*.img|*.iso)
+			# PXE boot set: kernel, initramfs, rootfs (plus detached .sig)
+			*-live-kernel.x86_64|*-live-initramfs.x86_64.img|*-live-rootfs.x86_64.img)
+				if [[ ! -f "${file}.sig" ]]; then
+					echo "	ERROR: no .sig file provided with this img, cannot verify file integrity!"
+					return 1
+				fi
+				if ! gpg --verify "$file.sig" "$file" >/dev/null 2>&1; then
+					echo "ERROR: Signature verification failed" >&2
+					return 1
+				fi
+				cp "$file" "$WORKDIR/offline/pxe"; cp "${file}.sig" "$WORKDIR/offline/pxe"
+				;;
+			# Full ISO (used only for the initial server bootstrap, not PXE)
+			*.iso)
 				if [[ ! -f "${file}.sig" ]]; then
 					echo "	ERROR: no .sig file provided with this img, cannot verify file integrity!"
 					return 1
@@ -387,11 +406,9 @@ save_iso_images(){
 
 save_registry_images(){
     # Save every image the server will need into $WORKDIR/offline/images/
-    # Naming: images/<name>.oci.tar  (loaded later with 'podman load')
+    # Naming: images/<name>.oci.tar
     local dest="$1"
     mkdir -p "$dest"
-    # Base images the server pushes into its local registry (match
-    # build_registry.sh pull_registry_images and install_packages.sh sourceList)
     local images=(
         "quay.io/coreos/etcd:v3.6.4"
         "quay.io/coreos/coreos-installer:release"
@@ -404,8 +421,6 @@ save_registry_images(){
         "quay.io/freeipa/freeipa-server:almalinux-10"
     )
     # Locally built images (exist as localhost/<name> after build_registry.sh)
-    # Bootc pathway (FCOS >=45 / USE_BOOTC=1) builds the overlays with a
-    # _bootc suffix (docs/UPDATE_TO_BOOTC.md).
     local overlay_suffix=""
     if [[ "${USE_BOOTC:-0}" == "1" ]]; then
         overlay_suffix="_bootc"
@@ -488,19 +503,11 @@ download_offline_artifacts(){
     	echo "	Skipping UltraGrid checksum!"
     	return 0
     else
-		local ug_repo="${UG_RELEASE_REPO:-armelvil/UltraGrid}"
-		local ug_url="https://github.com/${ug_repo}/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage"
-		local ug_file="$HOME/.config/var/www/UltraGrid-continuous-x86_64.AppImage"
-		if [[ -f "$ug_file" ]]; then
-			echo "	Using cached UltraGrid AppImage.."
-		else
-			echo "	Downloading UltraGrid continuous build from GitHub ($ug_repo).."
-			if ! curl -sL --max-time 120 -o "$ug_file" "$ug_url"; then
-				echo -e "${RED}	Error downloading UltraGrid continuous build! Aborting.${NC}"
-				rm -f "$ug_file"
-				return 1
-			fi
-			chmod +x "$ug_file"
+		# Single shared downloader for the continuous AppImage (see
+		# get_ultragrid_appimage); cached-reuse + ELF validity guard live there.
+		if ! get_ultragrid_appimage; then
+			echo -e "${RED}	UltraGrid continuous build unavailable; aborting.${NC}"
+			return 1
 		fi
 		return 0
 	fi
@@ -543,9 +550,6 @@ stage_offline_artifacts(){
 }
 
 build_offline_partition(){
-    # Stage the full offline tree and materialise it as a single ext4 partition
-    # image labelled "wavelet-offline" (the label the target mounts by).  Returns
-    # the image size in MiB via the global OFFLINE_MIB.
     mkdir -p "$WORKDIR/offline"
     save_iso_images || return 1
     if ! download_offline_artifacts; then
@@ -629,9 +633,6 @@ build_image(){
 		build_offline_partition || return 1
 		offline_img="$WORKDIR/offline.img"
 	fi
-	# The live install environment is baked into the ISO itself by
-	# coreos-installer, so the LIVE partition is a customized copy of the ISO
-	# with the bootstrap ignition merged in - no separate kernel/initrd needed.
 	echo "	Customizing live ISO with bootstrap ignition.."
 	if ! coreos-installer iso customize \
 			--live-ignition "./ignition_files/installer.ign" \
@@ -643,10 +644,9 @@ build_image(){
 	populate_conf "$conf_img" || return 1
 	echo "	Building ESP partition (extracted from ISO).."
 	populate_esp "$esp_img" "$base_iso" || return 1
-	# LIVE is always gpt3 (CONF=1, ESP=2, LIVE=3, OFFLINE=4) - a build-time constant.
+	# LIVE is always gpt3 (CONF=1, ESP=2, LIVE=3, OFFLINE=4)
 	# STANDALONE provisions on an isolated network with no DHCP server, so pin a
-	# static IP in the live env rather than timing out on DHCP.  This must go in
-	# grub.cfg: it is what supplies the live kargs.
+	# static IP in the live env rather than timing out on DHCP in grub.cfg
 	local live_karg=""
 	if [[ "$DEPLOYMENT_MODE" == "STANDALONE" ]]; then
 		live_karg="ip=192.168.1.32::192.168.1.1:255.255.255.0:svr::none"
@@ -969,22 +969,18 @@ if [[ ${#requiredOptions[@]} -gt 0 ]]; then
 		fi
 	done
 fi
-
 if [[ $domain == *".local" ]]; then
 	echo -e "\n${RED}	.local TLD domain is reserved for mDNS, please select another domain or subdomain, preferably one from your organization's domain"
 	echo -e "${RED}	Failure to do this may result in unpredictable behavior with local name resolution.${NC}"
 	exit 1
 fi
-
 echo "	Dev mode is now enabled by default due to the need for running a customized UltraGrid AppImage.."
 # Yes, this is supposed to be forced.
 dev_flag="DEV";
-
 if [[ -z "$configFile" ]]; then
 	echo -e "${RED}	A configuration file (--config=<file>) must be provided.${NC}"
 	print_help
 fi
-
 # Check tooling before any work so we fail fast and clean
 check_required_tools || exit 1
 
@@ -1003,7 +999,8 @@ if [[ "$DEPLOYMENT_MODE" == "FULL" ]] || [[ "$DEPLOYMENT_MODE" == "LAN" ]]; then
 	# Always update to latest wavelet source from github or other official repo
 	download_wavelet_git || exit 1
 	if [[ "$UGCHECK" == 0 ]]; then
-		check_and_update_ultragrid_continuous || exit 1
+		# Refresh/update only if the cached copy is stale or missing.
+		get_ultragrid_appimage || exit 1
 	fi
 	# Add the LAN CA to the ignition folder if present (consumed by the CONF partition).
 	CAcert="$HOME/.config/var/ssl/certs/ca.crt"

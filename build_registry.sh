@@ -44,9 +44,7 @@ export_container_image(){
 }
 
 pull_from_registry(){
-    # When we skip a build because the image already exists in the LAN
-    # registry, ensure it also exists in the LOCAL podman store (tagged as
-    # localhost/<name>)
+    # If an image already exists in the LAN registry, ensure it also exists in the LOCAL podman store
     local imageTarget="$1"
     local registry_addr
     registry_addr="${REGISTRY_ADDR:-$(hostname -f)}"
@@ -67,26 +65,18 @@ rebuild_container_image(){
     local imageTarget="$1"
     local containerFile="$2"
     local env="$3"
-
-    # Force a rebuild regardless of freshness (e.g. after Containerfile changes)
     if [[ "${FORCE_BUILD:-0}" == "1" ]]; then
         build_container_image "$imageTarget" "$containerFile" "$env"
         return $?
     fi
-
     local registry_addr
     registry_addr="${REGISTRY_ADDR:-$(hostname -f)}"
     local registry_url="$registry_addr:5000"
-
     # Check if image exists in registry.
-    # NOTE: the registry is TLS-only (configure_registry), so this must be https with -k.
-    # Also: distribution v3 requires an explicit Accept header on manifest requests or it 404's.
     local manifest pushed_ts age_days
     manifest="$(curl -sk -H "Accept: application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json" \
         "https://${registry_url}/v2/${imageTarget}/manifests/latest" 2>/dev/null)"
     if echo "$manifest" | grep -q "schemaVersion"; then
-        # Image exists; check freshness via the wavelet.pushed annotation
-        # (stamped by export_container_image at push time).
         pushed_ts="$(echo "$manifest" | jq -r '.annotations["wavelet.pushed"] // empty' 2>/dev/null)"
         if [[ -n "$pushed_ts" && "$pushed_ts" =~ ^[0-9]+$ ]]; then
             age_days=$(( ( $(date +%s) - pushed_ts ) / 86400 ))
@@ -102,7 +92,6 @@ rebuild_container_image(){
             return 0
         fi
     fi
-
     # If not in registry (or stale), build it
     build_container_image "$imageTarget" "$containerFile" "$env"
 }
@@ -137,9 +126,6 @@ build_container_image(){
 
 pull_registry_images(){
 	# Sets vars for appropriate package sources and places them in the wavelet server's local registry
-	# In my lab environment, i setup a local registry that updates and tags everything with a cronjob
-	# The process saves bandwidth and having to download gbs of container images every test
-	# this could be adapted to an enterprise registry for scale deployments
 	local registry_addr
 	registry_addr="$(hostname -f)"
 	local registry_url="$registry_addr:5000"
@@ -149,7 +135,6 @@ pull_registry_images(){
   	sourceList+=("quay.io/coreos/etcd:v3.7.2")
 	sourceList+=("quay.io/coreos/coreos-installer:release")
 	sourceList+=("registry.fedoraproject.org/fedora:latest")
-	# sourceList+=("registry.fedoraproject.org/fedora:42") # needed to avoid RADIUSD bug
 	sourceList+=("docker.io/library/nginx:alpine")
 	sourceList+=("docker.io/library/php:fpm")
 	sourceList+=("docker.io/redis:latest")
@@ -212,6 +197,57 @@ generate_self_signed_certs(){
 	echo -e "	CA Certificate: $HOME/.config/var/ssl/certs/ca.crt"
 	echo -e "	Server Certificate: $HOME/.config/var/ssl/certs/server.crt"
 	echo -e "	Server Private Key: $HOME/.config/var/ssl/private/server.key"
+}
+
+verify_coreos_iso(){
+	# Verify the Fedora CoreOS live ISO against the detached signature (.sig)
+	local iso="$1"
+	local www_dir="$2"
+	local sig="$iso.sig"
+
+	if [[ ! -f "$sig" ]]; then
+		echo -e "${RED}	No signature file $sig found for $(basename "$iso"), refusing to serve an unverified ISO!${NC}"
+		return 1
+	fi
+	local fedora_keyring
+	fedora_keyring="$(get_fedora_keyring)" || {
+		echo -e "${RED}	Failed to obtain the Fedora GPG keyring for ISO verification.${NC}"
+		return 1
+	}
+	# Verify the detached signature against the ISO.  A good signature from the Fedora release key is required
+	echo "	Verifying $(basename "$iso") signature against the Fedora release key.."
+	if ! gpg --verify "$sig" "$iso" 2>&1 | grep -q "Good signature"; then
+		echo -e "${RED}	FAILED: signature verification for $(basename "$iso") did not report a good signature.${NC}"
+		return 1
+	fi
+	echo -e "${GREEN}	Signature verified OK for $(basename "$iso") (key: $(gpg --verify "$sig" "$iso" 2>&1 | grep -oP 'from "\K[^"]+' | head -n1)).${NC}"
+	return 0
+}
+
+get_fedora_keyring(){
+	# Ensure the Fedora GPG keyring file is present and print its path.
+	local fedora_keyring="$HOME/.config/var/ssl/fedora.gpg"
+	if [[ ! -f "$fedora_keyring" ]]; then
+		mkdir -p "$HOME/.config/var/ssl"
+		if ! curl -fsSL "https://fedoraproject.org/fedora.gpg" -o "$fedora_keyring"; then
+			return 1
+		fi
+	fi
+	echo "$fedora_keyring"
+	return 0
+}
+
+is_valid_ultragrid_appimage(){
+	local file="$1"
+	[[ -f "$file" ]] || return 1
+	# Must be an ELF binary...
+	[[ "$(head -c 4 "$file" 2>/dev/null)" == "$(printf '\x7fELF')" ]] || return 1
+	# ...and a real UltraGrid AppImage is tens of MB; anything smaller is an
+	# error/redirect page or truncated download.
+	local size
+	size="$(stat -c %s "$file" 2>/dev/null || stat -f %z "$file" 2>/dev/null)"
+	[[ -n "$size" ]] && (( size >= 50000000 )) || return 1
+	return 0
 }
 
 configure_httpd(){
@@ -402,27 +438,130 @@ EOF
 	else
 		echo "HTTPD server is not functional with IP address, TLS connections using anything other than hostname may fail!"
 	fi
-	# UltraGrid AppImage (continuous + version)
 	echo "Downloading UltraGrid AppImages (patched Continuous, and current targeted upstream release)"
-	wget -nc -P "$HOME/.config/var/www" https://github.com/armelvil/UltraGrid/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage
+	local ug_cont="$HOME/.config/var/www/UltraGrid-continuous-x86_64.AppImage"
+	if ! is_valid_ultragrid_appimage "$ug_cont"; then
+		# No valid cached copy.  Only download if the remote is actually good.
+		local ug_tmp="$ug_cont.tmp"
+		curl -fsSL --max-time 300 -o "$ug_tmp" \
+			https://github.com/armelvil/UltraGrid/releases/download/continuous/UltraGrid-continuous-x86_64.AppImage && \
+			is_valid_ultragrid_appimage "$ug_tmp" && {
+				mv -f "$ug_tmp" "$ug_cont"
+				chmod +x "$ug_cont"
+				echo -e "${GREEN}	Downloaded valid UltraGrid continuous AppImage.${NC}"
+			} || {
+				rm -f "$ug_tmp"
+				echo -e "${RED}	UltraGrid continuous build not available (no published release); skipped.${NC}"
+			}
+	else
+		echo -e "${GREEN}	Keeping existing valid UltraGrid continuous AppImage (remote has no published release).${NC}"
+	fi
 	wget -nc -P "$HOME/.config/var/www" https://github.com/CESNET/UltraGrid/releases/download/v1.10.1/UltraGrid-1.10.1-x86_64.AppImage
-	# CoreOS ISO files.  The install media must match the target stream
-	# passed as the 3rd argument.  Mount the download dir explicitly so this
-	# works regardless of the script's CWD (relative waveletdir must survive).
+	# The install media must match the target stream passed as the 3rd arg.
+	# The PXE boot set (kernel/initrd/rootfs) derived from the ISO uses the official sig files,
+	# the extracted artefacts are byte-identical.
 	REGISTRY_REF="quay.io/coreos/coreos-installer:latest"
 	local fcos_stream="$FCOS_STREAM"
 	local www_dir="$HOME/.config/var/www"
-	podman run --security-opt label=disable \
-		--pull=always \
-		--rm \
-		-v "$www_dir":/data -w /data \
-		"$REGISTRY_REF" download -s "$fcos_stream" -a x86_64 -f pxe
-	# And we need to download the baremetal ISO so our initial install media can get created.
+	local iso
+	# Download the baremetal ISO (needed for the initial install media).
 	podman run --security-opt label=disable \
 		--pull=always \
 		--rm \
 		-v "$www_dir":/data -w /data \
 		"$REGISTRY_REF" download -s "$fcos_stream" -a x86_64 -p metal -f iso
+	local stream_iso_url
+	stream_iso_url="$(curl -s "https://builds.coreos.fedoraproject.org/streams/${fcos_stream}.json" \
+		| jq -r '.architectures.x86_64.artifacts.metal.formats.iso.disk.location')"
+	if [[ -z "$stream_iso_url" ]]; then
+		echo -e "${RED}	Could not resolve current ${fcos_stream} ISO URL from stream metadata!${NC}"
+		return 1
+	fi
+	iso="$www_dir/$(basename "$stream_iso_url")"
+	if [[ ! -f "$iso" ]]; then
+		echo -e "${RED}	Expected ISO not found after download: $iso${NC}"
+		return 1
+	fi
+	# Verify the ISO against its detached signature before we derive the PXE files.
+	# or missing signature.
+	if ! verify_coreos_iso "$iso" "$www_dir"; then
+		return 1
+	fi
+	echo "	Deriving CoreOS PXE boot files from $(basename "$iso").."
+	local extract_dir
+	extract_dir="$(mktemp -d)"
+	if podman run --security-opt label=disable --rm \
+			-v "$extract_dir":/data -w /data \
+			-v "$www_dir":/www:ro \
+			"$REGISTRY_REF" iso extract pxe "/www/$(basename "$iso")"; then
+		local base
+		base="$(basename "$iso" .iso)"
+		base="${base%-live-iso.x86_64}"   # -> fedora-coreos-<version>
+		mv "$extract_dir"/${base}-live-iso.x86_64-vmlinuz \
+		   "$www_dir/${base}-live-kernel.x86_64"
+		mv "$extract_dir"/${base}-live-iso.x86_64-initrd.img \
+		   "$www_dir/${base}-live-initramfs.x86_64.img"
+		mv "$extract_dir"/${base}-live-iso.x86_64-rootfs.img \
+		   "$www_dir/${base}-live-rootfs.x86_64.img"
+		rm -rf "$extract_dir"
+		echo "	Fetching detached .sig files for the derived PXE boot files.."
+		local fedora_keyring
+		fedora_keyring="$(get_fedora_keyring)" || {
+			echo -e "${RED}	Failed to obtain the Fedora GPG keyring for PXE .sig verification.${NC}"
+			return 1
+		}
+		local sig_urls
+		sig_urls="$(curl -s "https://builds.coreos.fedoraproject.org/streams/${fcos_stream}.json" \
+			| jq -r '.architectures.x86_64.artifacts.metal.formats.pxe | to_entries[] | .value.signature')"
+		if [[ -z "$sig_urls" ]]; then
+			echo -e "${RED}	Could not read PXE .sig URLs from stream metadata for ${fcos_stream}!${NC}"
+			return 1
+		fi
+		local sig_url
+		local expected_name
+		while IFS= read -r sig_url; do
+			expected_name="$(basename "$sig_url" .sig)"
+			if [[ "$expected_name" != "${base}-live-kernel.x86_64" \
+			   && "$expected_name" != "${base}-live-initramfs.x86_64.img" \
+			   && "$expected_name" != "${base}-live-rootfs.x86_64.img" ]]; then
+				echo -e "	Skipping .sig for $expected_name: version does not match derived base ${base}."
+				continue
+			fi
+			# Download the sig and verify it matches the derived file (gpgv).
+			if ! curl -fsSL "$sig_url" -o "$www_dir/$expected_name.sig"; then
+				echo -e "${RED}	Failed to download .sig $sig_url${NC}"
+				return 1
+			fi
+			if ! gpgv --keyring="$fedora_keyring" "$www_dir/$expected_name.sig" "$www_dir/$expected_name" >/dev/null 2>&1; then
+				echo -e "${RED}	Downloaded .sig for $expected_name does NOT verify against the derived file!${NC}"
+				return 1
+			fi
+			echo -e "${GREEN}	OK: ${expected_name}.sig verified for derived $expected_name.${NC}"
+		done <<< "$sig_urls"
+		echo -e "${GREEN}	Derived PXE boot files (with .sig) from ISO into $www_dir.${NC}"
+	else
+		echo -e "${RED}	Failed to derive PXE boot files from ISO!${NC}"
+		rm -rf "$extract_dir"
+		return 1
+	fi
+	local stream_base
+	stream_base="$(basename "$iso" .iso)"
+	stream_base="${stream_base%-live-iso.x86_64}"   # -> fedora-coreos-<version>
+	echo "	Pruning stale cached CoreOS images (keeping ${stream_base}).."
+	pruned=0
+	local f
+	for f in "$www_dir"/fedora-coreos-*-live-*; do
+		[[ -e "$f" ]] || continue
+		# Keep files that belong to the current stream's base version.
+		if [[ "$(basename "$f")" == "${stream_base}"-live-* ]]; then
+			continue
+		fi
+		rm -f "$f" "${f}.sig"
+		pruned=1
+	done
+	if (( pruned )); then
+		echo -e "${GREEN}	Removed stale CoreOS image files; only ${stream_base} remains cached.${NC}"
+	fi
 }
 
 get_registry_reference(){
@@ -638,10 +777,6 @@ if [[ -z "${1:-}" ]]; then
 	echo "	./build_registry.sh <path-to-wavelet-git> <registry-IP-address> <fcos-stream: stable|testing|next>"
 	exit 1
 fi
-# Resolve the wavelet dir BEFORE opening the log file, so a bad path fails
-# fast with a clear message instead of blowing up on every log redirect later.
-# Relative paths are allowed (resolved against the caller's CWD), so the
-# checkout can live anywhere.
 if [[ "$1" == */ ]]; then
   echo "    Removing trailing / from directory arg"
   waveletdir="${1%/*}"
@@ -768,8 +903,8 @@ cp "$output_dir"/ffmpeg-libs-${ffmpeg_version}-*.fc${FCOS_VERSION}.x86_64.rpm "$
 
 
 # Build the OCI container layers for the client, then utilize that as a base for the server layer.
-# Check if containers already exist in registry before building
-# On bootc-era FCOS (>=45) use the dnf-based bootc Containerfiles with baked initramfs,
+# Check if containers already exist in registry before building.
+# On bootc FCOS (>=45) use the dnf-based bootc Containerfiles with baked initramfs,
 # tagged with a _bootc suffix so they coexist with rpm-ostree-era images.
 if (( USE_BOOTC )); then
     rebuild_container_image "coreos_overlay_client${OVERLAY_SUFFIX}" "Containerfile.bootc.coreos.overlay.client"
