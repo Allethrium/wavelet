@@ -108,8 +108,8 @@ generate_tftpboot() {
 		fi
 	else
 		echo "	Building tftpboot container image and executing.."
-		if podman build --tag tftpboot -f /home/wavelet/containerfiles/Containerfile.tftpboot; then
-			podman run --privileged --security-opt label=disable -v /var/lib:/tmp/ "tftpboot"
+		if podman build --tag localhost/tftpboot -f /home/wavelet/containerfiles/Containerfile.tftpboot; then
+			podman run --privileged --security-opt label=disable -v /var/lib:/tmp/ "localhost/tftpboot"
 			return 0
 		else
 			# This cannot be a failable step
@@ -360,7 +360,7 @@ pull_coreos_files() {
 			exit 1
 		fi
 	fi
-	echo "	Pulled files: kernel=${kernel##*/} rootfs=${rootfs##*/} initrd=${initrd##*/}"
+	echo "Pulled files: kernel=${kernel##*/} rootfs=${rootfs##*/} initrd=${initrd##*/}"
 }
 
 generate_coreos_image() {
@@ -376,7 +376,7 @@ generate_coreos_image() {
 	attempt=0
 	pull_coreos_files
 	cp /var/home/wavelet/config/automated_client_installer.yml ./
-	butane --pretty --files-dir ./automated_client_installer.yml --output automated_installer.ign
+	butane --pretty ./automated_client_installer.yml --output automated_installer.ign
 	cp ./automated_installer.ign /var/home/wavelet/http/ignition/automated_installer.ign
 	cp /usr/local/bin/wavelet_install_client.sh /var/home/wavelet/http/ignition
 	# Customize for PXE boot automation

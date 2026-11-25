@@ -18,7 +18,7 @@ print_help(){
 	echo -e "-g=, --servergateway=\nDefines the server static IP4 gateway (I.E 192.168.0.1)"
 	echo -e "-dns=, --serverdns=\nDefines the server DNS forwarder (I.E 192.168.0.53)"
 	echo -e "-c=, --config=\nDefines a configuration file instead of commandline parameters (see wavelet_example.conf)"
-	echo -e "--full\nBuild FULL offline install media (stages all images/tarballs onto the USB; no internet required at the install site)"
+	echo -e "--full\nBuild FULL offline install media (stages all images/tarballs onto the USB)"
 	exit 0
 }
 
@@ -219,7 +219,7 @@ parse_config_file() {
 
 
 #
-## USB install media (see docs/CONF_FIRST_USB_INSTALL_MEDIA.md)
+## USB install media
 #
 # Windows only mounts the first partition of removable media, therefore CONF partition must be physical partition 1.
 #
@@ -309,7 +309,7 @@ write_grub_cfg(){
 	local live_label
 	live_label="$(blkid -o value -s LABEL "$live_iso" 2>/dev/null || true)"
 	if [[ -z "$live_label" ]]; then
-		echo -e "${RED}	Could not determine ISO9660 label of $live_iso (required for coreos.liveiso=). Aborting.${NC}"
+		echo -e "${RED}	Could not determine ISO9660 label of $live_iso. Aborting.${NC}"
 		return 1
 	fi
 	local cfg="$WORKDIR/grub.cfg"
@@ -410,7 +410,7 @@ save_registry_images(){
     local dest="$1"
     mkdir -p "$dest"
     local images=(
-        "quay.io/coreos/etcd:v3.6.4"
+        "quay.io/coreos/etcd:v3.7.2"
         "quay.io/coreos/coreos-installer:release"
         "registry.fedoraproject.org/fedora:latest"
         "docker.io/library/nginx:alpine"
@@ -418,7 +418,7 @@ save_registry_images(){
         "docker.io/redis:latest"
         "docker.io/library/httpd:latest"
         "docker.io/library/registry:latest"
-        "quay.io/freeipa/freeipa-server:almalinux-10"
+        "quay.io/freeipa/freeipa-server:fedora-45"
     )
     # Locally built images (exist as localhost/<name> after build_registry.sh)
     local overlay_suffix=""
@@ -450,7 +450,7 @@ save_registry_images(){
         fi
         echo "	  -> $ref  =>  $short.oci.tar"
         if ! podman save --format oci-archive -o "$dest/$short.oci.tar" "$ref"; then
-            echo -e "${RED}	  FAILED to save $ref => $short.oci.tar (see error above)${NC}"
+            echo -e "${RED}	  FAILED to save $ref => $short.oci.tar${NC}"
             rm -f "$dest/$short.oci.tar"
             failed=1
         fi
@@ -461,7 +461,7 @@ save_registry_images(){
             echo "	  -> localhost/$name  =>  $name.oci.tar"
             # oci-archive keeps the gzip-compressed layer blobs small for the USB.
             if ! podman save --format oci-archive -o "$dest/$name.oci.tar" "localhost/$name"; then
-                echo -e "${RED}	  FAILED to save localhost/$name => $name.oci.tar (see error above)${NC}"
+                echo -e "${RED}	  FAILED to save localhost/$name => $name.oci.tar${NC}"
                 rm -f "$dest/$name.oci.tar"
                 failed=1
             fi
@@ -503,8 +503,7 @@ download_offline_artifacts(){
     	echo "	Skipping UltraGrid checksum!"
     	return 0
     else
-		# Single shared downloader for the continuous AppImage (see
-		# get_ultragrid_appimage); cached-reuse + ELF validity guard live there.
+		# Single shared downloader for the continuous AppImage
 		if ! get_ultragrid_appimage; then
 			echo -e "${RED}	UltraGrid continuous build unavailable; aborting.${NC}"
 			return 1
@@ -524,16 +523,15 @@ stage_offline_artifacts(){
     fi
     local tarball="$HOME/.config/var/www/$branch.tar.gz"
     if [[ ! -f "$tarball" ]]; then
-        echo -e "${RED}	Wavelet tarball missing at $tarball (download step failed?).${NC}"
+        echo -e "${RED}	Wavelet tarball missing at $tarball.${NC}"
         return 1
     fi
     echo "	Staging $(basename "$tarball").."
     cp "$tarball" "$dest/wavelet_files.tar.gz"
     # UltraGrid AppImage - downloaded by download_offline_artifacts() above.
     local appimage="$HOME/.config/var/www/UltraGrid-continuous-x86_64.AppImage"
-    # TODO ensure AppImage size is healthy - >150mb
     if [[ ! -f "$appimage" ]]; then
-        echo -e "${RED}	UltraGrid AppImage missing at $appimage (download step failed?).${NC}"
+        echo -e "${RED}	UltraGrid AppImage missing at $appimage.${NC}"
         return 1
     fi
     echo "	Staging $(basename "$appimage").."
@@ -553,7 +551,7 @@ build_offline_partition(){
     mkdir -p "$WORKDIR/offline"
     save_iso_images || return 1
     if ! download_offline_artifacts; then
-        echo -e "${RED}	Failed to download offline artifacts (tarball/AppImage). Aborting.${NC}"
+        echo -e "${RED}	Failed to download offline artifacts. Aborting.${NC}"
         return 1
     fi
     if ! save_registry_images "$WORKDIR/offline/images"; then
@@ -625,11 +623,11 @@ build_image(){
 		out_fs="$(df --output=target "$out_dir" | tail -n1)"
 		if (( avail_bytes < src_bytes )); then
 			echo -e "${RED}	Probably not enough free space on ${out_fs} for a FULL build"
-			echo "	(need a few GiB for the offline tree; $(( avail_bytes / 1024 / 1024 / 1024 ))GiB available).${NC}"
+			echo "	$(( avail_bytes / 1024 / 1024 / 1024 ))GiB available).${NC}"
 			echo "	Free up space, or run the build with TMPDIR pointing at a larger filesystem."
 			return 1
 		fi
-		echo "	Staging offline artifacts for FULL mode (no internet needed at install site).."
+		echo "	Staging offline artifacts for FULL mode.."
 		build_offline_partition || return 1
 		offline_img="$WORKDIR/offline.img"
 	fi
@@ -642,7 +640,7 @@ build_image(){
 	fi
 	echo "	Building CONF partition.."
 	populate_conf "$conf_img" || return 1
-	echo "	Building ESP partition (extracted from ISO).."
+	echo "	Building ESP partition.."
 	populate_esp "$esp_img" "$base_iso" || return 1
 	# LIVE is always gpt3 (CONF=1, ESP=2, LIVE=3, OFFLINE=4)
 	# STANDALONE provisions on an isolated network with no DHCP server, so pin a
@@ -654,7 +652,7 @@ build_image(){
 	write_grub_cfg "$live_img" "gpt3" "$live_karg" || return 1
 	# Overwrite the stub grub.cfg with our custom one.
 	mcopy -o -i "$esp_img" "$WORKDIR/grub.cfg" ::/EFI/boot/grub.cfg
-	# Compute partition geometry (whole MiB) and master image size.
+	# Compute partition geometry and master image size.
 	local iso_bytes
 	iso_bytes="$(stat -c%s "$live_img")"
 	# P1 @1MiB(64M), P2 @65MiB(128M), P3 (LIVE) after ESP, P4 (OFFLINE) after LIVE.
@@ -699,8 +697,8 @@ build_image(){
 	echo "	LIVE ISO label: $LIVE_ISO_LABEL"
 	echo "
 	Deployment instructions:
-	  1. Flash $master to USB (dd or Rufus in raw mode).
-	  2. On Windows, edit the .conf file on the CONF partition (drive letter appears immediately).
+	  1. Flash $master to USB.
+	  2. On Windows, edit the .conf file on the CONF partition.
 	  3. Boot the target from the USB and LEAVE THE USB PLUGGED IN.
 	  4. First boot customizes the ignition from the .conf file and installs${offline_img:+ fully offline}.
 	  5. After provisioning completes, the USB may be removed."
@@ -835,7 +833,7 @@ coreos_installer(){
     	return 1
     fi
     if [[ ${#EXISTING_FILES[@]} -gt 1 ]]; then
-    	echo "	Available CoreOS live ISOs (newest first):"
+    	echo "	Available CoreOS live ISOs, newest first:"
     	for f in "${EXISTING_FILES[@]}"; do echo "	   - $(basename "$f")"; done
     fi
     echo "	Using base ISO: $IMAGEFILE"

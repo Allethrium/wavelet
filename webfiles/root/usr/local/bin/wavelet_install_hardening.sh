@@ -416,7 +416,7 @@ configure_idm(){
 		--ip="$IPAServerHostIP" \
 		--network=ipa_ipvlan \
 		-v /var/freeipa-data:/data:Z \
-		"$hostNameSys/freeipa-server:latest" ipa-server-install -q -U < "/var/freeipa-data/ipa-server-install-options"
+		"$hostNameSys/freeipa-server" ipa-server-install -q -U < "/var/freeipa-data/ipa-server-install-options"
 	# Wait for server install to complete
 	file="/var/freeipa-data/var/log/ipaserver-install.log" >> "$logName"
 	while [[ ! -f "$file" ]]; do
@@ -442,7 +442,7 @@ configure_idm(){
 	podman pull "$hostNameSys/freeipa-server"
 	cat > "/etc/containers/systemd/freeipa.container" <<-EOF
 		[Container]
-		Image=%H/freeipa-server:latest
+		Image=%H/freeipa-server
 		ContainerName=freeipa_server
 		Volume=/var/freeipa-data:/data:z
 		HostName=dc1.$DOMAIN
@@ -1085,10 +1085,10 @@ configure_ap_video_optimization(){
 export_container(){
 	# Exports container image to the Wavelet registry
 	imageTarget="$1"
-	if podman tag "$imageTarget" "${hostNameSys}/$imageTarget:latest"; then
+	if podman tag "$imageTarget" "localhost/$imageTarget"; then
 		fail=0
 		echo -e "Pushing container $imageTarget to registry..${NC}"
-		podman push --format oci "${hostNameSys}/$imageTarget:latest" "$hostNameSys:5000/$imageTarget:latest" \
+		podman push --format oci "localhost/$imageTarget" "$hostNameSys:5000/$imageTarget:latest" \
 			>> "./build_registry.log"
 	else
 		fail=1

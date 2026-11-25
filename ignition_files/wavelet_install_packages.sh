@@ -498,15 +498,15 @@ pull_registry_images() {
   if [[ "$externalReg" == "0" ]]; then
     echo "Pulling container images from internet sources.."
     local tls=""
-    sourceList+=("quay.io/coreos/etcd:v3.6.4")
+    sourceList+=("quay.io/coreos/etcd:v3.7.2")
     sourceList+=("quay.io/coreos/coreos-installer:release")
     sourceList+=("registry.fedoraproject.org/fedora:latest")
     sourceList+=("docker.io/library/nginx:alpine")
     sourceList+=("docker.io/library/php:fpm")
     sourceList+=("docker.io/library/redis:latest")
     sourceList+=("docker.io/library/httpd")
-    sourceList+=("quay.io/freeipa/freeipa-server:almalinux-10")
-    sourceList+=("registry.fedoraproject.org/fedora:42")
+    sourceList+=("quay.io/freeipa/freeipa-server:fedora-45")
+    sourceList+=("registry.fedoraproject.org/fedora:45")
   else
     echo "An external registry is configured! Pulling sources from: $oci_registry"
     local tls=""

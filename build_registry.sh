@@ -32,6 +32,7 @@ export_container_image(){
             echo -e "${GREEN}		Successfully pushed $imageTarget${NC}"
             # Remove local localhost/ image to avoid doubling storage in local podman storage
             # since the registry now holds the image
+            podman rmi "localhost/$imageTarget" >/dev/null 2>&1
             return 0
         else
             echo -e "${RED}		Failed to push $imageTarget${NC}"
@@ -140,7 +141,7 @@ pull_registry_images(){
 	sourceList+=("docker.io/redis:latest")
 	sourceList+=("docker.io/library/httpd")
 	sourceList+=("docker.io/library/registry")
-	sourceList+=("quay.io/freeipa/freeipa-server:almalinux-10")
+	sourceList+=("quay.io/freeipa/freeipa-server:fedora-45")
 	# Work through our container image list, pull and tag to wavelet server registry
 	for source in "${sourceList[@]}"; do
 		sourceShort="${source##*/}"
