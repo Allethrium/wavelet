@@ -422,8 +422,7 @@ check_registry(){
 	# Do we have an external registry or no?
 	# DEPLOYMENT_REGISTRY should be defined in the conf file
 	# DEPLOYMENT_IP may be used as a backup
-	# FULL_ISO install: media images are already podman-loaded locally by
-	# full_iso_mode(); treat as local-only build regardless of conf.
+	# FULL_ISO install: media images are already podman-loaded locally by full_iso_mode()
 	if [[ "${FULL_ISO_ACTIVE:-0}" == "1" ]]; then
 		echo "	FULL_ISO install: images loaded from install media, local-only registry."
 		oci_registry="svr.$DOMAIN"
@@ -451,7 +450,6 @@ check_registry(){
 			insecure = false
 		EOF
 		# The server registry is "temporarily" insecure as it only works locally
-		# We then utilize a domain certificate/CA once FreeIPA has spun up.
 		cat > "/etc/containers/registries.conf.d/10-wavelet.conf" <<-EOF
 			[[registry]]
 			prefix = "svr.$DOMAIN"
@@ -460,8 +458,6 @@ check_registry(){
 		EOF
 		oci_registry="lan.$DOMAIN"
 		externalReg=1
-		# It is easier to perform the registry podman pull here to save us an if test
-		# NOTE:  ca.crt must exist at: /etc/containers/certs.d/lan.wavelet.local/ca.crt
 		podman pull "$oci_registry/registry"
 		echo "Pulling OCI client image from external registry to local registry, oci_registry set to: $oci_registry"
 		echo "Container images will be pulled from external registry"
@@ -469,99 +465,128 @@ check_registry(){
 }
 
 pull_registry_images() {
-  # Sets vars for appropriate package sources and places them in the wavelet server's local registry
-  # In my lab environment, I setup a local registry that updates and tags everything with a cronjob
-  # The process saves bandwidth and having to download gbs of container images every test
-  # FULL_ISO install: images are already podman-loaded locally (full_iso_mode)
-  # as localhost/<shortname>; just push them into the local registry.
-  if [[ "${FULL_ISO_ACTIVE:-0}" == "1" ]]; then
-    echo "FULL_ISO install: pushing media-loaded images into local registry.."
-    local loaded
-    for loaded in etcd coreos-installer fedora nginx php redis httpd registry freeipa-server \
-                  coreos_overlay_client"${OVERLAY_SUFFIX}" coreos_overlay_server"${OVERLAY_SUFFIX}" \
-                  tftpd tftpboot isc-kea radiusd php-fpm-redis; do
-      if podman image exists "localhost/$loaded"; then
-        echo "	Pushing localhost/$loaded -> $hostNameSys:5000/$loaded"
-        podman push "localhost/$loaded" "$hostNameSys:5000/$loaded" || \
-          echo "	ERROR: push of localhost/$loaded failed (may already exist in registry)."
-      else
-        echo "	WARNING: localhost/$loaded not in local store, skipping push."
-      fi
-    done
-    return 0
-  fi
-  local max_parallel=4
-  local counter=0
-  local timeout=180  # 3 minute timeout for each operation
-  local max_retries=2  # 1 retry before failing
-  local sourceList=()
-  if [[ "$externalReg" == "0" ]]; then
-    echo "Pulling container images from internet sources.."
-    local tls=""
-    sourceList+=("quay.io/coreos/etcd:v3.7.2")
-    sourceList+=("quay.io/coreos/coreos-installer:release")
-    sourceList+=("registry.fedoraproject.org/fedora:latest")
-    sourceList+=("docker.io/library/nginx:alpine")
-    sourceList+=("docker.io/library/php:fpm")
-    sourceList+=("docker.io/library/redis:latest")
-    sourceList+=("docker.io/library/httpd")
-    sourceList+=("quay.io/freeipa/freeipa-server:fedora-45")
-    sourceList+=("registry.fedoraproject.org/fedora:45")
-  else
-    echo "An external registry is configured! Pulling sources from: $oci_registry"
-    local tls=""
-    sourceList+=("${oci_registry}/etcd:latest")
-    sourceList+=("${oci_registry}/coreos-installer:latest")
-    sourceList+=("${oci_registry}/fedora:latest")
-    sourceList+=("${oci_registry}/nginx:latest")
-    sourceList+=("${oci_registry}/php-fpm-redis:latest") # PHP-FPM customized with redis package
-    sourceList+=("${oci_registry}/redis:latest")
-    sourceList+=("${oci_registry}/httpd:latest")
-    sourceList+=("${oci_registry}/tftpboot")
-    sourceList+=("${oci_registry}/isc-kea")
-    sourceList+=("${oci_registry}/tftpd")
-    sourceList+=("${oci_registry}/freeipa-server")
-    sourceList+=("${oci_registry}/radiusd")
-  fi
+	# Sets vars for appropriate container sources, push to the server registry once present.
+	local sourceList=()
+	local max_parallel=4
+	local counter=0
+	local timeout=180
+	local max_retries=2
+	if [[ "${FULL_ISO_ACTIVE:-0}" == "1" ]]; then
+		echo "FULL_ISO install: pushing media-loaded images into local registry.."
+	    sourceList+=("etcd")
+	    sourceList+=("coreos-installer")
+	    sourceList+=("fedora")
+	    sourceList+=("nginx")
+	    sourceList+=("php")
+	    sourceList+=("redis")
+	    sourceList+=("httpd")
+	    sourceList+=("registry")
+	    sourceList+=("freeipa-server")
+	    sourceList+=("coreos_overlay_client${OVERLAY_SUFFIX}")
+	    sourceList+=("coreos_overlay_server${OVERLAY_SUFFIX}")
+	    sourceList+=("tftpd")
+	    sourceList+=("tftpboot")
+	    sourceList+=("isc-kea")
+	    sourceList+=("radiusd")
+	    sourceList+=("php-fpm-redis")
+	    local media="/mnt/wavelet-offline"
+	    [[ -d "$media" ]] && mountpoint -q "$media" || media=""
+	    local loadedList=()
+	    for loaded in "${sourceList[@]}";do
+			if podman image exists "localhost/$loaded"; then
+				echo "	$loaded exists in localhost, continuing.."
+				loadedList+=("localhost/$loaded")
+			else
+				echo "	WARNING: localhost/$loaded not in local store, checking offline media for file match.."
+				if [[ -n "$media" && -f "$media/images/$loaded.oci.tar" ]]; then
+					echo "	Loading $loaded from offline media.."
+					if podman load -i "$media/images/$loaded.oci.tar"; then
+						echo "	Successfully loaded $loaded from media."
+						loadedList+=("localhost/$loaded")
+					else
+						echo "	ERROR: failed to load $loaded from media, skipping."
+						return 1
+					fi
+				else
+					echo "	WARNING: no media match for $loaded, skipping."
+					return 1
+				fi
+			fi
+		done
+		sourceList=("${loadedList[@]}")
+		if [[ ${#sourceList[@]} -eq 0 ]]; then
+			echo "	ERROR: no images available to push to local registry!"
+			return 1
+		fi
+		echo "	Sources confirmed in local podman storage from offline media, proceeding.."
+	elif [[ "$externalReg" == "0" ]]; then
+		echo "Pulling container images from internet sources.."
+		local tls=""
+		sourceList+=("quay.io/coreos/etcd:v3.7.2")
+		sourceList+=("quay.io/coreos/coreos-installer:release")
+		sourceList+=("registry.fedoraproject.org/fedora:latest")
+		sourceList+=("docker.io/library/nginx:alpine")
+		sourceList+=("docker.io/library/php:fpm")
+		sourceList+=("docker.io/library/redis:latest")
+		sourceList+=("docker.io/library/httpd")
+		sourceList+=("quay.io/freeipa/freeipa-server:fedora-45")
+		sourceList+=("registry.fedoraproject.org/fedora:45")
+	else
+		echo "An external registry is configured! Pulling sources from: $oci_registry"
+		local tls=""
+		sourceList+=("${oci_registry}/etcd:latest")
+		sourceList+=("${oci_registry}/coreos-installer:latest")
+		sourceList+=("${oci_registry}/fedora:latest")
+		sourceList+=("${oci_registry}/nginx:latest")
+		sourceList+=("${oci_registry}/php-fpm-redis:latest") # PHP-FPM customized with redis package
+		sourceList+=("${oci_registry}/redis:latest")
+		sourceList+=("${oci_registry}/httpd:latest")
+		sourceList+=("${oci_registry}/tftpboot")
+		sourceList+=("${oci_registry}/isc-kea")
+		sourceList+=("${oci_registry}/tftpd")
+		sourceList+=("${oci_registry}/freeipa-server")
+		sourceList+=("${oci_registry}/radiusd")
+	fi
 
-  for source in "${sourceList[@]}"; do
-    (
-      echo "Starting pull for $source"
-      local retry=1
-      while (( retry <= max_retries )); do
-        if timeout $timeout podman pull "$source"; then
-          break
-        fi
-        echo "Pull attempt $retry failed for $source. Retrying in 5 seconds..."
-        sleep 5
-        retry=$((retry + 1))
-      done
-      if (( retry > max_retries )); then
-        echo "ERROR: Failed to pull $source after $max_retries attempts"
-        exit 1
-      fi
-      shortSource="${source##*/}"
-      echo "Pushing container $source to $hostNameSys:5000/${shortSource%%:*}"
-      retry=1
-      while (( retry <= max_retries )); do
-        if timeout $timeout podman push "$source" "$hostNameSys:5000/${shortSource%%:*}"; then
-          break
-        fi
-        echo "Push attempt $retry failed for $hostNameSys/${shortSource%%:*}. Retrying in 5 seconds..."
-        sleep 5
-        retry=$((retry + 1))
-      done
-      if (( retry > max_retries )); then
-        echo "ERROR: Failed to push $source after $max_retries attempts"
-        exit 1
-      fi
-    ) &
-    counter=$((counter + 1))
-    if (( counter % max_parallel == 0 )); then
-      wait
-    fi
-  done
-  wait
+	for source in "${sourceList[@]}"; do
+	(
+		# Perform pulls, in some modes the images will already exist and skip through.
+		echo "Starting pull for $source"
+		local retry=1
+		while (( retry <= max_retries )); do
+			if timeout $timeout podman pull "$source"; then
+				break
+			fi
+			echo "Pull attempt $retry failed for $source. Retrying in 5 seconds..."
+			sleep 5
+			retry=$((retry + 1))
+      	done
+		if (( retry > max_retries )); then
+			echo "ERROR: Failed to pull $source after $max_retries attempts"
+			exit 1
+		fi
+		shortSource="${source##*/}"
+		echo "Pushing container $source to $hostNameSys:5000/${shortSource%%:*}"
+		retry=1
+		while (( retry <= max_retries )); do
+			if timeout $timeout podman push "$source" "$hostNameSys:5000/${shortSource%%:*}"; then
+				break
+			fi
+			echo "Push attempt $retry failed for $hostNameSys/${shortSource%%:*}. Retrying in 5 seconds..."
+			sleep 5
+			retry=$((retry + 1))
+		done
+		if (( retry > max_retries )); then
+			echo "ERROR: Failed to push $source after $max_retries attempts"
+			exit 1
+		fi
+	) &
+	counter=$((counter + 1))
+	if (( counter % max_parallel == 0 )); then
+		wait
+	fi
+	done
+	wait
 }
 
 build_container_image(){

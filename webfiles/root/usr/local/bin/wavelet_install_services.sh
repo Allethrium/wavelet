@@ -316,12 +316,15 @@ pull_coreos_files() {
 	rm -f "$dir"/fedora-coreos-*-vmlinuz \
 	      "$dir"/fedora-coreos-*-initrd.img \
 	      "$dir"/fedora-coreos-*-rootfs.img
+	# Pick the coreos-installer image the same way the tftpboot step does:
+	local installer_image
+	installer_image="$(hostname -f)/coreos-installer:latest"
 	local extract_tmp
 	extract_tmp="$(mktemp -d)"
 	if podman run --security-opt label=disable --rm \
 			-v "$extract_tmp":/data -w /data \
 			-v "$dir":/www:ro \
-			"$(hostname -f)/coreos-installer:latest" iso extract pxe "/www/$(basename "$iso_path")"; then
+			"$installer_image" iso extract pxe "/www/$(basename "$iso_path")"; then
 		# iso extract pxe emits:
 		# 	*-live-iso.x86_64-vmlinuz
 		# 	*-initrd.img
