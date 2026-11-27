@@ -145,11 +145,15 @@ pull_registry_images(){
 	# Work through our container image list, pull and tag to wavelet server registry
 	for source in "${sourceList[@]}"; do
 		sourceShort="${source##*/}"
-		echo "	Processing container base image: ${source%%:*}"
-		podman pull "$source" >> "$waveletdir/logs/build_registry.log"
-		podman tag "$sourceShort" "localhost/${sourceShort%%:*}" >> "$waveletdir/logs/build_registry.log"
-		echo "	Pushing tagged image localhost/${sourceShort%%:*} to LAN registry.."
-		export_container_image "${sourceShort%%:*}"
+		if podman image exists "$source"; then
+			echo "${GREEN}	$source exists in localhost, skipping.." >> "$waveletdir/logs/build_registry.log ${NC}"
+		else
+			echo "	Processing container base image: ${source%%:*}"
+			podman pull "$source" >> "$waveletdir/logs/build_registry.log"
+			podman tag "$sourceShort" "localhost/${sourceShort%%:*}" >> "$waveletdir/logs/build_registry.log"
+			echo "	Pushing tagged image localhost/${sourceShort%%:*} to LAN registry.."
+			export_container_image "${sourceShort%%:*}"
+		fi
 	done
 }
 
@@ -925,5 +929,5 @@ rebuild_container_image "php-fpm-redis" "Containerfile.php-fpm-redis"
 pull_registry_images
 echo -e "${GREEN}Registry base images generated and stored in the registry on this host."
 echo "Wavelet setup can be configured to utilize this registry by defining -reg=$(hostname) via install_wavelet_server.sh"
-echo "This is so that the wavelet installer may download the application tarball"
+echo "This is so that the wavelet installer may download the application tarball${NC}"
 check_firewall_ports
